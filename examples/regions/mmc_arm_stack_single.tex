@@ -1,0 +1,69 @@
+\documentclass[border=1pt]{standalone}
+\usepackage{mathptmx}  % Times text and math
+\usepackage{circuitikz}
+\ctikzset{bipoles/length=0.75cm, transistors/scale=0.8,
+  inductors/coils=4, current/distance=.5, bipoles/diode/height=.32,
+  bipoles/diode/width=.26}
+\usepackage{CJKutf8}
+\begin{document}
+\fontsize{8}{9.6}\selectfont
+\begin{CJK}{UTF8}{gbsn}
+% mmc_arm_stack: coordinates are layout units, 1 unit = 0.9545 cm across and 1 cm up (ieee-single)
+\begin{circuitikz}[x=0.9545cm, y=1cm, line width=0.55pt, cute inductors, european resistors, american voltages]
+% ---- regions (background) ----
+\filldraw[fill={rgb,255:red,214;green,239;blue,237}, draw={rgb,255:red,35;green,128;blue,123}, line width=0.44pt] (1.35,0.15) rectangle (3.35,6.05);
+\filldraw[fill={rgb,255:red,219;green,232;blue,245}, draw={rgb,255:red,47;green,111;blue,174}, line width=0.44pt] (1.05,-0.15) rectangle (3.05,5.75);
+\fill[fill={rgb,255:red,226;green,239;blue,217}] (0.75,-0.45) rectangle (2.75,5.45);
+\node[inner sep=0pt] at (1.75,-0.68) {$a$ 相};
+\draw[draw={rgb,255:red,110;green,110;blue,110}, line width=0.44pt, dash pattern=on 2.4pt off 1.6pt] (0.95,4.05) rectangle (2.45,4.95);
+\draw[draw={rgb,255:red,110;green,110;blue,110}, line width=0.44pt, dash pattern=on 2.4pt off 1.6pt] (5,1.75) rectangle (8.35,4.95);
+\node[inner sep=0pt] at (6.675,1.52) {半桥子模块};
+\filldraw[fill={rgb,255:red,236;green,236;blue,236}, draw={rgb,255:red,110;green,110;blue,110}, line width=0.33pt, line join=round] (3.2,4.66) -- (4.4728,4.66) -- (4.4728,4.81) -- (4.85,4.5) -- (4.4728,4.19) -- (4.4728,4.34) -- (3.2,4.34) -- cycle;
+% ---- wires ----
+\draw (0,5) -- (1.5,5);
+\draw (0,0) -- (1.5,0);
+\draw (1.5,3) -- (1.5,2);
+\draw (1.5,2.5) -- (3.6,2.5);
+\draw (6.6,3.5) -- (6.6,3.2);
+\draw (6.6,4.5) -- (7.6,4.5);
+\draw (6.6,2.2) -- (7.6,2.2);
+\draw (5.6,3.35) -- (6.6,3.35);
+\draw (5.6,2.2) -- (6.6,2.2);
+% ---- Vdc (V) ----
+\draw (0,5) to[V, l_=$V_{dc}$] (0,0);
+% ---- S1 (igbt) ----
+\node[nigbt,bodydiode] (S1) at (1.5,4.5) {};
+\draw (1.5,5) -- (S1.C) (S1.E) -- (1.5,4);
+\node[anchor=west] at ([xshift=0.2933cm]S1.center) {$SM_1$};
+% ---- L1 (L) ----
+\draw (1.5,4) to[L, l^=$L_{arm}$] (1.5,3);
+% ---- L2 (L) ----
+\draw (1.5,2) to[L, l^=$L_{arm}$] (1.5,1);
+% ---- S2 (igbt) ----
+\node[nigbt,bodydiode] (S2) at (1.5,0.5) {};
+\draw (1.5,1) -- (S2.C) (S2.E) -- (1.5,0);
+\node[anchor=west] at ([xshift=0.2933cm]S2.center) {$SM_2$};
+% ---- a (port) ----
+\node[ocirc] at (3.6,2.5) {};
+\node at (3.8672,2.5) {$a$};
+% ---- Ta (igbt) ----
+\node[nigbt,bodydiode] (Ta) at (6.6,4) {};
+\draw (6.6,4.5) -- (Ta.C) (Ta.E) -- (6.6,3.5);
+\node[anchor=west] at ([xshift=0.2933cm]Ta.center) {$T_1$};
+% ---- Tb (igbt) ----
+\node[nigbt,bodydiode] (Tb) at (6.6,2.7) {};
+\draw (6.6,3.2) -- (Tb.C) (Tb.E) -- (6.6,2.2);
+\node[anchor=west] at ([xshift=0.2933cm]Tb.center) {$T_2$};
+% ---- Csm (C) ----
+\draw (7.6,4.5) to[C, l^=$C$] (7.6,2.2);
+% ---- A (port) ----
+\node[ocirc] at (5.6,3.35) {};
+\node at (5.3328,3.35) {$A$};
+% ---- B (port) ----
+\node[ocirc] at (5.6,2.2) {};
+\node at (5.3328,2.2) {$B$};
+% ---- junction dots ----
+\foreach \p in {(1.5,2.5),(6.6,2.2),(6.6,3.35)} \fill \p circle (1.3pt);
+\end{circuitikz}
+\end{CJK}
+\end{document}

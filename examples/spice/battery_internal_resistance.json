@@ -1,0 +1,27 @@
+{
+  "name": "battery_internal_resistance",
+  "elements": [
+    {"id": "B1", "kind": "V", "pins": {"a": [0.0, 0.0], "b": [0.0, 2.0]}, "label": "$E$", "label_pos": "left", "opts": {"battery": true}},
+    {"id": "RL", "kind": "R", "pins": {"a": [3.0, 2.0], "b": [3.0, 0.0]}, "label": "$R_L$", "label_pos": "right"}
+  ],
+  "wires": [
+    [[0.0, 2.0], [3.0, 2.0]],
+    [[0.0, 0.0], [3.0, 0.0]]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {"B1.b": "P", "RL.a": "P", "B1.a": "N", "RL.b": "N"},
+  "simulation": {
+    "version": 1,
+    "ground": "B1.a",
+    "components": {
+      "B1": {"dc": "12", "series_resistance": "0.1", "series_inductance": "10u"},
+      "RL": {"value": "1"}
+    },
+    "transient": {"step": "200n", "max_step": "200n", "stop": "100u"},
+    "probes": [
+      {"name": "v_bat", "kind": "voltage", "positive": "B1.b", "negative": "B1.a"},
+      {"name": "i_bat", "kind": "current", "element": "B1"}
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+body:has(#wavePanel:not([hidden])) { grid-template-rows: auto minmax(220px,1fr) auto; }
+#wavePanel { background:#fff; border-top:2px solid #d9d9d6; height:48vh; min-height:320px; display:flex; flex-direction:column; }
+#wavePanel[hidden] { display:none; }
+.wave-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid #ddd; }
+.wave-toolbar strong { margin-right:auto; }
+.wave-body { display:grid; grid-template-columns:minmax(300px,1fr) 350px; min-height:0; flex:1; }
+.wave-chart-wrap { overflow:auto; padding:12px; min-height:0; background:#eee; }
+#waveChart { display:block; width:100%; height:auto; touch-action:none; font-family:"Times New Roman",serif; background:white; box-shadow:0 1px 4px #0002; }
+.wave-sidebar { border-left:1px solid #ddd; overflow:auto; }
+.wave-settings { padding:8px 12px; }
+.wave-paper-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:5px 12px; border-bottom:1px solid #ddd; font-size:12px; }
+.wave-paper-toolbar select { font-size:12px; }
+#waveProperties { padding:10px 12px; border-bottom:1px solid #ddd; background:#f8faff; }
+.wave-prop-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
+.wave-prop-grid label, .wave-note-text { display:flex; flex-direction:column; gap:3px; font-size:12px; }
+.wave-prop-grid input, .wave-note-text textarea { width:100%; min-width:0; box-sizing:border-box; }
+.wave-prop-grid input[type=color] { height:29px; }
+.wave-settings label, .wave-settings summary { font-size:12px; }
+.wave-settings input[type=number] { width:105px; min-width:0; }
+.wave-settings select { max-width:220px; }
+.wave-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin:6px 0; }
+.wave-binding { display:grid; grid-template-columns:75px 1fr; gap:5px; margin:5px 0; }
+.wave-binding button.active { background:#e6edff; border-color:#2457d6; }
+.wave-channel { display:grid; grid-template-columns:20px 1fr 65px 35px; gap:5px; margin:6px 0; }
+.wave-channel input[type=text] { width:100%; min-width:0; }
+.wave-channel input[type=color] { width:32px; height:25px; padding:0; }
+.wave-channel small { grid-column:2 / -1; color:#6b6b70; overflow-wrap:anywhere; }
+#waveNotice { padding:3px 12px; font-size:12px; min-height:23px; }
+#waveNotice.bad { color:#b22626; } #waveNotice.ok { color:#217245; }
+#waveFileSummary, #waveExportResult { overflow-wrap:anywhere; }
+.wave-marker { cursor:ew-resize; }
+@media (max-width:900px) { .wave-body { grid-template-columns:minmax(250px,1fr) 285px; } }
+.wave-tools { display:flex; align-items:center; gap:4px; font-size:12px; color:#4a4a4f; }
+.wave-tools button.on { background:#e6edff; border-color:#2457d6; }
+.wave-label, .wave-note { cursor:move; }
+.wave-handle { fill:#fff; stroke:#2457d6; stroke-width:1.5; cursor:grab; }
+#waveChart:focus { outline:none; }

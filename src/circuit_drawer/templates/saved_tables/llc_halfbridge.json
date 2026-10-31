@@ -1,0 +1,351 @@
+{
+ "template": {
+  "name": "llc_halfbridge",
+  "title": "Half-bridge LLC (center-tapped rectifier)",
+  "aliases": [
+   "半桥llc",
+   "半桥 LLC",
+   "half bridge llc",
+   "half-bridge llc"
+  ],
+  "description": "Two-switch half bridge, series Cr-Lr, explicit Lm across primary; tank returns to DC negative. Center-tapped diode rectifier, Co and R load. No prescribed fs/load-specific modes.",
+  "default_profile": "ieee-single",
+  "references": [
+   "https://www.ti.com/document-viewer/lit/html/SSZTCH0"
+  ]
+ },
+ "layout": {
+  "name": "llc_halfbridge",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      3.9
+     ]
+    },
+    "label": "$V_\\mathrm{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.9
+     ],
+     "s": [
+      1.0,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      1.0
+     ],
+     "s": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "Cr",
+    "kind": "C",
+    "pins": {
+     "a": [
+      1.9,
+      2.5
+     ],
+     "b": [
+      2.8,
+      2.5
+     ]
+    },
+    "label": "$C_r$"
+   },
+   {
+    "id": "Lr",
+    "kind": "L",
+    "pins": {
+     "a": [
+      2.8,
+      2.5
+     ],
+     "b": [
+      3.9,
+      2.5
+     ]
+    },
+    "label": "$L_r$"
+   },
+   {
+    "id": "Lm",
+    "kind": "L",
+    "pins": {
+     "a": [
+      4.15,
+      2.5
+     ],
+     "b": [
+      4.15,
+      1.2
+     ]
+    },
+    "label": "$L_m$",
+    "label_pos": "left"
+   },
+   {
+    "id": "T",
+    "kind": "transformer",
+    "pins": {
+     "p1": [
+      4.9,
+      2.5
+     ],
+     "p2": [
+      4.9,
+      1.2
+     ],
+     "s1": [
+      5.65,
+      3.1
+     ],
+     "sct": [
+      5.65,
+      1.85
+     ],
+     "s2": [
+      5.65,
+      0.6
+     ]
+    },
+    "opts": {
+     "ratio": "$1:n$"
+    }
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.65,
+      3.1
+     ],
+     "b": [
+      6.55,
+      3.1
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.65,
+      0.6
+     ],
+     "b": [
+      6.55,
+      0.6
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "below"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      6.9,
+      3.1
+     ],
+     "b": [
+      6.9,
+      1.85
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.0,
+      3.1
+     ],
+     "b": [
+      8.0,
+      1.85
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "left"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     1.0,
+     3.9
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.9
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     1.9,
+     2.5
+    ]
+   ],
+   [
+    [
+     3.9,
+     2.5
+    ],
+    [
+     4.9,
+     2.5
+    ]
+   ],
+   [
+    [
+     4.15,
+     1.2
+    ],
+    [
+     4.9,
+     1.2
+    ],
+    [
+     4.9,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   [
+    [
+     6.55,
+     3.1
+    ],
+    [
+     8.9,
+     3.1
+    ]
+   ],
+   [
+    [
+     6.55,
+     0.6
+    ],
+    [
+     8.9,
+     0.6
+    ],
+    [
+     8.9,
+     3.1
+    ]
+   ],
+   [
+    [
+     5.65,
+     1.85
+    ],
+    [
+     8.0,
+     1.85
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [
+   {
+    "at": [
+     8.45,
+     2.895
+    ],
+    "text": "$+$"
+   },
+   {
+    "at": [
+     8.45,
+     2.475
+    ],
+    "text": "$v_o$"
+   },
+   {
+    "at": [
+     8.45,
+     2.055
+    ],
+    "text": "$-$"
+   }
+  ],
+  "netlist": {
+   "Vin.b": "DCP",
+   "S1.d": "DCP",
+   "Vin.a": "DCN",
+   "S2.s": "DCN",
+   "Lm.b": "DCN",
+   "T.p2": "DCN",
+   "S1.s": "A",
+   "S2.d": "A",
+   "Cr.a": "A",
+   "Cr.b": "X",
+   "Lr.a": "X",
+   "Lr.b": "P",
+   "Lm.a": "P",
+   "T.p1": "P",
+   "T.s1": "S1NET",
+   "D1.a": "S1NET",
+   "T.s2": "S2NET",
+   "D2.a": "S2NET",
+   "D1.b": "OUT",
+   "D2.b": "OUT",
+   "Co.a": "OUT",
+   "RL.a": "OUT",
+   "T.sct": "RETURN",
+   "Co.b": "RETURN",
+   "RL.b": "RETURN"
+  }
+ }
+}

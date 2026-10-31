@@ -1,0 +1,47 @@
+\documentclass[border=1pt]{standalone}
+\usepackage{mathptmx}  % Times text and math
+\usepackage{circuitikz}
+\ctikzset{bipoles/length=0.75cm, transistors/scale=0.8,
+  inductors/coils=4, current/distance=.5, bipoles/diode/height=.32,
+  bipoles/diode/width=.26}
+\begin{document}
+\fontsize{8}{9.6}\selectfont
+% flyback: coordinates are layout units, 1 unit = 1.4 cm across and 1.2 cm up (ieee-single)
+\begin{circuitikz}[x=1.4cm, y=1.2cm, line width=0.55pt, cute inductors, european resistors, american voltages]
+% ---- wires ----
+\draw (0,3) -- (1.3,3);
+\draw (1.3,0.6) -- (1.3,0) -- (0,0);
+\draw (1.9,3) -- (4.3,3);
+\draw (1.9,1.6) -- (1.9,0);
+\draw (3,0) -- (4.3,0);
+% ---- Vin (V) ----
+\draw (0,3) to[V, l_=$V_\mathrm{in}$] (0,0);
+% ---- T (transformer) ----
+\draw (1.3,3) to[L] (1.3,1.6);
+\draw (1.9,1.6) to[L] (1.9,3);
+\draw (1.5643,1.6) -- (1.5643,3) (1.6357,1.6) -- (1.6357,3);
+\fill (1.1786,2.5333) circle (1.2pt);
+\fill (2.0214,2.0667) circle (1.2pt);
+\node at (1.6,3.1917) {$1:n$};
+% ---- S (nmos) ----
+\node[nmos,bodydiode] (S) at (1.3,1.1) {};
+\draw (1.3,1.6) -- (S.D) (S.S) -- (1.3,0.6);
+\node[anchor=west] at ([xshift=0.2933cm]S.center) {$S$};
+% ---- D (D) ----
+\draw (3,0) to[D, l^=$D$] (1.9,0);
+% ---- Co (C) ----
+\draw (3.4,3) to[C, l_=$C_o$] (3.4,0);
+% ---- RL (R) ----
+\draw (4.3,3) to[R, l_=$R_L$] (4.3,0);
+% ---- annotations ----
+\node[currarrow, rotate=0] at (0.65,3) {};
+\node[anchor=south, inner sep=0pt] at ([yshift=.1cm]0.65,3) {$i_p$};
+\node[currarrow, rotate=180] at (3.2,0) {};
+\node[anchor=south, inner sep=0pt] at ([yshift=.1cm]3.2,0) {$i_D$};
+\node at (4.8,1.92) {$+$};
+\node at (4.8,1.5) {$v_o$};
+\node at (4.8,1.08) {$-$};
+% ---- junction dots ----
+\foreach \p in {(3.4,0),(3.4,3)} \fill \p circle (1.3pt);
+\end{circuitikz}
+\end{document}

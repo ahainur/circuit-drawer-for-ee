@@ -1,0 +1,248 @@
+{
+ "title": "Buck",
+ "symbol": "dcdc",
+ "ports": {
+  "P": "Port_P.p",
+  "N": "Port_N.p",
+  "OP": "Port_OP.p",
+  "ON": "Port_ON.p"
+ },
+ "port_layout": {
+  "P": {
+   "side": "left",
+   "order": 0
+  },
+  "N": {
+   "side": "left",
+   "order": 1
+  },
+  "OP": {
+   "side": "right",
+   "order": 2
+  },
+  "ON": {
+   "side": "right",
+   "order": 3
+  }
+ },
+ "editable": [
+  {
+   "element": "S1",
+   "field": "duty"
+  },
+  {
+   "element": "S1",
+   "field": "delay"
+  },
+  {
+   "element": "L1",
+   "field": "value"
+  },
+  {
+   "element": "Co",
+   "field": "value"
+  }
+ ],
+ "defaults": {
+  "S1": {
+   "ron": "0.01",
+   "roff": "1G",
+   "frequency": "50k",
+   "duty": "0.5",
+   "delay": "0",
+   "rise": "10n",
+   "fall": "10n",
+   "model": "ideal_switch"
+  },
+  "D1": {
+   "is": "1n",
+   "n": "1",
+   "rs": "0.01",
+   "model": "generic_diode"
+  },
+  "L1": {
+   "value": "500u",
+   "initial": "0"
+  },
+  "Co": {
+   "value": "220u",
+   "initial": "0"
+  }
+ },
+ "layout": {
+  "name": "Buck",
+  "elements": [
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      0.0,
+      3.0
+     ],
+     "s": [
+      1.2,
+      3.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "below"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      1.5,
+      0.0
+     ],
+     "b": [
+      1.5,
+      2.0
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      1.8,
+      3.0
+     ],
+     "b": [
+      3.0,
+      3.0
+     ]
+    },
+    "label": "$L_1$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      3.3,
+      3.0
+     ],
+     "b": [
+      3.3,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_P",
+    "kind": "port",
+    "pins": {
+     "p": [
+      0.0,
+      3.0
+     ]
+    }
+   },
+   {
+    "id": "Port_N",
+    "kind": "port",
+    "pins": {
+     "p": [
+      1.5,
+      0.0
+     ]
+    }
+   },
+   {
+    "id": "Port_OP",
+    "kind": "port",
+    "pins": {
+     "p": [
+      3.3,
+      3.0
+     ]
+    }
+   },
+   {
+    "id": "Port_ON",
+    "kind": "port",
+    "pins": {
+     "p": [
+      3.3,
+      0.0
+     ]
+    }
+   }
+  ],
+  "wires": [
+   [
+    [
+     1.2,
+     3.0
+    ],
+    [
+     1.5,
+     3.0
+    ]
+   ],
+   [
+    [
+     1.5,
+     3.0
+    ],
+    [
+     1.8,
+     3.0
+    ]
+   ],
+   [
+    [
+     1.5,
+     2.0
+    ],
+    [
+     1.5,
+     3.0
+    ]
+   ],
+   [
+    [
+     3.0,
+     3.0
+    ],
+    [
+     3.3,
+     3.0
+    ]
+   ],
+   [
+    [
+     1.5,
+     0.0
+    ],
+    [
+     3.3,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {
+   "S1.d": "IN",
+   "S1.s": "SW",
+   "D1.b": "SW",
+   "L1.a": "SW",
+   "L1.b": "OUT",
+   "Co.a": "OUT",
+   "D1.a": "GND",
+   "Co.b": "GND",
+   "Port_P.p": "IN",
+   "Port_N.p": "GND",
+   "Port_OP.p": "OUT",
+   "Port_ON.p": "GND"
+  }
+ }
+}

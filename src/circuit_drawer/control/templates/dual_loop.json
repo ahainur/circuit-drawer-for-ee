@@ -1,0 +1,62 @@
+{
+ "kind": "control",
+ "name": "dual_loop",
+ "title": "电压外环、电流内环双闭环控制",
+ "profile": "ieee-double",
+ "blocks": [
+  {"id": "vref", "type": "tag", "style": "ref", "at": [0.75, 0], "size": [1.1, 0.5], "text": "$V_{o,\\mathrm{ref}}$"},
+  {"id": "s1", "type": "sum", "at": [2.0, 0], "signs": {"w": "+", "s": "-"}},
+  {"id": "piv", "type": "block", "at": [3.8, 0], "size": [1.9, 0.8], "text": "Voltage loop\\\\PI controller"},
+  {"id": "lim", "type": "limiter", "at": [5.5, 0], "size": [0.8, 0.6], "label": "$\\pm I_{L,\\max}$"},
+  {"id": "s2", "type": "sum", "at": [7.3, 0], "signs": {"w": "+", "s": "-"}},
+  {"id": "pii", "type": "block", "at": [9.1, 0], "size": [1.9, 0.8], "text": "Current loop\\\\PI controller"},
+  {"id": "pwm", "type": "block", "at": [11.6, 0], "size": [2.0, 0.9], "text": "PWM\\\\$f_{sw}=100$ kHz"},
+  {"id": "lpfv", "type": "block", "at": [2.0, -1.3], "size": [0.8, 0.5], "text": "LPF"},
+  {"id": "vo", "type": "tag", "style": "meas", "at": [2.0, -2.3], "size": [0.7, 0.5], "text": "$v_{o}$"},
+  {"id": "lpfi", "type": "block", "at": [7.3, -1.3], "size": [0.8, 0.5], "text": "LPF"},
+  {"id": "il", "type": "tag", "style": "meas", "at": [7.3, -2.3], "size": [0.7, 0.5], "text": "$i_{L}$"}
+ ],
+ "links": [
+  {"from": "vref.e", "to": "s1.w"},
+  {"from": "s1.e", "to": "piv.w"},
+  {"from": "piv.e", "to": "lim.w"},
+  {"from": "lim.e", "to": "s2.w", "label": "$i_{L}^{*}$"},
+  {"from": "s2.e", "to": "pii.w"},
+  {"from": "pii.e", "to": "pwm.w", "label": "$d$"},
+  {"from": "pwm.e", "to": [13.4, 0], "open": true},
+  {"from": "vo.n", "to": "lpfv.s"},
+  {"from": "lpfv.n", "to": "s1.s"},
+  {"from": "il.n", "to": "lpfi.s"},
+  {"from": "lpfi.n", "to": "s2.s"}
+ ],
+ "texts": [
+  {"at": [13.48, 0], "text": "$S_{1}$", "anchor": "west"}
+ ],
+ "regions": [
+  {"from": [-0.2, -3.4], "to": [14.1, 1.35], "fill": "green", "label": "Dual closed-loop controller", "label_pos": "inside"},
+  {"from": [0.1, -2.75], "to": [6.15, 0.75], "fill": "none", "border": "dashed", "border_color": "blue", "label": "Outer voltage loop", "members": ["vref", "s1", "piv", "lim", "lpfv", "vo"]},
+  {"from": [6.85, -2.75], "to": [10.15, 0.75], "fill": "none", "border": "dashed", "border_color": "blue", "label": "Inner current loop", "members": ["s2", "pii", "lpfi", "il"]}
+ ],
+ "loop": {
+  "params": {"Vin": 24, "L": 22e-6, "C": 220e-6, "Rload": 2.0, "fs": 100e3, "VM": 1},
+  "tf": {
+   "piv": {"pi": {"kp": 1.2, "ki": 1500}},
+   "pii": {"pi": {"kp": 0.02, "ki": 60}},
+   "pwm": {"gain": "1/VM", "delay": "1.5/fs"},
+   "lpfv": {"lpf": {"fc": 20e3}},
+   "lpfi": {"lpf": {"fc": 50e3}}
+  },
+  "plant": [
+   {"from": "pwm", "to": "vo", "model": "buck", "out": "v", "vin": "Vin", "l": "L", "c": "C", "r": "Rload"},
+   {"from": "pwm", "to": "il", "model": "buck", "out": "i", "vin": "Vin", "l": "L", "c": "C", "r": "Rload"}
+  ],
+  "breaks": [{"at": "pwm", "label": "$T_{d}$ (cut at $d$)"}, {"at": "lpfv", "label": "$T_{v}$ (voltage loop)"}],
+  "closed": [{"from": "vref", "to": "vo", "label": "$v_{o}/V_{o,\\mathrm{ref}}$"}],
+  "freq": [10, 1e5]
+ },
+ "code": {
+  "fs": "fs", "method": "tustin", "arith": "fixed", "q": 24,
+  "blocks": {"piv": {"min": -8, "max": 8}, "lim": {"min": -8, "max": 8},
+             "pii": {"min": 0, "max": 0.95}, "pwm": {"min": 0, "max": 0.95}}
+ }
+}

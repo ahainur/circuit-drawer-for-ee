@@ -1,0 +1,169 @@
+{
+ "name": "igbt_ac",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.0
+    ]
+   },
+   "label": "$v_{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "R1",
+   "kind": "R",
+   "pins": {
+    "a": [
+     1.0,
+     4.0
+    ],
+    "b": [
+     3.0,
+     4.0
+    ]
+   },
+   "label": "$R$"
+  },
+  {
+   "id": "Q1",
+   "kind": "igbt",
+   "pins": {
+    "c": [
+     4.0,
+     3.0
+    ],
+    "e": [
+     4.0,
+     1.0
+    ]
+   },
+   "label": "$Q_1$",
+   "opts": {
+    "diode": true
+   }
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    4.0
+   ],
+   [
+    1.0,
+    4.0
+   ]
+  ],
+  [
+   [
+    3.0,
+    4.0
+   ],
+   [
+    4.0,
+    4.0
+   ],
+   [
+    4.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    1.0
+   ],
+   [
+    4.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vin.b": "P",
+  "R1.a": "P",
+  "R1.b": "C",
+  "Q1.c": "C",
+  "Vin.a": "N",
+  "Q1.e": "N"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "24",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "R1": {
+    "value": 10
+   },
+   "Q1": {
+    "model": "simplified_igbt",
+    "ron": ".1",
+    "roff": "1G",
+    "vce0": "1.5",
+    "frequency": "2k",
+    "duty": ".5",
+    "delay": "0",
+    "rise": "1u",
+    "fall": "1u"
+   }
+  },
+  "transient": {
+   "step": "2u",
+   "max_step": "1u",
+   "stop": "60m"
+  },
+  "probes": [
+   {
+    "name": "v_in",
+    "kind": "voltage",
+    "positive": "Vin.b",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "v_ce",
+    "kind": "voltage",
+    "positive": "Q1.c",
+    "negative": "Q1.e"
+   },
+   {
+    "name": "i_c",
+    "kind": "current",
+    "element": "Q1"
+   },
+   {
+    "name": "i_in",
+    "kind": "current",
+    "element": "Vin"
+   },
+   {
+    "name": "gate",
+    "kind": "drive",
+    "element": "Q1"
+   }
+  ]
+ }
+}

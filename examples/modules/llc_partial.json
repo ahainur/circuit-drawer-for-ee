@@ -1,0 +1,159 @@
+{
+  "name": "llc_ipos_partial",
+  "elements": [],
+  "wires": [],
+  "hops": [],
+  "annotations": [],
+  "netlist": {},
+  "modules": {
+    "version": 1,
+    "instances": [
+      {
+        "id": "M1",
+        "definition": "llc_halfbridge",
+        "display": "partial"
+      },
+      {
+        "id": "M2",
+        "definition": "llc_halfbridge",
+        "display": "partial"
+      }
+    ],
+    "links": [
+      [
+        "Vin.b",
+        "M1.P"
+      ],
+      [
+        "Vin.a",
+        "M1.N"
+      ],
+      [
+        "M1.P",
+        "M2.P"
+      ],
+      [
+        "M1.N",
+        "M2.N"
+      ],
+      [
+        "M1.OP",
+        "RL.a"
+      ],
+      [
+        "M1.ON",
+        "M2.OP"
+      ],
+      [
+        "M2.ON",
+        "RL.b"
+      ]
+    ],
+    "parts": [
+      {
+        "id": "Vin",
+        "kind": "V",
+        "label": "$V_{in}$"
+      },
+      {
+        "id": "RL",
+        "kind": "R",
+        "label": "$R_L$"
+      }
+    ]
+  },
+  "simulation": {
+    "version": 1,
+    "ground": "Vin.a",
+    "components": {
+      "Vin": {
+        "dc": "48",
+        "wave": {
+          "kind": "step",
+          "initial": "0",
+          "final": "48",
+          "delay": "0",
+          "rise": "2u"
+        }
+      },
+      "RL": {
+        "value": "24"
+      }
+    },
+    "transient": {
+      "step": "100n",
+      "max_step": "100n",
+      "node_capacitance": "1n",
+      "stop": "10m"
+    },
+    "probes": [
+      {
+        "name": "v_out",
+        "kind": "voltage",
+        "positive": "RL.a",
+        "negative": "RL.b"
+      },
+      {
+        "name": "i_in",
+        "kind": "current",
+        "element": "Vin"
+      },
+      {
+        "name": "v_M1",
+        "kind": "voltage",
+        "positive": "M1/Co.a",
+        "negative": "M1/Co.b"
+      },
+      {
+        "name": "i_r_M1",
+        "kind": "current",
+        "element": "M1/Lr"
+      },
+      {
+        "name": "i_m_M1",
+        "kind": "current",
+        "element": "M1/Lm"
+      },
+      {
+        "name": "v_p_M1",
+        "kind": "voltage",
+        "positive": "M1/T.p1",
+        "negative": "M1/T.p2"
+      },
+      {
+        "name": "v_s_M1",
+        "kind": "voltage",
+        "positive": "M1/T.s1",
+        "negative": "M1/T.s2"
+      },
+      {
+        "name": "v_M2",
+        "kind": "voltage",
+        "positive": "M2/Co.a",
+        "negative": "M2/Co.b"
+      },
+      {
+        "name": "i_r_M2",
+        "kind": "current",
+        "element": "M2/Lr"
+      },
+      {
+        "name": "i_m_M2",
+        "kind": "current",
+        "element": "M2/Lm"
+      },
+      {
+        "name": "v_p_M2",
+        "kind": "voltage",
+        "positive": "M2/T.p1",
+        "negative": "M2/T.p2"
+      },
+      {
+        "name": "v_s_M2",
+        "kind": "voltage",
+        "positive": "M2/T.s1",
+        "negative": "M2/T.s2"
+      }
+    ]
+  }
+}

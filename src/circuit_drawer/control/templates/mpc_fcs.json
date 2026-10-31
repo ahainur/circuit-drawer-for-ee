@@ -1,0 +1,33 @@
+{
+ "kind": "control",
+ "control_ai": {"stateful": ["load"], "dynamic_links": [{"from": "inv.e", "to": "pred.e"}]},
+ "name": "mpc_fcs",
+ "title": "有限控制集模型预测电流控制 (FCS-MPC)",
+ "profile": "ieee-double",
+ "blocks": [
+  {"id": "iref", "type": "tag", "style": "ref", "at": [0.7, 0], "size": [1.1, 0.55], "text": "$\\mathbf{i}^{*}(k)$"},
+  {"id": "extrap", "type": "block", "at": [2.8, 0], "size": [1.9, 0.8], "text": "Reference\\\\extrapolation"},
+  {"id": "cost", "type": "block", "at": [6.7, 0], "size": [2.6, 1.0], "text": "Cost function\\\\$g_{j}=\\|\\mathbf{i}^{*}-\\mathbf{i}^{p}_{j}\\|$"},
+  {"id": "minim", "type": "block", "at": [10.1, 0], "size": [2.4, 1.0], "text": "Minimization\\\\$j_{\\mathrm{opt}}=\\arg\\min_{j} g_{j}$"},
+  {"id": "inv", "type": "block", "at": [13.2, 0], "size": [1.5, 1.0], "text": "Two-level\\\\inverter"},
+  {"id": "load", "type": "block", "at": [15.8, 0], "size": [1.2, 1.0], "text": "Load"},
+  {"id": "pred", "type": "block", "at": [6.7, -1.8], "size": [2.6, 1.0], "text": "Prediction model\\\\$\\mathbf{i}^{p}_{j}(k+1)$"},
+  {"id": "vv", "type": "block", "at": [6.7, -3.4], "size": [2.6, 0.8], "text": "Voltage vectors\\\\$\\mathbf{v}_{j},\\ j=0,\\ldots,7$"},
+  {"id": "vdc", "type": "tag", "style": "meas", "at": [3.6, -3.4], "size": [0.8, 0.5], "text": "$V_{dc}$"}
+ ],
+ "links": [
+  {"from": "iref.e", "to": "extrap.w"},
+  {"from": "extrap.e", "to": "cost.w", "label": "$\\mathbf{i}^{*}(k+1)$"},
+  {"from": "cost.e", "to": "minim.w", "label": "$g_{j}$"},
+  {"from": "minim.e", "to": "inv.w", "label": "$S_{\\mathrm{opt}}$"},
+  {"from": "inv.e", "to": "load.w"},
+  {"from": [14.6, 0], "via": [[14.6, -1.8]], "to": "pred.e", "label": "$\\mathbf{i}(k)$", "label_at": 0.7},
+  {"from": "pred.n", "to": "cost.s", "label": "$\\mathbf{i}^{p}_{j}(k+1)$", "label_pos": "right"},
+  {"from": "vv.n", "to": "pred.s", "label": "$\\mathbf{v}_{j}$", "label_pos": "right"},
+  {"from": "vdc.e", "to": "vv.w"}
+ ],
+ "texts": [],
+ "regions": [
+  {"from": [1.6, -4.05], "to": [11.4, 0.75], "fill": "none", "border": "dashed", "border_color": "blue", "label": "FCS-MPC (repeated every $T_{s}$ for $j=0,\\ldots,7$)", "label_pos": "above", "members": ["extrap", "cost", "minim", "pred", "vv", "vdc"]}
+ ]
+}

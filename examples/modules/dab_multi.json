@@ -1,0 +1,777 @@
+{
+  "name": "dab_multi_modules",
+  "elements": [
+    {
+      "id": "RL",
+      "kind": "R",
+      "pins": {
+        "a": [
+          10.5,
+          9.3
+        ],
+        "b": [
+          10.5,
+          5.4
+        ]
+      },
+      "label": "$R_L$",
+      "label_pos": "right"
+    },
+    {
+      "id": "P",
+      "kind": "port",
+      "pins": {
+        "p": [
+          9.6,
+          9.3
+        ]
+      },
+      "label_pos": "above"
+    },
+    {
+      "id": "N",
+      "kind": "port",
+      "pins": {
+        "p": [
+          9.6,
+          5.4
+        ]
+      },
+      "label_pos": "below"
+    }
+  ],
+  "wires": [
+    [
+      [
+        9.6,
+        9.3
+      ],
+      [
+        10.5,
+        9.3
+      ]
+    ],
+    [
+      [
+        9.6,
+        5.4
+      ],
+      [
+        10.5,
+        5.4
+      ]
+    ]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {
+    "RL.a": "OP",
+    "RL.b": "ON",
+    "P.p": "OP",
+    "N.p": "ON"
+  },
+  "modules": {
+    "version": 1,
+    "root_ports": {
+      "P.p": "OP",
+      "N.p": "ON"
+    },
+    "definitions": {
+      "dab_cell": {
+        "layout": {
+          "name": "dab_cell",
+          "elements": [
+            {
+              "id": "Vin",
+              "kind": "V",
+              "pins": {
+                "a": [
+                  0.0,
+                  0.0
+                ],
+                "b": [
+                  0.0,
+                  3.9
+                ]
+              },
+              "label": "$V_{in}$",
+              "label_pos": "left"
+            },
+            {
+              "id": "S1",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  1.0,
+                  3.9
+                ],
+                "s": [
+                  1.0,
+                  2.9
+                ]
+              },
+              "label": "$S_{1}$"
+            },
+            {
+              "id": "S2",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  1.0,
+                  1.0
+                ],
+                "s": [
+                  1.0,
+                  0.0
+                ]
+              },
+              "label": "$S_{2}$"
+            },
+            {
+              "id": "S3",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  2.35,
+                  3.9
+                ],
+                "s": [
+                  2.35,
+                  2.9
+                ]
+              },
+              "label": "$S_{3}$"
+            },
+            {
+              "id": "S4",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  2.35,
+                  1.0
+                ],
+                "s": [
+                  2.35,
+                  0.0
+                ]
+              },
+              "label": "$S_{4}$"
+            },
+            {
+              "id": "L",
+              "kind": "L",
+              "pins": {
+                "a": [
+                  2.6,
+                  2.5
+                ],
+                "b": [
+                  3.65,
+                  2.5
+                ]
+              },
+              "label": "$L$"
+            },
+            {
+              "id": "T",
+              "kind": "transformer",
+              "pins": {
+                "p1": [
+                  3.9,
+                  2.5
+                ],
+                "p2": [
+                  3.9,
+                  1.2
+                ],
+                "s1": [
+                  4.5,
+                  2.5
+                ],
+                "s2": [
+                  4.5,
+                  1.2
+                ]
+              },
+              "opts": {
+                "ratio": "$1:0.5$"
+              }
+            },
+            {
+              "id": "S5",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  5.2,
+                  3.9
+                ],
+                "s": [
+                  5.2,
+                  2.9
+                ]
+              },
+              "label": "$S_{5}$"
+            },
+            {
+              "id": "S6",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  5.2,
+                  1.0
+                ],
+                "s": [
+                  5.2,
+                  0.0
+                ]
+              },
+              "label": "$S_{6}$"
+            },
+            {
+              "id": "S7",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  6.55,
+                  3.9
+                ],
+                "s": [
+                  6.55,
+                  2.9
+                ]
+              },
+              "label": "$S_{7}$"
+            },
+            {
+              "id": "S8",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  6.55,
+                  1.0
+                ],
+                "s": [
+                  6.55,
+                  0.0
+                ]
+              },
+              "label": "$S_{8}$"
+            },
+            {
+              "id": "Co",
+              "kind": "C",
+              "pins": {
+                "a": [
+                  7.5,
+                  3.9
+                ],
+                "b": [
+                  7.5,
+                  0.0
+                ]
+              },
+              "label": "$C_o$",
+              "label_pos": "left"
+            },
+            {
+              "id": "OUTP",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  8.55,
+                  3.9
+                ]
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "OUTN",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  8.55,
+                  0.0
+                ]
+              },
+              "label_pos": "below"
+            }
+          ],
+          "wires": [
+            [
+              [
+                0.0,
+                3.9
+              ],
+              [
+                2.35,
+                3.9
+              ]
+            ],
+            [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                2.35,
+                0.0
+              ]
+            ],
+            [
+              [
+                1.0,
+                2.9
+              ],
+              [
+                1.0,
+                1.0
+              ]
+            ],
+            [
+              [
+                2.35,
+                2.9
+              ],
+              [
+                2.35,
+                1.0
+              ]
+            ],
+            [
+              [
+                1.0,
+                2.5
+              ],
+              [
+                2.6,
+                2.5
+              ]
+            ],
+            [
+              [
+                3.65,
+                2.5
+              ],
+              [
+                3.9,
+                2.5
+              ]
+            ],
+            [
+              [
+                3.9,
+                1.2
+              ],
+              [
+                2.35,
+                1.2
+              ]
+            ],
+            [
+              [
+                4.5,
+                2.5
+              ],
+              [
+                6.55,
+                2.5
+              ]
+            ],
+            [
+              [
+                4.5,
+                1.2
+              ],
+              [
+                5.2,
+                1.2
+              ]
+            ],
+            [
+              [
+                5.2,
+                2.9
+              ],
+              [
+                5.2,
+                1.0
+              ]
+            ],
+            [
+              [
+                6.55,
+                2.9
+              ],
+              [
+                6.55,
+                1.0
+              ]
+            ],
+            [
+              [
+                5.2,
+                3.9
+              ],
+              [
+                8.55,
+                3.9
+              ]
+            ],
+            [
+              [
+                5.2,
+                0.0
+              ],
+              [
+                8.55,
+                0.0
+              ]
+            ]
+          ],
+          "hops": [
+            [
+              2.35,
+              2.5
+            ],
+            [
+              5.2,
+              2.5
+            ]
+          ],
+          "annotations": [],
+          "netlist": {
+            "Vin.a": "DCN",
+            "Vin.b": "DCP",
+            "S1.d": "DCP",
+            "S1.s": "NA",
+            "S2.d": "NA",
+            "S2.s": "DCN",
+            "S3.d": "DCP",
+            "S3.s": "NB",
+            "S4.d": "NB",
+            "S4.s": "DCN",
+            "L.a": "NA",
+            "L.b": "NP",
+            "T.p1": "NP",
+            "T.p2": "NB",
+            "T.s1": "ND",
+            "T.s2": "NC",
+            "S5.d": "OP",
+            "S5.s": "NC",
+            "S6.d": "NC",
+            "S6.s": "ON",
+            "S7.d": "OP",
+            "S7.s": "ND",
+            "S8.d": "ND",
+            "S8.s": "ON",
+            "Co.a": "OP",
+            "Co.b": "ON",
+            "OUTP.p": "OP",
+            "OUTN.p": "ON"
+          },
+          "regions": [
+            {
+              "from": [
+                -0.75,
+                -0.6
+              ],
+              "to": [
+                9,
+                4.55
+              ],
+              "fill": "blue",
+              "members": [
+                "Vin",
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "L",
+                "T",
+                "S5",
+                "S6",
+                "S7",
+                "S8",
+                "Co"
+              ]
+            }
+          ]
+        },
+        "ports": {
+          "out_positive": "OUTP.p",
+          "out_negative": "OUTN.p"
+        },
+        "defaults": {
+          "Vin": {
+            "dc": "48",
+            "wave": {
+              "kind": "step",
+              "initial": "0",
+              "final": "48",
+              "delay": "0",
+              "rise": "2u"
+            }
+          },
+          "S1": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "1e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S2": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "2e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S3": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "2e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S4": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "1e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "L": {
+            "value": "40u",
+            "initial": "0"
+          },
+          "T": {
+            "ratio": ".5",
+            "reference_resistance": "1G",
+            "model": "ideal_transformer",
+            "polarity": "same"
+          },
+          "S5": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "2.1666666666666667e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S6": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "1.1666666666666668e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S7": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "1.1666666666666668e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S8": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "50000",
+            "duty": ".49",
+            "delay": "2.1666666666666667e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "Co": {
+            "value": "220u",
+            "initial": "0"
+          }
+        }
+      }
+    },
+    "instances": [
+      {
+        "id": "M1",
+        "definition": "dab_cell",
+        "at": [
+          0,
+          5.4
+        ],
+        "bindings": {
+          "out_positive": "OP",
+          "out_negative": "MID"
+        },
+        "label": {
+          "at": [
+            4,
+            4.25
+          ],
+          "text": "DAB module 1"
+        }
+      },
+      {
+        "id": "M2",
+        "definition": "dab_cell",
+        "at": [
+          0,
+          0
+        ],
+        "bindings": {
+          "out_positive": "MID",
+          "out_negative": "ON"
+        },
+        "label": {
+          "at": [
+            4,
+            4.25
+          ],
+          "text": "DAB module 2"
+        }
+      }
+    ]
+  },
+  "regions": [
+    {
+      "id": "cells",
+      "from": [
+        -0.75,
+        4.8
+      ],
+      "to": [
+        9,
+        9.95
+      ],
+      "fill": "blue",
+      "stack": {
+        "count": 1,
+        "offset": [
+          0.18,
+          0.18
+        ]
+      },
+      "members": [
+        "M1/Vin",
+        "M1/S1",
+        "M1/S2",
+        "M1/S3",
+        "M1/S4",
+        "M1/L",
+        "M1/T",
+        "M1/S5",
+        "M1/S6",
+        "M1/S7",
+        "M1/S8",
+        "M1/Co"
+      ]
+    }
+  ],
+  "stack_usage": {
+    "cells": {
+      "purpose": "instances",
+      "instances": [
+        "M1",
+        "M2"
+      ]
+    }
+  },
+  "module_view": "expanded",
+  "simulation": {
+    "version": 1,
+    "ground": "M1/Vin.a",
+    "components": {
+      "RL": {
+        "value": "14.4"
+      }
+    },
+    "transient": {
+      "step": "100n",
+      "max_step": "100n",
+      "node_capacitance": "1n",
+      "stop": "1m"
+    },
+    "probes": [
+      {
+        "name": "v_out",
+        "kind": "voltage",
+        "positive": "RL.a",
+        "negative": "RL.b"
+      },
+      {
+        "name": "v_M1",
+        "kind": "voltage",
+        "positive": "M1/Co.a",
+        "negative": "M1/Co.b"
+      },
+      {
+        "name": "i_in_M1",
+        "kind": "current",
+        "element": "M1/Vin"
+      },
+      {
+        "name": "i_L_M1",
+        "kind": "current",
+        "element": "M1/L"
+      },
+      {
+        "name": "v_p_M1",
+        "kind": "voltage",
+        "positive": "M1/T.p1",
+        "negative": "M1/T.p2"
+      },
+      {
+        "name": "v_s_M1",
+        "kind": "voltage",
+        "positive": "M1/T.s1",
+        "negative": "M1/T.s2"
+      },
+      {
+        "name": "v_M2",
+        "kind": "voltage",
+        "positive": "M2/Co.a",
+        "negative": "M2/Co.b"
+      },
+      {
+        "name": "i_in_M2",
+        "kind": "current",
+        "element": "M2/Vin"
+      },
+      {
+        "name": "i_L_M2",
+        "kind": "current",
+        "element": "M2/L"
+      },
+      {
+        "name": "v_p_M2",
+        "kind": "voltage",
+        "positive": "M2/T.p1",
+        "negative": "M2/T.p2"
+      },
+      {
+        "name": "v_s_M2",
+        "kind": "voltage",
+        "positive": "M2/T.s1",
+        "negative": "M2/T.s2"
+      }
+    ]
+  }
+}

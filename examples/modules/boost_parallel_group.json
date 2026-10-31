@@ -1,0 +1,429 @@
+{
+ "name": "boost_parallel_group",
+ "elements": [],
+ "wires": [],
+ "hops": [],
+ "annotations": [],
+ "netlist": {},
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "24"
+   },
+   "RL": {
+    "value": "30"
+   }
+  },
+  "transient": {
+   "step": "200n",
+   "stop": "80m",
+   "max_step": "200n"
+  },
+  "probes": [
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "L1"
+   },
+   {
+    "name": "pwm",
+    "kind": "drive",
+    "element": "S1"
+   }
+  ]
+ },
+ "modules": {
+  "version": 1,
+  "definitions": {
+   "Boost": {
+    "layout": {
+     "name": "Boost",
+     "elements": [
+      {
+       "id": "L1",
+       "kind": "L",
+       "pins": {
+        "a": [
+         0.0,
+         3.0
+        ],
+        "b": [
+         1.3,
+         3.0
+        ]
+       },
+       "label": "$L_1$"
+      },
+      {
+       "id": "D1",
+       "kind": "D",
+       "pins": {
+        "a": [
+         2.0,
+         3.0
+        ],
+        "b": [
+         3.0,
+         3.0
+        ]
+       },
+       "label": "$D_1$"
+      },
+      {
+       "id": "S1",
+       "kind": "nmos",
+       "pins": {
+        "d": [
+         1.7,
+         2.1
+        ],
+        "s": [
+         1.7,
+         0.9
+        ]
+       },
+       "label": "$S_1$"
+      },
+      {
+       "id": "Co",
+       "kind": "C",
+       "pins": {
+        "a": [
+         3.6,
+         3.0
+        ],
+        "b": [
+         3.6,
+         0.0
+        ]
+       },
+       "label": "$C_o$",
+       "label_pos": "left"
+      },
+      {
+       "id": "Port_P",
+       "kind": "port",
+       "pins": {
+        "p": [
+         0.0,
+         3.0
+        ]
+       }
+      },
+      {
+       "id": "Port_N",
+       "kind": "port",
+       "pins": {
+        "p": [
+         1.7,
+         0.0
+        ]
+       }
+      },
+      {
+       "id": "Port_OP",
+       "kind": "port",
+       "pins": {
+        "p": [
+         3.6,
+         3.0
+        ]
+       }
+      },
+      {
+       "id": "Port_ON",
+       "kind": "port",
+       "pins": {
+        "p": [
+         3.6,
+         0.0
+        ]
+       }
+      }
+     ],
+     "wires": [
+      [
+       [
+        1.3,
+        3.0
+       ],
+       [
+        1.7,
+        3.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        3.0
+       ],
+       [
+        2.0,
+        3.0
+       ]
+      ],
+      [
+       [
+        3.0,
+        3.0
+       ],
+       [
+        3.6,
+        3.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        3.0
+       ],
+       [
+        1.7,
+        2.1
+       ]
+      ],
+      [
+       [
+        1.7,
+        0.9
+       ],
+       [
+        1.7,
+        0.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        0.0
+       ],
+       [
+        3.6,
+        0.0
+       ]
+      ]
+     ],
+     "hops": [],
+     "annotations": [],
+     "netlist": {
+      "L1.a": "IN",
+      "L1.b": "SW",
+      "D1.a": "SW",
+      "S1.d": "SW",
+      "D1.b": "OUT",
+      "Co.a": "OUT",
+      "S1.s": "GND",
+      "Co.b": "GND",
+      "Port_P.p": "IN",
+      "Port_N.p": "GND",
+      "Port_OP.p": "OUT",
+      "Port_ON.p": "GND"
+     }
+    },
+    "ports": {
+     "P": "Port_P.p",
+     "N": "Port_N.p",
+     "OP": "Port_OP.p",
+     "ON": "Port_ON.p"
+    },
+    "defaults": {
+     "L1": {
+      "value": "500u",
+      "initial": "0"
+     },
+     "D1": {
+      "is": "1n",
+      "n": "1",
+      "rs": "0.01",
+      "model": "generic_diode"
+     },
+     "S1": {
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.5",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n",
+      "model": "ideal_switch"
+     },
+     "Co": {
+      "value": "220u",
+      "initial": "0"
+     }
+    },
+    "port_layout": {
+     "P": {
+      "side": "left",
+      "order": 0
+     },
+     "N": {
+      "side": "left",
+      "order": 1
+     },
+     "OP": {
+      "side": "right",
+      "order": 2
+     },
+     "ON": {
+      "side": "right",
+      "order": 3
+     }
+    },
+    "editable": [
+     {
+      "element": "L1",
+      "field": "value"
+     }
+    ],
+    "title": "Boost"
+   }
+  },
+  "instances": [
+   {
+    "id": "M",
+    "definition": "Boost",
+    "at": [
+     0.6,
+     0.0
+    ],
+    "unconnected": [],
+    "display": "expanded",
+    "group": {
+     "members": [
+      "M1"
+     ],
+     "fill": "green",
+     "label": "Boost A / B"
+    }
+   },
+   {
+    "id": "M1",
+    "definition": "Boost",
+    "at": [
+     0.6,
+     -5
+    ],
+    "display": "expanded",
+    "unconnected": []
+   }
+  ],
+  "links": [
+   [
+    "Vin.b",
+    "M.P"
+   ],
+   [
+    "Vin.a",
+    "M.N"
+   ],
+   [
+    "RL.a",
+    "M.OP"
+   ],
+   [
+    "RL.b",
+    "M.ON"
+   ],
+   [
+    "M1.P",
+    "M.P"
+   ],
+   [
+    "M1.N",
+    "M.N"
+   ],
+   [
+    "M1.OP",
+    "M.OP"
+   ],
+   [
+    "M1.ON",
+    "M.ON"
+   ]
+  ],
+  "parts": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "label": "$V_\\mathrm{in}$"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "label": "$R_L$"
+   }
+  ]
+ },
+ "module_authoring": {
+  "aliases": {
+   "M/L1": "L1",
+   "M/D1": "D1",
+   "M/S1": "S1",
+   "M/Co": "Co"
+  },
+  "order": [
+   "Vin",
+   "L1",
+   "D1",
+   "S1",
+   "Co",
+   "RL"
+  ],
+  "terminals": [
+   "M/Port_P",
+   "M/Port_N",
+   "M/Port_OP",
+   "M/Port_ON",
+   "M1/Port_P",
+   "M1/Port_N",
+   "M1/Port_OP",
+   "M1/Port_ON"
+  ],
+  "modes": [
+   {
+    "name": "Inductor charging",
+    "condition": "CCM, positive inductor current, ideal switching",
+    "caption": "$S_1$ on, $D_1$ off",
+    "on": [
+     "S1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "S1"
+     ],
+     [
+      "RL",
+      "Co"
+     ]
+    ]
+   },
+   {
+    "name": "Energy transfer",
+    "condition": "CCM, positive inductor current, ideal switching",
+    "caption": "$S_1$ off, $D_1$ conducting",
+    "on": [
+     "D1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "D1",
+      "Co|RL"
+     ]
+    ]
+   }
+  ]
+ }
+}

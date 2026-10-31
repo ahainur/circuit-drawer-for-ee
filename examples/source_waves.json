@@ -1,0 +1,313 @@
+{
+ "name": "source_waves",
+ "elements": [
+  {
+   "id": "Vup",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     2.0
+    ]
+   },
+   "label": "$V_{1}$",
+   "label_pos": "left",
+   "opts": {
+    "wave": "step-up",
+    "color": "blue"
+   }
+  },
+  {
+   "id": "R1",
+   "kind": "R",
+   "pins": {
+    "a": [
+     3.0,
+     2.0
+    ],
+    "b": [
+     3.0,
+     0.0
+    ]
+   },
+   "label": "$R_{1}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Vdown",
+   "kind": "V",
+   "pins": {
+    "a": [
+     5.0,
+     0.0
+    ],
+    "b": [
+     5.0,
+     2.0
+    ]
+   },
+   "label": "$V_{2}$",
+   "label_pos": "left",
+   "opts": {
+    "wave": "step-down",
+    "color": "blue"
+   }
+  },
+  {
+   "id": "R2",
+   "kind": "R",
+   "pins": {
+    "a": [
+     8.0,
+     2.0
+    ],
+    "b": [
+     8.0,
+     0.0
+    ]
+   },
+   "label": "$R_{2}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Ipulse",
+   "kind": "I",
+   "pins": {
+    "a": [
+     10.0,
+     0.0
+    ],
+    "b": [
+     10.0,
+     2.0
+    ]
+   },
+   "label": "$I_1$",
+   "label_pos": "left",
+   "opts": {
+    "wave": "pulse",
+    "color": "magenta"
+   }
+  },
+  {
+   "id": "R3",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.0,
+     2.0
+    ],
+    "b": [
+     13.0,
+     0.0
+    ]
+   },
+   "label": "$R_{3}$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    2.0
+   ],
+   [
+    3.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    3.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    5.0,
+    2.0
+   ],
+   [
+    8.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    5.0,
+    0.0
+   ],
+   [
+    8.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    3.0,
+    0.0
+   ],
+   [
+    5.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    10.0,
+    2.0
+   ],
+   [
+    13.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    10.0,
+    0.0
+   ],
+   [
+    13.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    8.0,
+    0.0
+   ],
+   [
+    10.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vup.b": "out0",
+  "R1.a": "out0",
+  "Vdown.b": "out1",
+  "R2.a": "out1",
+  "Ipulse.b": "out2",
+  "R3.a": "out2",
+  "Vup.a": "GND",
+  "R1.b": "GND",
+  "Vdown.a": "GND",
+  "R2.b": "GND",
+  "Ipulse.a": "GND",
+  "R3.b": "GND"
+ },
+ "wave_symbols": [
+  {
+   "at": [
+    2,
+    -1
+   ],
+   "wave": "step-up",
+   "color": "blue",
+   "scale": 1.5
+  },
+  {
+   "at": [
+    7,
+    -1
+   ],
+   "wave": "step-down",
+   "color": "blue",
+   "scale": 1.5
+  },
+  {
+   "at": [
+    12,
+    -1
+   ],
+   "wave": "pulse",
+   "color": "blue",
+   "scale": 1.5
+  }
+ ],
+ "simulation": {
+  "version": 1,
+  "ground": "Vup.a",
+  "components": {
+   "Vup": {
+    "dc": "0",
+    "wave": {
+     "kind": "step",
+     "initial": "0",
+     "final": "5",
+     "delay": "1m",
+     "rise": "1u"
+    }
+   },
+   "R1": {
+    "value": "10"
+   },
+   "Vdown": {
+    "dc": "5",
+    "wave": {
+     "kind": "step",
+     "initial": "5",
+     "final": "0",
+     "delay": "1m",
+     "rise": "1u"
+    }
+   },
+   "R2": {
+    "value": "10"
+   },
+   "Ipulse": {
+    "dc": "0",
+    "wave": {
+     "kind": "pulse",
+     "initial": "0",
+     "final": "1",
+     "delay": "1m",
+     "rise": "1u",
+     "fall": "1u",
+     "width": "300u",
+     "period": "1m"
+    }
+   },
+   "R3": {
+    "value": "10"
+   }
+  },
+  "transient": {
+   "step": "1u",
+   "max_step": "1u",
+   "stop": "5m"
+  },
+  "probes": [
+   {
+    "name": "Vup",
+    "kind": "voltage",
+    "positive": "Vup.b",
+    "negative": "Vup.a"
+   },
+   {
+    "name": "Vdown",
+    "kind": "voltage",
+    "positive": "Vdown.b",
+    "negative": "Vdown.a"
+   },
+   {
+    "name": "Ipulse",
+    "kind": "voltage",
+    "positive": "Ipulse.b",
+    "negative": "Ipulse.a"
+   }
+  ]
+ }
+}

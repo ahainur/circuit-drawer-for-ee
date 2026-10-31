@@ -1,0 +1,682 @@
+{
+  "name": "llc_ipos_modules",
+  "elements": [],
+  "wires": [],
+  "hops": [],
+  "annotations": [],
+  "netlist": {},
+  "modules": {
+    "version": 1,
+    "definitions": {
+      "llc_cell": {
+        "layout": {
+          "name": "llc_halfbridge_cell",
+          "elements": [
+            {
+              "id": "S1",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  3.0,
+                  4.8
+                ],
+                "s": [
+                  3.0,
+                  3.8
+                ]
+              },
+              "label": "$S_{1}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "S2",
+              "kind": "nmos",
+              "pins": {
+                "d": [
+                  3.0,
+                  1.4
+                ],
+                "s": [
+                  3.0,
+                  0.4
+                ]
+              },
+              "label": "$S_{2}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "Lr",
+              "kind": "L",
+              "pins": {
+                "a": [
+                  3.6,
+                  3.2
+                ],
+                "b": [
+                  4.8,
+                  3.2
+                ]
+              },
+              "label": "$L_r$",
+              "label_pos": "above"
+            },
+            {
+              "id": "Cr",
+              "kind": "C",
+              "pins": {
+                "a": [
+                  5.0,
+                  3.2
+                ],
+                "b": [
+                  6.0,
+                  3.2
+                ]
+              },
+              "label": "$C_r$",
+              "label_pos": "above"
+            },
+            {
+              "id": "T",
+              "kind": "transformer",
+              "pins": {
+                "p1": [
+                  7.7,
+                  3.2
+                ],
+                "p2": [
+                  7.7,
+                  2.0
+                ],
+                "s1": [
+                  8.5,
+                  3.2
+                ],
+                "s2": [
+                  8.5,
+                  2.0
+                ]
+              },
+              "opts": {
+                "ratio": "$1:1$",
+                "dots": "same"
+              }
+            },
+            {
+              "id": "Lm",
+              "kind": "L",
+              "pins": {
+                "a": [
+                  6.5,
+                  3.2
+                ],
+                "b": [
+                  6.5,
+                  0.4
+                ]
+              },
+              "label": "$L_m$",
+              "label_pos": "left"
+            },
+            {
+              "id": "D1",
+              "kind": "D",
+              "pins": {
+                "a": [
+                  10.0,
+                  3.8
+                ],
+                "b": [
+                  10.0,
+                  4.8
+                ]
+              },
+              "label": "$D_{1}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "D2",
+              "kind": "D",
+              "pins": {
+                "a": [
+                  11.6,
+                  3.8
+                ],
+                "b": [
+                  11.6,
+                  4.8
+                ]
+              },
+              "label": "$D_{2}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "D3",
+              "kind": "D",
+              "pins": {
+                "a": [
+                  10.0,
+                  0.4
+                ],
+                "b": [
+                  10.0,
+                  1.4
+                ]
+              },
+              "label": "$D_{3}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "D4",
+              "kind": "D",
+              "pins": {
+                "a": [
+                  11.6,
+                  0.4
+                ],
+                "b": [
+                  11.6,
+                  1.4
+                ]
+              },
+              "label": "$D_{4}$",
+              "label_pos": "right"
+            },
+            {
+              "id": "Co",
+              "kind": "C",
+              "pins": {
+                "a": [
+                  13.0,
+                  4.8
+                ],
+                "b": [
+                  13.0,
+                  0.4
+                ]
+              },
+              "label": "$C_o$",
+              "label_pos": "left"
+            },
+            {
+              "id": "INP",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  2.2,
+                  4.8
+                ]
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "INN",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  2.2,
+                  0.4
+                ]
+              },
+              "label_pos": "below"
+            },
+            {
+              "id": "OUTP",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  13.8,
+                  4.8
+                ]
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "OUTN",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  13.8,
+                  0.4
+                ]
+              },
+              "label_pos": "below"
+            }
+          ],
+          "wires": [
+            [
+              [
+                3.0,
+                3.8
+              ],
+              [
+                3.0,
+                1.4
+              ]
+            ],
+            [
+              [
+                3.0,
+                3.2
+              ],
+              [
+                3.6,
+                3.2
+              ]
+            ],
+            [
+              [
+                4.8,
+                3.2
+              ],
+              [
+                5.0,
+                3.2
+              ]
+            ],
+            [
+              [
+                6.0,
+                3.2
+              ],
+              [
+                7.7,
+                3.2
+              ]
+            ],
+            [
+              [
+                7.7,
+                2.0
+              ],
+              [
+                7.7,
+                0.4
+              ]
+            ],
+            [
+              [
+                8.5,
+                3.2
+              ],
+              [
+                10.0,
+                3.2
+              ]
+            ],
+            [
+              [
+                8.5,
+                2.0
+              ],
+              [
+                11.6,
+                2.0
+              ]
+            ],
+            [
+              [
+                10.0,
+                3.8
+              ],
+              [
+                10.0,
+                1.4
+              ]
+            ],
+            [
+              [
+                11.6,
+                3.8
+              ],
+              [
+                11.6,
+                1.4
+              ]
+            ],
+            [
+              [
+                2.2,
+                4.8
+              ],
+              [
+                3.0,
+                4.8
+              ]
+            ],
+            [
+              [
+                2.2,
+                0.4
+              ],
+              [
+                7.7,
+                0.4
+              ]
+            ],
+            [
+              [
+                10.0,
+                4.8
+              ],
+              [
+                13.8,
+                4.8
+              ]
+            ],
+            [
+              [
+                10.0,
+                0.4
+              ],
+              [
+                13.8,
+                0.4
+              ]
+            ]
+          ],
+          "hops": [
+            [
+              10.0,
+              2.0
+            ]
+          ],
+          "annotations": [],
+          "netlist": {
+            "S1.d": "P",
+            "S1.s": "A",
+            "S2.d": "A",
+            "S2.s": "N",
+            "Lr.a": "A",
+            "Lr.b": "B",
+            "Cr.a": "B",
+            "Cr.b": "C",
+            "T.p1": "C",
+            "T.p2": "N",
+            "T.s1": "SU",
+            "T.s2": "SL",
+            "Lm.a": "C",
+            "Lm.b": "N",
+            "D1.a": "SU",
+            "D1.b": "OP",
+            "D2.a": "SL",
+            "D2.b": "OP",
+            "D3.a": "ON",
+            "D3.b": "SU",
+            "D4.a": "ON",
+            "D4.b": "SL",
+            "Co.a": "OP",
+            "Co.b": "ON",
+            "INP.p": "P",
+            "INN.p": "N",
+            "OUTP.p": "OP",
+            "OUTN.p": "ON"
+          },
+          "regions": [
+            {
+              "from": [
+                1.85,
+                -0.3
+              ],
+              "to": [
+                14.2,
+                5.5
+              ],
+              "fill": "green",
+              "members": [
+                "S1",
+                "S2",
+                "Lr",
+                "Cr",
+                "T",
+                "Lm",
+                "Co",
+                "D1",
+                "D2",
+                "D3",
+                "D4"
+              ]
+            }
+          ]
+        },
+        "ports": {
+          "P": "INP.p",
+          "N": "INN.p",
+          "OP": "OUTP.p",
+          "ON": "OUTN.p"
+        },
+        "defaults": {
+          "S1": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "100000",
+            "duty": ".48",
+            "delay": "1e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "S2": {
+            "ron": "0.01",
+            "roff": "1G",
+            "frequency": "100000",
+            "duty": ".48",
+            "delay": "1.5000000000000002e-05",
+            "rise": "10n",
+            "fall": "10n",
+            "model": "ideal_switch"
+          },
+          "Lr": {
+            "value": "20u",
+            "initial": "0"
+          },
+          "Cr": {
+            "value": "126.6514795529n",
+            "initial": "0"
+          },
+          "Lm": {
+            "value": "100u",
+            "initial": "0"
+          },
+          "T": {
+            "ratio": "1",
+            "reference_resistance": "1T",
+            "model": "ideal_transformer",
+            "polarity": "same"
+          },
+          "Co": {
+            "value": "220u",
+            "initial": "0"
+          },
+          "D1": {
+            "is": "1n",
+            "n": "1",
+            "rs": "0.01",
+            "model": "generic_diode"
+          },
+          "D2": {
+            "is": "1n",
+            "n": "1",
+            "rs": "0.01",
+            "model": "generic_diode"
+          },
+          "D3": {
+            "is": "1n",
+            "n": "1",
+            "rs": "0.01",
+            "model": "generic_diode"
+          },
+          "D4": {
+            "is": "1n",
+            "n": "1",
+            "rs": "0.01",
+            "model": "generic_diode"
+          }
+        },
+        "title": "LLC"
+      }
+    },
+    "instances": [
+      {
+        "id": "M1",
+        "definition": "llc_cell",
+        "display": "expanded",
+        "label": {
+          "at": [
+            8,
+            5.0
+          ],
+          "text": "LLC 1"
+        }
+      },
+      {
+        "id": "M2",
+        "definition": "llc_cell",
+        "display": "expanded",
+        "label": {
+          "at": [
+            8,
+            5.0
+          ],
+          "text": "LLC 2"
+        }
+      }
+    ],
+    "links": [
+      [
+        "Vin.b",
+        "M1.P"
+      ],
+      [
+        "Vin.a",
+        "M1.N"
+      ],
+      [
+        "M1.P",
+        "M2.P"
+      ],
+      [
+        "M1.N",
+        "M2.N"
+      ],
+      [
+        "M1.OP",
+        "RL.a"
+      ],
+      [
+        "M1.ON",
+        "M2.OP"
+      ],
+      [
+        "M2.ON",
+        "RL.b"
+      ]
+    ],
+    "parts": [
+      {
+        "id": "Vin",
+        "kind": "V",
+        "label": "$V_{in}$"
+      },
+      {
+        "id": "RL",
+        "kind": "R",
+        "label": "$R_L$"
+      }
+    ]
+  },
+  "simulation": {
+    "version": 1,
+    "ground": "Vin.a",
+    "components": {
+      "Vin": {
+        "dc": "48",
+        "wave": {
+          "kind": "step",
+          "initial": "0",
+          "final": "48",
+          "delay": "0",
+          "rise": "2u"
+        }
+      },
+      "RL": {
+        "value": "24"
+      }
+    },
+    "transient": {
+      "step": "100n",
+      "max_step": "100n",
+      "node_capacitance": "1n",
+      "stop": "10m"
+    },
+    "probes": [
+      {
+        "name": "v_out",
+        "kind": "voltage",
+        "positive": "RL.a",
+        "negative": "RL.b"
+      },
+      {
+        "name": "i_in",
+        "kind": "current",
+        "element": "Vin"
+      },
+      {
+        "name": "v_M1",
+        "kind": "voltage",
+        "positive": "M1/Co.a",
+        "negative": "M1/Co.b"
+      },
+      {
+        "name": "i_r_M1",
+        "kind": "current",
+        "element": "M1/Lr"
+      },
+      {
+        "name": "i_m_M1",
+        "kind": "current",
+        "element": "M1/Lm"
+      },
+      {
+        "name": "v_p_M1",
+        "kind": "voltage",
+        "positive": "M1/T.p1",
+        "negative": "M1/T.p2"
+      },
+      {
+        "name": "v_s_M1",
+        "kind": "voltage",
+        "positive": "M1/T.s1",
+        "negative": "M1/T.s2"
+      },
+      {
+        "name": "v_M2",
+        "kind": "voltage",
+        "positive": "M2/Co.a",
+        "negative": "M2/Co.b"
+      },
+      {
+        "name": "i_r_M2",
+        "kind": "current",
+        "element": "M2/Lr"
+      },
+      {
+        "name": "i_m_M2",
+        "kind": "current",
+        "element": "M2/Lm"
+      },
+      {
+        "name": "v_p_M2",
+        "kind": "voltage",
+        "positive": "M2/T.p1",
+        "negative": "M2/T.p2"
+      },
+      {
+        "name": "v_s_M2",
+        "kind": "voltage",
+        "positive": "M2/T.s1",
+        "negative": "M2/T.s2"
+      }
+    ]
+  }
+}

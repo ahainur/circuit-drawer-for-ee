@@ -1,0 +1,625 @@
+{
+ "name": "grid_inverter_dq",
+ "elements": [
+  {
+   "id": "Vdc",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.4
+    ]
+   },
+   "label": "$V_{dc}$"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     4.4
+    ],
+    "s": [
+     2.0,
+     3.4
+    ]
+   },
+   "label": "$S_{1}$"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     1.0
+    ],
+    "s": [
+     2.0,
+     0.0
+    ]
+   },
+   "label": "$S_{2}$"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     4.4
+    ],
+    "s": [
+     3.6,
+     3.4
+    ]
+   },
+   "label": "$S_{3}$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     1.0
+    ],
+    "s": [
+     3.6,
+     0.0
+    ]
+   },
+   "label": "$S_{4}$"
+  },
+  {
+   "id": "S5",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     4.4
+    ],
+    "s": [
+     5.2,
+     3.4
+    ]
+   },
+   "label": "$S_{5}$"
+  },
+  {
+   "id": "S6",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     1.0
+    ],
+    "s": [
+     5.2,
+     0.0
+    ]
+   },
+   "label": "$S_{6}$"
+  },
+  {
+   "id": "La",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     3.1
+    ],
+    "b": [
+     7.6,
+     3.1
+    ]
+   },
+   "label": "$L_a$"
+  },
+  {
+   "id": "Va",
+   "kind": "vac",
+   "pins": {
+    "b": [
+     8.0,
+     3.1
+    ],
+    "a": [
+     9.2,
+     3.1
+    ]
+   },
+   "label": "$v_a$"
+  },
+  {
+   "id": "Lb",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     2.15
+    ],
+    "b": [
+     7.6,
+     2.15
+    ]
+   },
+   "label": "$L_b$"
+  },
+  {
+   "id": "Vb",
+   "kind": "vac",
+   "pins": {
+    "b": [
+     8.0,
+     2.15
+    ],
+    "a": [
+     9.2,
+     2.15
+    ]
+   },
+   "label": "$v_b$"
+  },
+  {
+   "id": "Lc",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     1.2
+    ],
+    "b": [
+     7.6,
+     1.2
+    ]
+   },
+   "label": "$L_c$"
+  },
+  {
+   "id": "Vc",
+   "kind": "vac",
+   "pins": {
+    "b": [
+     8.0,
+     1.2
+    ],
+    "a": [
+     9.2,
+     1.2
+    ]
+   },
+   "label": "$v_c$"
+  },
+  {
+   "id": "Rn",
+   "kind": "R",
+   "pins": {
+    "a": [
+     9.8,
+     0.9
+    ],
+    "b": [
+     9.8,
+     0.0
+    ]
+   },
+   "label": "$R_n$"
+  }
+ ],
+ "wires": [
+  [
+   [
+    2.0,
+    3.4
+   ],
+   [
+    2.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    3.6,
+    3.4
+   ],
+   [
+    3.6,
+    1.0
+   ]
+  ],
+  [
+   [
+    5.2,
+    3.4
+   ],
+   [
+    5.2,
+    1.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    3.1
+   ],
+   [
+    6.4,
+    3.1
+   ]
+  ],
+  [
+   [
+    7.6,
+    3.1
+   ],
+   [
+    8.0,
+    3.1
+   ]
+  ],
+  [
+   [
+    9.2,
+    3.1
+   ],
+   [
+    9.8,
+    3.1
+   ]
+  ],
+  [
+   [
+    3.6,
+    2.15
+   ],
+   [
+    6.4,
+    2.15
+   ]
+  ],
+  [
+   [
+    7.6,
+    2.15
+   ],
+   [
+    8.0,
+    2.15
+   ]
+  ],
+  [
+   [
+    9.2,
+    2.15
+   ],
+   [
+    9.8,
+    2.15
+   ]
+  ],
+  [
+   [
+    5.2,
+    1.2
+   ],
+   [
+    6.4,
+    1.2
+   ]
+  ],
+  [
+   [
+    7.6,
+    1.2
+   ],
+   [
+    8.0,
+    1.2
+   ]
+  ],
+  [
+   [
+    9.2,
+    1.2
+   ],
+   [
+    9.8,
+    1.2
+   ]
+  ],
+  [
+   [
+    0.0,
+    4.4
+   ],
+   [
+    5.2,
+    4.4
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    9.8,
+    0.0
+   ]
+  ],
+  [
+   [
+    9.8,
+    3.1
+   ],
+   [
+    9.8,
+    0.9
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   3.6,
+   3.1
+  ],
+  [
+   5.2,
+   3.1
+  ],
+  [
+   5.2,
+   2.15
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vdc.b": "P",
+  "S1.d": "P",
+  "S3.d": "P",
+  "S5.d": "P",
+  "Vdc.a": "N",
+  "S2.s": "N",
+  "S4.s": "N",
+  "S6.s": "N",
+  "Rn.b": "N",
+  "S1.s": "A",
+  "S2.d": "A",
+  "La.a": "A",
+  "S3.s": "B",
+  "S4.d": "B",
+  "Lb.a": "B",
+  "S5.s": "C",
+  "S6.d": "C",
+  "Lc.a": "C",
+  "La.b": "GA",
+  "Va.b": "GA",
+  "Lb.b": "GB",
+  "Vb.b": "GB",
+  "Lc.b": "GC",
+  "Vc.b": "GC",
+  "Va.a": "NEU",
+  "Vb.a": "NEU",
+  "Vc.a": "NEU",
+  "Rn.a": "NEU"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vdc.a",
+  "components": {
+   "Vdc": {
+    "dc": "300"
+   },
+   "Rn": {
+    "value": "1Meg"
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "S2": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "S3": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "S4": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "S5": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "S6": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "La": {
+    "value": "5m",
+    "initial": "0",
+    "series_resistance": "0.1"
+   },
+   "Va": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "100",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "Lb": {
+    "value": "5m",
+    "initial": "0",
+    "series_resistance": "0.1"
+   },
+   "Vb": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "100",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "-120"
+    }
+   },
+   "Lc": {
+    "value": "5m",
+    "initial": "0",
+    "series_resistance": "0.1"
+   },
+   "Vc": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "100",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "120"
+    }
+   }
+  },
+  "transient": {
+   "step": "2u",
+   "stop": "60m",
+   "max_step": "0.5u"
+  },
+  "probes": [
+   {
+    "name": "v_ga",
+    "kind": "voltage",
+    "positive": "Va.b",
+    "negative": "Va.a"
+   },
+   {
+    "name": "v_gb",
+    "kind": "voltage",
+    "positive": "Vb.b",
+    "negative": "Vb.a"
+   },
+   {
+    "name": "i_a",
+    "kind": "current",
+    "element": "La"
+   },
+   {
+    "name": "i_b",
+    "kind": "current",
+    "element": "Lb"
+   },
+   {
+    "name": "i_c",
+    "kind": "current",
+    "element": "Lc"
+   }
+  ]
+ },
+ "closed_loop": {
+  "control": "grid_dq.control.json",
+  "inputs": {
+   "va": {
+    "probe": "v_ga"
+   },
+   "vb": {
+    "probe": "v_gb"
+   },
+   "ia": {
+    "probe": "i_a"
+   },
+   "ib": {
+    "probe": "i_b"
+   },
+   "w0": {
+    "value": 314.159265
+   },
+   "idref": {
+    "value": 10,
+    "ramp": 0.02
+   },
+   "iqref": {
+    "value": 0
+   },
+   "vdc": {
+    "value": 300
+   }
+  },
+  "outputs": {
+   "sv.da": {
+    "switches": [
+     "S1"
+    ],
+    "complement": [
+     "S2"
+    ],
+    "dead_time": "1u"
+   },
+   "sv.db": {
+    "switches": [
+     "S3"
+    ],
+    "complement": [
+     "S4"
+    ],
+    "dead_time": "1u"
+   },
+   "sv.dc": {
+    "switches": [
+     "S5"
+    ],
+    "complement": [
+     "S6"
+    ],
+    "dead_time": "1u"
+   }
+  }
+ }
+}

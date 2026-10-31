@@ -1,0 +1,35 @@
+/* Both editors load this stylesheet and menu.js from the same packaged files. */
+  header { display: block; padding: 0; }
+  .menu-row, .quick-tools { display: flex; align-items: center; gap: 4px; padding: 5px 12px; }
+  .menu-row { min-height: 38px; border-bottom: 1px solid var(--line); }
+  .menu-bar { display: flex; gap: 2px; flex-shrink: 0; }
+  .menu-bar > button { border-color: transparent; padding: 4px 12px; }
+  .menu-bar > button[aria-expanded="true"] { background: #e6edff; color: var(--accent); }
+  header .file { margin: 0 0 0 auto; min-width: 0; max-width: 40vw; font-size: 12px; color: var(--muted); }
+  .quick-tools { flex-wrap: wrap; gap: 6px; min-height: 44px; }
+  .quick-tools select { max-width: 220px; }
+  .menu-panel { position: fixed; z-index: 100; min-width: 240px; max-width: calc(100vw - 16px);
+    overflow: auto; padding: 6px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); box-shadow: 0 8px 24px #0002; }
+  .menu-panel[hidden], .menu-panel [hidden] { display: none !important; }
+  .menu-panel > button, .menu-subpanel > button { display: flex; align-items: center; justify-content: space-between;
+    gap: 24px; width: 100%; border: 0; border-radius: 4px; padding: 7px 10px; text-align: left;
+    background: transparent; color: var(--ink); white-space: nowrap; }
+  .menu-panel button:hover, .menu-panel button:focus-visible { background: #e6edff; }
+  .menu-subpanel { border-left: 2px solid var(--line); margin-left: 10px; padding-left: 4px; }
+  .menu-panel > button.on { background: #e6edff; color: var(--accent); }
+  .menu-panel button:disabled { opacity: .45; cursor: default; }
+  .menu-panel label { display: flex; align-items: center; gap: 8px; padding: 7px 10px; color: var(--ink); }
+  .menu-panel label select { margin-left: auto; max-width: 210px; min-width: 0; }
+  .menu-panel hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+  .menu-panel kbd { color: var(--muted); font: 11px/1.4 system-ui, sans-serif; }
+  .menu-caption { padding: 5px 10px; color: var(--muted); font-size: 12px; }
+  .menu-help { width: min(560px, 92vw); }
+  .menu-help p { margin: 10px 0; }
+  .menu-help kbd { white-space: nowrap; }
+  header :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  @media (max-width: 760px) {
+    .menu-row, .quick-tools { padding: 5px 6px; }
+    .menu-bar > button { padding: 4px 8px; }
+    header .file { max-width: 20vw; }
+  }

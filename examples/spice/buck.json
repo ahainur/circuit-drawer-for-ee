@@ -1,0 +1,282 @@
+{
+ "name": "buck",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.0
+    ]
+   },
+   "label": "$V_\\mathrm{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     3.0
+    ],
+    "s": [
+     2.2,
+     3.0
+    ]
+   },
+   "label": "$S_1$",
+   "label_pos": "below"
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.5,
+     0.0
+    ],
+    "b": [
+     2.5,
+     2.0
+    ]
+   },
+   "label": "$D_1$",
+   "label_pos": "left"
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.8,
+     3.0
+    ],
+    "b": [
+     4.0,
+     3.0
+    ]
+   },
+   "label": "$L_1$"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     4.3,
+     3.0
+    ],
+    "b": [
+     4.3,
+     0.0
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     5.4,
+     3.0
+    ],
+    "b": [
+     5.4,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "left"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.0
+   ],
+   [
+    1.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.2,
+    3.0
+   ],
+   [
+    2.8,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.5,
+    2.0
+   ],
+   [
+    2.5,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    3.0
+   ],
+   [
+    5.4,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    5.4,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    6.05,
+    1.92
+   ],
+   "text": "$+$"
+  },
+  {
+   "at": [
+    6.05,
+    1.5
+   ],
+   "text": "$v_o$"
+  },
+  {
+   "at": [
+    6.05,
+    1.08
+   ],
+   "text": "$-$"
+  }
+ ],
+ "netlist": {
+  "Vin.b": "IN",
+  "S1.d": "IN",
+  "S1.s": "SW",
+  "D1.b": "SW",
+  "L1.a": "SW",
+  "L1.b": "OUT",
+  "Co.a": "OUT",
+  "RL.a": "OUT",
+  "Vin.a": "GND",
+  "D1.a": "GND",
+  "Co.b": "GND",
+  "RL.b": "GND"
+ },
+ "modes": [
+  {
+   "name": "Switch on",
+   "condition": "CCM, positive inductor current, ideal switching",
+   "caption": "$S_1$ on, $D_1$ off",
+   "on": [
+    "S1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L1",
+     "Co|RL"
+    ]
+   ]
+  },
+  {
+   "name": "Freewheel",
+   "condition": "CCM, positive inductor current, ideal switching",
+   "caption": "$S_1$ off, $D_1$ freewheeling",
+   "on": [
+    "D1"
+   ],
+   "loops": [
+    [
+     "D1",
+     "L1",
+     "Co|RL"
+    ]
+   ]
+  }
+ ],
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "24"
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "D1": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "L1": {
+    "value": "500u",
+    "initial": "0"
+   },
+   "Co": {
+    "value": "220u",
+    "initial": "0"
+   },
+   "RL": {
+    "value": "10"
+   }
+  },
+  "transient": {
+   "step": "200n",
+   "stop": "20m",
+   "max_step": "200n"
+  },
+  "probes": [
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "L1"
+   },
+   {
+    "name": "pwm",
+    "kind": "drive",
+    "element": "S1"
+   }
+  ]
+ }
+}

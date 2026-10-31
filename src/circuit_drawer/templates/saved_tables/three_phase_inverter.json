@@ -1,0 +1,320 @@
+{
+ "template": {
+  "name": "three_phase_inverter",
+  "title": "Three-phase two-level voltage-source inverter",
+  "aliases": [
+   "三相逆变器",
+   "三相两电平逆变器",
+   "three phase inverter"
+  ],
+  "description": "Six-switch two-level bridge with antiparallel diodes, DC link capacitor and floating star-connected R load. No grid, neutral connection or prescribed PWM states.",
+  "default_profile": "ieee-double",
+  "references": []
+ },
+ "layout": {
+  "name": "three_phase_inverter",
+  "elements": [
+   {
+    "id": "Vdc",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      3.9
+     ]
+    },
+    "label": "$V_\\mathrm{dc}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Cdc",
+    "kind": "C",
+    "pins": {
+     "a": [
+      1.2,
+      3.9
+     ],
+     "b": [
+      1.2,
+      0.0
+     ]
+    },
+    "label": "$C_{dc}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      2.6,
+      3.9
+     ],
+     "e": [
+      2.6,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S4",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      2.6,
+      1.0
+     ],
+     "e": [
+      2.6,
+      0.0
+     ]
+    },
+    "label": "$S_{4}$"
+   },
+   {
+    "id": "S3",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.2,
+      3.9
+     ],
+     "e": [
+      4.2,
+      2.9
+     ]
+    },
+    "label": "$S_{3}$"
+   },
+   {
+    "id": "S6",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.2,
+      1.0
+     ],
+     "e": [
+      4.2,
+      0.0
+     ]
+    },
+    "label": "$S_{6}$"
+   },
+   {
+    "id": "S5",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      5.8,
+      3.9
+     ],
+     "e": [
+      5.8,
+      2.9
+     ]
+    },
+    "label": "$S_{5}$"
+   },
+   {
+    "id": "S2",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      5.8,
+      1.0
+     ],
+     "e": [
+      5.8,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "Ra",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.6,
+      2.5
+     ],
+     "b": [
+      8.6,
+      0.3
+     ]
+    },
+    "label": "$R_a$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Rb",
+    "kind": "R",
+    "pins": {
+     "a": [
+      7.7,
+      2.0
+     ],
+     "b": [
+      7.7,
+      0.3
+     ]
+    },
+    "label": "$R_b$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Rc",
+    "kind": "R",
+    "pins": {
+     "a": [
+      6.8,
+      1.5
+     ],
+     "b": [
+      6.8,
+      0.3
+     ]
+    },
+    "label": "$R_c$",
+    "label_pos": "left"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     5.8,
+     3.9
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     5.8,
+     0.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     2.9
+    ],
+    [
+     2.6,
+     1.0
+    ]
+   ],
+   [
+    [
+     4.2,
+     2.9
+    ],
+    [
+     4.2,
+     1.0
+    ]
+   ],
+   [
+    [
+     5.8,
+     2.9
+    ],
+    [
+     5.8,
+     1.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     2.5
+    ],
+    [
+     8.6,
+     2.5
+    ]
+   ],
+   [
+    [
+     4.2,
+     2.0
+    ],
+    [
+     7.7,
+     2.0
+    ]
+   ],
+   [
+    [
+     5.8,
+     1.5
+    ],
+    [
+     6.8,
+     1.5
+    ]
+   ],
+   [
+    [
+     6.8,
+     0.3
+    ],
+    [
+     8.6,
+     0.3
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    4.2,
+    2.5
+   ],
+   [
+    5.8,
+    2.5
+   ],
+   [
+    5.8,
+    2.0
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "S1.e": "PHa",
+   "S4.c": "PHa",
+   "Ra.a": "PHa",
+   "S1.c": "DCP",
+   "S4.e": "DCN",
+   "Ra.b": "STAR",
+   "S3.e": "PHb",
+   "S6.c": "PHb",
+   "Rb.a": "PHb",
+   "S3.c": "DCP",
+   "S6.e": "DCN",
+   "Rb.b": "STAR",
+   "S5.e": "PHc",
+   "S2.c": "PHc",
+   "Rc.a": "PHc",
+   "S5.c": "DCP",
+   "S2.e": "DCN",
+   "Rc.b": "STAR",
+   "Vdc.b": "DCP",
+   "Cdc.a": "DCP",
+   "Vdc.a": "DCN",
+   "Cdc.b": "DCN"
+  }
+ }
+}

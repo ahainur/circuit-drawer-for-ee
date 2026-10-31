@@ -1,0 +1,286 @@
+{
+ "name": "three_phase_ac",
+ "elements": [
+  {
+   "id": "Va",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     6.0
+    ],
+    "b": [
+     0.0,
+     8.0
+    ]
+   },
+   "label": "$v_a$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Ra",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.0,
+     8.0
+    ],
+    "b": [
+     4.0,
+     6.0
+    ]
+   },
+   "label": "$R_a$"
+  },
+  {
+   "id": "Vb",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     3.0
+    ],
+    "b": [
+     0.0,
+     5.0
+    ]
+   },
+   "label": "$v_b$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Rb",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.0,
+     5.0
+    ],
+    "b": [
+     4.0,
+     3.0
+    ]
+   },
+   "label": "$R_b$"
+  },
+  {
+   "id": "Vc",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     2.0
+    ]
+   },
+   "label": "$v_c$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Rc",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.0,
+     2.0
+    ],
+    "b": [
+     4.0,
+     0.0
+    ]
+   },
+   "label": "$R_c$"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    8.0
+   ],
+   [
+    4.0,
+    8.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    6.0
+   ],
+   [
+    0.0,
+    6.0
+   ],
+   [
+    -2.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    5.0
+   ],
+   [
+    4.0,
+    5.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    3.0
+   ],
+   [
+    0.0,
+    3.0
+   ],
+   [
+    -2.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    2.0
+   ],
+   [
+    4.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0
+   ],
+   [
+    -2.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    -2.0,
+    0.0
+   ],
+   [
+    -2.0,
+    6.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Va.a": "N",
+  "Vb.a": "N",
+  "Vc.a": "N",
+  "Ra.b": "N",
+  "Rb.b": "N",
+  "Rc.b": "N",
+  "Va.b": "A",
+  "Ra.a": "A",
+  "Vb.b": "B",
+  "Rb.a": "B",
+  "Vc.b": "C",
+  "Rc.a": "C"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Va.a",
+  "components": {
+   "Va": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "24",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "Ra": {
+    "value": "10"
+   },
+   "Vb": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "24",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "-120"
+    }
+   },
+   "Rb": {
+    "value": "10"
+   },
+   "Vc": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "24",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "120"
+    }
+   },
+   "Rc": {
+    "value": "10"
+   }
+  },
+  "transient": {
+   "step": "20u",
+   "max_step": "20u",
+   "stop": "60m"
+  },
+  "probes": [
+   {
+    "name": "v_a",
+    "kind": "voltage",
+    "positive": "Va.b",
+    "negative": "Va.a"
+   },
+   {
+    "name": "i_a",
+    "kind": "current",
+    "element": "Va"
+   },
+   {
+    "name": "v_b",
+    "kind": "voltage",
+    "positive": "Vb.b",
+    "negative": "Vb.a"
+   },
+   {
+    "name": "i_b",
+    "kind": "current",
+    "element": "Vb"
+   },
+   {
+    "name": "v_c",
+    "kind": "voltage",
+    "positive": "Vc.b",
+    "negative": "Vc.a"
+   },
+   {
+    "name": "i_c",
+    "kind": "current",
+    "element": "Vc"
+   }
+  ]
+ }
+}

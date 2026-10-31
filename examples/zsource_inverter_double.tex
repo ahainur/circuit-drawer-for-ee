@@ -1,0 +1,84 @@
+\documentclass[border=1pt]{standalone}
+\usepackage{mathptmx}  % Times text and math
+\usepackage{circuitikz}
+\ctikzset{bipoles/length=0.75cm, transistors/scale=0.9,
+  inductors/coils=4, current/distance=.5, bipoles/diode/height=.32,
+  bipoles/diode/width=.26}
+\begin{document}
+\fontsize{8}{9.6}\selectfont
+% zsource_inverter: coordinates are layout units, 1 unit = 1.2 cm across and 1.2 cm up (ieee-double)
+\begin{circuitikz}[x=1.2cm, y=1.2cm, line width=0.55pt, cute inductors, european resistors, american voltages]
+% ---- wires ----
+\draw (0,3.9) -- (0.35,3.9);
+\draw (1.15,3.9) -- (1.6,3.9);
+\draw (0,0) -- (1.6,0);
+\draw (1.6,3.9) -- (1.6,2.85);
+\draw (2.2,2.25) -- (3.4,1.05) -- (3.4,0);
+\draw (3.4,3.9) -- (3.4,2.85);
+\draw (2.8,2.25) -- (2.5707,2.0207);
+\draw (2.4293,1.8793) -- (1.6,1.05) -- (1.6,0);
+\draw (3.4,3.9) -- (7.7,3.9);
+\draw (3.4,0) -- (7.7,0);
+\draw (4.9,2.9) -- (4.9,1);
+\draw (6.3,2.9) -- (6.3,1);
+\draw (7.7,2.9) -- (7.7,1);
+\draw (4.9,2.5) -- (6.2,2.5);
+\draw (6.4,2.5) -- (7.6,2.5);
+\draw (7.8,2.5) -- (10.1,2.5);
+\draw (6.3,2) -- (7.6,2);
+\draw (7.8,2) -- (9.4,2);
+\draw (7.7,1.5) -- (8.7,1.5);
+\draw (8.7,0.4) -- (10.1,0.4);
+% ---- Vdc (V) ----
+\draw (0,3.9) to[V, l_=$V_\mathrm{dc}$] (0,0);
+% ---- D1 (D) ----
+\draw (0.35,3.9) to[D, l^=$D_1$] (1.15,3.9);
+% ---- L1 (L) ----
+\draw (1.6,3.9) to[L, l^=$L_1$] (3.4,3.9);
+% ---- L2 (L) ----
+\draw (1.6,0) to[L, l_=$L_2$] (3.4,0);
+% ---- C1 (C) ----
+\draw (1.6,2.85) to[C] (2.2,2.25);
+\node at (1.5732,2.2232) {$C_1$};
+% ---- C2 (C) ----
+\draw (3.4,2.85) to[C] (2.8,2.25);
+\node at (3.4268,2.2232) {$C_2$};
+% ---- S1 (nmos) ----
+\node[nmos,bodydiode] (S1) at (4.9,3.4) {};
+\draw (4.9,3.9) -- (S1.D) (S1.S) -- (4.9,2.9);
+\node[anchor=west] at ([xshift=0.33cm]S1.center) {$S_{1}$};
+% ---- S4 (nmos) ----
+\node[nmos,bodydiode] (S4) at (4.9,0.5) {};
+\draw (4.9,1) -- (S4.D) (S4.S) -- (4.9,0);
+\node[anchor=west] at ([xshift=0.33cm]S4.center) {$S_{4}$};
+% ---- S3 (nmos) ----
+\node[nmos,bodydiode] (S3) at (6.3,3.4) {};
+\draw (6.3,3.9) -- (S3.D) (S3.S) -- (6.3,2.9);
+\node[anchor=west] at ([xshift=0.33cm]S3.center) {$S_{3}$};
+% ---- S6 (nmos) ----
+\node[nmos,bodydiode] (S6) at (6.3,0.5) {};
+\draw (6.3,1) -- (S6.D) (S6.S) -- (6.3,0);
+\node[anchor=west] at ([xshift=0.33cm]S6.center) {$S_{6}$};
+% ---- S5 (nmos) ----
+\node[nmos,bodydiode] (S5) at (7.7,3.4) {};
+\draw (7.7,3.9) -- (S5.D) (S5.S) -- (7.7,2.9);
+\node[anchor=west] at ([xshift=0.33cm]S5.center) {$S_{5}$};
+% ---- S2 (nmos) ----
+\node[nmos,bodydiode] (S2) at (7.7,0.5) {};
+\draw (7.7,1) -- (S2.D) (S2.S) -- (7.7,0);
+\node[anchor=west] at ([xshift=0.33cm]S2.center) {$S_{2}$};
+% ---- Ra (R) ----
+\draw (10.1,2.5) to[R, l_=$R_a$] (10.1,0.4);
+% ---- Rb (R) ----
+\draw (9.4,2) to[R, l_=$R_b$] (9.4,0.4);
+% ---- Rc (R) ----
+\draw (8.7,1.5) to[R, l_=$R_c$] (8.7,0.4);
+% ---- crossings without connection ----
+\draw (2.5707,2.0207) arc[start angle=45,end angle=225,radius=0.12cm];
+\draw (6.2,2.5) arc[start angle=180,end angle=0,radius=0.12cm];
+\draw (7.6,2.5) arc[start angle=180,end angle=0,radius=0.12cm];
+\draw (7.6,2) arc[start angle=180,end angle=0,radius=0.12cm];
+% ---- junction dots ----
+\foreach \p in {(1.6,0),(1.6,3.9),(3.4,0),(3.4,3.9),(4.9,0),(4.9,2.5),(4.9,3.9),(6.3,0),(6.3,2),(6.3,3.9),(7.7,1.5),(9.4,0.4)} \fill \p circle (1.3pt);
+\end{circuitikz}
+\end{document}

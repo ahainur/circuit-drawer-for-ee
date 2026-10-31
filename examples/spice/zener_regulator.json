@@ -1,0 +1,28 @@
+{
+  "name": "zener_regulator",
+  "elements": [
+    {"id": "Vin", "kind": "V", "pins": {"a": [0, 0], "b": [0, 3]}, "label": "$V_{in}$", "label_pos": "left"},
+    {"id": "Rs", "kind": "R", "pins": {"a": [0.6, 3], "b": [2, 3]}, "label": "$R_s$"},
+    {"id": "Dz", "kind": "D", "pins": {"a": [3, 0], "b": [3, 3]}, "label": "$D_z$", "label_pos": "left", "opts": {"zener": true}},
+    {"id": "RL", "kind": "R", "pins": {"a": [5, 3], "b": [5, 0]}, "label": "$R_L$", "label_pos": "right"}
+  ],
+  "wires": [
+    [[0, 3], [0.6, 3]], [[2, 3], [3, 3]], [[3, 3], [5, 3]],
+    [[0, 0], [3, 0]], [[3, 0], [5, 0]]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {"Vin.b": "IN", "Rs.a": "IN", "Rs.b": "OUT", "Dz.b": "OUT", "RL.a": "OUT", "Vin.a": "GND", "Dz.a": "GND", "RL.b": "GND"},
+  "simulation": {
+    "version": 1, "ground": "Vin.a",
+    "components": {
+      "Vin": {"dc": "12"}, "Rs": {"value": "470"}, "RL": {"value": "1k"},
+      "Dz": {"model": "generic_diode", "is": "1n", "n": "1", "rs": "0.01", "breakdown_voltage": "5.1", "breakdown_current": "10m", "zener_resistance": "5"}
+    },
+    "transient": {"step": "1u", "max_step": "1u", "stop": "1m"},
+    "probes": [
+      {"name": "v_out", "kind": "voltage", "positive": "Dz.b", "negative": "Dz.a"},
+      {"name": "i_z", "kind": "current", "element": "Dz"}
+    ]
+  }
+}

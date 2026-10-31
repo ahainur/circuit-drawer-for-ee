@@ -1,0 +1,119 @@
+{
+ "name": "intentional_overlap",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     2.0
+    ]
+   },
+   "label": "$V_{in}$"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.0,
+     2.0
+    ],
+    "b": [
+     4.0,
+     0.0
+    ]
+   },
+   "label": "$R_{L}$"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    2.0
+   ],
+   [
+    0.0,
+    4.0
+   ],
+   [
+    4.0,
+    4.0
+   ],
+   [
+    4.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    -2.0
+   ],
+   [
+    4.0,
+    -2.0
+   ],
+   [
+    4.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vin.b": "P",
+  "RL.a": "P",
+  "Vin.a": "N",
+  "RL.b": "N"
+ },
+ "regions": [
+  {
+   "from": [
+    -1,
+    -2.6
+   ],
+   "to": [
+    2,
+    3
+   ],
+   "fill": "gray",
+   "label": "Input stage"
+  }
+ ],
+ "callouts": [
+  {
+   "from": [
+    -2,
+    5
+   ],
+   "to": [
+    1,
+    2.5
+   ],
+   "style": "block",
+   "detail": false
+  }
+ ],
+ "wave_symbols": [
+  {
+   "at": [
+    0,
+    -1
+   ],
+   "wave": "step-up",
+   "on_wire": true
+  }
+ ]
+}

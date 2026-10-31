@@ -1,0 +1,22 @@
+body { grid-template-rows: auto minmax(0, 1fr) auto; }
+main { grid-template-columns: 180px minmax(200px, 1fr) 320px; }
+#componentPanel { border-left: 0; border-right: 1px solid var(--line); padding: 12px; }
+#componentSearch { width: 100%; padding: 7px; border: 1px solid var(--line); border-radius: 6px; }
+#library section { display: contents; }
+#library h4 { width: 100%; margin: 16px 0 6px; color: var(--muted); font-size: 12px; }
+#library button { display: flex; align-items: center; gap: 10px; width: 100%; margin: 3px 0; text-align: left; cursor: grab; }
+#library svg { width: 32px; height: 24px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; }
+#validationBar { display: flex; gap: 16px; align-items: center; border-top: 1px solid var(--line); padding: 5px 12px; background: var(--panel); font-size: 12px; }
+#validationStatus { border: 0; font-weight: 600; }
+#validationStatus.bad { color: var(--bad); }
+#validationStatus.ok { color: var(--good); }
+#validationDetail { color: var(--muted); }
+#liveNetlist { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+#netlistText, #liveSpice { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 ui-monospace, Consolas, monospace; }
+.electrical-label { font: .15px sans-serif; fill: #2457d6; stroke: white; stroke-width: .04; paint-order: stroke; pointer-events: none; }
+.electrical-branch { fill: #805120; }
+.no-connect { stroke: #805120; stroke-width: .025; pointer-events: none; }
+@media (max-width: 1000px) { main { grid-template-columns: 130px minmax(160px, 1fr) 260px; } }
+
+#library [hidden] { display: none; }
+body:has(#wavePanel:not([hidden])) { grid-template-rows: auto minmax(220px,1fr) auto auto; }

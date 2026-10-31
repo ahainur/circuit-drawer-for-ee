@@ -1,0 +1,222 @@
+{
+ "name": "coupled_inductor",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.0
+    ]
+   },
+   "label": "$v_\\mathrm{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Rs",
+   "kind": "R",
+   "pins": {
+    "a": [
+     1.0,
+     3.0
+    ],
+    "b": [
+     2.0,
+     3.0
+    ]
+   },
+   "label": "$R_s$"
+  },
+  {
+   "id": "Lc",
+   "kind": "transformer",
+   "pins": {
+    "p1": [
+     3.0,
+     3.0
+    ],
+    "p2": [
+     3.0,
+     0.0
+    ],
+    "s1": [
+     4.0,
+     3.0
+    ],
+    "s2": [
+     4.0,
+     0.0
+    ]
+   },
+   "opts": {
+    "dots": "same",
+    "core": false,
+    "ratio": "$k$"
+   }
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     5.5,
+     3.0
+    ],
+    "b": [
+     5.5,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.0
+   ],
+   [
+    1.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    3.0
+   ],
+   [
+    3.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    3.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    3.0
+   ],
+   [
+    5.5,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    0.0
+   ],
+   [
+    5.5,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    2.5,
+    1.5
+   ],
+   "text": "$L_1$"
+  },
+  {
+   "at": [
+    4.5,
+    1.5
+   ],
+   "text": "$L_2$"
+  }
+ ],
+ "netlist": {
+  "Vin.b": "IN",
+  "Rs.a": "IN",
+  "Rs.b": "P",
+  "Lc.p1": "P",
+  "Vin.a": "N",
+  "Lc.p2": "N",
+  "Lc.s1": "S",
+  "RL.a": "S",
+  "Lc.s2": "B",
+  "RL.b": "B"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "10",
+     "frequency": "10k",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "Rs": {
+    "value": "1"
+   },
+   "RL": {
+    "value": "10"
+   },
+   "Lc": {
+    "model": "ideal_transformer",
+    "ratio": "2.1052631578947367",
+    "polarity": "same",
+    "reference_resistance": "1T",
+    "magnetizing_inductance": "90.25u",
+    "leakage_inductance": "9.75u"
+   }
+  },
+  "transient": {
+   "step": "500n",
+   "max_step": "500n",
+   "stop": "500u"
+  },
+  "probes": [
+   {
+    "name": "v_p",
+    "kind": "voltage",
+    "positive": "Lc.p1",
+    "negative": "Lc.p2"
+   },
+   {
+    "name": "v_s",
+    "kind": "voltage",
+    "positive": "Lc.s1",
+    "negative": "Lc.s2"
+   },
+   {
+    "name": "i_p",
+    "kind": "current",
+    "element": "Lc",
+    "winding": "primary"
+   },
+   {
+    "name": "i_s",
+    "kind": "current",
+    "element": "Lc",
+    "winding": "secondary"
+   }
+  ]
+ }
+}

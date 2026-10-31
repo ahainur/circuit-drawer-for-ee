@@ -1,0 +1,82 @@
+{
+ "kind": "control",
+ "name": "grid_dq",
+ "title": "并网逆变器 dq 电流控制：锁相环、d/q 轴 PI、反 Park、SVPWM",
+ "profile": "ieee-double",
+ "blocks": [
+  {"id": "va", "type": "tag", "style": "meas", "at": [0.5, 4.3], "size": [0.8, 0.5], "text": "$v_{a}$"},
+  {"id": "vb", "type": "tag", "style": "meas", "at": [0.5, 3.7], "size": [0.8, 0.5], "text": "$v_{b}$"},
+  {"id": "clv", "type": "block", "at": [2.2, 4.0], "size": [1.2, 1.2], "text": "Clarke"},
+  {"id": "parkv", "type": "block", "at": [4.2, 4.0], "size": [1.2, 1.2], "text": "Park"},
+  {"id": "pll", "type": "block", "at": [6.2, 3.7], "size": [1.0, 0.5], "text": "PI"},
+  {"id": "sw", "type": "sum", "at": [7.6, 3.7], "signs": {"w": "+", "n": "+"}},
+  {"id": "w0", "type": "tag", "style": "ref", "at": [7.6, 4.6], "size": [0.8, 0.5], "text": "$\\omega_{0}$"},
+  {"id": "integ", "type": "block", "at": [9.0, 3.7], "size": [0.8, 0.7], "text": "$\\frac{1}{s}$"},
+  {"id": "ia", "type": "tag", "style": "meas", "at": [0.5, 1.4], "size": [0.8, 0.5], "text": "$i_{a}$"},
+  {"id": "ib", "type": "tag", "style": "meas", "at": [0.5, 0.6], "size": [0.8, 0.5], "text": "$i_{b}$"},
+  {"id": "cli", "type": "block", "at": [2.2, 1.0], "size": [1.2, 1.2], "text": "Clarke"},
+  {"id": "parki", "type": "block", "at": [4.2, 1.0], "size": [1.2, 1.2], "text": "Park"},
+  {"id": "idref", "type": "tag", "style": "ref", "at": [5.9, 2.2], "size": [0.8, 0.5], "text": "$i_{d}^{*}$"},
+  {"id": "iqref", "type": "tag", "style": "ref", "at": [5.9, -0.2], "size": [0.8, 0.5], "text": "$i_{q}^{*}$"},
+  {"id": "sd", "type": "sum", "at": [5.9, 1.4], "signs": {"n": "+", "w": "-"}},
+  {"id": "sq", "type": "sum", "at": [5.9, 0.6], "signs": {"s": "+", "w": "-"}},
+  {"id": "pid", "type": "block", "at": [7.3, 1.4], "size": [1.0, 0.5], "text": "PI"},
+  {"id": "piq", "type": "block", "at": [7.3, 0.6], "size": [1.0, 0.5], "text": "PI"},
+  {"id": "ipk", "type": "block", "at": [9.3, 1.0], "size": [1.2, 1.2], "text": "Park$^{-1}$"},
+  {"id": "vdc", "type": "tag", "style": "meas", "at": [11.3, 2.2], "size": [0.8, 0.5], "text": "$V_{dc}$"},
+  {"id": "sv", "type": "block", "at": [11.3, 1.0], "size": [1.2, 1.2], "text": "SVPWM"}
+ ],
+ "links": [
+  {"from": "va.e", "to": "clv.w+0.3"},
+  {"from": "vb.e", "to": "clv.w-0.3"},
+  {"from": "clv.e+0.3", "to": "parkv.w+0.3", "label": "$v_{\\alpha}$"},
+  {"from": "clv.e-0.3", "to": "parkv.w-0.3", "label": "$v_{\\beta}$", "label_pos": "below"},
+  {"from": "parkv.e-0.3", "to": "pll.w", "label": "$v_{q}$"},
+  {"from": "pll.e", "to": "sw.w"},
+  {"from": "w0.s", "to": "sw.n"},
+  {"from": "sw.e", "to": "integ.w"},
+  {"from": "integ.e", "via": [[10.0, 3.7], [10.0, 2.8], [4.2, 2.8]], "to": "parkv.s", "label": "$\\theta$", "label_at": 0.04},
+  {"from": [4.2, 2.8], "to": "parki.n"},
+  {"from": [9.3, 2.8], "to": "ipk.n"},
+  {"from": "ia.e", "to": "cli.w+0.4"},
+  {"from": "ib.e", "to": "cli.w-0.4"},
+  {"from": "cli.e+0.3", "to": "parki.w+0.3"},
+  {"from": "cli.e-0.3", "to": "parki.w-0.3"},
+  {"from": "parki.e+0.4", "to": "sd.w", "label": "$i_{d}$"},
+  {"from": "parki.e-0.4", "to": "sq.w", "label": "$i_{q}$", "label_pos": "below"},
+  {"from": "idref.s", "to": "sd.n"},
+  {"from": "iqref.n", "to": "sq.s"},
+  {"from": "sd.e", "to": "pid.w"},
+  {"from": "sq.e", "to": "piq.w"},
+  {"from": "pid.e", "to": "ipk.w+0.4", "label": "$v_{d}^{*}$"},
+  {"from": "piq.e", "to": "ipk.w-0.4", "label": "$v_{q}^{*}$", "label_pos": "below"},
+  {"from": "ipk.e+0.3", "to": "sv.w+0.3"},
+  {"from": "ipk.e-0.3", "to": "sv.w-0.3"},
+  {"from": "vdc.s", "to": "sv.n"},
+  {"from": "sv.e+0.4", "to": [13.2, 1.4], "open": true, "label": "$d_{a}$", "label_at": 0.55},
+  {"from": "sv.e", "to": [13.2, 1.0], "open": true, "label": "$d_{b}$", "label_at": 0.55},
+  {"from": "sv.e-0.4", "to": [13.2, 0.6], "open": true, "label": "$d_{c}$", "label_at": 0.55, "label_pos": "below"}
+ ],
+ "functions": {
+  "clv": {"fn": "clarke", "in": {"a": "w+0.3", "b": "w-0.3"}, "out": {"alpha": "e+0.3", "beta": "e-0.3"}},
+  "parkv": {"fn": "park", "in": {"alpha": "w+0.3", "beta": "w-0.3", "theta": "s"}, "out": {"q": "e-0.3"}},
+  "cli": {"fn": "clarke", "in": {"a": "w+0.4", "b": "w-0.4"}, "out": {"alpha": "e+0.3", "beta": "e-0.3"}},
+  "parki": {"fn": "park", "in": {"alpha": "w+0.3", "beta": "w-0.3", "theta": "n"}, "out": {"d": "e+0.4", "q": "e-0.4"}},
+  "ipk": {"fn": "ipark", "in": {"d": "w+0.4", "q": "w-0.4", "theta": "n"}, "out": {"alpha": "e+0.3", "beta": "e-0.3"}},
+  "sv": {"fn": "svpwm", "in": {"alpha": "w+0.3", "beta": "w-0.3", "vdc": "n"}, "out": {"da": "e+0.4", "db": "e", "dc": "e-0.4"}}
+ },
+ "loop": {
+  "params": {"Vm": 100, "L": 5e-3, "R": 0.1, "wc": 3141.6, "wn": 314.2},
+  "tf": {
+   "pll": {"pi": {"kp": "2*0.7*wn/Vm", "ki": "wn*wn/Vm"}},
+   "integ": {"num": [1], "den": [1, 0]},
+   "pid": {"pi": {"kp": "wc*L", "ki": "wc*wc*L/10"}},
+   "piq": {"pi": {"kp": "wc*L", "ki": "wc*wc*L/10"}}
+  }
+ },
+ "code": {
+  "fs": 20e3, "method": "tustin", "arith": "float",
+  "outputs": ["sv.da", "sv.db", "sv.dc"],
+  "blocks": {"integ": {"delay": 1}, "pid": {"min": -160, "max": 160}, "piq": {"min": -160, "max": 160}}
+ }
+}

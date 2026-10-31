@@ -1,0 +1,28 @@
+{
+ "name": "intentional_open",
+ "elements": [
+  {
+   "id": "R1",
+   "kind": "R",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     2.0,
+     0.0
+    ]
+   },
+   "label": "$R_1$"
+  }
+ ],
+ "wires": [],
+ "hops": [],
+ "annotations": [],
+ "netlist": {},
+ "no_connect": [
+  "R1.a",
+  "R1.b"
+ ]
+}

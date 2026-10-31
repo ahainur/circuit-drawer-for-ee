@@ -1,0 +1,2 @@
+# CSV snapshot hashes in the coordinate table require byte-identical checkouts.
+**/waveforms-data/*.csv -text

@@ -1,0 +1,129 @@
+\documentclass[border=1pt]{standalone}
+\usepackage{mathptmx}  % Times text and math
+\usepackage{circuitikz}
+\ctikzset{bipoles/length=0.75cm, transistors/scale=0.9,
+  inductors/coils=4, current/distance=.5, bipoles/diode/height=.32,
+  bipoles/diode/width=.26}
+\usepackage{CJKutf8}
+\begin{document}
+\fontsize{8}{9.6}\selectfont
+\begin{CJK}{UTF8}{gbsn}
+% llc_ipos: coordinates are layout units, 1 unit = 0.989 cm across and 1 cm up (ieee-double)
+\begin{circuitikz}[x=0.989cm, y=1cm, line width=0.55pt, cute inductors, european resistors, american voltages]
+% ---- regions (background) ----
+\fill[fill={rgb,255:red,226;green,239;blue,217}] (2,6.7) rectangle (14,12.5);
+\node[inner sep=0pt] at (8,6.47) {LLC 模块 1};
+\fill[fill={rgb,255:red,219;green,232;blue,245}] (2,-0.3) rectangle (14,5.5);
+\node[inner sep=0pt] at (8,-0.53) {LLC 模块 2};
+% ---- wires ----
+\draw (-1,11.8) -- (3,11.8);
+\draw (0.5,11.8) -- (0.5,4.8) -- (1.1787,4.8);
+\draw (1.4213,4.8) -- (3,4.8);
+\draw (-1,0.4) -- (7.7,0.4);
+\draw (1.3,0.4) -- (1.3,7.4) -- (7.7,7.4);
+\draw (3,3.8) -- (3,1.4);
+\draw (3,3.2) -- (3.6,3.2);
+\draw (4.8,3.2) -- (5,3.2);
+\draw (6,3.2) -- (7.7,3.2);
+\draw (7.7,1.4) -- (7.7,0.4);
+\draw (8.5,3.2) -- (10,3.2);
+\draw (8.5,1.4) -- (9.2,1.4) -- (9.2,2) -- (9.8787,2);
+\draw (10.1213,2) -- (11.6,2);
+\draw (10,3.8) -- (10,1.4);
+\draw (11.6,3.8) -- (11.6,1.4);
+\draw (10,4.8) -- (13,4.8);
+\draw (10,0.4) -- (15.7,0.4);
+\draw (3,10.8) -- (3,8.4);
+\draw (3,10.2) -- (3.6,10.2);
+\draw (4.8,10.2) -- (5,10.2);
+\draw (6,10.2) -- (7.7,10.2);
+\draw (7.7,8.4) -- (7.7,7.4);
+\draw (8.5,10.2) -- (10,10.2);
+\draw (8.5,8.4) -- (9.2,8.4) -- (9.2,9) -- (9.8787,9);
+\draw (10.1213,9) -- (11.6,9);
+\draw (10,10.8) -- (10,8.4);
+\draw (11.6,10.8) -- (11.6,8.4);
+\draw (10,11.8) -- (15.7,11.8);
+\draw (10,7.4) -- (13,7.4);
+\draw (13,4.8) -- (14.5,4.8) -- (14.5,7.4) -- (13,7.4);
+% ---- Vin (V) ----
+\draw (-1,11.8) to[V, l_=$V_\mathrm{in}$] (-1,0.4);
+% ---- S3 (nmos) ----
+\node[nmos,bodydiode] (S3) at (3,4.3) {};
+\draw (3,4.8) -- (S3.D) (S3.S) -- (3,3.8);
+\node at (3.5157,4.3) {$S_3$};
+% ---- S4 (nmos) ----
+\node[nmos,bodydiode] (S4) at (3,0.9) {};
+\draw (3,1.4) -- (S4.D) (S4.S) -- (3,0.4);
+\node at (3.5157,0.9) {$S_4$};
+% ---- Lr2 (L) ----
+\draw (3.6,3.2) to[L, l^=$L_{r2}$] (4.8,3.2);
+% ---- Cr2 (C) ----
+\draw (5,3.2) to[C, l^=$C_{r2}$] (6,3.2);
+% ---- T2 (transformer) ----
+\draw (7.7,3.2) to[L] (7.7,1.4);
+
+\draw (8.5,1.4) to[L] (8.5,3.2);
+
+\draw (8.0494,1.4) -- (8.0494,3.2);
+\draw (8.1506,1.4) -- (8.1506,3.2);
+\fill (7.5281,2.58) circle (1.2pt);
+\fill (8.6719,2.58) circle (1.2pt);
+\node at (8.1,3.43) {$1:n$};
+% ---- Lm2 (L) ----
+\draw (6.5,3.2) to[L, l_=$L_{m2}$] (6.5,0.4);
+% ---- D21 (D) ----
+\draw (10,3.8) to[D, l_=$D_{21}$] (10,4.8);
+% ---- D22 (D) ----
+\draw (11.6,3.8) to[D, l_=$D_{22}$] (11.6,4.8);
+% ---- D23 (D) ----
+\draw (10,0.4) to[D, l_=$D_{23}$] (10,1.4);
+% ---- D24 (D) ----
+\draw (11.6,0.4) to[D, l_=$D_{24}$] (11.6,1.4);
+% ---- Co2 (C) ----
+\draw (13,4.8) to[C, l_=$C_{o2}$] (13,0.4);
+% ---- S1 (nmos) ----
+\node[nmos,bodydiode] (S1) at (3,11.3) {};
+\draw (3,11.8) -- (S1.D) (S1.S) -- (3,10.8);
+\node at (3.5157,11.3) {$S_1$};
+% ---- S2 (nmos) ----
+\node[nmos,bodydiode] (S2) at (3,7.9) {};
+\draw (3,8.4) -- (S2.D) (S2.S) -- (3,7.4);
+\node at (3.5157,7.9) {$S_2$};
+% ---- Lr1 (L) ----
+\draw (3.6,10.2) to[L, l^=$L_{r1}$] (4.8,10.2);
+% ---- Cr1 (C) ----
+\draw (5,10.2) to[C, l^=$C_{r1}$] (6,10.2);
+% ---- T1 (transformer) ----
+\draw (7.7,10.2) to[L] (7.7,8.4);
+
+\draw (8.5,8.4) to[L] (8.5,10.2);
+
+\draw (8.0494,8.4) -- (8.0494,10.2);
+\draw (8.1506,8.4) -- (8.1506,10.2);
+\fill (7.5281,9.58) circle (1.2pt);
+\fill (8.6719,9.58) circle (1.2pt);
+\node at (8.1,10.43) {$1:n$};
+% ---- Lm1 (L) ----
+\draw (6.5,10.2) to[L, l_=$L_{m1}$] (6.5,7.4);
+% ---- D11 (D) ----
+\draw (10,10.8) to[D, l_=$D_{11}$] (10,11.8);
+% ---- D12 (D) ----
+\draw (11.6,10.8) to[D, l_=$D_{12}$] (11.6,11.8);
+% ---- D13 (D) ----
+\draw (10,7.4) to[D, l_=$D_{13}$] (10,8.4);
+% ---- D14 (D) ----
+\draw (11.6,7.4) to[D, l_=$D_{14}$] (11.6,8.4);
+% ---- Co1 (C) ----
+\draw (13,11.8) to[C, l_=$C_{o1}$] (13,7.4);
+% ---- RL (R) ----
+\draw (15.7,11.8) to[R, l^=$R_L$] (15.7,0.4);
+% ---- crossings without connection ----
+\draw (1.1787,4.8) arc[start angle=180,end angle=0,radius=0.12cm];
+\draw (9.8787,2) arc[start angle=180,end angle=0,radius=0.12cm];
+\draw (9.8787,9) arc[start angle=180,end angle=0,radius=0.12cm];
+% ---- junction dots ----
+\foreach \p in {(0.5,11.8),(1.3,0.4),(3,0.4),(3,3.2),(3,7.4),(3,10.2),(6.5,0.4),(6.5,3.2),(6.5,7.4),(6.5,10.2),(10,3.2),(10,10.2),(11.6,0.4),(11.6,2),(11.6,4.8),(11.6,7.4),(11.6,9),(11.6,11.8),(13,0.4),(13,4.8),(13,7.4),(13,11.8)} \fill \p circle (1.3pt);
+\end{circuitikz}
+\end{CJK}
+\end{document}

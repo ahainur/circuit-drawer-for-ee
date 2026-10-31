@@ -1,0 +1,156 @@
+{
+ "name": "thyristor_holding",
+ "elements": [
+  {
+   "id": "Vs",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     2.0
+    ]
+   },
+   "label": "$v_\\mathrm{s}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "T1",
+   "kind": "scr",
+   "pins": {
+    "a": [
+     0.6,
+     2.0
+    ],
+    "b": [
+     1.8,
+     2.0
+    ]
+   },
+   "label": "$T_1$"
+  },
+  {
+   "id": "R1",
+   "kind": "R",
+   "pins": {
+    "a": [
+     2.4,
+     2
+    ],
+    "b": [
+     2.4,
+     0
+    ]
+   },
+   "label": "$R$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    2.0
+   ],
+   [
+    0.6,
+    2.0
+   ]
+  ],
+  [
+   [
+    1.8,
+    2.0
+   ],
+   [
+    2.4,
+    2.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    2.4,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vs.b": "S",
+  "T1.a": "S",
+  "T1.b": "K",
+  "R1.a": "K",
+  "R1.b": "N",
+  "Vs.a": "N"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vs.a",
+  "components": {
+   "Vs": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "100",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "T1": {
+    "model": "simplified_thyristor",
+    "ron": "0.01",
+    "roff": "1G",
+    "vf": "1",
+    "frequency": "50",
+    "duty": "0.05",
+    "delay": "3.3333333m",
+    "rise": "1u",
+    "fall": "1u",
+    "holding_current": "0.5",
+    "latching_current": "1"
+   },
+   "R1": {
+    "value": "10"
+   }
+  },
+  "transient": {
+   "step": "10u",
+   "max_step": "10u",
+   "stop": "60m"
+  },
+  "probes": [
+   {
+    "name": "v_s",
+    "kind": "voltage",
+    "positive": "Vs.b",
+    "negative": "Vs.a"
+   },
+   {
+    "name": "v_o",
+    "kind": "voltage",
+    "positive": "T1.b",
+    "negative": "Vs.a"
+   },
+   {
+    "name": "i_T",
+    "kind": "current",
+    "element": "T1"
+   },
+   {
+    "name": "gate",
+    "kind": "drive",
+    "element": "T1"
+   }
+  ]
+ }
+}

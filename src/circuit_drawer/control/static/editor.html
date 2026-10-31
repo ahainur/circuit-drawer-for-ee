@@ -1,0 +1,1498 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>控制框图编辑器</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70;
+    --line: #d9d9d6; --accent: #2457d6; --bad: #d12f2f; --good: #1f8a4c; --warn: #b7791f;
+    --grid-minor: #f0f0ee; --grid-major: #dcdcd8; --sel: #2457d6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang SC",
+         "Microsoft YaHei", sans-serif; color: var(--ink); background: var(--bg);
+         display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+  header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px;
+           background: var(--panel); border-bottom: 1px solid var(--line); }
+  header .file { font-weight: 600; margin-right: auto; overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; max-width: 30vw; }
+  header .sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }
+  button, select, input, textarea { font: inherit; }
+  button, select { border: 1px solid var(--line); background: var(--panel); border-radius: 6px;
+           padding: 4px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.on { background: #e6edff; border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  main { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+  #canvasWrap { position: relative; min-height: 0; overflow: hidden; }
+  svg#canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none;
+               user-select: none; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow: auto; padding: 12px; }
+  aside h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+  aside h3:first-child { margin-top: 0; }
+  #status { font-weight: 600; }
+  #status.ok { color: var(--good); } #status.bad { color: var(--bad); }
+  #issues { list-style: none; padding: 0; margin: 0; max-height: 30vh; overflow: auto; }
+  #issues li { padding: 5px 8px; border-radius: 6px; margin-bottom: 4px; background: #fbeaea;
+               font-size: 12.5px; cursor: pointer; overflow-wrap: anywhere; }
+  #issues li.warning { background: #fdf5e3; }
+  textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 6px;
+             font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .row select { flex: 1; min-width: 0; }
+  #appearance { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  #appearance .row label { width: 64px; flex: none; }
+  #appearance input[type=color] { width: 38px; height: 30px; padding: 2px; border: 1px solid var(--line); border-radius: 5px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  #coords { position: absolute; left: 10px; bottom: 8px; background: rgba(255,255,255,.9);
+            border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; font-size: 12px; }
+  #modeTip { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+             background: #1d1d1f; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 12px; display: none; }
+  #toast { position: absolute; right: 12px; bottom: 10px; background: #1d1d1f; color: #fff;
+           padding: 6px 12px; border-radius: 6px; font-size: 12.5px; display: none; max-width: 60%; }
+  dialog { border: 1px solid var(--line); border-radius: 10px; max-width: 94vw; max-height: 92vh; padding: 14px; }
+  dialog img { max-width: 90vw; max-height: 74vh; display: block; margin-top: 8px; background: #fff; }
+  .loop-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 420px); gap: 14px; align-items: start; }
+  .loop-grid img { max-width: 100%; max-height: 62vh; }
+  .loop-grid table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+  .loop-grid td, .loop-grid th { border: 1px solid var(--line); padding: 2px 6px; text-align: left; vertical-align: top; }
+  .loop-grid textarea { width: 100%; height: 180px; font: 12px ui-monospace, Consolas, monospace; }
+  .loop-grid input[type=number] { width: 80px; }
+  dialog .row input[type=text] { flex: 1; min-width: 200px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
+  .block-body { cursor: move; }
+  .handle { cursor: grab; }
+  .port { cursor: crosshair; }
+  #texBox { margin: 8px 0; border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+  #texInput { font-size: 13px; }
+  #texPalette .grp { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; align-items: center; }
+  #texPalette .grp span { font-size: 11.5px; color: var(--muted); width: 30px; }
+  #texPalette button { padding: 1px 5px; min-width: 26px; font: 14px "Times New Roman", "STIX Two Math", serif; }
+  #texPreview { min-height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 6px;
+                display: flex; align-items: center; justify-content: center; background: #fff; }
+  #texPreview img { max-width: 100%; max-height: 120px; }
+
+</style>
+<link rel="stylesheet" href="/menu.css">
+</head>
+<body>
+<header>
+  <div class="menu-row">
+    <nav class="menu-bar" aria-label="主菜单">
+      <button data-menu="file" id="menu-file" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-file-panel">文件</button>
+      <button data-menu="edit" id="menu-edit" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-edit-panel">编辑</button>
+      <button data-menu="view" id="menu-view" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-view-panel">视图</button>
+      <button data-menu="insert" id="menu-insert" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-insert-panel">插入</button>
+      <button data-menu="ai" id="menu-ai" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-ai-panel">AI</button>
+      <button data-menu="analysis" id="menu-analysis" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-analysis-panel">分析</button>
+      <button data-menu="help" id="menu-help" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-help-panel">帮助</button>
+    </nav>
+    <span class="file" id="file">控制框图</span><span id="dirty" class="hint"></span>
+  </div>
+  <div class="quick-tools" role="toolbar" aria-label="常用工具栏">
+<button id="saveBtn" title="Ctrl+S">保存</button>
+<button id="undoBtn" title="撤销 (Ctrl+Z)">撤销</button>
+<button id="redoBtn" title="重做 (Ctrl+Shift+Z)">重做</button>
+<select id="addSel" title="添加">
+    <option value="">＋ 添加…</option>
+    <option value="block">方框（PI、LPF…）</option>
+    <option value="limiter">限幅器</option>
+    <option value="tag:ref">参考量标签（默认青）</option>
+    <option value="tag:meas">测量量标签（默认黄）</option>
+    <option value="sum">求和点</option>
+    <option value="mul">乘法点</option>
+    <option value="div">除法点</option>
+    <option value="switch">A/B 开关</option>
+    <option value="text">文字</option>
+    <option value="region:green">底板（框住选中的方块）</option>
+    <option value="region:dashed">蓝色虚线框（框住选中的方块）</option>
+  </select>
+<button id="linkBtn" title="连线模式 (L)：点一个端口，再点另一个端口；点空白处得到开口端，点在线上得到分支">连线</button>
+<button id="delBtn" title="删除选中 (Delete)">删除</button>
+<button id="fitBtn">适应窗口</button>
+<button id="previewBtn">LaTeX 预览</button>
+<button id="quickAi" data-command="tweakControl" title="AI 修改当前图">AI 修改…</button>
+<button id="exportBtn" class="primary">导出…</button>
+  </div>
+  <div id="menu-file-panel" class="menu-panel" role="menu" aria-labelledby="menu-file" hidden>
+    <button data-command="saveBtn" role="menuitem" tabindex="-1" >保存<kbd>Ctrl+S</kbd></button>
+    <button data-command="exportBtn" role="menuitem" tabindex="-1" >导出…</button>
+    <hr role="separator">
+    <button data-command="tplLoad" role="menuitem" tabindex="-1" >从所选模板新建</button>
+    <button data-command="tplSave" role="menuitem" tabindex="-1" >整张图存为模板…</button>
+    <button data-command="snipSave" role="menuitem" tabindex="-1" >选中的方块存为片段…</button>
+    <div class="menu-caption" role="presentation">模板与片段在右侧选择</div>
+  </div>
+  <div id="menu-edit-panel" class="menu-panel" role="menu" aria-labelledby="menu-edit" hidden>
+    <button data-command="undoBtn" role="menuitem" tabindex="-1" >撤销<kbd>Ctrl+Z</kbd></button>
+    <button data-command="redoBtn" role="menuitem" tabindex="-1" >重做<kbd>Ctrl+Shift+Z / Ctrl+Y</kbd></button>
+    <hr role="separator">
+    <button id="cutSelection" role="menuitem" tabindex="-1" >剪切<kbd>Ctrl+X</kbd></button>
+    <button id="copySelection" role="menuitem" tabindex="-1" >复制<kbd>Ctrl+C</kbd></button>
+    <button id="pasteSelection" role="menuitem" tabindex="-1" >粘贴<kbd>Ctrl+V</kbd></button>
+    <button data-command="delBtn" role="menuitem" tabindex="-1" >删除所选<kbd>Delete / Backspace</kbd></button>
+    <button data-command="lBtn" role="menuitem" tabindex="-1" >给连线加 L 形拐点</button>
+  </div>
+  <div id="menu-view-panel" class="menu-panel" role="menu" aria-labelledby="menu-view" hidden>
+    <button data-command="fitBtn" role="menuitem" tabindex="-1" >适应窗口</button>
+    <label>吸附 <select id="snapSel"><option>0.05</option><option selected>0.1</option><option>0.25</option></select></label>
+    <hr role="separator">
+    <button data-command="previewBtn" role="menuitem" tabindex="-1" >LaTeX 预览</button>
+  </div>
+  <div id="menu-insert-panel" class="menu-panel" role="menu" aria-labelledby="menu-insert" hidden>
+    <button id="add-block" role="menuitem" tabindex="-1" data-add="block">方框（PI、LPF…）</button>
+    <button id="add-limiter" role="menuitem" tabindex="-1" data-add="limiter">限幅器</button>
+    <button id="add-tag-ref" role="menuitem" tabindex="-1" data-add="tag:ref">参考量标签（默认青）</button>
+    <button id="add-tag-meas" role="menuitem" tabindex="-1" data-add="tag:meas">测量量标签（默认黄）</button>
+    <button id="add-sum" role="menuitem" tabindex="-1" data-add="sum">求和点</button>
+    <button id="add-mul" role="menuitem" tabindex="-1" data-add="mul">乘法点</button>
+    <button id="add-div" role="menuitem" tabindex="-1" data-add="div">除法点</button>
+    <button id="add-switch" role="menuitem" tabindex="-1" data-add="switch">A/B 开关</button>
+    <button id="add-text" role="menuitem" tabindex="-1" data-add="text">文字</button>
+    <button id="add-region-green" role="menuitem" tabindex="-1" data-add="region:green">底板（框住选中的方块）</button>
+    <button id="add-region-dashed" role="menuitem" tabindex="-1" data-add="region:dashed">蓝色虚线框（框住选中的方块）</button>
+    <hr role="separator">
+    <button data-command="linkBtn" role="menuitem" tabindex="-1" >连线<kbd>L</kbd></button>
+    <button data-command="snipInsert" role="menuitem" tabindex="-1" >插入所选片段</button>
+  </div>
+  <div id="menu-ai-panel" class="menu-panel" role="menu" aria-labelledby="menu-ai" hidden>
+    <button id="aiSettings" role="menuitem" tabindex="-1">AI 接口设置…</button>
+    <button id="describeControl" role="menuitem" tabindex="-1">描述新框图…</button>
+    <button id="tweakControl" role="menuitem" tabindex="-1">AI 修改当前图…</button>
+  </div>
+  <div id="menu-analysis-panel" class="menu-panel" role="menu" aria-labelledby="menu-analysis" hidden>
+    <button role="menuitem" tabindex="-1" id="loopBtn" title="按表中 loop 部分计算开环增益、裕度、闭环极点，画 Bode 图，给出补偿器参数">环路分析</button>
+  </div>
+  <div id="menu-help-panel" class="menu-panel" role="menu" aria-labelledby="menu-help" hidden>
+    <button id="menuUserGuide" role="menuitem" tabindex="-1" data-guide="USER_MANUAL.zh-CN.md">用户指南</button>
+    <button id="menuPromptGuide" role="menuitem" tabindex="-1" data-guide="USER_MANUAL.zh-CN.md#ai">提示词说明</button>
+    <button id="menuAboutOpen" role="menuitem" tabindex="-1">关于…</button>
+    <button id="menuHelpOpen" role="menuitem" tabindex="-1" >操作与快捷键…</button>
+  </div>
+</header>
+<main>
+  <div id="canvasWrap">
+    <svg id="canvas"><g id="gridLayer"></g><g id="world"></g><rect id="band" fill="rgba(36,87,214,.08)" stroke="#2457d6" stroke-dasharray="4 3" display="none"/></svg>
+    <div id="coords">x 0, y 0</div>
+    <div id="modeTip"></div>
+    <div id="toast"></div>
+  </div>
+  <aside>
+    <h3>校验</h3>
+    <div id="status">…</div>
+    <ul id="issues"></ul>
+    <h3>选中</h3>
+    <div id="selInfo" class="hint">点选方块、连线拐点、文字或区域边框；Shift 点选可多选，空白处拖动可框选。拖方块时，相连的拐点跟着移动，保持横平竖直。双击连线可加拐点。</div>
+    <div id="appearance" style="display:none" aria-label="外观"></div>
+    <div id="texBox" style="display:none">
+      <div class="row"><strong style="font-size:13px">文字与公式</strong><select id="texField"></select></div>
+      <textarea id="texInput" rows="3" spellcheck="false" placeholder="直接输入，公式写在 $…$ 里；或点下面的按钮插入"></textarea>
+      <div id="texPalette"></div>
+      <div id="texPreview"><span id="texMsg" class="hint">停顿片刻后，用 LaTeX 排出预览，与导出一致</span><img id="texImg" alt="" style="display:none"></div>
+      <div class="hint">这里输入的是 LaTeX 原文，不用管 JSON 的转义。<code>\\</code> 换行；公式外的 <code>_ % &amp; #</code> 前面要加 <code>\</code>。</div>
+    </div>
+    <textarea id="selJson" rows="9" spellcheck="false" style="display:none"></textarea>
+    <div class="row" id="selActions" style="display:none">
+      <button id="applyBtn">应用修改</button>
+      <button id="lBtn" title="给斜的连线加一个拐点，先横后竖">加 L 形拐点</button>
+    </div>
+    <h3>模板与片段</h3>
+    <div class="row"><select id="tplSel"></select><button id="tplLoad">从模板新建</button></div>
+    <div class="row"><button id="tplSave">整张图存为模板…</button></div>
+    <div class="row"><select id="snipSel"></select><button id="snipInsert">插入片段</button></div>
+    <div class="row"><button id="snipSave">选中的方块存为片段…</button></div>
+    <div class="hint">片段会带上选中方块之间的连线、附近的文字和只框住它们的区域；插入时放在图的下方（不加宽画面），重名 id 自动加后缀。</div>
+    <h3>整张表 JSON</h3>
+    <details><summary class="hint">展开直接改坐标表</summary>
+      <textarea id="tableJson" rows="14" spellcheck="false"></textarea>
+      <div class="row"><button id="tableApply">应用</button></div>
+    </details>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <div class="row"><strong id="dlgTitle"></strong><span style="margin-left:auto"></span><button id="dlgClose">关闭</button></div>
+  <div id="dlgBody"></div>
+</dialog>
+
+<dialog id="menuHelp" class="menu-help" aria-labelledby="menuHelpTitle">
+  <strong id="menuHelpTitle">操作与快捷键</strong>
+  <p>点选方块、连线拐点、文字或区域边框；Shift 点选可多选，空白处拖动可框选。拖方块时，相连的拐点跟着移动。双击连线可加拐点。</p><p><kbd>Ctrl+S</kbd> 保存，<kbd>Ctrl+Z</kbd> 撤销，<kbd>Ctrl+Shift+Z / Ctrl+Y</kbd> 重做，<kbd>Ctrl+X</kbd> 剪切，<kbd>Ctrl+C</kbd> 复制，<kbd>Ctrl+V</kbd> 粘贴（带连线、区域和传递函数，重名 id 自动加后缀），<kbd>Delete / Backspace</kbd> 删除，<kbd>L</kbd> 切换连线模式，<kbd>Esc</kbd> 取消连线或清除选择。</p><p>方向键移动选中的方块或文字，按住 Shift 移动 5 倍吸附步长。滚轮缩放；“适应窗口”显示整张图。</p>
+  <p>菜单支持方向键、Enter 选择、Esc 收起；点击画布也会收起。Mac 上可用 ⌘ 代替 Ctrl。</p>
+  <button id="menuHelpClose">关闭</button>
+</dialog>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+let table = null, profile = "ieee-double", constants = null, analysis = null;
+let undoStack = [], redoStack = [], dirty = false;
+let sel = { blocks: new Set(), texts: new Set(), link: null, corner: null, region: null };
+let view = { tx: 60, ty: 300, z: 60 };
+let drag = null, linkMode = false, linkStart = null, checkTimer = null, checkSeq = 0;
+
+// ---------------------------------------------------------------- server
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json();
+  if (!r.ok) { const e = new Error(data.error || r.statusText); e.data = data; throw e; }
+  return data;
+}
+function toast(msg, ms = 2600) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.style.display = "none", ms);
+}
+function scheduleCheck(delay = 150) {
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(runCheck, delay);
+}
+async function runCheck() {
+  const seq = ++checkSeq;
+  try {
+    const a = await api("/api/check", { table, profile });
+    if (seq !== checkSeq) return;
+    analysis = a; Object.assign(constants, a.constants); showIssues(); draw();
+  } catch (e) { $("status").textContent = "校验失败：" + e.message; $("status").className = "bad"; }
+}
+
+// ---------------------------------------------------------------- history
+const clone = (o) => JSON.parse(JSON.stringify(o));
+// indented JSON with coordinate pairs kept on one line
+const pretty = (o) => JSON.stringify(o, null, 1).replace(/\[\s*(-?[\d.]+(?:,\s*-?[\d.]+)*)\s*\]/g,
+  (m, inner) => "[" + inner.replace(/\s+/g, " ") + "]");
+function commit(next, base = table) {
+  undoStack.push(JSON.stringify(base)); redoStack = [];
+  if (undoStack.length > 200) undoStack.shift();
+  table = next; changed();
+}
+function changed() {
+  dirty = true; $("dirty").textContent = "未保存";
+  pruneSelection(); draw(); showSelection(); scheduleCheck();
+  $("tableJson").value = pretty(table);
+}
+function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify(table)); table = JSON.parse(undoStack.pop()); changed(); }
+function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify(table)); table = JSON.parse(redoStack.pop()); changed(); }
+
+// ---------------------------------------------------------------- geometry
+const S = () => (analysis && analysis.scale_cm_per_unit) || 1;
+const sumR = () => constants.sum_r_cm / S();
+const contactR = () => constants.contact_cm / S();
+const fontU = (pt) => constants.font_cm * (pt || 8) / 8 / S();
+const blocks = () => table.blocks || (table.blocks = []);
+const links = () => table.links || (table.links = []);
+const texts = () => table.texts || (table.texts = []);
+const regions = () => table.regions || (table.regions = []);
+const blockById = (id) => blocks().find((b) => b.id === id);
+const isBox = (b) => ["block", "limiter", "tag"].includes(b.type);
+const isCircle = (b) => ["sum", "mul", "div"].includes(b.type);
+const snapStep = () => parseFloat($("snapSel").value);
+const snap = (v) => Math.round(v / snapStep()) * snapStep();
+const r4 = (v) => Math.round(v * 10000) / 10000;
+
+function blockRect(b) {
+  if (b.type === "switch") {
+    const pts = [b.pole, ...Object.values(b.throws || {})];
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), c = contactR();
+    return [Math.min(...xs) - c, Math.min(...ys) - c, Math.max(...xs) + c, Math.max(...ys) + c];
+  }
+  if (isCircle(b)) { const r = sumR(); return [b.at[0] - r, b.at[1] - r, b.at[0] + r, b.at[1] + r]; }
+  const [w, h] = b.size || [1, 0.5];
+  return [b.at[0] - w / 2, b.at[1] - h / 2, b.at[0] + w / 2, b.at[1] + h / 2];
+}
+function ports(b) {
+  if (b.type === "switch") return { c: b.pole, ...(b.throws || {}) };
+  if (isCircle(b)) { const r = sumR(), [x, y] = b.at;
+    return { w: [x - r, y], e: [x + r, y], n: [x, y + r], s: [x, y - r] }; }
+  const [x0, y0, x1, y1] = blockRect(b), [x, y] = b.at;
+  return { w: [x0, y], e: [x1, y], n: [x, y1], s: [x, y0] };
+}
+const PORT_RE = /^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$/;
+function parseRef(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().match(PORT_RE);
+  return m ? { block: m[1], port: m[2], off: parseFloat(m[3] || "0") } : null;
+}
+function endPoint(v) {
+  if (Array.isArray(v)) return v;
+  const ref = parseRef(v); if (!ref) return null;
+  const b = blockById(ref.block); if (!b) return null;
+  const p = ports(b)[ref.port]; if (!p) return null;
+  if (!ref.off) return p;
+  return (ref.port === "w" || ref.port === "e") ? [p[0], p[1] + ref.off] : [p[0] + ref.off, p[1]];
+}
+function linkPoints(lk) {
+  const a = endPoint(lk.from), b = endPoint(lk.to);
+  if (!a || !b) return null;
+  return [a, ...(lk.via || []), b];
+}
+
+// ---------------------------------------------------------------- TeX-ish text for the canvas
+const CMDS = { rightarrow: "→", leftarrow: "←", sim: "∼", pm: "±", max: "max", min: "min", circ: "°",
+  times: "×", cdot: "·", alpha: "α", beta: "β", gamma: "γ", delta: "δ", theta: "θ", omega: "ω",
+  Omega: "Ω", phi: "φ", varphi: "φ", mu: "μ", pi: "π", sigma: "σ", tau: "τ", Delta: "Δ", infty: "∞",
+  le: "≤", ge: "≥", leq: "≤", geq: "≥", ",": " ", ";": " ", " ": " ", "%": "%",
+  "|": "‖", lVert: "‖", rVert: "‖", lvert: "|", rvert: "|", ldots: "…", cdots: "⋯",
+  arg: "arg ", lambda: "λ", psi: "ψ", eta: "η", int: "∫", sum: "∑", epsilon: "ε", varepsilon: "ε",
+  xi: "ξ", rho: "ρ", Phi: "Φ", Psi: "Ψ", Sigma: "Σ", Lambda: "Λ", partial: "∂", nabla: "∇",
+  approx: "≈", neq: "≠", angle: "∠", to: "→" };
+function texRuns(line) {
+  const runs = []; let math = false;
+  // math letters in italic, digits and symbols upright, as TeX sets them
+  const push = (t, shift, it) => {
+    if (!t) return;
+    if (!it) { runs.push({ t, shift, it: false }); return; }
+    for (const m of t.match(/[A-Za-z\u03b1-\u03c9]+|[^A-Za-z\u03b1-\u03c9]+/g)) runs.push({ t: m, shift, it: /^[A-Za-z\u03b1-\u03c9]/.test(m) });
+  };
+  const parts = line.split("$");
+  parts.forEach((part, k) => {
+    math = k % 2 === 1;
+    let s = part.replace(/\\_/g, "\u0001")
+      .replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\{((?:[^{}]|\{[^{}]*\})*)\}/g, "$1/$2")
+      .replace(/\\(mathrm|text|mathbf|textbf)\{([^{}]*)\}/g, "\u0002$2\u0003")
+      .replace(/\\(mathit|textit|hat|bar|dot|ddot|tilde|vec|overline|sqrt)\{([^{}]*)\}/g, "$2")
+      .replace(/\\([A-Za-z]+|[,; %|])/g, (m, c) => CMDS[c] !== undefined ? CMDS[c] : c);
+    let i = 0, up = false, buf = "";
+    const flush = () => { push(buf.replace(/\u0001/g, "_"), 0, math && !up); buf = ""; };
+    while (i < s.length) {
+      const c = s[i];
+      if (c === "\u0002") { flush(); up = true; i++; continue; }
+      if (c === "\u0003") { flush(); up = false; i++; continue; }
+      if ((c === "_" || c === "^") && i + 1 < s.length) {
+        flush();
+        let t; if (s[i + 1] === "{") { const j = s.indexOf("}", i + 2); t = s.slice(i + 2, j < 0 ? s.length : j); i = j < 0 ? s.length : j + 1; }
+        else { t = s[i + 1]; i += 2; }
+        const upright = t.includes("\u0002");
+        t = t.replace(/[\u0002\u0003^{}]/g, "");
+        push(t.replace(/\u0001/g, "_"), c === "_" ? -1 : 1, math && !upright);
+        continue;
+      }
+      if (c !== "{" && c !== "}") buf += c;
+      i++;
+    }
+    flush();
+  });
+  return runs;
+}
+function svgText(parent, str, x, y, opt = {}) {
+  const f = opt.size || fontU(), lines = String(str).split("\\\\");
+  const g = el("g", { transform: `translate(${x},${y}) scale(1,-1)` }, parent);
+  const lead = f * 1.2, y0 = -((lines.length - 1) * lead) / 2;
+  const anchor = opt.anchor || "middle";
+  lines.forEach((ln, k) => {
+    const t = el("text", { x: 0, y: y0 + k * lead, "font-size": f, "text-anchor": anchor,
+      "dominant-baseline": "central", fill: opt.color || "#000",
+      "font-family": "'Times New Roman', Times, serif" }, g);
+    for (const run of texRuns(ln.trim())) {
+      const ts = el("tspan", {}, t); ts.textContent = run.t;
+      if (run.it) ts.setAttribute("font-style", "italic");
+      if (run.shift) { ts.setAttribute("font-size", f * 0.7); ts.setAttribute("baseline-shift", run.shift < 0 ? "sub" : "super"); }
+    }
+  });
+  return g;
+}
+
+// ---------------------------------------------------------------- drawing
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const colorKey = (v) => String(v || "").trim().toLowerCase().replace(/[ _-]/g, "");
+function ink(name) { const k = colorKey(name); return constants.inks[constants.ink_aliases[k] || k] || name || constants.inks.black; }
+function blockColors(b) {
+  const st = b.type === "tag" ? constants.tag_style[b.style || "ref"] || constants.tag_style.ref : ["white", "black", "black"];
+  const fill = b.fill ?? st[0];
+  return { fill: constants.fill_colors[colorKey(fill)] || fill, stroke: ink(b.border ?? st[1]), color: ink(b.color ?? st[2]) };
+}
+function draw() {
+  const W = $("world"); W.innerHTML = "";
+  W.setAttribute("transform", `translate(${view.tx},${view.ty}) scale(${view.z},${-view.z})`);
+  drawGrid();
+  if (!table) return;
+  const lw = 0.02 / S(), hw = 1.6 / view.z;
+  // regions
+  regions().forEach((r, i) => {
+    const [x0, x1] = [Math.min(r.from[0], r.to[0]), Math.max(r.from[0], r.to[0])];
+    const [y0, y1] = [Math.min(r.from[1], r.to[1]), Math.max(r.from[1], r.to[1])];
+    const a = analysis && analysis.regions && analysis.regions[i];
+    const fill = r.fill === "none" ? "none" : (a && a.fill) || "#e2efd9";
+    const border = r.border || (r.fill === "none" ? "dashed" : "none");
+    el("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill,
+      stroke: border === "none" ? "none" : (a && a.edge) || "#2f6fae", "stroke-width": lw * 0.8,
+      "stroke-dasharray": border === "dashed" ? `${0.085 / S()} ${0.056 / S()}` : border === "dotted" ? `${0.02 / S()} ${0.04 / S()}` : "" }, W);
+    if (r.label) {
+      const pos = r.label_pos || "below", f = fontU(r.size), g = 0.08 / S();
+      const p = { below: [(x0 + x1) / 2, y0 - g - f * 0.6], above: [(x0 + x1) / 2, y1 + g + f * 0.6],
+        left: [x0 - g, (y0 + y1) / 2], right: [x1 + g, (y0 + y1) / 2],
+        inside: [(x0 + x1) / 2, y1 - 0.06 / S() - f * 0.6] }[pos];
+      svgText(W, r.label, p[0], p[1], { anchor: pos === "left" ? "end" : pos === "right" ? "start" : "middle" });
+    }
+    const on = sel.region === i;
+    el("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill: "none",
+      stroke: on ? "#2457d6" : "transparent", "stroke-width": on ? 2 / view.z : 10 / view.z,
+      "pointer-events": "stroke", "data-region": i, style: "cursor:move" }, W);
+    if (on) for (const [k, p] of [["lo", [x0, y0]], ["hi", [x1, y1]]])
+      el("rect", { x: p[0] - hw * 2, y: p[1] - hw * 2, width: hw * 4, height: hw * 4, fill: "#fff",
+        stroke: "#2457d6", "stroke-width": 1.2 / view.z, class: "handle", "data-rhandle": `${i}:${k}` }, W);
+  });
+  // links
+  const ah = 0.14 / S();
+  links().forEach((lk, li) => {
+    const pts = linkPoints(lk); if (!pts) return;
+    const on = sel.link === li;
+    const d = pts.map((p) => p.join(",")).join(" ");
+    if (on) el("polyline", { points: d, fill: "none", stroke: "#2457d6", opacity: 0.25, "stroke-width": lw * 5 }, W);
+    const color = ink(lk.color), dash = lk.dash || "solid";
+    el("polyline", { points: d, fill: "none", stroke: color, "stroke-width": lw,
+      "data-line": li, "stroke-dasharray": dash === "dashed" ? `${0.085 / S()} ${0.056 / S()}` : dash === "dotted" ? `${0.02 / S()} ${0.04 / S()}` : "" }, W);
+    const arrow = lk.arrow || "end";
+    if (arrow === "end" || arrow === "both") arrowHead(W, pts[pts.length - 2], pts[pts.length - 1], ah, color);
+    if (arrow === "start" || arrow === "both") arrowHead(W, pts[1], pts[0], ah, color);
+    el("polyline", { points: d, fill: "none", stroke: "transparent", "stroke-width": 9 / view.z,
+      "data-link": li, style: "cursor:pointer" }, W);
+    if (lk.label) {
+      const [p] = along(pts, lk.label_at ?? 0.5), f = fontU(lk.size_pt), g = 0.08 / S();
+      const off = { above: [0, g + f * 0.6], below: [0, -g - f * 0.6], left: [-g - f, 0], right: [g + f, 0] }[lk.label_pos || "above"];
+      svgText(W, lk.label, p[0] + off[0], p[1] + off[1], { color });
+    }
+    if (on || sel.corner && sel.corner.link === li) {
+      (lk.via || []).forEach((p, k) => el("circle", { cx: p[0], cy: p[1], r: hw * 2.4, fill: "#fff",
+        stroke: "#2457d6", "stroke-width": 1.2 / view.z, class: "handle", "data-corner": `${li}:${k}` }, W));
+      for (const key of ["from", "to"]) if (Array.isArray(lk[key]))
+        el("rect", { x: lk[key][0] - hw * 2, y: lk[key][1] - hw * 2, width: hw * 4, height: hw * 4, fill: "#fff",
+          stroke: "#2457d6", "stroke-width": 1.2 / view.z, class: "handle", "data-end": `${li}:${key}` }, W);
+    }
+  });
+  for (const p of (analysis && analysis.dots) || [])
+    el("circle", { cx: p[0], cy: p[1], r: 0.046 / S(), fill: "#000" }, W);
+  // blocks
+  for (const b of blocks()) drawBlock(W, b, lw);
+  // free text
+  texts().forEach((t, i) => {
+    const on = sel.texts.has(i);
+    const a = t.anchor || "center";
+    const anchor = a.includes("west") ? "start" : a.includes("east") ? "end" : "middle";
+    const f = fontU(t.size_pt), n = String(t.text).split("\\\\").length;
+    const dy = a.includes("south") ? f * 0.6 * n : a.includes("north") ? -f * 0.6 * n : 0;
+    const g = svgText(W, t.text, t.at[0], t.at[1] + dy, { anchor, color: t.color ? ink(t.color) : "#000", size: f });
+    g.setAttribute("data-text", i); g.style.cursor = "move";
+    if (on) el("rect", { x: t.at[0] - hw * 2, y: t.at[1] - hw * 2, width: hw * 4, height: hw * 4, fill: "#2457d6" }, W);
+  });
+  // link mode: ports
+  if (linkMode) for (const b of blocks()) for (const [name, p] of Object.entries(ports(b)))
+    el("circle", { cx: p[0], cy: p[1], r: 4 / view.z, fill: linkStart && linkStart.ref === `${b.id}.${name}` ? "#2457d6" : "rgba(36,87,214,.35)",
+      class: "port", "data-port": `${b.id}.${name}` }, W);
+}
+function arrowHead(W, a, b, len, color) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+  const w = len * 0.42;
+  const p = [[b[0], b[1]], [b[0] - ux * len - uy * w, b[1] - uy * len + ux * w],
+    [b[0] - ux * len * 0.75, b[1] - uy * len * 0.75], [b[0] - ux * len + uy * w, b[1] - uy * len - ux * w]];
+  el("polygon", { points: p.map((q) => q.join(",")).join(" "), fill: color }, W);
+}
+function along(pts, t) {
+  const seg = []; let total = 0;
+  for (let i = 0; i + 1 < pts.length; i++) { const L = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); seg.push(L); total += L; }
+  let left = t * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (left <= seg[i] || i === seg.length - 1) {
+      const k = seg[i] ? Math.min(left / seg[i], 1) : 0, a = pts[i], b = pts[i + 1];
+      return [[a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], [b[0] - a[0], b[1] - a[1]]];
+    }
+    left -= seg[i];
+  }
+  return [pts[pts.length - 1], [1, 0]];
+}
+function drawBlock(W, b, lw) {
+  const g = el("g", { "data-block": b.id, class: "block-body" }, W);
+  const on = sel.blocks.has(b.id), selStroke = "#2457d6";
+  const { fill, stroke, color } = blockColors(b);
+  if (on) {
+    const [x0, y0, x1, y1] = blockRect(b), m = 4 / view.z;
+    el("rect", { x: x0 - m, y: y0 - m, width: x1 - x0 + 2 * m, height: y1 - y0 + 2 * m,
+      fill: "none", stroke: selStroke, "stroke-width": 1.5 / view.z, "stroke-dasharray": `${4 / view.z} ${3 / view.z}`, "data-selection": b.id }, g);
+  }
+  if (b.type === "switch") {
+    const pole = b.pole, th = b.throws || {}, on_ = th[b.on] || Object.values(th)[0], c = contactR();
+    if (on_) el("line", { x1: pole[0], y1: pole[1], x2: on_[0], y2: on_[1], stroke, "stroke-width": lw }, g);
+    for (const [k, p] of Object.entries(th)) {
+      const d = Math.hypot(p[0] - pole[0], p[1] - pole[1]) || 1, gap = 0.2 / S();
+      svgText(g, k, p[0] + (p[0] - pole[0]) / d * gap, p[1] + (p[1] - pole[1]) / d * gap, { color: b.color ? ink(b.color) : "#000" });
+    }
+    for (const p of [pole, ...Object.values(th)]) el("circle", { cx: p[0], cy: p[1], r: c, fill, stroke, "stroke-width": lw, "pointer-events": "all" }, g);
+    const [x0, y0, x1, y1] = blockRect(b), m = 0.12;
+    el("rect", { x: x0 - m, y: y0 - m, width: x1 - x0 + 2 * m, height: y1 - y0 + 2 * m, fill: "transparent",
+      stroke: "none" }, g);
+    return;
+  }
+  if (isCircle(b)) {
+    const r = sumR(), [x, y] = b.at;
+    el("circle", { cx: x, cy: y, r, fill, stroke, "stroke-width": lw, "pointer-events": "all" }, g);
+    if (b.type === "mul") { const k = r * 0.62 * Math.SQRT1_2;
+      el("path", { d: `M${x - k},${y - k}L${x + k},${y + k}M${x - k},${y + k}L${x + k},${y - k}`, stroke, "stroke-width": lw }, g); }
+    if (b.type === "div") {
+      el("line", { x1: x - r * 0.6, y1: y, x2: x + r * 0.6, y2: y, stroke, "stroke-width": lw }, g);
+      for (const s of [1, -1]) el("circle", { cx: x, cy: y + s * r * 0.45, r: r * 0.09, fill: stroke }, g);
+    }
+    for (const [side, sign] of Object.entries(b.signs || {})) {
+      const u = { w: [-1, 0], e: [1, 0], n: [0, 1], s: [0, -1] }[side]; if (!u) continue;
+      const gap = r + 0.1 / S(), lift = 0.16 / S();
+      const px = u[0] ? 0 : -lift, py = u[0] ? lift : 0;
+      svgText(g, sign === "-" ? "−" : "+", x + u[0] * gap + px, y + u[1] * gap + py, { color });
+    }
+    if (b.label) blockLabel(g, b, [x - r, y - r, x + r, y + r]);
+    return;
+  }
+  const [x0, y0, x1, y1] = blockRect(b);
+  el("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill, stroke,
+    "stroke-width": b.type === "tag" ? lw * 0.6 : lw, "pointer-events": "all" }, g);
+  if (b.type === "limiter") {
+    const [x, y] = b.at, [w, h] = b.size, ax = w * 0.36, ay = h * 0.36, kx = w * 0.16, ky = h * 0.24, fx = w * 0.34;
+    el("path", { d: `M${x - ax},${y}L${x + ax},${y}M${x},${y - ay}L${x},${y + ay}`, stroke, "stroke-width": lw * 0.5 }, g);
+    el("polyline", { points: `${x - fx},${y - ky} ${x - kx},${y - ky} ${x + kx},${y + ky} ${x + fx},${y + ky}`, fill: "none", stroke, "stroke-width": lw }, g);
+  } else if (b.text) svgText(g, b.text, b.at[0], b.at[1], { color, size: fontU(b.size_pt) });
+  if (b.label) blockLabel(g, b, [x0, y0, x1, y1]);
+}
+function blockLabel(g, b, [x0, y0, x1, y1]) {
+  const f = fontU(b.size_pt), n = String(b.label).split("\\\\").length, gp = 0.08 / S();
+  const h = f * 1.2 * n / 2, pos = b.label_pos || "below", cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const p = { below: [cx, y0 - gp - h, "middle"], above: [cx, y1 + gp + h, "middle"],
+    left: [x0 - gp, cy, "end"], right: [x1 + gp, cy, "start"] }[pos];
+  svgText(g, b.label, p[0], p[1], { anchor: p[2], color: b.color ? ink(b.color) : "#000", size: f });
+}
+function drawGrid() {
+  const G = $("gridLayer"); G.innerHTML = "";
+  const svg = $("canvas"), W = svg.clientWidth, H = svg.clientHeight;
+  const minor = view.z * 0.5 >= 14 ? 0.5 : view.z >= 14 ? 1 : 2;
+  const x0 = Math.floor(-view.tx / view.z / minor) * minor, x1 = (W - view.tx) / view.z;
+  const y1 = Math.ceil(view.ty / view.z / minor) * minor, y0 = (view.ty - H) / view.z;
+  for (let x = x0; x <= x1; x += minor) {
+    const sx = view.tx + x * view.z, major = Math.abs(x / (minor * 2) - Math.round(x / (minor * 2))) < 1e-6;
+    el("line", { x1: sx, y1: 0, x2: sx, y2: H, stroke: major ? "var(--grid-major)" : "var(--grid-minor)" }, G);
+  }
+  for (let y = y1; y >= y0; y -= minor) {
+    const sy = view.ty - y * view.z, major = Math.abs(y / (minor * 2) - Math.round(y / (minor * 2))) < 1e-6;
+    el("line", { x1: 0, y1: sy, x2: W, y2: sy, stroke: major ? "var(--grid-major)" : "var(--grid-minor)" }, G);
+  }
+}
+function extent() {
+  const xs = [], ys = [];
+  for (const b of blocks()) { const r = blockRect(b); xs.push(r[0], r[2]); ys.push(r[1], r[3]); }
+  for (const r of regions()) { xs.push(r.from[0], r.to[0]); ys.push(r.from[1], r.to[1]); }
+  for (const lk of links()) { const p = linkPoints(lk); if (p) for (const q of p) { xs.push(q[0]); ys.push(q[1]); } }
+  for (const t of texts()) { xs.push(t.at[0]); ys.push(t.at[1]); }
+  if (!xs.length) return [0, 0, 4, 3];
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+function fit() {
+  const [x0, y0, x1, y1] = extent(), svg = $("canvas"), W = svg.clientWidth, H = svg.clientHeight;
+  view.z = Math.max(8, Math.min((W - 60) / Math.max(x1 - x0, 1), (H - 60) / Math.max(y1 - y0, 1), 200));
+  view.tx = (W - (x1 - x0) * view.z) / 2 - x0 * view.z;
+  view.ty = (H + (y1 - y0) * view.z) / 2 + y0 * view.z;
+  draw();
+}
+
+// ---------------------------------------------------------------- issues & selection panel
+function showIssues() {
+  const a = analysis, st = $("status");
+  st.className = a.ok ? "ok" : "bad";
+  st.textContent = a.ok ? `通过校验（${(a.scale_cm_per_unit).toFixed(2)} cm/单位）` + (a.warnings.length ? `，${a.warnings.length} 条提醒` : "")
+    : `${a.errors.length} 个错误，不能导出`;
+  const ul = $("issues"); ul.innerHTML = "";
+  for (const [kind, list] of [["error", a.errors], ["warning", a.warnings]])
+    for (const msg of list) {
+      const li = document.createElement("li"); li.className = kind; li.textContent = msg;
+      li.onclick = () => selectFromMessage(msg); ul.appendChild(li);
+    }
+}
+function selectFromMessage(msg) {
+  clearSel();
+  let m = msg.match(/links\[(\d+)\]/); if (m) sel.link = +m[1];
+  m = msg.match(/texts\[(\d+)\]/); if (m) sel.texts.add(+m[1]);
+  m = msg.match(/regions\[(\d+)\]/); if (m) sel.region = +m[1];
+  for (const b of blocks()) if (new RegExp(`(^|[^A-Za-z0-9_\\[])${b.id}([^A-Za-z0-9_]|$)`).test(msg)) sel.blocks.add(b.id);
+  draw(); showSelection();
+}
+function clearSel() { sel = { blocks: new Set(), texts: new Set(), link: null, corner: null, region: null }; }
+function pruneSelection() {
+  for (const id of [...sel.blocks]) if (!blockById(id)) sel.blocks.delete(id);
+  for (const i of [...sel.texts]) if (i >= texts().length) sel.texts.delete(i);
+  if (sel.link !== null && sel.link >= links().length) sel.link = null;
+  if (sel.region !== null && sel.region >= regions().length) sel.region = null;
+  if (sel.corner && !(links()[sel.corner.link] && (links()[sel.corner.link].via || [])[sel.corner.i])) sel.corner = null;
+}
+function selectedItem() {
+  const n = sel.blocks.size + sel.texts.size + (sel.link !== null) + (sel.region !== null);
+  if (n !== 1) return null;
+  if (sel.blocks.size) { const id = [...sel.blocks][0]; return { kind: "block", obj: blockById(id), id }; }
+  if (sel.texts.size) { const i = [...sel.texts][0]; return { kind: "text", obj: texts()[i], i }; }
+  if (sel.link !== null) return { kind: "link", obj: links()[sel.link], i: sel.link };
+  return { kind: "region", obj: regions()[sel.region], i: sel.region };
+}
+function showSelection() {
+  const item = selectedItem(), n = sel.blocks.size + sel.texts.size;
+  $("selJson").style.display = item ? "" : "none";
+  $("selActions").style.display = item ? "" : "none";
+  $("lBtn").style.display = item && item.kind === "link" ? "" : "none";
+  if (item) {
+    $("selInfo").textContent = { block: `方块 ${item.id}`, text: `文字 texts[${item.i}]`, link: `连线 links[${item.i}]`, region: `区域 regions[${item.i}]` }[item.kind]
+      + "：在下面修改外观或文字；高级设置可编辑 JSON。";
+    $("selJson").value = pretty(item.obj);
+  } else if (n > 1) $("selInfo").textContent = `已选 ${sel.blocks.size} 个方块、${sel.texts.size} 段文字：可整体拖动、方向键微调，或存为片段。`;
+  else $("selInfo").textContent = "点选方块、连线拐点、文字或区域边框；Shift 点选可多选，空白处拖动可框选。拖方块时，相连的拐点跟着移动，保持横平竖直。双击连线可加拐点。";
+  showTexBox(item);
+  showAppearance();
+}
+
+// Same dropdown + custom picker interaction as the circuit editor. Colour
+// choices/aliases are supplied by Python; selection never rewrites other keys.
+function appearanceItems() {
+  const item = selectedItem();
+  return item ? [item] : [...sel.blocks].map(id => ({ kind: "block", id, obj: blockById(id) }))
+    .concat([...sel.texts].map(i => ({ kind: "text", i, obj: texts()[i] })));
+}
+function setAppearance(key, value, kinds) {
+  const next = clone(table);
+  for (const item of appearanceItems().filter(i => kinds.includes(i.kind))) {
+    const obj = item.kind === "block" ? next.blocks.find(b => b.id === item.id)
+      : { text: next.texts, link: next.links, region: next.regions }[item.kind][item.i];
+    if (value === "") delete obj[key]; else obj[key] = value;
+  }
+  commit(next);
+}
+function showAppearance() {
+  const box = $("appearance"), items = appearanceItems(); box.innerHTML = "";
+  box.style.display = items.length ? "" : "none";
+  if (!items.length) return;
+  const title = document.createElement("strong"); title.textContent = "外观"; box.appendChild(title);
+  const names = { cyan: "青", yellow: "黄", green: "绿", orange: "橙", white: "白", gray: "灰", blue: "浅蓝",
+    red: "红", purple: "紫", teal: "青绿", magenta: "品红", black: "黑", none: "无", solid: "实线", dashed: "虚线", dotted: "点线" };
+  function row(label, key, values, kinds, picker, colors) {
+    const targets = items.filter(i => kinds.includes(i.kind)); if (!targets.length) return;
+    function optionValue(value) {
+      if (!picker) return value ?? "";
+      const name = colorKey(value ?? "");
+      if (!name || values.includes(name) || name.startsWith("#")) return name;
+      const aliases = picker === "ink" ? constants.ink_aliases : constants.color_aliases;
+      // Block fill_colors already resolves the block-specific cyan aliases.
+      // Only match display options here; opening the panel must not edit JSON.
+      const resolved = colors[name] || colors[aliases[name]];
+      return values.find(v => resolved && colors[v] === resolved)
+        || (values.includes(aliases[name]) ? aliases[name] : name);
+    }
+    const current = targets.map(i => optionValue(i.obj[key])), mixed = current.some(v => v !== current[0]);
+    const wrap = document.createElement("div"); wrap.className = "row";
+    const caption = document.createElement("label"), select = document.createElement("select");
+    caption.textContent = label; select.id = `appearance-${key}`; caption.htmlFor = select.id;
+    select.setAttribute("aria-label", label);
+    for (const v of ["", ...values]) {
+      const option = document.createElement("option"); option.value = v;
+      option.textContent = v === "" ? "默认（按类型）" : (key !== "fill" && v === "blue" ? "蓝" : names[v] || v);
+      if (colors?.[v] && v !== "none") {
+        if (picker === "fill") option.style.backgroundColor = colors[v]; else option.style.color = colors[v];
+      }
+      select.appendChild(option);
+    }
+    const cur = mixed ? "__mixed__" : current[0];
+    if (cur && !values.includes(cur)) {
+      const option = document.createElement("option"); option.value = cur; option.textContent = mixed ? "多种值（改动将统一）" : cur;
+      option.disabled = mixed; select.appendChild(option);
+    }
+    select.value = cur; select.onchange = () => setAppearance(key, select.value, kinds);
+    wrap.append(caption, select);
+    if (picker) {
+      const input = document.createElement("input"); input.type = "color"; input.id = `appearance-${key}-custom`;
+      input.title = `${label}：自定义颜色（#rrggbb）`; input.setAttribute("aria-label", `${label}自定义颜色`);
+      const first = targets[0], fallback = first.kind === "block" ? blockColors(first.obj)[{fill: "fill", border: "stroke", color: "color"}[key]]
+        : first.kind === "region" ? analysis?.regions[first.i]?.[key === "fill" ? "fill" : "edge"] : ink(first.obj.color);
+      const canonical = constants.color_aliases[colorKey(current[0])] || colorKey(current[0]);
+      const resolved = !current[0] ? fallback : picker === "ink" ? ink(current[0]) : colors[colorKey(current[0])] || colors[canonical] || current[0];
+      input.value = /^#[0-9a-f]{6}$/i.test(resolved || "") ? resolved : constants.inks.black;
+      input.onchange = () => setAppearance(key, input.value, kinds); wrap.appendChild(input);
+    }
+    box.appendChild(wrap);
+  }
+  row("填充", "fill", Object.keys(constants.fills), ["block"], "fill", constants.fill_colors);
+  row("边框", "border", Object.keys(constants.inks), ["block"], "ink", constants.inks);
+  row(items.some(i => i.kind === "block") ? "文字" : "颜色", "color", Object.keys(constants.inks), ["block", "text", "link"], "ink", constants.inks);
+  row("线型", "dash", constants.dashes, ["link"]);
+  row("填充", "fill", [...Object.keys(constants.palette), "none"], ["region"], "fill", constants.palette);
+  row("边框样式", "border", constants.borders, ["region"]);
+  row("边框颜色", "border_color", Object.keys(constants.palette), ["region"], "fill", constants.palette_edges);
+}
+// ---------------------------------------------------------------- text and formula box
+// which fields of each kind of object hold printed text: field -> name shown in the page
+function textFields(item) {
+  if (item.kind === "block") {
+    const b = item.obj, f = {};
+    if (isBox(b) && b.type !== "limiter") f.text = "框内文字";
+    f.label = "框外说明"; return f;
+  }
+  return { text: { text: "文字" }, link: { label: "线旁文字" }, region: { label: "区域说明" } }[item.kind];
+}
+// palette: [shown, inserted before the cursor, inserted after it, tooltip]
+const TEX_PALETTE = [
+  ["希腊", [["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"], ["ε", "\\varepsilon"], ["θ", "\\theta"],
+            ["λ", "\\lambda"], ["μ", "\\mu"], ["ξ", "\\xi"], ["π", "\\pi"], ["ρ", "\\rho"], ["σ", "\\sigma"], ["τ", "\\tau"],
+            ["φ", "\\varphi"], ["ψ", "\\psi"], ["ω", "\\omega"], ["Δ", "\\Delta"], ["Φ", "\\Phi"], ["Ψ", "\\Psi"], ["Ω", "\\Omega"]]],
+  ["结构", [["x²", "^{", "}", "上标"], ["x₂", "_{", "}", "下标"], ["a/b", "\\frac{", "}{}", "分数"], ["√", "\\sqrt{", "}", "根号"],
+            ["x̂", "\\hat{", "}", "帽子（估计值）"], ["x̄", "\\bar{", "}", "上划线（平均值）"], ["ẋ", "\\dot{", "}", "一阶导数"],
+            ["ẍ", "\\ddot{", "}", "二阶导数"], ["𝐱", "\\mathbf{", "}", "粗体（矢量）"], ["Rm", "\\mathrm{", "}", "正体（下标里的文字）"],
+            ["‖x‖", "\\|", "\\|", "范数"], ["|x|", "|", "|", "绝对值"], ["( )", "\\left(", "\\right)", "自动大小的括号"]]],
+  ["算子", [["±", "\\pm"], ["×", "\\times"], ["·", "\\cdot"], ["∫", "\\int"], ["∑", "\\sum"], ["∂", "\\partial"],
+            ["∇", "\\nabla"], ["d/dt", "\\frac{d}{dt}"], ["1/s", "\\frac{1}{s}"], ["z⁻¹", "z^{-1}"], ["e^x", "e^{", "}"],
+            ["argmin", "\\arg\\min_{", "}"], ["max", "\\max_{", "}"], ["∠", "\\angle"], ["∞", "\\infty"]]],
+  ["关系", [["=", "="], ["≈", "\\approx"], ["≠", "\\neq"], ["≤", "\\leq"], ["≥", "\\geq"], ["→", "\\rightarrow"],
+            ["←", "\\leftarrow"], ["°", "^{\\circ}"], ["…", "\\ldots"]]],
+  ["排版", [["换行", "\\\\", "", "\\\\ 换行（公式外使用）"], ["空格", "\\,", "", "公式里的小空格"], ["$ $", "$", "$", "开始一段公式"]]],
+];
+let texKey = null, texTimer = null, texPrevTimer = null, texSeq = 0;
+function texTarget() {
+  const item = selectedItem(); if (!item) return null;
+  const fields = textFields(item); const field = $("texField").value;
+  return fields && field in fields ? { item, field } : null;
+}
+function showTexBox(item) {
+  const fields = item && textFields(item);
+  $("texBox").style.display = fields ? "" : "none";
+  if (!fields) { texKey = null; return; }
+  const key = item.kind + ":" + (item.id ?? item.i);
+  if (key !== texKey) {
+    const keep = $("texField").value;
+    $("texField").innerHTML = Object.entries(fields).map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+    if (keep in fields && texKey && texKey.split(":")[0] === item.kind) $("texField").value = keep;
+  }
+  const value = item.obj[$("texField").value] || "";
+  // keep the cursor while the user is typing: the box already holds this text
+  if (key !== texKey || document.activeElement !== $("texInput")) {
+    if ($("texInput").value !== value) $("texInput").value = value;
+    if (key !== texKey) texPreview(0);
+  }
+  texKey = key;
+}
+function texChanged() {
+  clearTimeout(texTimer);
+  texTimer = setTimeout(() => {
+    const t = texTarget(); if (!t) return;
+    const value = $("texInput").value, old = t.item.obj[t.field] || "";
+    if (value === old) return;
+    const next = clone(table);
+    const obj = t.item.kind === "block" ? next.blocks.find((b) => b.id === t.item.id)
+      : { text: next.texts, link: next.links, region: next.regions }[t.item.kind][t.item.i];
+    if (value) obj[t.field] = value; else delete obj[t.field];
+    commit(next);
+  }, 350);
+  texPreview(900);
+}
+function texPreview(delay) {
+  clearTimeout(texPrevTimer);
+  texPrevTimer = setTimeout(async () => {
+    const seq = ++texSeq, text = $("texInput").value, t = texTarget();
+    const img = $("texImg"), msg = $("texMsg");
+    if (!text.trim()) { img.style.display = "none"; msg.textContent = "（空）"; msg.style.display = ""; return; }
+    msg.textContent = "排版中…"; msg.style.display = "";
+    try {
+      const r = await api("/api/tex-preview", { text, profile, size_pt: t ? t.item.obj.size_pt : undefined });
+      if (seq !== texSeq) return;
+      img.src = "data:image/png;base64," + r.png; img.style.display = ""; msg.style.display = "none";
+    } catch (e) {
+      if (seq !== texSeq) return;
+      img.style.display = "none"; msg.textContent = e.message; msg.style.display = "";
+    }
+  }, delay);
+}
+// inside a formula when an odd number of unescaped $ come before the cursor
+function inMath(s, pos) {
+  let n = 0;
+  for (let i = 0; i < pos; i++) if (s[i] === "$" && s[i - 1] !== "\\") n++;
+  return n % 2 === 1;
+}
+function texInsert(before, after = "") {
+  const ta = $("texInput"), a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
+  const wrap = before !== "$" && !before.startsWith("\\\\") && !inMath(v, a);
+  const pre = (wrap ? "$" : "") + before, post = after + (wrap ? "$" : "");
+  ta.value = v.slice(0, a) + pre + v.slice(a, b) + post + v.slice(b);
+  const caret = a + pre.length + (b - a);
+  ta.focus(); ta.setSelectionRange(caret, caret);
+  texChanged();
+}
+function buildPalette() {
+  $("texPalette").innerHTML = "";
+  for (const [group, items] of TEX_PALETTE) {
+    const g = document.createElement("div"); g.className = "grp";
+    g.innerHTML = `<span>${group}</span>`;
+    for (const [shown, before, after, tip] of items) {
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = shown;
+      bt.title = (tip ? tip + "：" : "") + before + "…" + (after || "");
+      bt.onmousedown = (e) => e.preventDefault();      // keep the cursor in the text box
+      bt.onclick = () => texInsert(before, after);
+      g.appendChild(bt);
+    }
+    $("texPalette").appendChild(g);
+  }
+}
+
+function applySelJson() {
+  const item = selectedItem(); if (!item) return;
+  let obj; try { obj = JSON.parse($("selJson").value); } catch (e) { toast("JSON 格式不对：" + e.message); return; }
+  const next = clone(table);
+  if (item.kind === "block") {
+    const k = next.blocks.findIndex((b) => b.id === item.id); next.blocks[k] = obj;
+    if (obj.id && obj.id !== item.id) { renameRefs(next, item.id, obj.id); sel.blocks = new Set([obj.id]); }
+  } else if (item.kind === "text") next.texts[item.i] = obj;
+  else if (item.kind === "link") next.links[item.i] = obj;
+  else next.regions[item.i] = obj;
+  commit(next);
+}
+function renameRefs(t, old, neu) {
+  for (const lk of t.links || []) for (const key of ["from", "to"]) {
+    const ref = parseRef(lk[key]); if (ref && ref.block === old) lk[key] = neu + lk[key].slice(old.length);
+  }
+  for (const r of t.regions || []) if (r.members) r.members = r.members.map((m) => m === old ? neu : m);
+}
+
+// ---------------------------------------------------------------- editing operations
+function eq(a, b) { return Math.abs(a - b) < 1e-6; }
+// Move point k of a polyline and drag along the neighbours that shared its
+// x (vertical segment) or y (horizontal segment), so the route stays square.
+function movePoint(pts, old, k, p, fixed) {
+  pts[k] = p;
+  for (const dir of [-1, 1]) {
+    let i = k;
+    while (true) {
+      const j = i + dir;
+      if (j < 0 || j >= pts.length || fixed(j)) break;
+      const horiz = eq(old[i][1], old[j][1]) && !eq(old[i][0], old[j][0]);
+      const vert = eq(old[i][0], old[j][0]) && !eq(old[i][1], old[j][1]);
+      if (horiz && !eq(pts[j][1], pts[i][1])) pts[j] = [pts[j][0], pts[i][1]];
+      else if (vert && !eq(pts[j][0], pts[i][0])) pts[j] = [pts[i][0], pts[j][1]];
+      else break;
+      i = j;
+    }
+  }
+}
+function storePoints(lk, pts) {
+  if (Array.isArray(lk.from)) lk.from = pts[0].map(r4);
+  if (Array.isArray(lk.to)) lk.to = pts[pts.length - 1].map(r4);
+  lk.via = pts.slice(1, -1).map((p) => p.map(r4));
+  if (!lk.via.length) delete lk.via;
+}
+function moveSelection(base, dx, dy) {
+  const t = clone(base), tb = table; table = t;   // endPoint() reads the table being built
+  const ids = sel.blocks, mv = (p) => [r4(p[0] + dx), r4(p[1] + dy)];
+  const before = {};
+  t.links = t.links || [];
+  t.links.forEach((lk, i) => { table = base; before[i] = linkPoints(lk); table = t; });
+  for (const b of t.blocks || []) if (ids.has(b.id)) {
+    if (b.type === "switch") { b.pole = mv(b.pole); for (const k in b.throws) b.throws[k] = mv(b.throws[k]); }
+    else b.at = mv(b.at);
+  }
+  for (const i of sel.texts) t.texts[i].at = mv(t.texts[i].at);
+  t.links.forEach((lk, i) => {
+    const old = before[i]; if (!old) return;
+    const fr = parseRef(lk.from), to = parseRef(lk.to);
+    const fMoved = fr && ids.has(fr.block), tMoved = to && ids.has(to.block);
+    if (!fMoved && !tMoved) return;
+    // both ends travel with the selection: shift the whole route
+    if (fMoved && tMoved) { storePoints(lk, old.map(mv)); return; }
+    const pts = old.map((p) => p.slice());
+    const last = pts.length - 1;
+    const fixed = (j) => (j === 0 && !fMoved) || (j === last && !tMoved);
+    if (fMoved) movePoint(pts, old, 0, mv(old[0]), (j) => fixed(j) || j === last);
+    const mid = pts.map((p) => p.slice());
+    if (tMoved) movePoint(pts, mid, last, mv(old[last]), (j) => fixed(j) || j === 0);
+    storePoints(lk, pts);
+  });
+  table = tb;
+  return t;
+}
+function nextId(prefix) {
+  let k = 1; while (blockById(prefix + k)) k++; return prefix + k;
+}
+function viewCentre() {
+  const svg = $("canvas");
+  return [snap((svg.clientWidth / 2 - view.tx) / view.z), snap((view.ty - svg.clientHeight / 2) / view.z)];
+}
+function addItem(kind) {
+  const [x, y] = viewCentre(), next = clone(table);
+  next.blocks = next.blocks || [];
+  const [type, style] = kind.split(":");
+  let b = null;
+  if (type === "block") b = { id: nextId("blk"), type, at: [x, y], size: [1.6, 0.8], text: "PI\\\\controller" };
+  if (type === "limiter") b = { id: nextId("lim"), type, at: [x, y], size: [0.8, 0.6], label: "$0\\sim 1$" };
+  if (type === "tag") b = { id: nextId(style === "meas" ? "meas" : "ref"), type, style, at: [x, y], size: [1.0, 0.5], text: style === "meas" ? "$v_{o}$" : "$V_{\\mathrm{ref}}$" };
+  if (type === "sum") b = { id: nextId("sum"), type, at: [x, y], signs: { w: "+", s: "-" } };
+  if (type === "mul" || type === "div") b = { id: nextId(type), type, at: [x, y] };
+  if (type === "switch") b = { id: nextId("sw"), type, pole: [x, y], throws: { A: [r4(x - 0.5), r4(y + 0.4)], B: [r4(x - 0.5), r4(y - 0.4)] }, on: "A" };
+  if (b) { next.blocks.push(b); clearSel(); sel.blocks.add(b.id); commit(next); return; }
+  if (type === "text") { next.texts = next.texts || []; next.texts.push({ at: [x, y], text: "Text" });
+    clearSel(); sel.texts.add(next.texts.length - 1); commit(next); return; }
+  if (type === "region") {
+    if (!sel.blocks.size) { toast("先选中要框住的方块"); return; }
+    let r = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const id of sel.blocks) { const q = blockRect(blockById(id)); r = [Math.min(r[0], q[0]), Math.min(r[1], q[1]), Math.max(r[2], q[2]), Math.max(r[3], q[3])]; }
+    const m = 0.3, box = { from: [snap(r[0] - m), snap(r[1] - m)], to: [snap(r[2] + m), snap(r[3] + m)] };
+    next.regions = next.regions || [];
+    if (style === "green") next.regions.unshift({ ...box, fill: "green", label: "Controller", label_pos: "inside" });
+    else next.regions.push({ ...box, fill: "none", border: "dashed", border_color: "blue", label: "Loop", members: [...sel.blocks] });
+    commit(next);
+  }
+}
+function deleteSelection() {
+  const next = clone(table);
+  if (sel.corner) { next.links[sel.corner.link].via.splice(sel.corner.i, 1);
+    if (!next.links[sel.corner.link].via.length) delete next.links[sel.corner.link].via; sel.corner = null; commit(next); return; }
+  const gone = sel.blocks;
+  next.blocks = (next.blocks || []).filter((b) => !gone.has(b.id));
+  next.links = (next.links || []).filter((lk, i) => i !== sel.link &&
+    ![lk.from, lk.to].some((v) => { const r = parseRef(v); return r && gone.has(r.block); }));
+  next.texts = (next.texts || []).filter((t, i) => !sel.texts.has(i));
+  next.regions = (next.regions || []).filter((r, i) => i !== sel.region)
+    .map((r) => r.members ? { ...r, members: r.members.filter((m) => !gone.has(m)) } : r);
+  if (next.loop) {   // loop data of a deleted block would fail the checker
+    for (const id of gone) if (next.loop.tf) delete next.loop.tf[id];
+    if (next.loop.plant) next.loop.plant = next.loop.plant.filter((p) => !gone.has(p.from) && !gone.has(p.to));
+    if (next.loop.breaks) next.loop.breaks = next.loop.breaks.filter((b) => !gone.has(typeof b === "string" ? b : b.at));
+    if (next.loop.closed) next.loop.closed = next.loop.closed.filter((c) => !gone.has(c.from) && !gone.has(c.to));
+  }
+  // a function block's declaration and code settings go with it; listed
+  // inputs and outputs drop its signals ("blk" or "blk.out")
+  if (next.functions) for (const id of gone) delete next.functions[id];
+  if (next.code) {
+    if (next.code.blocks) for (const id of gone) delete next.code.blocks[id];
+    for (const key of ["external", "outputs"])
+      if (Array.isArray(next.code[key])) next.code[key] = next.code[key].filter((s) => !gone.has(String(s).split(".")[0]));
+  }
+  clearSel(); commit(next);
+}
+// ---------------------------------------------------------------- copy, cut, paste
+// The server cuts the selection out the same way it saves a snippet (links
+// between the chosen blocks, regions around them, their transfer functions
+// and function-block entries) and renames clashing ids on paste.
+const PASTE_STEP = [0.5, -0.5];   // each paste lands this far from the last, like the circuit editor
+let clipboard = null;
+async function copySelection(quiet = false) {
+  if (!sel.blocks.size && !sel.texts.size) { toast("先选中要复制的方块或文字"); return false; }
+  try {
+    const r = await api("/api/copy", { table, ids: [...sel.blocks], texts: [...sel.texts] });
+    clipboard = { part: r.part, next: r.corner.map((v, i) => r4(v + PASTE_STEP[i])) };
+    if (!quiet) toast(`已复制 ${sel.blocks.size} 个方块、${sel.texts.size} 段文字；Ctrl+V 粘贴`);
+    return true;
+  } catch (e) { toast(e.message, 5000); return false; }
+}
+async function cutSelection() {
+  const corner = await copySelection(true) && clipboard.next.map((v, i) => r4(v - PASTE_STEP[i]));
+  if (!corner) return;
+  clipboard.next = corner;          // the first paste puts a cut selection back where it was
+  deleteSelection(); toast("已剪切；Ctrl+V 粘贴");
+}
+async function pasteClipboard() {
+  if (!clipboard) { toast("还没有复制内容：先选中方块或文字，按 Ctrl+C"); return; }
+  const at = clipboard.next, count = (clipboard.part.texts || []).length;
+  try {
+    const r = await api("/api/paste", { table, part: clipboard.part, at });
+    clipboard.next = at.map((v, i) => r4(v + PASTE_STEP[i]));
+    const n = (r.table.texts || []).length;
+    clearSel(); r.ids.forEach((id) => sel.blocks.add(id));
+    for (let i = n - count; i < n; i++) sel.texts.add(i);
+    commit(r.table);
+  } catch (e) { toast(e.message, 5000); }
+}
+function lCorner() {
+  const item = selectedItem(); if (!item || item.kind !== "link") return;
+  const pts = linkPoints(item.obj); if (!pts) return;
+  const next = clone(table), lk = next.links[item.i], a = pts[0], b = pts[pts.length - 1];
+  if ((lk.via || []).length) { toast("这条线已有拐点，直接拖动拐点调整"); return; }
+  const ref = parseRef(lk.from), vertFirst = ref && (ref.port === "n" || ref.port === "s");
+  lk.via = [vertFirst ? [a[0], b[1]] : [b[0], a[1]]].map((p) => p.map(r4));
+  commit(next);
+}
+function nearestOnLink(li, p) {
+  const pts = linkPoints(links()[li]); let best = null;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+    const q = [a[0] + dx * t, a[1] + dy * t], d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (!best || d < best.d) best = { d, q, seg: i, horiz: Math.abs(dy) < 1e-9 };
+  }
+  // snap along the segment, keep the other coordinate on the line
+  if (best.horiz) best.q = [r4(snap(best.q[0])), best.q[1]]; else best.q = [best.q[0], r4(snap(best.q[1]))];
+  return best;
+}
+function finishLink(endRef, endPt) {
+  const next = clone(table), lk = { from: linkStart.ref || linkStart.pt, to: endRef || endPt };
+  if (!endRef) lk.open = true;
+  const a = linkStart.ref ? endPoint(linkStart.ref) : linkStart.pt, b = endRef ? endPoint(endRef) : endPt;
+  if (a && b && Math.abs(a[0] - b[0]) > 1e-6 && Math.abs(a[1] - b[1]) > 1e-6) {
+    // Leave and enter each port along its own axis: e/w to e/w is a Z through the
+    // middle (an L would enter the end port sideways with a stub too short for the arrowhead).
+    const axis = (r) => { const p = r && parseRef(r); return p ? { e: "h", w: "h", n: "v", s: "v" }[p.port] : null; };
+    const from = axis(linkStart.ref), to = endRef ? axis(endRef) : null;
+    let via;
+    if (from === "h" && to === "h") { const mx = (a[0] + b[0]) / 2; via = [[mx, a[1]], [mx, b[1]]]; }
+    else if (from === "v" && to === "v") { const my = (a[1] + b[1]) / 2; via = [[a[0], my], [b[0], my]]; }
+    else if (from === "v" || (!from && to === "h")) via = [[a[0], b[1]]];
+    else via = [[b[0], a[1]]];
+    lk.via = via.map((p) => p.map(r4));
+  }
+  next.links = next.links || []; next.links.push(lk);
+  linkStart = null; clearSel(); sel.link = next.links.length - 1; commit(next); tip();
+}
+function tip() {
+  const t = $("modeTip");
+  if (!linkMode) { t.style.display = "none"; return; }
+  t.style.display = "block";
+  t.textContent = linkStart ? "再点终点端口；点空白处得到开口端；Esc 取消" : "连线：先点起点端口，或点在一条线上从那里分支";
+}
+
+// ---------------------------------------------------------------- mouse
+function world(ev) {
+  const r = $("canvas").getBoundingClientRect();
+  return [(ev.clientX - r.left - view.tx) / view.z, (view.ty - (ev.clientY - r.top)) / view.z];
+}
+function hitTarget(ev) {
+  let n = ev.target;
+  while (n && n !== $("canvas")) {
+    for (const key of ["port", "corner", "end", "rhandle", "block", "text", "link", "region"])
+      if (n.dataset && n.dataset[key] !== undefined) return { key, val: n.dataset[key] };
+    n = n.parentNode;
+  }
+  return null;
+}
+$("canvas").addEventListener("mousedown", (ev) => {
+  const p = world(ev), hit = hitTarget(ev);
+  if (ev.button === 1 || ev.altKey) { drag = { kind: "pan", sx: ev.clientX, sy: ev.clientY, tx: view.tx, ty: view.ty }; ev.preventDefault(); return; }
+  if (ev.button !== 0) return;
+  if (linkMode) {
+    if (hit && hit.key === "port") {
+      if (!linkStart) { linkStart = { ref: hit.val }; draw(); tip(); }
+      else finishLink(hit.val, null);
+    } else if (hit && hit.key === "link" && !linkStart) {
+      linkStart = { pt: nearestOnLink(+hit.val, p).q }; tip();
+    } else if (linkStart) finishLink(null, [r4(snap(p[0])), r4(snap(p[1]))]);
+    return;
+  }
+  if (!hit) {
+    if (!ev.shiftKey) clearSel();
+    drag = { kind: "band", a: p, b: p }; draw(); showSelection(); return;
+  }
+  const base = clone(table);
+  if (hit.key === "block") {
+    if (ev.shiftKey) { sel.blocks.has(hit.val) ? sel.blocks.delete(hit.val) : sel.blocks.add(hit.val); draw(); showSelection(); return; }
+    if (!sel.blocks.has(hit.val)) { clearSel(); sel.blocks.add(hit.val); }
+    drag = { kind: "move", start: p, base }; draw(); showSelection(); return;
+  }
+  if (hit.key === "text") {
+    const i = +hit.val;
+    if (ev.shiftKey) { sel.texts.has(i) ? sel.texts.delete(i) : sel.texts.add(i); draw(); showSelection(); return; }
+    if (!sel.texts.has(i)) { clearSel(); sel.texts.add(i); }
+    drag = { kind: "move", start: p, base }; draw(); showSelection(); return;
+  }
+  if (hit.key === "corner") {
+    const [li, k] = hit.val.split(":").map(Number);
+    sel.corner = { link: li, i: k }; sel.link = li;
+    drag = { kind: "corner", li, k: k + 1, base, start: p }; draw(); showSelection(); return;
+  }
+  if (hit.key === "end") {
+    const [li, key] = hit.val.split(":");
+    drag = { kind: "corner", li: +li, k: key === "from" ? 0 : -1, base, start: p, end: true }; return;
+  }
+  if (hit.key === "link") { clearSel(); sel.link = +hit.val; draw(); showSelection(); return; }
+  if (hit.key === "region") { clearSel(); sel.region = +hit.val; drag = { kind: "region", i: +hit.val, base, start: p }; draw(); showSelection(); return; }
+  if (hit.key === "rhandle") { const [i, k] = hit.val.split(":"); drag = { kind: "rhandle", i: +i, k, base, start: p }; return; }
+});
+window.addEventListener("mousemove", (ev) => {
+  const svgR = $("canvas").getBoundingClientRect();
+  if (ev.clientX >= svgR.left && ev.clientX <= svgR.right && ev.clientY >= svgR.top && ev.clientY <= svgR.bottom) {
+    const p = world(ev); $("coords").textContent = `x ${p[0].toFixed(2)}, y ${p[1].toFixed(2)}`;
+  }
+  if (!drag) return;
+  const p = world(ev);
+  if (drag.kind === "pan") { view.tx = drag.tx + ev.clientX - drag.sx; view.ty = drag.ty + ev.clientY - drag.sy; draw(); return; }
+  if (drag.kind === "band") {
+    drag.b = p; const b = $("band"), x = Math.min(drag.a[0], p[0]), y = Math.max(drag.a[1], p[1]);
+    b.setAttribute("display", ""); b.setAttribute("x", view.tx + x * view.z); b.setAttribute("y", view.ty - y * view.z);
+    b.setAttribute("width", Math.abs(p[0] - drag.a[0]) * view.z); b.setAttribute("height", Math.abs(p[1] - drag.a[1]) * view.z);
+    return;
+  }
+  const dx = snap(p[0] - drag.start[0]), dy = snap(p[1] - drag.start[1]);
+  if (dx === drag.dx && dy === drag.dy) return;
+  drag.dx = dx; drag.dy = dy; drag.moved = true;
+  if (drag.kind === "move") table = moveSelection(drag.base, dx, dy);
+  if (drag.kind === "corner") {
+    const t = clone(drag.base), tb = table; table = drag.base;
+    const old = linkPoints(drag.base.links[drag.li]); table = tb;
+    const k = drag.k < 0 ? old.length - 1 : drag.k, pts = old.map((q) => q.slice());
+    const last = old.length - 1, lk = t.links[drag.li];
+    const fixed = (j) => (j === 0 && !Array.isArray(lk.from)) || (j === last && !Array.isArray(lk.to)) || (j !== k && (j === 0 || j === last));
+    movePoint(pts, old, k, [r4(old[k][0] + dx), r4(old[k][1] + dy)], fixed);
+    storePoints(lk, pts); table = t;
+  }
+  if (drag.kind === "region") {
+    const t = clone(drag.base), r = t.regions[drag.i];
+    r.from = [r4(r.from[0] + dx), r4(r.from[1] + dy)]; r.to = [r4(r.to[0] + dx), r4(r.to[1] + dy)]; table = t;
+  }
+  if (drag.kind === "rhandle") {
+    const t = clone(drag.base), r = t.regions[drag.i];
+    const x0 = Math.min(r.from[0], r.to[0]), x1 = Math.max(r.from[0], r.to[0]), y0 = Math.min(r.from[1], r.to[1]), y1 = Math.max(r.from[1], r.to[1]);
+    if (drag.k === "lo") { r.from = [r4(x0 + dx), r4(y0 + dy)]; r.to = [x1, y1]; } else { r.from = [x0, y0]; r.to = [r4(x1 + dx), r4(y1 + dy)]; }
+    table = t;
+  }
+  draw(); scheduleCheck(250);
+});
+window.addEventListener("mouseup", () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.kind === "band") {
+    $("band").setAttribute("display", "none");
+    const x0 = Math.min(d.a[0], d.b[0]), x1 = Math.max(d.a[0], d.b[0]), y0 = Math.min(d.a[1], d.b[1]), y1 = Math.max(d.a[1], d.b[1]);
+    if (x1 - x0 > 0.05 || y1 - y0 > 0.05) {
+      for (const b of blocks()) { const r = blockRect(b); if (r[0] < x1 && r[2] > x0 && r[1] < y1 && r[3] > y0) sel.blocks.add(b.id); }
+      texts().forEach((t, i) => { if (t.at[0] > x0 && t.at[0] < x1 && t.at[1] > y0 && t.at[1] < y1) sel.texts.add(i); });
+    }
+    draw(); showSelection(); return;
+  }
+  if (d.kind === "pan") return;
+  if (d.moved) { const now = table; table = d.base; commit(now, d.base); }
+});
+$("canvas").addEventListener("dblclick", (ev) => {
+  const hit = hitTarget(ev); if (!hit || hit.key !== "link") return;
+  const li = +hit.val, best = nearestOnLink(li, world(ev)), next = clone(table), lk = next.links[li];
+  lk.via = lk.via || []; lk.via.splice(best.seg, 0, best.q.map(r4));
+  clearSel(); sel.link = li; sel.corner = { link: li, i: best.seg }; commit(next);
+  toast("已加拐点：拖动它把线折成直角");
+});
+$("canvas").addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const r = $("canvas").getBoundingClientRect(), sx = ev.clientX - r.left, sy = ev.clientY - r.top;
+  const k = Math.exp(-ev.deltaY * 0.0015), z = Math.max(8, Math.min(400, view.z * k));
+  view.tx = sx - (sx - view.tx) * z / view.z; view.ty = sy - (sy - view.ty) * z / view.z; view.z = z; draw();
+}, { passive: false });
+
+// ---------------------------------------------------------------- keyboard & buttons
+// Text boxes keep the browser's own editing keys (their Ctrl+Z, Ctrl+C... act
+// on the text).  A drop-down, check box or button keeps only plain keys, so
+// Ctrl shortcuts still reach the diagram after one was used.
+const TEXT_INPUTS = ["text", "search", "number", "email", "url", "password", "tel"];
+const isTextField = (el) => el.isContentEditable || el.tagName === "TEXTAREA" ||
+  (el.tagName === "INPUT" && TEXT_INPUTS.includes(el.type));
+window.addEventListener("keydown", (ev) => {
+  const active = document.activeElement, ctrl = ev.ctrlKey || ev.metaKey, key = ev.key.toLowerCase();
+  if (ctrl && key === "s") { ev.preventDefault(); save(); return; }
+  // An open dialog (preview, loop analysis, help) owns the keyboard, not the diagram behind it
+  if (isTextField(active) || document.querySelector("dialog[open]")) return;
+  if (ctrl && key === "z") { ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
+  if (ctrl && key === "y") { ev.preventDefault(); redo(); return; }
+  if (ctrl && key === "c") { ev.preventDefault(); copySelection(); return; }
+  if (ctrl && key === "x") { ev.preventDefault(); cutSelection(); return; }
+  if (ctrl && key === "v") { ev.preventDefault(); pasteClipboard(); return; }
+  if (["SELECT", "INPUT"].includes(active.tagName)) return;
+  if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); deleteSelection(); return; }
+  if (ev.key === "Escape") { if (linkStart) linkStart = null; else if (linkMode) setLinkMode(false); else clearSel(); draw(); showSelection(); tip(); return; }
+  if (ev.key.toLowerCase() === "l") { setLinkMode(!linkMode); return; }
+  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+  if (arrows && (sel.blocks.size || sel.texts.size)) {
+    ev.preventDefault(); const st = snapStep() * (ev.shiftKey ? 5 : 1);
+    commit(moveSelection(table, arrows[0] * st, arrows[1] * st));
+  }
+});
+function setLinkMode(on) { linkMode = on; linkStart = null; $("linkBtn").classList.toggle("on", on); draw(); tip(); }
+async function save() {
+  try { const r = await api("/api/save", { table }); dirty = false; $("dirty").textContent = ""; toast("已保存 " + r.saved); }
+  catch (e) { toast("保存失败：" + e.message); }
+}
+function dialog(title, body) {
+  $("dlgTitle").textContent = title; $("dlgBody").innerHTML = ""; $("dlgBody").appendChild(body);
+  if (!$("dlg").open) $("dlg").showModal();
+}
+async function preview() {
+  const box = document.createElement("div");
+  box.innerHTML = `<div class="row"><label><input type="checkbox" id="pvGrid"> 网格</label><label><input type="checkbox" id="pvMono"> 黑白</label><button id="pvGo">刷新</button><span class="hint" id="pvMsg">编译中…</span></div><img id="pvImg" alt="">`;
+  dialog("LaTeX 预览（与导出相同）", box);
+  const go = async () => {
+    $("pvMsg").textContent = "编译中…";
+    try { const r = await api("/api/preview", { table, profile, grid: $("pvGrid").checked, mono: $("pvMono").checked });
+      $("pvImg").src = "data:image/png;base64," + r.png; $("pvMsg").textContent = ""; }
+    catch (e) { $("pvMsg").textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
+  };
+  $("pvGo").onclick = go; go();
+}
+// ---------------------------------------------------------------- loop analysis
+function esc(t) { return String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+// a curve label without its TeX markup, for the table next to the plot
+function plain(t) { return esc(String(t).replace(/\\(mathrm|text|mathit)\{([^}]*)\}/g, "$2").replace(/[$\\{}]/g, "")); }
+function loopTables(rep) {
+  const pm = (v) => v === null ? "—" : v.toFixed(1);
+  const rows = rep.loops.map((l) => `<tr><td>${plain(l.label)}<br><span class="hint">断开于 ${esc(l.break)}</span></td>
+    <td>${l.fc_hz === null ? "无穿越" : (l.fc_hz >= 1000 ? (l.fc_hz / 1000).toPrecision(3) + " kHz" : l.fc_hz.toPrecision(3) + " Hz")}</td>
+    <td>${pm(l.pm_deg)}°</td><td>${l.gm_db === null ? "—" : l.gm_db.toFixed(1) + " dB"}</td>
+    <td style="color:${l.stable ? "var(--good)" : "var(--bad)"}">${l.stable ? "稳定" : "不稳定"}</td></tr>
+    <tr><td colspan="5" class="hint">闭环极点：${esc(l.closed_loop_poles.join("；") || "无")}</td></tr>`).join("");
+  const cl = rep.closed.map((c) => `<tr><td>${plain(c.label)}</td><td colspan="4">低频增益 ${c.gain_at_fmin}，带宽 ${c.bandwidth_hz === null ? "超出扫频范围" : c.bandwidth_hz + " Hz"}</td></tr>`).join("");
+  return `<table><tr><th>开环</th><th>穿越频率</th><th>相位裕度</th><th>增益裕度</th><th></th></tr>${rows}${cl}</table>`;
+}
+function loopDlg() {
+  const box = document.createElement("div");
+  const tfIds = Object.keys((table.loop || {}).tf || {});
+  box.innerHTML = `<div class="loop-grid"><div>
+      <div class="row"><label><input type="checkbox" id="lpMono"> 黑白</label><button id="lpGo">重新计算</button><span class="hint" id="lpMsg">计算中…</span></div>
+      <img id="lpImg" alt=""><div id="lpRep"></div>
+      <div class="row"><button id="lpExport">导出 Bode 图（单栏 PDF+PNG）</button><span class="hint" id="lpExMsg"></span></div>
+      <div class="row"><button id="lpCode" title="按表里的 code 部分（采样率、定点/浮点、限幅）离散化控制器，写出 .c/.h、运行库和 PC 测试程序">生成 C 代码</button><span class="hint" id="lpCodeMsg"></span></div>
+    </div><div>
+      <strong>补偿器设计（k 因子法）</strong>
+      <div class="row">方块 <select id="dsBlock">${tfIds.map((b) => `<option>${esc(b)}</option>`).join("")}</select>
+        类型 <select id="dsType"><option value="">自动</option><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></div>
+      <div class="row">穿越频率 <input type="number" id="dsFc" value="10000" min="1"> Hz　相位裕度 <input type="number" id="dsPm" value="60" min="1" max="179"> °</div>
+      <div class="row"><button id="dsGo">计算</button><button id="dsApply" disabled>写入表</button><span class="hint" id="dsMsg"></span></div>
+      <div id="dsOut" class="hint"></div>
+      <details><summary class="hint">loop 部分（传递函数、功率级、断点）</summary>
+        <textarea id="lpJson"></textarea><div class="row"><button id="lpApply">应用</button></div></details>
+    </div></div>`;
+  dialog("环路分析（Bode 图与导出相同）", box);
+  $("lpJson").value = table.loop ? JSON.stringify(table.loop, null, 1) : `{\n "tf": {},\n "plant": [],\n "breaks": []\n}`;
+  const go = async () => {
+    $("lpMsg").textContent = "计算中…";
+    try { const r = await api("/api/loop", { table, profile, mono: $("lpMono").checked });
+      $("lpImg").src = "data:image/png;base64," + r.png; $("lpRep").innerHTML = loopTables(r.report); $("lpMsg").textContent = ""; }
+    catch (e) { $("lpMsg").textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
+  };
+  let designed = null;
+  $("lpGo").onclick = go;
+  $("lpApply").onclick = () => {
+    try { const t = JSON.parse(JSON.stringify(table)); t.loop = JSON.parse($("lpJson").value); commit(t); go(); }
+    catch (e) { $("lpMsg").textContent = "JSON 格式不对：" + e.message; }
+  };
+  $("dsGo").onclick = async () => {
+    $("dsMsg").textContent = "计算中…"; $("dsApply").disabled = true;
+    try {
+      const r = await api("/api/design", { table, profile, block: $("dsBlock").value, type: $("dsType").value,
+        fc: Number($("dsFc").value), pm: Number($("dsPm").value) });
+      designed = r.table; const d = r.design, c = d.tf.comp;
+      const op = Object.entries(d.opamp).filter(([k]) => k !== "note").map(([k, v]) => `${k} = ${v}`).join("，");
+      $("dsOut").innerHTML = `Type ${["", "I", "II", "III"][d.type]}：需要相位提升 ${d.boost_deg}°，k = ${d.k}<br>
+        f<sub>i</sub> = ${c.fi} Hz${c.fz ? `，零点 ${c.fz.join("、")} Hz，极点 ${c.fp.join("、")} Hz` : ""}<br>
+        实际：穿越 ${d.achieved.fc_hz} Hz，相位裕度 ${d.achieved.pm_deg}°<br>运放实现：${op}<br>${esc(d.opamp.note)}`;
+      $("dsMsg").textContent = ""; $("dsApply").disabled = false;
+    } catch (e) { $("dsMsg").textContent = e.message; }
+  };
+  $("dsApply").onclick = () => { if (designed) { commit(designed); $("lpJson").value = JSON.stringify(table.loop, null, 1); go(); } };
+  $("lpCode").onclick = async () => {
+    $("lpCodeMsg").textContent = "生成中…";
+    try { const r = await api("/api/export-code", { table });
+      $("lpCodeMsg").textContent = "已写出：" + r.files.join("，") + (r.warnings.length ? "。提醒：" + r.warnings.join("；") : ""); }
+    catch (e) { $("lpCodeMsg").textContent = e.message; }
+  };
+  $("lpExport").onclick = async () => {
+    $("lpExMsg").textContent = "导出中…";
+    try { const r = await api("/api/export-bode", { table, mono: $("lpMono").checked, formats: ["pdf", "png"] });
+      $("lpExMsg").textContent = "已写出：" + r.files.join("，"); }
+    catch (e) { $("lpExMsg").textContent = e.message; }
+  };
+  go();
+}
+function exportDlg() {
+  const box = document.createElement("div");
+  box.innerHTML = `<div class="row">${state.formats.map((f) => `<label><input type="checkbox" value="${f}" ${f === "pdf" || f === "png" ? "checked" : ""}> ${f.toUpperCase()}</label>`).join(" ")}
+    <label><input type="checkbox" id="exMono"> 黑白</label></div>
+    <div class="row"><span>文件夹</span><input type="text" id="exDir" value="${state.out_dir}"></div>
+    <div class="row"><button class="primary" id="exGo">导出</button><span class="hint" id="exMsg"></span></div>`;
+  dialog("导出", box);
+  $("exGo").onclick = async () => {
+    const formats = [...box.querySelectorAll("input[value]")].filter((i) => i.checked).map((i) => i.value);
+    $("exMsg").textContent = "导出中…";
+    try { const r = await api("/api/export", { table, profile, formats, out_dir: $("exDir").value, mono: $("exMono").checked });
+      dirty = false; $("dirty").textContent = "";
+      $("exMsg").textContent = "已写出：" + r.files.join("，") + (r.warnings.length ? `（${r.warnings.length} 条提醒）` : ""); }
+    catch (e) { $("exMsg").textContent = e.message; }
+  };
+}
+function fillLists(d) {
+  $("tplSel").innerHTML = Object.entries(d.templates).map(([n, t]) => `<option value="${n}">${n}：${t}</option>`).join("");
+  const sn = Object.entries(d.snippets);
+  $("snipSel").innerHTML = sn.length ? sn.map(([n, t]) => `<option value="${n}">${n}：${t}</option>`).join("") : `<option value="">（还没有片段）</option>`;
+}
+async function saveTemplate() {
+  const name = prompt("模板名（小写字母、数字、下划线）："); if (!name) return;
+  const title = prompt("说明（可留空）：", table.title || "") || "";
+  try { const r = await api("/api/save-template", { table, profile, name, title }); fillLists(r); toast("已存为模板：" + r.saved); }
+  catch (e) {
+    if (/已存在/.test(e.message) && confirm(e.message + "\n覆盖吗？")) {
+      const r = await api("/api/save-template", { table, profile, name, title, force: true }); fillLists(r); toast("已覆盖模板：" + r.saved);
+    } else toast(e.message, 5000);
+  }
+}
+async function saveSnippet() {
+  if (!sel.blocks.size) { toast("先选中要保存的方块（Shift 点选或框选）"); return; }
+  const name = prompt(`把选中的 ${sel.blocks.size} 个方块存为片段，名字：`); if (!name) return;
+  const title = prompt("说明（可留空）：") || "";
+  const body = { table, ids: [...sel.blocks], name, title };
+  try { const r = await api("/api/save-snippet", body); fillLists(r); toast("已存为片段：" + r.saved); }
+  catch (e) {
+    if (/已存在/.test(e.message) && confirm(e.message + "\n覆盖吗？")) { const r = await api("/api/save-snippet", { ...body, force: true }); fillLists(r); }
+    else toast(e.message, 5000);
+  }
+}
+async function insertSnippet() {
+  const name = $("snipSel").value; if (!name) return;
+  try { const r = await api("/api/insert-snippet", { table, name });
+    clearSel(); r.ids.forEach((id) => sel.blocks.add(id)); commit(r.table);
+    toast("已插入到图的下方，选中状态下直接拖到合适位置"); }
+  catch (e) { toast(e.message, 5000); }
+}
+async function loadTemplate() {
+  if (dirty && !confirm("当前修改尚未保存，换成模板会替换整张表（可撤销）。继续？")) return;
+  try { const r = await api("/api/template", { name: $("tplSel").value }); clearSel(); commit(r.table); fit(); }
+  catch (e) { toast(e.message, 5000); }
+}
+
+let state = null;
+async function boot() {
+  state = await api("/api/state");
+  table = state.table; profile = state.profile; constants = state.constants;
+  $("file").textContent = state.file; fillLists(state);
+  $("tableJson").value = pretty(table);
+  await runCheck(); fit(); showSelection();
+}
+$("undoBtn").onclick = undo; $("redoBtn").onclick = redo;
+// leave the drop-down after adding, so arrow keys nudge the new block instead of adding another
+$("addSel").onchange = (e) => { if (e.target.value) addItem(e.target.value); e.target.value = ""; e.target.blur(); };
+$("cutSelection").onclick = cutSelection; $("copySelection").onclick = () => copySelection();
+$("pasteSelection").onclick = pasteClipboard;
+$("linkBtn").onclick = () => setLinkMode(!linkMode);
+$("delBtn").onclick = deleteSelection;
+$("fitBtn").onclick = fit;
+$("saveBtn").onclick = save;
+$("previewBtn").onclick = preview;
+$("loopBtn").onclick = loopDlg;
+$("exportBtn").onclick = exportDlg;
+$("applyBtn").onclick = applySelJson;
+$("texInput").oninput = texChanged;
+$("texField").onchange = () => { texKey = null; showSelection(); };
+buildPalette();
+$("lBtn").onclick = lCorner;
+$("tplSave").onclick = saveTemplate; $("tplLoad").onclick = loadTemplate;
+$("snipSave").onclick = saveSnippet; $("snipInsert").onclick = insertSnippet;
+$("tableApply").onclick = () => { try { commit(JSON.parse($("tableJson").value)); } catch (e) { toast("JSON 格式不对：" + e.message); } };
+$("dlgClose").onclick = () => $("dlg").close();
+window.addEventListener("resize", draw);
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+boot();
+</script>
+<script>
+
+
+
+// Use the original add selector and its change handler for all insert-menu entries.
+document.querySelectorAll("[data-add]").forEach(button => {
+  button.onclick = () => {
+    const select = document.getElementById("addSel");
+    select.value = button.dataset.add; select.dispatchEvent(new Event("change", {bubbles: true}));
+  };
+});
+
+
+// AI requests share the circuit editor's providers, settings, job and rewrite loop.
+// A passing result is applied as one ordinary undoable editor transaction.
+(() => {
+  let activeJob = null, pollTimer = null, proposed = null, baseSnapshot = null;
+  const closeButton = $("dlgClose"), originalClose = closeButton.onclick;
+  function stopPolling() { clearTimeout(pollTimer); pollTimer = null; }
+  function writeAttempts(state) {
+    const list = $("controlAiAttempts"); list.replaceChildren();
+    for (const attempt of state.attempts || []) {
+      const item = document.createElement("li");
+      item.textContent = `第 ${attempt.round} 轮：` + (!attempt.errors?.length ? "校验通过" : attempt.errors.join("；"));
+      list.appendChild(item);
+    }
+  }
+  function busy(on) {
+    $("controlAiGo").disabled = on;
+    $("controlAiText").disabled = on;
+    $("controlAiCancel").hidden = !on;
+    $("describeControl").disabled = on;
+    $("tweakControl").disabled = on;
+    closeButton.disabled = on;
+  }
+  async function poll(id) {
+    if (activeJob !== id) return;
+    try {
+      const state = await api("/api/job/" + id);
+      if (activeJob !== id || !$("controlAiState")) return;
+      writeAttempts(state);
+      $("controlAiState").textContent = `第 ${state.round} / ${state.rounds_max} 轮 · 已用 ${state.elapsed_s} 秒`;
+      if (state.state === "running") { pollTimer = setTimeout(() => poll(id), 500); return; }
+      activeJob = null; busy(false);
+      if (state.state === "cancelled") { $("controlAiState").textContent = "已取消，当前图保持原样。"; return; }
+      if (state.state === "error" || !state.result?.ok) {
+        $("controlAiState").textContent = state.error || "三轮内未通过校验，当前图保持原样。可修改描述后重试。";
+        return;
+      }
+      proposed = state.result.table;
+      $("controlAiApply").hidden = false;
+      const changes = state.result.changes || [];
+      $("controlAiState").textContent = `已通过校验：${proposed.blocks.length} 个方块、${proposed.links.length} 条连线。` + (changes.length ? " " + changes.join("；") : "");
+    } catch (error) {
+      // Keep the id so cancellation remains possible after a temporary polling failure.
+      if (activeJob === id && $("controlAiState")) {
+        $("controlAiState").textContent = "读取进度失败，正在重试：" + error.message;
+        pollTimer = setTimeout(() => poll(id), 1500);
+      }
+    }
+  }
+  function openAi(edit) {
+    if (activeJob) return;
+    stopPolling(); proposed = null;
+    const box = document.createElement("div");
+    box.style.width = "min(680px, 85vw)";
+    box.innerHTML = `<p id="controlAiProvider" class="hint">读取已有模型设置…</p>
+      <p>${edit ? "说清楚要改哪里；未提到的结构和参数保留。" : "描述方块、连接、加减号和分区；可直接引用已有模板和片段。"}</p>
+      <textarea id="controlAiText" rows="5" aria-label="框图需求" placeholder="${edit ? "把内环换成 PR 控制器，其他部分保持原样" : "双闭环，外环电压 PI 加 ±I_L,max 限幅，内环电流 PI，100 kHz PWM，反馈都经过 LPF"}"></textarea>
+      <p class="hint">AI 只写结构，程序负责排版并校验，最多 3 轮。数值参数未提供时保留符号，不会猜测控制器或功率级参数。</p>
+      <div class="row"><button id="controlAiGo" class="primary">${edit ? "生成修改方案" : "生成框图"}</button>
+      <button id="controlAiCancel" hidden>取消生成</button><button id="controlAiApply" hidden>采用结果</button></div>
+      <p id="controlAiState" role="status"></p><ol id="controlAiAttempts"></ol>`;
+    dialog(edit ? "AI 修改当前图" : "描述新框图", box);
+    api("/api/ai-status").then(info => {
+      if (!$("controlAiProvider")) return;
+      $("controlAiProvider").textContent = info.problem || `共用模型：${info.provider} / ${info.model} · ${info.base_url} · 思考强度 ${info.draw_effort || "服务商默认"}`;
+    }).catch(error => { if ($("controlAiProvider")) $("controlAiProvider").textContent = error.message; });
+    $("controlAiGo").onclick = async () => {
+      const description = $("controlAiText").value.trim();
+      if (!description) { $("controlAiState").textContent = "请先填写需求。"; return; }
+      baseSnapshot = JSON.stringify(table); proposed = null;
+      $("controlAiApply").hidden = true; $("controlAiAttempts").replaceChildren(); busy(true);
+      $("controlAiState").textContent = "开始生成…";
+      try {
+        const state = await api("/api/generate", {description, profile, rounds: 3, ...(edit ? {current: JSON.parse(baseSnapshot)} : {})});
+        activeJob = state.id; poll(activeJob);
+      } catch (error) { busy(false); $("controlAiState").textContent = error.message; }
+    };
+    $("controlAiCancel").onclick = async () => {
+      if (!activeJob) return;
+      try { await api("/api/cancel", {id: activeJob}); $("controlAiState").textContent = "正在取消；当前请求返回后丢弃结果。"; }
+      catch (error) { $("controlAiState").textContent = "取消失败，可重试：" + error.message; }
+    };
+    $("controlAiApply").onclick = () => {
+      if (!proposed) return;
+      if (JSON.stringify(table) !== baseSnapshot) { $("controlAiState").textContent = "当前图已发生变化，请重新生成，避免覆盖新修改。"; return; }
+      commit(proposed); clearSel(); fit(); showSelection(); proposed = null; $("dlg").close();
+      toast("已采用 AI 结果；可撤销。点保存后写入文件。");
+    };
+  }
+  $("describeControl").onclick = () => openAi(false);
+  $("tweakControl").onclick = () => openAi(true);
+  closeButton.onclick = () => { if (!activeJob) { stopPolling(); originalClose(); } };
+  $("dlg").addEventListener("cancel", event => { if (activeJob || $("controlAiGo")?.disabled) event.preventDefault(); });
+  // Native control shortcuts must not edit the drawing while typing an AI request.
+  window.addEventListener("keydown", event => { if ($("dlg").open && $("controlAiText")) event.stopImmediatePropagation(); }, true);
+})();
+</script>
+<script src="/menu.js"></script>
+<script src="/ai-settings.js"></script>
+</body>
+</html>

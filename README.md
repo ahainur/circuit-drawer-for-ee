@@ -16,7 +16,7 @@ Circuit Drawer turns one hand-placed, validated coordinate table into paper-read
 
 4、**Web editor.** Drag parts from a categorised library, draw wires, select with a box, edit groups, use context menus, undo and redo, nudge with the arrow keys, and see every problem the moment it appears.
 
-5、**Modules.** Define a converter cell once, place it several times, fold it into a box with an IEC symbol, and wire modules by port name. Folding changes the picture only; simulation always uses the full circuit.
+5、**Modules.** Define a converter cell once, drag it from the library into the canvas, and connect its ports with ordinary wires. Instances can be folded into boxes with IEC symbols. Folding changes the picture only; simulation always uses the full circuit.
 
 6、**Operating modes and waveforms.** Highlight the conducting path of each switching state, export a mode sheet, and line up simulated or measured waveforms with t0, t1, ... and the matching mode figures.
 
@@ -66,7 +66,7 @@ Optional components:
 | Poppler `pdftocairo` | SVG and PNG output |
 | `CJKutf8` LaTeX package | Chinese text in figures |
 | ngspice | Running simulations and getting CSV results |
-| MATLAB, Simulink and Simscape | Running the exported Simulink model |
+| MATLAB, Simulink and Simscape | Running the exported Simulink model; PMSM and Clarke/Park blocks also need Simscape Electrical |
 | PLECS Standalone | Opening the exported `.plecs` model |
 | Python package `anthropic` | The AI assistant with an Anthropic-compatible interface (`python -m pip install "anthropic>=2.3"`) |
 
@@ -79,7 +79,7 @@ Drawing, editing, checking, exporting TeX and exporting simulation models need n
 circuit-drawer list
 
 # 2. Draw a template: PDF, SVG, PNG and TeX in figs/
-circuit-drawer draw llc_fullbridge -o figs
+circuit-drawer draw llc_fullbridge -o figs -f pdf,svg,png,tex
 
 # 3. Start from the Buck template and edit it in the browser (http://127.0.0.1:8765)
 circuit-drawer edit my_buck.json -t buck
@@ -105,14 +105,14 @@ In the editor, drag parts and wires, watch the status bar for problems, then use
 | Draw a common topology (Buck, Boost, LLC, DAB, flyback, CLLC, NPC, Vienna, Z-source, ...) | `circuit-drawer draw <template>` |
 | Move parts, change labels, colours and symbol sizes | Web editor |
 | Group selection, context menus, undo/redo, arrow-key nudging | Web editor |
-| Background regions, stacked panels, block arrows, curved and wavy arrows, control blocks | Web editor, **插入** (Insert) menu |
+| Background regions, stacked panels, block arrows, curved and wavy arrows, control blocks | Web editor, **Insert** menu |
 | Step and pulse marks next to sources | Web editor, part properties |
-| Reusable modules, folding, module library | Web editor, **模块（子系统）** (Modules) group of the parts library |
-| Operating-mode figures | **模态** (Modes) tab, or `circuit-drawer modes` |
-| Waveforms bound to modes | **分析 → 波形与模态…** (Analysis > Waveforms and modes), or `circuit-drawer waveforms` |
-| ngspice simulation | **分析 → SPICE 仿真…** (Analysis > SPICE simulation), or `circuit-drawer spice` |
+| Reusable modules, folding, module library | Web editor, **Modules (subsystems)** group of the parts library |
+| Operating-mode figures | **Modes** tab, or `circuit-drawer modes` |
+| Waveforms bound to modes | **Analysis → Waveforms and modes…**, or `circuit-drawer waveforms` |
+| ngspice simulation | **Analysis → SPICE simulation…**, or `circuit-drawer spice` |
 | Conducted EMI engineering estimates and filter comparison | **Analysis → Conducted EMI estimate…**; start with the `buck_emi` template |
-| Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | Same window, or `circuit-drawer simulink` / `circuit-drawer plecs` |
+| Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | **Analysis → SPICE simulation…**, or `circuit-drawer simulink` / `circuit-drawer plecs` |
 | Control diagrams, loop analysis, C code | `circuit-drawer-control` |
 | New topology from a description, or a one-sentence change | **AI** menu, or `circuit-drawer new` / `circuit-drawer tweak` |
 | Save a checked table as your own template | `circuit-drawer save-template` |
@@ -125,11 +125,11 @@ What the checker does not do: it verifies connections, geometry and text placeme
 
 2、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
 
-[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
+3、[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
 
-1、[Change log](CHANGELOG.md)
+4、[Change log](CHANGELOG.md)
 
-2、[Examples](examples/)
+5、[Examples](examples/)
 
 ## License
 

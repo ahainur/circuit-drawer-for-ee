@@ -16,7 +16,7 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 
 4、**网页编辑器。** 从分类器件库拖入元件，画导线，框选，整组编辑，右键菜单，撤销重做，方向键微调，问题随改随报。
 
-5、**模块化。** 一个变换器单元定义一次、放置多份，可折叠成带 IEC 符号的方框，按端口名连线。折叠只改画面，仿真始终使用完整电路。
+5、**模块化。** 一个变换器单元定义一次，可从库中拖入画布、放置多份，用普通导线连接端口，也可折叠成带 IEC 符号的方框。折叠只改画面，仿真始终使用完整电路。
 
 6、**模态图与波形。** 按开关状态高亮导通回路，导出整组模态图；把仿真或实测波形与 t₀、t₁… 分界和对应模态图排在一起。
 
@@ -66,7 +66,7 @@ python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
 | Poppler 的 `pdftocairo` | 输出 SVG 和 PNG |
 | LaTeX 宏包 `CJKutf8` | 图中有中文 |
 | ngspice | 运行仿真、得到 CSV 结果 |
-| MATLAB、Simulink 和 Simscape | 运行导出的 Simulink 模型 |
+| MATLAB、Simulink 和 Simscape | 运行导出的 Simulink 模型；PMSM 和 Clarke／Park 变换还需要 Simscape Electrical |
 | PLECS Standalone | 打开导出的 `.plecs` 模型 |
 | Python 包 `anthropic` | AI 画图助手使用 Anthropic 兼容接口时（`python -m pip install "anthropic>=2.3"`） |
 
@@ -79,7 +79,7 @@ python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
 circuit-drawer list
 
 # 2、用模板出图：PDF、SVG、PNG、TeX 写到 figs/
-circuit-drawer draw llc_fullbridge -o figs
+circuit-drawer draw llc_fullbridge -o figs -f pdf,svg,png,tex
 
 # 3、从 Buck 模板开始，在浏览器里编辑（http://127.0.0.1:8765）
 circuit-drawer edit my_buck.json -t buck
@@ -111,7 +111,8 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 | 工作模态图 | **模态** 页，或 `circuit-drawer modes` |
 | 波形与模态对应 | **分析 → 波形与模态…**，或 `circuit-drawer waveforms` |
 | ngspice 仿真 | **分析 → SPICE 仿真…**，或 `circuit-drawer spice` |
-| Simulink 和 PLECS 模型、闭环控制器、折叠模块导出为子系统 | 同一窗口，或 `circuit-drawer simulink` / `circuit-drawer plecs` |
+| 传导 EMI 工程估算及滤波前后对比 | **分析 → 传导 EMI 估算…**，从 `buck_emi` 模板开始 |
+| Simulink 和 PLECS 模型、闭环控制器、折叠模块导出为子系统 | **分析 → SPICE 仿真…**，或 `circuit-drawer simulink` / `circuit-drawer plecs` |
 | 控制框图、环路分析、C 代码 | `circuit-drawer-control` |
 | 用文字生成新拓扑，或一句话修改当前图 | **AI** 菜单，或 `circuit-drawer new` / `circuit-drawer tweak` |
 | 把校验通过的表存成自己的模板 | `circuit-drawer save-template` |
@@ -122,13 +123,13 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 
 1、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
 
-[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
+2、[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
 
-2、[User manual (English)](docs/USER_MANUAL.en.md)
+3、[User manual (English)](docs/USER_MANUAL.en.md)
 
-3、[更新记录](CHANGELOG.md)
+4、[更新记录](CHANGELOG.md)
 
-4、[示例](examples/)
+5、[示例](examples/)
 
 ## 七、许可证
 

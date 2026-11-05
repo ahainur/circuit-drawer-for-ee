@@ -69,6 +69,8 @@ def _check_state_dependencies(circuit):
         if p.kind not in ('L', 'I', 'VM'):
             if p.kind == 'T':
                 join(*p.nodes[:2]); join(*p.nodes[2:])
+            elif p.kind == 'PMSM':
+                join(p.nodes[0], p.nodes[1]); join(p.nodes[0], p.nodes[2])
             else:
                 join(*p.nodes)
     for p in circuit.parts:
@@ -101,12 +103,19 @@ TERMINALS = {
     'Ammeter': [(20, 0), (-20, 0), (0, 15)],
     'Voltmeter': [(20, 0), (-20, 0), (0, 15)],
     'Transformer': [(10, -15), (10, 15), (-10, -15), (-10, 15)],
+    # Machine library Terminal list, rotated so direction names the phase side.
+    'PMSM': [(30, 10), (30, 0), (30, -10), (-30, -30)],
     'Ground': [(10, 0)],
     'Label': [(0, 0)],
 }
 KINDS = {'R': 'Resistor', 'L': 'Inductor', 'C': 'Capacitor', 'D': 'Diode', 'V': 'VoltageSource',
          'I': 'CurrentSource', 'S': 'Mosfet', 'Q': 'Igbt', 'SCR': 'Thyristor', 'T': 'Transformer',
-         'VM': 'Voltmeter', 'AM': 'Ammeter'}
+         'VM': 'Voltmeter', 'AM': 'Ammeter', 'PMSM': 'PMSM'}
+PMSM_LIBRARY = 'Components/Electrical/Machines/Perm.-Magnet SM'
+PMSM_FRAME = (-25, -25, 25, 35)
+# From the installed PLECS 4.9.5 library and its PMSM demo, Direction up.
+PMSM_TERMINALS = [('Port', (-30, -10), 'left'), ('Port', (-30, 0), 'left'),
+                  ('Port', (-30, 10), 'left'), ('Rotational', (30, 30), 'right')]
 # parts with a gate input; PLECS's own Thyristor latches and turns off at zero current
 GATED = ('S', 'Q', 'SCR')
 # PLECS's Thyristor has no holding / latching current or turn-off time: such a thyristor becomes
@@ -137,7 +146,7 @@ def rotate(offset, direction):
 
 def emit(circuit, name, numerical_resistance):
     from types import SimpleNamespace
-    from .export_layout import DIRS, Spot, direction_of, plan
+    from .export_layout import DIRS, Spot, direction_of, nearby, plan
     _check_state_dependencies(circuit)
     if any(p.role == 'numerical_capacitance' for p in circuit.parts):
         circuit.notes.append(f'PLECS：每个数值稳定电容串联 {numerical_resistance:g} Ω，解除理想源/状态依赖；这会改变极快瞬态，请比较不同阻值及积分步长。实际器件电容不自动加 ESR。')
@@ -221,7 +230,8 @@ def emit(circuit, name, numerical_resistance):
         wires = [[tuple(p) for p in w] for w in drawing.get('wires', [])]
         mine = [p for p in parts if p.level == level]
         layout = plan([SimpleNamespace(name=p.name, kind=p.kind, nodes=nodes_of(p), source=p.source, role=p.role)
-                       for p in mine], elements, wires, pin_nodes, terminal, gate)
+                       for p in mine], elements, wires, pin_nodes, terminal, gate,
+                      boxes=[s.box for s in circuit.subsystems] if level is None else ())
         spots = dict(layout.spots)
         for p in mine:
             if p.kind == 'I':
@@ -236,6 +246,7 @@ def emit(circuit, name, numerical_resistance):
             self.components, self.connections, self.terminal_xy = [], [], {}
             self.edges = defaultdict(set, {n: set(e) for n, e in layout.edges.items()})
             self.signals, self.signal_junctions, self.label_names = defaultdict(list), {}, set()
+            self.occupied = []
 
         def block(self, kind, block_name, params, pos, direction='right', extra='', show=True, library=None, frame=None):
             """``library`` / ``frame``: a Reference block's SrcComponent (right after
@@ -244,6 +255,10 @@ def emit(circuit, name, numerical_resistance):
                 # PLECS 4.9.5: 1 is Global, 2 is Schematic. Each sheet has its
                 # own tags; only explicit Input / Output ports cross levels.
                 params = dict(params, Visibility=2)
+            w, h = (60, 20) if kind in ('Goto', 'From', 'Label') else (25, 25)
+            if direction in ('up', 'down'):
+                w, h = h, w
+            self.occupied.append((pos[0] - w, pos[1] - h, pos[0] + w, pos[1] + h + (20 if show else 0)))
             fields = '\n'.join(f'Parameter {{ Variable {quoted(k)} Value {quoted(numeric(v))} Show off }}' for k, v in params.items())
             source = f'SrcComponent {quoted(library)}\n' if library else ''
             box = f'Frame [{frame[0]},{frame[1]};{frame[2]},{frame[3]}]\n' if frame else ''
@@ -297,6 +312,34 @@ def emit(circuit, name, numerical_resistance):
             spot = sheet.spots[p.name]
             kind = plecs_kind(p)
             v = getattr(p, 'params', {})
+            if p.kind == 'PMSM':
+                theta = v['initial_angle']
+                phase_current = lambda angle: v['initial_id'] * math.cos(angle) - v['initial_iq'] * math.sin(angle)
+                params = {'configuration': 2, 'R': v['resistance'], 'L': f"[{numeric(v['ld'])} {numeric(v['lq'])}]",
+                          'phi': v['flux_linkage'], 'p': v['pole_pairs'], 'J': v['inertia'], 'F': v['friction'],
+                          'wm0': v['initial_speed'], 'thm0': theta / v['pole_pairs'],
+                          'is0': f'[{numeric(phase_current(theta))} {numeric(phase_current(theta - 2 * math.pi / 3))}]'}
+                extra = '\n'.join(f'Terminal {{ Type {t} Position [{x},{y}] Direction {d} }}'
+                                  for t, (x, y), d in PMSM_TERMINALS)
+                direction = {'left': 'up', 'up': 'right', 'right': 'down', 'down': 'left'}[spot.direction]
+                sheet.block('Reference', p.name, params, spot.pos, direction, extra=extra,
+                            library=PMSM_LIBRARY, frame=PMSM_FRAME)
+                sheet.place('PMSM', p.name, spot)
+                # Positive Tm opposes the motor, using the demo's two-flange load.
+                tx, ty = sheet.terminal_xy[p.name, 3]
+                blockers = sheet.layout.occupied + sheet.occupied + (occupied if sheet.level is None else [])
+                lx, ly = nearby((tx + 110, ty + 50), (240, 100), blockers)
+                load, ground, command = p.name + '_load', p.name + '_frame', p.name + '_load_torque'
+                sheet.block('ControlledTorque', load, {'SecondFlange': 2, 'StateSpaceInlining': 2},
+                            (lx - 50, ly), 'left')
+                sheet.block('RotationalReference', ground, {}, (lx - 50, ly + 25), 'up', show=False)
+                sheet.block('Constant', command, {'Value': v['load_torque']}, (lx + 50, ly), 'left')
+                sheet.connections.append(f'Connection {{ Type Rotational SrcComponent {quoted(p.name)} SrcTerminal 4 '
+                                         f'Points [{lx - 50},{ty}] DstComponent {quoted(load)} DstTerminal 3 }}')
+                sheet.connections.append(f'Connection {{ Type Rotational SrcComponent {quoted(ground)} SrcTerminal 1 '
+                                         f'DstComponent {quoted(load)} DstTerminal 1 }}')
+                sheet.signal_wire(command, 1, load, 2)
+                continue
             params = {
                 'R': lambda: {'R': v.get('value')},
                 'L': lambda: {'L': v.get('value'), 'i_init': v.get('initial')},
@@ -479,8 +522,7 @@ def emit(circuit, name, numerical_resistance):
     # the measurement panel stands right of the drawing; loose rows keep clear of it
     meas_x = x1 + 260
     rows = len(circuit.outputs)
-    layout.lower_loose([(meas_x - 20, y0 - 20, meas_x + 140, y0 + max(rows - 1, 0) * ROW + 20),
-                        (meas_x + 200, y0 - 20, meas_x + 320, y0 + rows * ROW + 20)], 20, SIGNAL_REACH)
+    occupied = list(layout.occupied) + [(meas_x - 20, y0 - 20, meas_x + 320, y0 + rows * ROW + 20)]
     lowest = max([y1] + [s.pos[1] + 40 for s in spots.values()] + [b[1][1] for b in boxes.values()])
     loose_y = lowest + 40
     devices(top, mine)
@@ -496,18 +538,33 @@ def emit(circuit, name, numerical_resistance):
     tags(top)
     if not wires(top, 'ground', list(boxes.values())):
         loose_ground(top, 'ground', (x0, loose_y + 90))
+    drives(top, mine)
+    readings(top, [(name + '_vak', name + '_vak') for name in latched])
+    readings(top, [(origin, tag) for origin, tag in tag_of.items() if origin in mine_names])
+    occupied += top.occupied
 
-    # Signals: generators in a drive panel under the drawing, sent by Goto
-    # tags; each gate / source input / sensor output has its tag block beside it.
+    # Generators and their existing tags form a group beside the driven device.
     drive_y = (loose_y + 160) if layout.loose else loose_y
     # a closed-loop gate (kind control) is made in the control panel below
     gens = [s for s in circuit.signals if s.kind != 'control']
     gates = {p.params['signal']: p.name for p in parts if p.kind in GATED}
-    clock = any(s.kind != 'dc' for s in gens)
-    if clock:
-        top.block('Clock', 'time', {}, (x0, drive_y), show=False)
+    if any(s.kind != 'dc' for s in gens):
+        clock = nearby((x0, y0), (140, 40), occupied)
+        top.block('Clock', 'time', {}, (clock[0] - 40, clock[1]), show=False)
+        top.block('Goto', 'send_time', {'Tag': 'cd_time', 'Visibility': 1}, (clock[0] + 40, clock[1]), show=False)
+        top.signal_wire('time', 1, 'send_time', 1)
     for row, s in enumerate(gens):
-        pos = (x0 + 120, drive_y + row * ROW)
+        device = next((p for p in parts if p.params.get('signal') == s.name), None)
+        anchor = spots[device.name].pos if device and device.name in spots else (x0 + 120, drive_y)
+        if device and device.level is not None:
+            a, b = boxes[device.level]
+            anchor = ((a[0] + b[0]) / 2, a[1])
+        latches = [name for name, signal in latched.items() if signal == s.name]
+        width = 240 + (270 if s.name in gates else 90)
+        if latches:
+            width = 600 + 12 * LATCH_STEP
+        cx, cy = nearby(anchor, (width, ROW * max(1, len(latches))), occupied)
+        pos = (cx - width // 2 + 120, cy)
         v = s.params
         if s.kind == 'dc':
             top.block('Constant', s.name, {'Value': v['dc']}, pos)
@@ -526,8 +583,10 @@ def emit(circuit, name, numerical_resistance):
             top.block('Function', s.name, {'f(u)': expression}, pos)
         out = 1 if s.kind == 'dc' else 2
         if s.kind != 'dc':
-            top.signal_wire('time', 1, s.name, 1, [(x0 + 40, drive_y), (x0 + 40, pos[1])] if row else None,
-                            junction=(x0 + 40, drive_y))
+            # Read the common clock locally, without a wire across the power stage.
+            clock_name = 'time_' + s.name
+            top.block('From', clock_name, {'Tag': 'cd_time', 'Visibility': 1}, (pos[0] - 80, pos[1]), show=False)
+            top.signal_wire(clock_name, 1, s.name, 1)
         top.block('Goto', 'send_' + s.name, {'Tag': s.name, 'Visibility': 1}, (pos[0] + 90, pos[1]), show=False)
         top.signal_wire(s.name, out, 'send_' + s.name, 1, junction=(pos[0] + 40, pos[1]))
         if s.name in gates:
@@ -542,24 +601,56 @@ def emit(circuit, name, numerical_resistance):
             top.block('Goto', 'send_' + s.name + '_gate', {'Tag': s.name + '_gate', 'Visibility': 1},
                       (pos[0] + 270, pos[1]), show=False)
             top.signal_wire(gate_name, 2, 'send_' + s.name + '_gate', 1)
-        for scr in [name for name, signal in latched.items() if signal == s.name]:
-            latch(top, by_name[scr], (pos[0] + 440, pos[1]))
-    drives(top, mine)
-    readings(top, [(name + '_vak', name + '_vak') for name in latched])
+        for i, scr in enumerate(latches):
+            latch(top, by_name[scr], (pos[0] + 440, pos[1] + i * ROW))
 
     # Measurements: each sensor sends its reading by tag; the measurement
     # panel reads it into an output port and the scope.
     terminals, axes = [], []
-    sent, measurement_tags = set(), {}
+    measurement_tags = {}
+    motor_readings = set()
     for i, output in enumerate(circuit.outputs, 1):
         origin = output['origin']
         if origin in by_name:
             tag = tag_of[origin]
-            if origin not in sent and origin in mine_names:
-                sent.add(origin)
-                readings(top, [(origin, tag)])
         else:
             tag = origin                     # a drive signal: its generator's tag
+        if output['kind'] == 'motor' and origin not in motor_readings:
+            motor_readings.add(origin)
+            motor = by_name[output['part']]
+            v, quantity = motor.params, output['quantity']
+            source, expression = {
+                'ia': ('Stator phase currents', 'u[1]'),
+                'ib': ('Stator phase currents', 'u[2]'),
+                'ic': ('Stator phase currents', 'u[3]'),
+                'id': ('Stator flux (dq)', f"(u[1]-{numeric(v['flux_linkage'])})/{numeric(v['ld'])}"),
+                'iq': ('Stator flux (dq)', f"u[2]/{numeric(v['lq'])}"),
+                'omega_m': ('Rotational speed', None),
+                'theta_e': ('Rotational speed', f"u[1]*{numeric(v['pole_pairs'])}"),
+                'torque': ('Electrical torque', None),
+            }[quantity]
+            angle = quantity == 'theta_e'
+            px, py = nearby((meas_x - 180, y0 + (i - 1) * ROW), (410 if angle else 310, ROW), occupied)
+            probe, value = origin + '_probe', origin + '_value'
+            extra = (f'Probe {{ Component {quoted(motor.name)} Path {quoted(motor.level or "")} '
+                     f'Signals {{{quoted(source)}}} }}')
+            top.block('PlecsProbe', probe, {}, (px - (150 if angle else 100), py), extra=extra)
+            sender, port = probe, 1
+            if expression:
+                function = origin + '_rate' if angle else value
+                top.block('Function', function, {'f(u)': expression}, (px - (50 if angle else 0), py), show=False)
+                top.signal_wire(probe, 1, function, 1)
+                sender, port = function, 2
+            if angle:
+                # Native Rotor position wraps at mechanical +/-pi; expose continuous electrical angle.
+                top.block('Integrator', value, {'x0': v['initial_angle'], 'ExternalReset': 1,
+                          'InitialConditionSource': 1, 'ShowStatePort': 1, 'EnableWrapping': 1,
+                          'UpperLimit': 'inf', 'LowerLimit': '-inf'}, (px + 50, py), show=False)
+                top.signal_wire(sender, port, value, 1)
+                sender, port = value, 2
+            top.block('Goto', 'send_' + origin, {'Tag': origin, 'Visibility': 1},
+                      (px + (150 if angle else 100), py), show=False)
+            top.signal_wire(sender, port, 'send_' + origin, 1)
         measurement_tags[output['name']] = tag
         y = y0 + (i - 1) * ROW
         out = 'out_' + output['name']
@@ -574,7 +665,7 @@ def emit(circuit, name, numerical_resistance):
               extra=f'Axes "{len(axes)}"\nOpen "0"\nTs "-1"\nXAxisLabel "Time / s"\n' + '\n'.join(axes))
     panel = getattr(circuit, 'panel', None)
     if panel:
-        _control_panel(circuit, panel, (x0, drive_y + max(len(gens), 1) * ROW + 40), top.block, top.signal_wire,
+        _control_panel(circuit, panel, (x0, max(r[3] for r in occupied) + ROW), top.block, top.signal_wire,
                        measurement_tags)
     tr = circuit.transient
     return (f'Plecs {{\nName {quoted(name)}\nVersion "4.9"\nCircuitModel "ContStateSpace"\n'

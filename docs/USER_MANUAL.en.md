@@ -2,9 +2,9 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | English
 
-This manual covers Circuit Drawer for EE 1.5.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 1.6.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
-The editor's interface is in Chinese. Every menu item, button and option is quoted here in its original Chinese form, followed by an English translation in parentheses, for example **文件 → 导出电路图…** (File > Export circuit figure).
+Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
 
 ## Contents
 
@@ -77,10 +77,10 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 ### 2.2 Installing the program
 
-Option 1: download the wheel `circuit_drawer_for_ee-1.5.0-py3-none-any.whl` from the [GitHub Releases](https://github.com/ahainur/circuit-drawer-for-ee/releases) page and run, in the folder that contains it:
+Option 1: download the wheel `circuit_drawer_for_ee-1.6.0-py3-none-any.whl` from the [GitHub Releases](https://github.com/ahainur/circuit-drawer-for-ee/releases) page and run, in the folder that contains it:
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.5.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
 
 Option 2: install directly from the repository:
@@ -270,11 +270,19 @@ circuit-drawer draw 四开关升降压 switch=igbt
 
 3. **文件 → 存为模板…** (File > Save as template) in the editor does the same.
 
+4. The save confirmation and `list` show the options supported by that template. `switch` requires switch symbols, and `currents` requires existing current reference arrows. Names are trimmed and converted to lowercase. After saving with `--dir`, set `CIRCUIT_DRAWER_TEMPLATES` to the same folder when using the template.
+
+5. Run `circuit-drawer --version` or `circuit-drawer-control --version` to see the version being used.
+
 ---
 
 ## 4. Editor tour
 
 ![Circuit editor overview](images/manual/editor-overview.png)
+
+Use the **文 / A** selector at the top right to change the interface language immediately. Unsaved edits, open forms and field values are preserved. The browser remembers the choice for the same address and port; another editor port has its own preference. All translations ship with the software and work offline. Drawing text, custom names, JSON and raw output from external tools remain unchanged. The command line and Windows launcher use their own existing text.
+
+![English interface](images/manual/editor-language-en.png)
 
 ### 4.1 Layout
 
@@ -307,7 +315,7 @@ circuit-drawer draw 四开关升降压 switch=igbt
 
 | Menu | Items |
 | --- | --- |
-| 文件 (File) | 保存 (Save), 存为模板… (Save as template), 存为模块… (Save as module), 导出电路图… (Export circuit figure), 导出全部模态… (Export all modes) |
+| 文件 (File) | 保存 (Save), 另存为… (Save As), 存为模板… (Save as template), 存为模块… (Save as module), 导出电路图… (Export circuit figure), 导出全部模态… (Export all modes) |
 | 编辑 (Edit) | 撤销 (Undo), 重做 (Redo), 剪切 (Cut), 复制 (Copy), 粘贴 (Paste), 创建副本 (Duplicate), 旋转 90° (Rotate 90°), 镜像 / 反向 (Mirror / reverse), 增大符号 (Enlarge symbol), 缩小符号 (Shrink symbol), 删除所选 (Delete selection), 同类对象图层 (Layer among objects of the same kind: raise, lower, bring to front, send to back); with modules also 编辑选中模块定义 (Edit selected module definition) and 解散选中实例为普通元件 (Dissolve selected instance), and for old-style module tables 模块定义… (Module definitions) and 转换为端口连接 (Convert to port links) |
 | 视图 (View) | 适应窗口 (Fit), 放大 (Zoom in), 缩小 (Zoom out), 模块显示 (Module display, submenu), 显示节点/支路标号 (Show node and branch labels), 显示画布坐标刻度 (Show canvas ruler), 实时网表面板 (Live netlist panel), 全图器件模型… (Device models for the whole drawing), 栏宽 (Column width), 预览带坐标网 (Grid in preview), 色块灰度 (Grey regions), 真实预览 (True preview) |
 | 插入 (Insert) | 画导线 (Draw wire), 画区域 (Draw region), 画方框 (Draw block), 画箭头 (Draw arrow), 添加模块… (Add module), 阶跃 / 脉冲标记 (Step / pulse mark), 导线交叉 (Wire crossing mode), 元件库 (all parts) |
@@ -320,6 +328,8 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 ### 4.3 Saving, previewing and exporting
 
 1. **保存** (Save) writes the current JSON. The circuit editor has no save shortcut; use the toolbar button or **文件 → 保存** (File > Save).
+
+   **文件 → 另存为…** (File > Save As) creates a file beside the original and switches to it; later saves write to the new file. It adds `.json`, replaces spaces and punctuation with underscores, and adds `_2`, `_3`, etc. if the name exists. Cancelling before submission writes nothing; closing after submission lets the save finish. Edits made while waiting stay unsaved. Finish or cancel module-definition editing before using Save As for the whole project.
 
 2. **预览** (Preview, the true preview) runs LaTeX to show the final result. **视图 → 预览带坐标网** (View > Grid in preview) decides whether the preview overlays the coordinate grid for reference.
 
@@ -350,6 +360,7 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 | 稳压管 (Zener diode) | `D` with `opts.zener: true` | As diode | Drawn as a Zener; simulation needs breakdown parameters |
 | 晶闸管 (thyristor) | `scr` | `a` (anode), `b` (cathode) | Horizontal or vertical only; the gate lead is drawn on the left of a→b, `F` moves it to the right; the gate is driven by the simulation trigger pulse and is not a pin |
 | MOSFET | `nmos` | `d`, `s` | Body diode by default (`opts.diode: false` removes it) |
+| P-channel MOSFET | `pmos` | `d`, `s` | Source-up symbol with a gate dot; body diode d→s; logical PWM 1 = on. Set its parameters in Analysis → SPICE simulation. |
 | IGBT | `igbt` | `c`, `e` | Anti-parallel diode by default |
 | 电压源 (voltage source) | `V` | `a` (−), `b` (+) | DC voltage source |
 | 交流电源 (AC source) | `vac` | `a` (reference), `b` | Sinusoidal source |
@@ -1139,9 +1150,13 @@ Expand **推荐仿真参数…** in the SPICE window:
 
 3. Click **生成推荐并检查** (Generate and check): the result lists the old value, proposed value, reason and assumption for each item, and runs a short ngspice check of at most 10 ms in a temporary folder.
 
-4. After reviewing, click **采用到参数表** (Apply to the form), then **保存参数** or export to write the file. Nothing is applied without ngspice, after a failed check, when the drawing has changed, or after cancelling. Module instances and closed-loop controllers are not yet supported.
+4. After reviewing, click **采用到参数表** (Apply to the form), then **保存参数** or export to write the file; this can be undone. Recommendations use the current form values. Nothing is applied without ngspice, after a failed check, when the drawing or form values have changed since generation, or after cancelling.
 
 5. These are first drafts from ideal CCM formulas: voltage drops are not compensated and device ratings are not chosen; a short simulation completing does not mean the targets are met.
+
+6. The development version also tunes module instances and closed-loop controllers from an existing runnable configuration, using the same AI settings. Only allowed instance values change; shared defaults and other instances remain intact. Controller tuning preserves connections, formulas and measurement bindings. A changed external controller becomes an inline copy in this circuit; the original file is untouched and later edits to it no longer update the copy.
+
+7. Try `examples/modules/boost_parallel_authored.json` with “Change only module M's L1 to 600u; keep all other parameters.” For `examples/closed_loop/buck_vmode.json`, try “Change only the Type III fi to 14000 Hz.” Review the proposal and short simulation, then apply and save. Existing loop-model analysis is shown for controllers; verify that its plant model matches the power stage. Short checks do not prove steady state or discrete-time stability.
 
 ### 17.7 Device models for the whole drawing
 
@@ -1159,6 +1174,14 @@ Fill in the parameters and click **应用到全图** (Apply to the whole drawing
 ### 17.8 Limits
 
 All models are simplified: no reverse recovery, magnetic saturation, temperature effects, tail current or vendor subcircuits. Verified cases include Buck / Boost, LLC, DAB, IGBT forward and reverse commutation, thyristor rectifiers and three-phase sines. The `.cir` file uses ngspice control syntax and is not guaranteed to work with other SPICE programs. Do not use the results for device loss, efficiency or ZVS conclusions.
+
+### 17.9 Conducted EMI estimate
+
+Start from the `buck_emi` template or [the Buck LISN example](../examples/emi/buck_lisn.json). The drawing must explicitly include both supply-line LISNs, their 50 Ω receiver ports and the chassis return. In **Analysis → SPICE simulation…**, set the supply and sampling parameters; then open **Analysis → Conducted EMI estimate…**.
+
+Select the positive and negative LISN voltage channels and an analysis window. **Run current parameters** runs ngspice and displays each line and its common-mode / differential-mode spectrum. The parasitic-capacitance section supports a geometry estimate or measured / Q3D CSV input. **Estimate filter and rerun comparison** changes the selected filter components in a candidate and reruns ngspice; review the comparison before explicitly applying it. Applying can be undone.
+
+These are engineering estimates using a Hann window and sinusoidal RMS amplitudes, not quasi-peak or average receiver readings. CISPR 32 curves are references for the specified AC mains port and do not establish DC-port compliance. Results depend on switching edges, parasitics, wiring, chassis paths, window drift and sampling step. Compare smaller steps and measurements; the supplied example's candidate remains above the reference curve.
 
 ---
 
@@ -1565,7 +1588,17 @@ When any text in a figure contains Chinese, `CJKutf8` (with the Song typeface) i
 
 ## 22. Command-line reference
 
-Keep template options beside the file/template positional argument, before flags: `circuit-drawer edit fb.json 二极管在下 -t flyback`. Do not place the trailing template option after `-t flyback`.
+1. Template options for `draw`, `modes`, `export` and `edit` may appear before or after flags: `circuit-drawer edit fb.json -t flyback 二极管在下` also works. Unknown command flags are still rejected.
+
+2. `circuit-drawer export` creates missing parent folders. An existing JSON requires a new name or explicit `--force` to replace it.
+
+3. An output selection such as `-f pdf` does not create or overwrite a companion `.tex`. Include `tex` when source output is wanted.
+
+4. If `check` fails at single-column width but passes at double-column width, stderr suggests `--profile double`. The JSON report and failure exit code remain unchanged; the drawing is never changed automatically.
+
+5. Before `waveforms`, import CSV through **分析 → 波形与模态**, check the curve and mode bindings, and save the table.
+
+6. `new --image` identifies PNG, JPEG, GIF and WebP by the file header rather than the extension. Image and `--structure` read errors are reported before template matching or API-key checks. Structure files must be UTF-8 text. Header detection identifies the format; the model service still checks image completeness.
 
 ### 22.1 circuit-drawer
 
@@ -1573,7 +1606,7 @@ Keep template options beside the file/template positional argument, before flags
 | --- | --- | --- |
 | `list` | List templates and options | |
 | `draw <template> [options...]` | Draw a template | `-p`, `-o`, `-f`, `--name`, `--grid`, `--mono` |
-| `export <template> [options...] -o x.json` | Write a template's coordinate table | `-o` (required) |
+| `export <template> [options...] -o x.json` | Write a template's coordinate table | `-o` (required), `--force` (replace existing JSON) |
 | `edit x.json [options...]` | Open the web editor | `-t`, `-p`, `--port`, `-o`, `--no-browser`, `--provider`, `--model` |
 | `check x.json` | Check only, print a JSON report; exit code 1 on failure | `-p` |
 | `render x.json` | Check and draw | `-p`, `-o`, `-f`, `--name`, `--grid`, `--mono` |

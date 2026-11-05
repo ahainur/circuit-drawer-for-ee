@@ -6,7 +6,8 @@ The backend uses R/L/C, DC/step/pulse/sine V/I, generic diodes, PWM MOSFET/IGBT
 approximations with separate antiparallel diodes and an optional linear output
 capacitance, gate-fired thyristors that latch while they conduct forward, and
 ideal transformers with optional primary-referred magnetising and leakage
-inductance. It is not a semiconductor loss model.
+inductance, and sinusoidal three-wire PMSMs with dq and mechanical dynamics.
+It is not a semiconductor loss model.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ from .pipeline import LayoutRejected
 from .profiles import get_profile
 from .validate import check
 from .completeness import simulation_completeness
+from . import pmsm
 
 
 class SpiceError(ValueError):
@@ -45,17 +47,27 @@ MIN_TRANSFORMER_REFERENCE_OHM = 1e9
 # Resolve a sinusoid well beyond Nyquist for usable phase/RMS comparisons.
 MIN_SINE_SAMPLES_PER_PERIOD = 100
 VOLTAGE_SOURCES = ("V", "vac")
-PWM_SWITCHES = ("nmos", "igbt")
+PWM_SWITCHES = ("nmos", "pmos", "igbt")
 # parts with a gate pulse train: the PWM switches and the thyristor
 GATED = (*PWM_SWITCHES, "scr")
 CURRENT_PROBE_KINDS = ("D", "L", *VOLTAGE_SOURCES, "igbt", "scr", "transformer")
 MAX_PROBES = 32  # Existing trace limit, shared with editor availability.
-# A thyristor's latch is an ideal switch with hysteresis in a 1 V control
-# loop: the gate drives its control to 1 (on), forward conduction holds it at
-# 0.5 (between the thresholds: keeps its state), otherwise 0 (off). The RC
-# (1 ohm, 1 nF: 1 ns) only smooths that control node for the solver.
-SCR_LATCH = "SW(RON=1m ROFF=1G VT=0.5 VH=0.4)"
-SCR_HOLD_RC = ("1", "1n")
+# Numerical regularisation, not device switching/recovery time: a 100 ns
+# state RC and a 10 uV knee (10 times the deck's VNTOL).
+SCR_STATE_WIDTH = 0.1
+SCR_VOLTAGE_WIDTH = 1e-5
+SCR_STATE_CAPACITANCE = 1e-7
+# Gate=1 sets the latch, hold=0.5 retains either state, drive=0 resets it.
+# These feedback/threshold levels leave 0.4 V margins in the 1 V state loop.
+SCR_LATCH_FEEDBACK, SCR_LATCH_THRESHOLD, SCR_LATCH_HOLD = 0.8, 0.9, 0.5
+# Charge the tq timer only once the continuous latch has substantially turned
+# on; charging at the midpoint would cancel a refire before it can latch.
+SCR_RECOVERY_ON, SCR_RECOVERY_WIDTH = 0.9, 0.01
+SCR_REFIRE_IDLE = 0.1
+SCR_REFIRE_DONE, SCR_REFIRE_DONE_WIDTH = 0.99, 0.001
+# Below this state the channel fraction is <1.01e-8; ignore turn-on/off edges.
+SCR_BLOCKED_STATE = 1e-4
+
 
 
 # name, user-facing label, example value (SI or SPICE suffix).
@@ -75,6 +87,8 @@ FIELDS = {
              ("delay", "启动延迟 (s)", "0"), ("rise", "上升时间 (s)", "10n"),
              ("fall", "下降时间 (s)", "10n")],
 }
+FIELDS["pmos"] = FIELDS["nmos"]
+FIELDS["pmsm"] = pmsm.FIELDS
 FIELDS["igbt"] = [*FIELDS["nmos"], ("vce0", "正向压降截距 Vce0 (V，≥0；非固定 Vce(sat))", "1.5")]
 # A thyristor's gate is a pulse train with the PWM fields: delay is the first
 # firing instant (firing angle alpha at frequency f: alpha / 360 / f), duty the
@@ -115,12 +129,15 @@ OPTIONAL_FIELDS["vac"] = OPTIONAL_FIELDS["V"]
 BODY_DIODE = "IS=1e-9 N=1 RS=0.01"
 BODY_DIODE_VALUES = {"diode_is": 1e-9, "diode_n": 1.0, "diode_rs": 0.01}
 OPTIONAL_FIELDS["igbt"] = OPTIONAL_FIELDS["nmos"]
+OPTIONAL_FIELDS["pmos"] = OPTIONAL_FIELDS["nmos"]
+OPTIONAL_FIELDS["pmsm"] = pmsm.OPTIONAL_FIELDS
 # RC snubber and firing-angle phase shift / soft start, as on a PWM switch;
 # holding / latching current (0: off at zero current, latched at once)
 OPTIONAL_FIELDS["scr"] = [*OPTIONAL_FIELDS["nmos"][:4],
                           ("holding_current", "维持电流 IH (A，0 为电流过零才关断)", "0"),
                           ("latching_current", "擎住电流 IL (A，0 为不要求；不小于 IH)", "0"),
-                          ("turn_off_time", "关断时间 tq (s，0 为不建模；反压不足 tq 时正压回来即重新导通)", "0")]
+                          ("turn_off_time", "关断时间 tq (s，0 为不建模；反压不足 tq 时正压回来即重新导通)", "0"),
+                          ("dv_dt_limit", "关断正向 dv/dt 额定值 (V/μs，0 不检查；仅仿真后提示)", "0")]
 # Recovery fraction thresholds of the tq timer (1 = just turned off, 0 = recovered):
 # refiring needs some reverse bias to have started and not finished
 TQ_STARTED, TQ_DONE = 0.999, 0.001
@@ -144,6 +161,8 @@ LIMIT_NOTE = ("简化模型：MOSFET 符号导出为 PWM 理想开关和通用�
               "变压器为无损理想变比，可选填折算到原边的线性励磁电感和漏感，副边数值参考电阻需显式填写；"
               "开关可选填线性输出电容 Coss，只能定性观察 ZVS 换流过程，不含电压相关的 Coss 和栅极电荷；"
               "晶闸管为门极脉冲触发、正向导通（Vf + Ron）、电流将要反向时关断的简化模型；维持 / 擎住电流和关断时间 tq 是可选的简化判据，不含 dv/dt 误触发；"
+              "PMSM 为三线星形、正弦磁链、恒定 Ld/Lq 和恒定负载转矩的 dq 机电动态模型，"
+              "电角度以 rad 表示、机械转速以 rad/s 表示；不含铁耗、磁饱和和齿槽转矩；"
               "数值稳定电容不是器件寄生模型；不包含反向恢复和磁饱和；闭环控制只在填写 closed_loop 时生成连续时间控制器模型；不能用于器件损耗结论。"
               "校验只检查连接、几何与参数格式，不证明工况正确。")
 
@@ -258,7 +277,7 @@ def example_settings(layout: Layout, topology: str, profile="ieee-single") -> di
     rep = _connections(layout, profile)
     if topology not in ("buck", "boost"):
         raise SpiceError("示例参数只提供 buck / boost")
-    count = Counter(e.kind for e in layout.elements)
+    count = Counter("nmos" if e.kind == "pmos" else e.kind for e in layout.elements)
     phases = count["nmos"]
     single = Counter(("V", "R", "L", "C", "D", "nmos"))
     multi = topology == "buck" and phases > 1 and count == Counter(
@@ -277,8 +296,11 @@ def example_settings(layout: Layout, topology: str, profile="ieee-single") -> di
     ok = len({ground, vin, out}) == 3 and {node(es["C"], "a"), node(es["C"], "b")} == load
     # Pair every switch with the diode and inductor on its own switch node.
     legs, used_d, used_l = [], set(), set()
-    for sw_el in [e for e in layout.elements if e.kind == "nmos"]:
-        sw = node(sw_el, "s" if topology == "buck" else "d")
+    for sw_el in [e for e in layout.elements if e.kind in ("nmos", "pmos")]:
+        pin = "s" if topology == "buck" else "d"
+        if sw_el.kind == "pmos":
+            pin = "d" if pin == "s" else "s"
+        sw = node(sw_el, pin)
         d = [e for e in layout.elements if e.kind == "D" and e.id not in used_d
              and sw in (node(e, "a"), node(e, "b"))]
         ind = [e for e in layout.elements if e.kind == "L" and e.id not in used_l
@@ -294,9 +316,9 @@ def example_settings(layout: Layout, topology: str, profile="ieee-single") -> di
         expect_l = {sw, out} if topology == "buck" else {vin, sw}
         ok &= {node(l_el, "a"), node(l_el, "b")} == expect_l
         if topology == "buck":
-            ok &= node(s_el, "d") == vin and node(d_el, "a") == ground and node(d_el, "b") == sw
+            ok &= node(s_el, "s" if s_el.kind == "pmos" else "d") == vin and node(d_el, "a") == ground and node(d_el, "b") == sw
         else:
-            ok &= node(s_el, "s") == ground and node(d_el, "a") == sw and node(d_el, "b") == out
+            ok &= node(s_el, "d" if s_el.kind == "pmos" else "s") == ground and node(d_el, "a") == sw and node(d_el, "b") == out
     if not ok:
         name = f"{phases} 相交错 buck" if multi else f"基础 {topology}"
         raise SpiceError(f"当前连接不符合{name}；不会根据名称套用错误模型")
@@ -333,6 +355,7 @@ class Deck:
     step: float
     stop: float
     notes: list[str] = field(default_factory=list)
+    dv_dt_limits: dict[str, float] = field(default_factory=dict)
 
 
 def source_excitation(cfg: dict, label: str, tr: dict) -> str:
@@ -443,63 +466,63 @@ def thyristor_thresholds(val):
 
 
 def _thyristor_lines(name, anode, cathode, val):
-    """Gate-fired, forward-only channel (Vf + Ron, like the IGBT's) with Roff
-    leakage, held on by its latch while it conducts forward; it turns off when
-    the anode-cathode voltage falls to Vf, i.e. when the current would reverse
-    (an ideal holding current of zero). ``ctl_<name>`` is the gate pulse train.
+    """Continuous latch and forward channel; IH/IL/tq retain their predicates.
 
-    With a holding current IH it turns off when its current falls below IH;
-    with a latching current IL the gate pulse must leave it carrying at least
-    IL (a second latch, ``latched``, records that), or it turns off with the
-    pulse. Both thresholds are anode-cathode voltages (thyristor_thresholds).
-
-    With a turn-off time tq, a timer ``rec`` (1 = just off, 0 = recovered)
-    runs down at 1/tq while it is off and reverse biased (Vak < 0). Forward
-    voltage (Vak > Vf) while it has started but not finished recovering fires
-    it again without a gate pulse: a commutation failure. A turn-off with no
-    reverse bias after it (at the holding current, still forward biased) keeps
-    the timer at 1 and does not refire."""
-    a, lat, hold = f"cd_{name}_a", f"cd_{name}_lat", f"cd_{name}_hold"
+    A 0/1 RC state replaces the ideal latch switch. Positive feedback retains
+    its hysteresis. A bounded rational conductance suppresses numerical state
+    undershoot without a hard clamp; the forward knee carries no reverse current.
+    """
+    a, lat = f"cd_{name}_a", f"cd_{name}_lat"
     vak = f"v({a},{cathode})"
     f = lambda key: f"{val[key]:.15g}"
-    r, c = SCR_HOLD_RC
-    held = f"v({lat}) > 0.5 && {vak} > {f('vf')}"
-    extra, refire, refired = [], "", ""
+    step = lambda x, w=SCR_STATE_WIDTH: f"cd_scr_step(({x}),{w:.15g})"
+    on = step(f"v({lat})-0.5")
+    forward = lambda v: step(f"{vak}-({v:.15g})", SCR_VOLTAGE_WIDTH)
+    # With IH=0, retain an almost-zero forward current through the rounded
+    # knee; the channel itself still blocks every reverse current.
+    hold_zero = step(f"{vak}-{f('vf')}+{2*SCR_VOLTAGE_WIDTH:.15g}", SCR_VOLTAGE_WIDTH)
+    held = f"{on}*{hold_zero}"
+    extra, refire = [], "0"
     if val.get("turn_off_time", 0):
         rec = f"cd_{name}_rec"
-        refired = (f"v({lat}) < 0.5 && v({rec}) > {TQ_DONE:g} && v({rec}) < {TQ_STARTED:g} && "
-                   f"{vak} > {f('vf')}")
-        refire = f" + (({refired}) ? 1 : 0)"
+        recovering = step(f"{SCR_RECOVERY_ON:g}-v({lat})", SCR_RECOVERY_WIDTH)
+        event = (f"{step(f'{SCR_REFIRE_IDLE:g}-v({lat})', SCR_RECOVERY_WIDTH)}*"
+                 f"{step(f'v({rec})-{TQ_DONE:g}', TQ_DONE/10)}*"
+                 f"{step(f'{TQ_STARTED:g}-v({rec})', TQ_DONE/10)}*{forward(val['vf'])}")
+        retry = f"cd_{name}_retry"
+        refire = step(f"v({retry})-0.5")
+        # Remember the refire event until turn-on completes. Otherwise the
+        # continuous state cancels its own trigger midway through the ramp.
+        pending = f"{refire}*(1-{step(f'v({lat})-{SCR_REFIRE_DONE:g}', SCR_REFIRE_DONE_WIDTH)})"
+        extra += [f"Bretry_{name} 0 {retry} I = {step(f'{event}+{SCR_LATCH_HOLD:g}*({pending})+{SCR_LATCH_FEEDBACK:g}*v({retry})-{SCR_LATCH_THRESHOLD:g}')}",
+                  f"Rretry_{name} {retry} 0 1",
+                  f"Cretry_{name} {retry} 0 {SCR_STATE_CAPACITANCE:.15g}"]
         extra += [f"* {name}: turn-off time {f('turn_off_time')} s, counted under reverse bias",
-                  # 1 nF: charged to 1 in about 1 ns while on, run down at 1/tq
-                  f"Brec_{name} 0 {rec} I = v({lat}) > 0.5 ? (1 - v({rec})) : "
-                  f"(({vak} < 0 && v({rec}) > 0) ? -{1e-9 / val['turn_off_time']:.15g} : 0)",
+                  f"Brec_{name} 0 {rec} I = (1-{recovering})*(1-v({rec})) - "
+                  f"{recovering}*{step(f'-{vak}', SCR_VOLTAGE_WIDTH)}*"
+                  f"{step(f'v({rec})', TQ_DONE/10)}*{1e-9/val['turn_off_time']:.15g}",
                   f"Crec_{name} {rec} 0 1n",
                   f"Rrec_{name} {rec} 0 1T"]
     if val.get("holding_current", 0) or val.get("latching_current", 0):
-        v_hold, v_latch = thyristor_thresholds(val)
-        flag, set_ = f"cd_{name}_latched", f"cd_{name}_set"
-        set_on = f"v({lat}) > 0.5 ? ({vak} > {v_latch:.15g} ? 1 : 0.5) : 0"
-        held = f"v({lat}) > 0.5 && v({flag}) > 0.5 && {vak} > {v_hold:.15g}"
-        extra += [f"* {name}: holding {f('holding_current')} A / latching {f('latching_current')} A, as Vak thresholds",
-                 # a refire (turn-off time not reached) counts as latched
-                 f"Bset_{name} 0 {set_} I = " + (f"({refired}) ? 1 : ({set_on})" if refired else set_on),
-                 f"Rset_{name} {set_} 0 {r}",
-                 f"Cset_{name} {set_} 0 {c}",
-                 f"Sflag_{name} cd_{name}_one {flag} {set_} 0 mlatch_{name}",
-                 f"Rflag_{name} {flag} 0 1k"]
-    return [f"* {name}: simplified thyristor; gate pulses fire it, forward conduction holds it",
+        flag = f"cd_{name}_latched"
+        # During a ramp, Vak alone is not Ron*I+Vf: the channel is only partly
+        # open. Apply IH/IL to its conductance-weighted current, not blocking V.
+        current_v = f"cd_scr_on(v({lat}))*({vak}-{f('vf')})"
+        above = lambda key: step(f"{current_v}-{val.get(key, 0)*val['ron']:.15g}", SCR_VOLTAGE_WIDTH) if val.get(key, 0) else hold_zero
+        held = f"{on}*{above('holding_current')}*{step(f'v({flag})-0.5')}"
+        drive = f"{on}*(0.5+0.5*{above('latching_current')})+({refire})"
+        extra += [f"* {name}: holding {f('holding_current')} A / latching {f('latching_current')} A",
+                  f"Bflag_{name} 0 {flag} I = {step(f'{drive}+{SCR_LATCH_FEEDBACK:g}*v({flag})-{SCR_LATCH_THRESHOLD:g}')}",
+                  f"Rflag_{name} {flag} 0 1",
+                  f"Cflag_{name} {flag} 0 {SCR_STATE_CAPACITANCE:.15g}"]
+    drive = f"v(ctl_{name})+{SCR_LATCH_HOLD:g}*({held})+({refire})"
+    return [f"* {name}: simplified thyristor; smooth numerical latch/channel, not switching losses",
             f"Vsense_{name} {anode} {a} 0",
             f"Bchannel_{name} {a} {cathode} I = {vak}/{f('roff')} + "
-            f"(v({lat}) > 0.5 ? max({vak}-{f('vf')},0)/{f('ron')} : 0)",
-            f"Bhold_{name} 0 {hold} I = v(ctl_{name}) + 0.5*(({held}) ? 1 : 0){refire}",
-            f"Rhold_{name} {hold} 0 {r}",
-            f"Chold_{name} {hold} 0 {c}",
-            f"Vone_{name} cd_{name}_one 0 1",
-            f"Slatch_{name} cd_{name}_one {lat} {hold} 0 mlatch_{name}",
-            f"Rlatch_{name} {lat} 0 1k",
-            *extra,
-            f".model mlatch_{name} {SCR_LATCH}"]
+            f"cd_scr_on(v({lat}))*cd_scr_pos({vak}-{f('vf')},{SCR_VOLTAGE_WIDTH:.15g})/{f('ron')}",
+            f"Blatch_{name} 0 {lat} I = {step(f'{drive}+{SCR_LATCH_FEEDBACK:g}*v({lat})-{SCR_LATCH_THRESHOLD:g}')}",
+            f"Rlatch_{name} {lat} 0 1",
+            f"Clatch_{name} {lat} 0 {SCR_STATE_CAPACITANCE:.15g}", *extra]
 
 
 def _transformer_lines(e, cfg, val, name, node):
@@ -555,6 +578,46 @@ def _transformer_lines(e, cfg, val, name, node):
     return lines
 
 
+def _pmsm_lines(name: str, pins: dict[str, str], val: dict[str, float]) -> list[str]:
+    """dq states with a floating star point; no zero-sequence current path.
+
+    State voltages represent id, iq, mechanical rad/s and electrical radians.
+    Two terminal current sources enforce ia+ib+ic=0 without grounding a hidden
+    neutral. The state capacitors are numerical integrators, not phase losses.
+    """
+    from .control.functions import expressions
+
+    node = lambda quantity: f"cd_{name}_{quantity}"
+    v = lambda quantity: f"v({node(quantity)})"
+    s = lambda key: f"{val[key]:.15g}"
+    out = [f"* {name}: amplitude-invariant PMSM, theta_e=0: d axis aligned with phase a"]
+    stationary = expressions("clarke", {phase: f"v({pins[phase]})" for phase in "abc"}, "spice")
+    rotating = expressions("park", {**stationary, "theta": v("theta_e")}, "spice")
+    for axis in "dq":
+        out.append(f"B{node('v' + axis)} {node('v' + axis)} 0 V = {rotating[axis]}")
+    stationary_i = expressions("ipark", {"d": v("id"), "q": v("iq"), "theta": v("theta_e")}, "spice")
+    phase_i = expressions("iclarke", stationary_i, "spice")
+    for phase in "ab":
+        out.append(f"B{node('i' + phase)} {node('i' + phase)} 0 V = {phase_i[phase]}")
+        out.append(f"Bphase_{name}_{phase} {pins[phase]} {pins['c']} I = {v('i' + phase)}")
+    out.append(f"B{node('ic')} {node('ic')} 0 V = -{v('ia')} - {v('ib')}")
+    out.append(f"B{node('torque')} {node('torque')} 0 V = 1.5*{s('pole_pairs')}*"
+               f"({s('flux_linkage')}*{v('iq')} + ({s('ld')} - {s('lq')})*{v('id')}*{v('iq')})")
+    omega_e = f"({s('pole_pairs')}*{v('omega_m')})"
+    rates = {
+        "id": f"({v('vd')} - {s('resistance')}*{v('id')} + {omega_e}*{s('lq')}*{v('iq')})/{s('ld')}",
+        "iq": f"({v('vq')} - {s('resistance')}*{v('iq')} - {omega_e}*"
+              f"({s('ld')}*{v('id')} + {s('flux_linkage')}))/{s('lq')}",
+        "omega_m": f"({v('torque')} - {s('load_torque')} - {s('friction')}*{v('omega_m')})/{s('inertia')}",
+        "theta_e": omega_e,
+    }
+    for state, initial in (("id", "initial_id"), ("iq", "initial_iq"),
+                           ("omega_m", "initial_speed"), ("theta_e", "initial_angle")):
+        out += [f"C{node(state)} {node(state)} 0 1 IC={s(initial)}",
+                f"Bstate_{name}_{state} 0 {node(state)} I = {rates[state]}"]
+    return out
+
+
 def _element_names(devices):
     """Opt-in named decks use drawing IDs, never electrical branch numbers.
 
@@ -562,7 +625,7 @@ def _element_names(devices):
     letter is suitable; encode namespaced/unusual IDs injectively otherwise.
     Reserve all literal IDs first so an encoded name cannot shadow a real one.
     """
-    prefixes = {"nmos": "S", "igbt": "Q", "vac": "V", "transformer": "T", "scr": "SCR"}
+    prefixes = {"nmos": "S", "pmos": "S", "igbt": "Q", "vac": "V", "transformer": "T", "scr": "SCR", "pmsm": "M"}
     names, used = {}, set()
     for e in devices:
         prefix = prefixes.get(e.kind, e.kind)
@@ -714,7 +777,7 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                 nodes[net] = alias; taken.add(alias)
     node = lambda ref: nodes[rep.nets[ref]]
     mapping = layout.extra.get("model_mapping", {})
-    prefixes = {"nmos": "S", "igbt": "Q", "vac": "V", "transformer": "T", "scr": "SCR"}
+    prefixes = {"nmos": "S", "pmos": "S", "igbt": "Q", "vac": "V", "transformer": "T", "scr": "SCR", "pmsm": "M"}
     names = {e.id: f"{prefixes.get(e.kind, e.kind)}{i}" for i, e in enumerate(devices, 1)}
     if "electrical" in layout.extra:
         branch_ids = layout.extra["electrical"]["branches"]
@@ -723,10 +786,27 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
              "* Generated from the validated JSON table. Do not use for device losses or ZVS.",
              "* Startup uses UIC with explicit L/C initial conditions; all units are SI.",
              "* PWM control is normalized 0/1, not a physical gate-voltage model."]
+    if any(e.kind == "scr" for e in devices):
+        # C1 joins avoid discontinuous conductance/Jacobian during commutation.
+        lines += [".func cd_scr_on(q) {q*q/(q*q+(1-q)*(1-q))}",
+                  ".func cd_scr_step(x,w) {0.5*(1+tanh(x/w))}",
+                  ".func cd_scr_pos(x,w) {x <= 0 ? 0 : (x >= w ? x-w/2 : x*x/(2*w))}"]
     for ref in sorted(rep.nets):
         lines.append(f"* pin {json.dumps(ref, ensure_ascii=True)} -> {node(ref)}")
+    dvdt_commands, dvdt_vectors, dvdt_limits = [], [], {}
     for e in devices:
         cfg = sim["components"][e.id]
+        if e.kind == "pmsm":
+            try:
+                val = pmsm.parameters(cfg, e.id, number)
+            except ValueError as exc:
+                raise SpiceError(str(exc)) from None
+            name = names[e.id]
+            lines.append(f"* element {json.dumps(e.id, ensure_ascii=True)} -> {name}")
+            if "electrical" in layout.extra:
+                lines.append(f"* branch {branch_ids[e.id]}: {json.dumps(e.id, ensure_ascii=True)} -> {name}")
+            lines.extend(_pmsm_lines(name, {pin: node(f"{e.id}.{pin}") for pin in "abc"}, val))
+            continue
         fields = [k for k, _, _ in FIELDS[e.kind]]
         defaults = {k: d for k, _, d in OPTIONAL_FIELDS.get(e.kind, [])}
         optional = list(defaults)
@@ -828,6 +908,12 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                     raise SpiceError(f"{e.id}: latching_current 不能小于 holding_current（0 表示不要求擎住电流）")
                 lines.extend(_pwm_lines(name, val, tr, e.id))
                 lines.extend(_thyristor_lines(name, n('a'), n('b'), val))
+                if val["dv_dt_limit"]:
+                    i = len(dvdt_limits)
+                    dvdt_limits[e.id] = val["dv_dt_limit"]
+                    dvdt_commands += [f"let cd_vak_{i} = v({n('a')},{n('b')})",
+                                       f"let cd_state_{i} = v(cd_{name}_lat)"]
+                    dvdt_vectors += [f"cd_vak_{i}", f"cd_state_{i}"]
                 sr, sc = val["snubber_resistance"], val["snubber_capacitance"]
                 if bool(sr) != bool(sc):
                     raise SpiceError(f"{e.id}: snubber_resistance / snubber_capacitance 须同时 > 0，或同时为 0 禁用")
@@ -844,9 +930,9 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                 if e.id in loop.averaged or e.id in averaged:
                     if e.id in loop.averaged:
                         lower, out = loop.averaged[e.id]
-                        pins = ("c", "e") if e.kind == "igbt" else ("d", "s")
+                        pins = ("c", "e") if e.kind == "igbt" else ("s", "d") if e.kind == "pmos" else ("d", "s")
                         low = ids[lower]
-                        lpins = ("c", "e") if low.kind == "igbt" else ("d", "s")
+                        lpins = ("c", "e") if low.kind == "igbt" else ("s", "d") if low.kind == "pmos" else ("d", "s")
                         if node(f"{e.id}.{pins[1]}") != node(f"{lower}.{lpins[0]}"):
                             raise SpiceError(f"{e.id} / {lower}: 不是同一桥臂（上管的 {pins[1]} 须接下管的 "
                                              f"{lpins[0]}），不能按 average 模型仿真")
@@ -889,7 +975,8 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                           f".model ms_{name} SW(RON={s('ron')} ROFF={s('roff')} VT=0.5 VH=0)"]
                 a, b = n('s'), n('d')
             if "switch" not in mapping and e.opts.get("diode", True) is not False:
-                lines += [f"Dbody_{name} {a} {b} mbody_{name}",
+                anode, cathode = (b, a) if e.kind == "pmos" else (a, b)
+                lines += [f"Dbody_{name} {anode} {cathode} mbody_{name}",
                           f".model mbody_{name} D({body})"]
             if sr:
                 # Keep the IGBT's zero-volt sensor outside every parallel
@@ -912,6 +999,8 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
             raise SpiceError("每个 probe 必须是对象")
         kind = probe.get("kind")
         fields = ("positive", "negative") if kind == "voltage" else ("element",)
+        if kind == "motor":
+            fields += ("quantity",)
         target = ids.get(probe.get("element")) if isinstance(probe.get("element"), str) else None
         winding = ("winding",) if kind == "current" and target and target.kind == "transformer" else ()
         _keys(probe, ("name", "kind", *fields, *winding), label=f"probe[{i}]")
@@ -925,10 +1014,18 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
             a, b = node(probe["positive"]), node(probe["negative"])
             expr = " - ".join("0" if x == "0" else f"v({x})" for x in (a, b))
             unit = "V"
+        elif kind == "motor":
+            if target is None or target.kind != "pmsm":
+                raise SpiceError(f"{label}: motor 测量通道的 element 必须是 PMSM 元件 ID")
+            quantity = probe["quantity"]
+            if not isinstance(quantity, str) or quantity not in pmsm.QUANTITIES:
+                raise SpiceError(f"{label}: quantity 必须为 {', '.join(pmsm.QUANTITIES)}")
+            expr = f"v(cd_{names[target.id]}_{quantity})"
+            unit = pmsm.QUANTITIES[quantity]["unit"]
         elif kind in ("current", "drive"):
             e = ids.get(probe["element"]) if isinstance(probe["element"], str) else None
             if e is None or (kind == "current" and e.kind not in CURRENT_PROBE_KINDS) or (kind == "drive" and e.kind not in GATED):
-                raise SpiceError(f"{label}: 电流通道支持 D/L/V/vac/igbt/scr/transformer；驱动通道支持 nmos/igbt/scr")
+                raise SpiceError(f"{label}: 电流通道支持 D/L/V/vac/igbt/scr/transformer；驱动通道支持 nmos/pmos/igbt/scr")
             expr = f"i({names[e.id]})" if kind == "current" else f"v(ctl_{names[e.id]})"
             if loop and kind == "current" and e.id in {*loop.averaged, *(lo for lo, _ in loop.averaged.values())}:
                 raise SpiceError(f"{label}: {e.id} 按闭环 average 模型仿真，没有单管电流；改测桥臂所接电感的电流")
@@ -961,11 +1058,16 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
         # Save device currents before transient analysis, without adding a
         # sensing source or changing decks that have no diode current probes.
         lines.append(".save all " + " ".join(dict.fromkeys(diode_currents)))
+    # Inspect adaptive solver points BEFORE linearize; the user's output
+    # sampling can miss fast blocking-voltage edges. Do not add visible probes.
+    ratings_output = (["set wr_singlescale", "set wr_vecnames", "set numdgt=15",
+                       *dvdt_commands, "wrdata thyristor_dvdt.dat " + " ".join(dvdt_vectors)]
+                      if dvdt_limits else [])
     lines += [f".tran {tr['step']:.15g} {tr['stop']:.15g} 0 {tr['max_step']:.15g} uic",
               ".options reltol=1e-5 abstol=1e-9 vntol=1e-6", ".control", "set noaskquit",
-              "run", "linearize", *commands, "set wr_singlescale", "set wr_vecnames",
+              "run", *ratings_output, "linearize", *commands, "set wr_singlescale", "set wr_vecnames",
               "set numdgt=15", "wrdata waveforms.dat " + " ".join(vectors), "quit", ".endc", ".end"]
-    return Deck("\n".join(lines) + "\n", columns, tr["step"], tr["stop"], loop.warnings if loop else [])
+    return Deck("\n".join(lines) + "\n", columns, tr["step"], tr["stop"], loop.warnings if loop else [], dvdt_limits)
 
 
 def executable(value=None) -> str | None:
@@ -980,6 +1082,10 @@ def _convergence_hint(deck: Deck, log: str) -> str:
     if not re.search(r"(?i)timestep too small", log):
         return ""
     text = "\n提示：积分步长过小通常来自浮空节点或开关不连续。先核对初始条件、电源上升沿和 PWM 启动延迟"
+    if "MOS(LEVEL=1 " in deck.text:
+        text += ("。检测到 LEVEL=1 MOSFET，请在“分析 → SPICE 仿真…”的对应开关参数中，"
+                 "核对“输出电容 Coss / Coes”（output_capacitance），按实际器件在工作电压下的参数填写并比较波形；"
+                 "线性 Coss 会改变换流过程，演示值见 examples/spice/buck_level1.json")
     if "Cnum_" not in deck.text:
         text += "；也可在瞬态设置中填写数值稳定电容（如 100p–1n），并比较不同取值下关注的指标是否一致"
     return text + "。详见使用说明书 SPICE 仿真一章的收敛建议。"
@@ -1026,6 +1132,64 @@ def _simulate(deck: Deck, engine: str, stage: Path, timeout: float) -> None:
             raise SpiceError("ngspice 仿真未覆盖设置的完整时间范围")
 
 
+def _check_dvdt(deck: Deck, stage: Path) -> list[dict]:
+    """Positive Vak rise while both ends of an interval are forward-blocking.
+
+    A sampled rating comparison, never a false claim of modelling dv/dt firing.
+    Validate all solver data before publishing any new output files.
+    """
+    if not deck.dv_dt_limits:
+        return []
+    records = [{"element": eid, "limit_v_per_us": limit, "peak_v_per_us": 0.0,
+                "time_s": None, "interval_s": None, "blocking_intervals": 0}
+               for eid, limit in deck.dv_dt_limits.items()]
+    raw = stage / "thyristor_dvdt.dat"
+    if not raw.is_file():
+        raise SpiceError("ngspice 未生成晶闸管 dv/dt 检查数据；没有发布本次结果")
+    previous, first, count = None, None, 0
+    with raw.open(encoding="ascii") as source:
+        next(source, None)
+        for line in source:
+            if not line.strip():
+                continue
+            try:
+                values = [float(v) for v in line.split()]
+            except ValueError as exc:
+                raise SpiceError("晶闸管 dv/dt 检查数据包含非数值") from exc
+            if (len(values) != 1 + 2 * len(records) or not all(map(math.isfinite, values))
+                    or (previous is not None and values[0] <= previous[0])):
+                raise SpiceError("晶闸管 dv/dt 检查数据的列数、数值或时间顺序无效")
+            if previous is not None:
+                dt = values[0] - previous[0]
+                for i, record in enumerate(records):
+                    v0, q0 = previous[1+2*i:3+2*i]
+                    v1, q1 = values[1+2*i:3+2*i]
+                    if max(abs(q0), abs(q1)) > SCR_BLOCKED_STATE or min(v0, v1) < 0:
+                        continue
+                    record["blocking_intervals"] += 1
+                    rate = max(0.0, (v1-v0) / dt / 1e6)  # V/s -> V/us
+                    if not math.isfinite(rate):
+                        raise SpiceError("晶闸管 dv/dt 检查结果超出数值范围")
+                    if record["time_s"] is None or rate > record["peak_v_per_us"]:
+                        record.update(peak_v_per_us=rate, time_s=values[0], interval_s=dt)
+            first = values[0] if first is None else first
+            previous, count = values, count + 1
+    if (count < 2 or not 0 <= first <= deck.step
+            or not math.isclose(previous[0], deck.stop, rel_tol=1e-9, abs_tol=1e-15)):
+        raise SpiceError("晶闸管 dv/dt 检查数据未覆盖完整仿真时间")
+    for record in records:
+        eid, peak, limit = record["element"], record["peak_v_per_us"], record["limit_v_per_us"]
+        if not record["blocking_intervals"]:
+            record.update(status="not_evaluated", message=f"{eid}：没有可检查的正向阻断区间，未完成 dv/dt 额定值检查。")
+        else:
+            exceeded = peak > limit
+            record.update(status="exceeded" if exceeded else "within_sampled_limit",
+                          message=f"{eid}：关断正向 dv/dt 峰值 {peak:.6g} V/μs，额定值 {limit:g} V/μs，"
+                          + ("已超限；请核对 RC 吸收和器件额定值。" if exceeded else "本次采样未发现超限。")
+                          + "这是积分点间的估算，请减小最大积分步长复核；不模拟误触发或反向恢复。")
+    return records
+
+
 def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
                  profile="ieee-single", run=False, ngspice=None, timeout=120, base_dir=None) -> dict:
     """Validate everything before creating output; stage runs to prevent stale CSV."""
@@ -1034,15 +1198,22 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
         raise SpiceError("输出名称只能包含字母、数字、下划线或连字符")
     engine = executable(ngspice) if run else None
     if run and not engine:
-        raise SpiceError("未找到 ngspice。先导出 .cir，或安装后设置 CIRCUIT_DRAWER_NGSPICE 为可执行文件路径")
+        raise SpiceError("未找到 ngspice。命令行可去掉 --run 先导出 .cir；运行仿真请安装并设置 CIRCUIT_DRAWER_NGSPICE 为可执行文件路径")
     destination = Path(out_dir).resolve()
     with tempfile.TemporaryDirectory(prefix="cd_spice_") as temp:
         stage = Path(temp)
         (stage / "circuit.cir").write_text(deck.text, encoding="ascii")
         sources = {"cir": stage / "circuit.cir"}
+        rating_checks = []
         if run:
             _simulate(deck, engine, stage, timeout)
             sources.update(csv=stage / "waveforms.csv", log=stage / "simulation.log")
+            rating_checks = _check_dvdt(deck, stage)
+            if rating_checks:
+                ratings = stage / "ratings.json"
+                ratings.write_text(json.dumps({"sampling": "adaptive_solver_points", "checks": rating_checks},
+                                              ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                sources["ratings.json"] = ratings
         destination.mkdir(parents=True, exist_ok=True)
         files = []
         for ext, source in sources.items():
@@ -1050,4 +1221,5 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
             shutil.copyfile(source, target)
             files.append(str(target))
     return {"files": files, "out_dir": str(destination), "columns": deck.columns,
-            "ran": bool(run), "notes": [LIMIT_NOTE, *deck.notes]}
+            "ran": bool(run), "notes": [LIMIT_NOTE, *deck.notes, *[r["message"] for r in rating_checks]],
+            "rating_checks": rating_checks}

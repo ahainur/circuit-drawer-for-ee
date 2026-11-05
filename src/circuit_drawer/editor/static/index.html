@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -29,7 +29,8 @@
   #canvasWrap { position: relative; min-height: 0; }
   #resizeNotice { position:absolute; top:14px; left:14px; right:14px; z-index:5; padding:14px 18px;
     border:2px solid #b42318; border-radius:8px; background:#fff1ed; color:#8a1710;
-    font-size:15px; font-weight:600; box-shadow:0 3px 12px #0002; pointer-events:none; }
+    font-size:15px; font-weight:600; box-shadow:0 3px 12px #0002; max-height:28vh; overflow:auto; }
+  #dismissResize { float:right; margin-left:12px; }
   svg#canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none; }
   aside { background: var(--panel); border-left: 1px solid var(--line); overflow: auto; padding: 12px; }
   aside h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
@@ -90,6 +91,7 @@
 <link rel="stylesheet" href="/menu.css">
 <link rel="stylesheet" href="/electrical.css">
 <link rel="stylesheet" href="/editor-ui.css">
+<link rel="stylesheet" href="/theme-eda.css">
 </head>
 <body>
 <header>
@@ -126,16 +128,17 @@
       <button id="waveforms" data-icon="wave">波形与模态</button>
       <button id="quickAi" data-command="tweak" data-icon="ai">AI 修改</button>
     </div>
-<span id="definitionActions" hidden><button id="saveDefinition" class="primary">保存模块定义</button> <button id="cancelDefinition">取消编辑定义</button></span>
+<span id="definitionActions" hidden><button id="saveDefinition" class="primary">设置端口并保存…</button> <button id="cancelDefinition">取消编辑定义</button></span>
   </div>
   <div class="document-tabs" role="tablist" aria-label="打开的文件">
     <button id="currentDocument" class="document-tab" role="tab" aria-selected="true" aria-controls="canvasWrap">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z M14 3v5h4 M10 12h5 M10 16h5"/></svg>
-      <span id="fileDirty" aria-label="未保存" hidden>●</span><span id="file">…</span>
+      <span id="fileDirty" aria-label="未保存" hidden>●</span><span id="file" translate="no">…</span>
     </button>
   </div>
   <div id="menu-file-panel" class="menu-panel" role="menu" aria-labelledby="menu-file" hidden>
     <button data-command="save" role="menuitem" tabindex="-1" >保存</button>
+    <button id="saveAs" role="menuitem" tabindex="-1">另存为…</button>
     <button role="menuitem" tabindex="-1" id="saveTpl" title="以后同一拓扑只需写选项">存为模板…</button>
     <button role="menuitem" tabindex="-1" id="saveModule">存为模块…</button>
     <hr role="separator">
@@ -173,7 +176,7 @@
     <button id="menuFit" role="menuitem" tabindex="-1">适应窗口</button>
     <button id="menuZoomIn" role="menuitem" tabindex="-1">放大</button>
     <button id="menuZoomOut" role="menuitem" tabindex="-1">缩小</button>
-    <button id="menuModuleDisplay" role="menuitem" tabindex="-1" data-submenu="module-display-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="module-display-panel">模块显示 <span>›</span></button>
+    <button id="menuModuleDisplay" role="menuitem" tabindex="-1" data-submenu="module-display-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="module-display-panel" disabled>模块显示 <span>›</span></button>
     <div id="module-display-panel" class="menu-subpanel" role="menu" aria-labelledby="menuModuleDisplay" hidden>
       <label>选中实例 <select id="menuInstanceSelect" aria-label="选中模块实例"></select></label>
       <button id="menuModuleExpanded" role="menuitem" tabindex="-1">展开选中实例</button>
@@ -221,9 +224,11 @@
     <button id="insert-I" role="menuitem" tabindex="-1" data-component="I" data-availability="drawWire">电流源</button>
     <button id="insert-port" role="menuitem" tabindex="-1" data-component="port" data-availability="drawWire">端子</button>
     <button id="insert-nmos" role="menuitem" tabindex="-1" data-component="nmos" data-availability="drawWire">MOSFET</button>
+    <button id="insert-pmos" role="menuitem" tabindex="-1" data-component="pmos" data-availability="drawWire">P 沟 MOSFET</button>
     <button id="insert-igbt" role="menuitem" tabindex="-1" data-component="igbt" data-availability="drawWire">IGBT</button>
     <button id="insert-transformer" role="menuitem" tabindex="-1" data-component="transformer" data-availability="drawWire">变压器</button>
     <button id="insert-coupled" role="menuitem" tabindex="-1" data-component="coupled" data-availability="drawWire">耦合电感</button>
+    <button id="insert-pmsm" role="menuitem" tabindex="-1" data-component="pmsm" data-availability="drawWire">永磁同步电机（PMSM）</button>
   </div>
   <div id="menu-ai-panel" class="menu-panel" role="menu" aria-labelledby="menu-ai" hidden>
     <button role="menuitem" tabindex="-1" id="aiSettings">AI 接口设置…</button>
@@ -233,6 +238,7 @@
   <div id="menu-analysis-panel" class="menu-panel" role="menu" aria-labelledby="menu-analysis" hidden>
     <button data-command="waveforms" role="menuitem" tabindex="-1" >波形与模态…</button>
     <button role="menuitem" tabindex="-1" id="spice">SPICE 仿真…</button>
+    <button role="menuitem" tabindex="-1" id="emi">传导 EMI 估算…</button>
     <button id="adopt" role="menuitem" tabindex="-1">以当前连接更新网表</button>
     <hr role="separator">
     <button data-command="modePrevBtn" role="menuitem" tabindex="-1" >上一个模态<kbd>[</kbd></button>
@@ -259,7 +265,7 @@
       <h2>从一个器件开始</h2><p>从左侧拖入器件，或用 AI 描述电路</p>
       <div><button id="openExample">打开示例</button><button id="emptyDescribe" class="primary">AI 描述</button></div>
     </div>
-    <div id="resizeNotice" role="alert" aria-live="assertive" hidden></div>
+    <div id="resizeNotice" role="alert" aria-live="assertive" hidden><button id="dismissResize" aria-label="关闭尺寸提示">关闭</button><span id="resizeMessage"></span></div>
     <div id="editorNotice" role="status" aria-live="polite" hidden></div>
     <div id="modeTip">画导线：单击加拐点，双击或回车结束，Esc 取消</div>
   </div>
@@ -330,6 +336,49 @@
   <p>网表记录哪些引脚应该相连。只有有意改接线后，才使用“分析 → 以当前连接更新网表”。模态页按开关状态高亮电流回路，箭头表示电流方向。</p>
   <button id="menuHelpClose">关闭</button>
 </dialog>
+<dialog id="startupDialog" aria-labelledby="startupTitle" style="max-width:480px">
+  <strong id="startupTitle">正在打开图纸…</strong>
+  <p id="startupMessage" role="status">正在加载页面和检查图纸，请稍候。</p>
+  <button id="startupReload" hidden>重新加载</button>
+</dialog>
+<script>
+// Keep a partially loaded editor inert until its scripts and initial check finish.
+(() => {
+  const dialog = document.getElementById('startupDialog');
+  const reload = document.getElementById('startupReload');
+  let problem = '';
+  dialog.showModal();
+  dialog.addEventListener('cancel', event => event.preventDefault());
+  window.addEventListener('keydown', event => {
+    if (!dialog.open) return;
+    event.stopImmediatePropagation();
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') event.preventDefault();
+  }, true);
+  window.addEventListener('error', event => {
+    if (!dialog.open || problem) return;
+    if (event.target instanceof HTMLScriptElement) problem = `未能加载页面文件 ${event.target.getAttribute('src')}`;
+    else if (event instanceof ErrorEvent) problem = event.message;
+  }, true);
+  const failed = message => {
+    document.getElementById('startupTitle').textContent = '编辑器未能启动';
+    document.getElementById('startupMessage').textContent = `${message}。请确认本机服务仍在运行，再点“重新加载”。`;
+    reload.hidden = false; reload.focus();
+  };
+  reload.onclick = () => location.reload();
+  document.addEventListener('DOMContentLoaded', async event => {
+    if (problem) { event.stopImmediatePropagation(); failed(problem); return; }
+    try {
+      await initializeEditor();
+      if (problem) failed(problem); else dialog.close();
+    } catch (error) {
+      console.error('Editor startup failed', error);
+      failed(error.message);
+    }
+  }, {once:true, capture:true});
+})();
+</script>
+<script src="/i18n-messages.js"></script>
+<script src="/i18n.js"></script>
 <script src="/electrical.js"></script>
 <script src="/editor-ui.js"></script>
 <script>
@@ -362,14 +411,23 @@ function joinPath(dir, name) {
   const sep = String(dir).includes("\\") ? "\\" : "/";
   return String(dir).replace(/[\\/]+$/, "") + sep + name;
 }
+let saveQueue = Promise.resolve();
 async function api(path, body) {
-  const savedTable = ['/api/save', '/api/save-as'].includes(path) && body?.layout ? JSON.stringify(body.layout) : null;
-  const r = await fetch(path, body === undefined ? {} : {method: "POST",
-    headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || r.statusText);
-  if (savedTable && j.saved) setEditorFile(j.saved, savedTable);
-  return j;
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  const savedTable = ['/api/save', '/api/save-as', '/api/waveform-save'].includes(path) && body?.layout ? JSON.stringify(body.layout) : null;
+  const request = async () => {
+    const r = await fetch(path, payload === undefined ? {} : {method: "POST",
+      headers: {"Content-Type": "application/json"}, body: payload});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    if (savedTable && j.saved) setEditorFile(j.saved, savedTable);
+    return j;
+  };
+  if (!savedTable) return request();
+  // Writes from Save and waveform Save must reach disk in the user's order.
+  const pending = saveQueue.then(request);
+  saveQueue = pending.catch(() => {});
+  return pending;
 }
 function pushHistory() {
   const snapshot = JSON.stringify(layout);
@@ -432,7 +490,11 @@ function currentView(source, info) {
 function fitView() { const result = projected(fitDrawingView); fittedViewWidth = view.w; return result; }
 function fitDrawingView() {
   const pts = [];
-  layout.elements.forEach(e => Object.values(e.pins).forEach(p => pts.push(p)));
+  layout.elements.forEach(e => {
+    Object.values(e.pins).forEach(p => pts.push(p));
+    const geo = report?.geometry?.[e.id];
+    [...(geo?.bodies || []), ...(geo?.labels || [])].forEach(b=>pts.push(b.slice(0,2),b.slice(2)));
+  });
   layout.wires.forEach(w => w.forEach(p => pts.push(p)));
   (layout.annotations || []).forEach(a => pts.push(a.at));
   (Array.isArray(layout.wave_symbols) ? layout.wave_symbols : []).forEach(w => { if (Array.isArray(w.at)) pts.push(w.at); });
@@ -590,6 +652,7 @@ function bodyEnds(e, box) {
 
 function drawElement(e, geo, root, glyphOnly = false) {
   const g = glyphOnly ? root : el("g", {"data-id": e.id, class: "element"}, root);
+  if (e.opts?.dash && e.opts.dash !== "solid") g.setAttribute("stroke-dasharray", e.opts.dash === "dotted" ? ".02 .06" : ".1 .07");
   if ((selected && selected.type === "el" && selected.id === e.id) || (typeof moduleSelection !== "undefined" && moduleSelection.has(e.id))) g.classList.add("sel");
   if (badIds.has(e.id)) g.classList.add("bad");
   inkOn(g, !glyphOnly && report && report.inks && report.inks.elements[e.id]);
@@ -662,19 +725,19 @@ function drawElement(e, geo, root, glyphOnly = false) {
     const hb = [Math.min(P.a[0], P.b[0], box[0]) - 0.06, Math.min(P.a[1], P.b[1], box[1]) - 0.06,
                 Math.max(P.a[0], P.b[0], box[2]) + 0.06, Math.max(P.a[1], P.b[1], box[3]) + 0.06];
     el("rect", {x: hb[0], y: -hb[3], width: hb[2] - hb[0], height: hb[3] - hb[1], class: "hit"}, g);
-  } else if ((e.kind === "nmos" || e.kind === "igbt") && box && geo.centre && geo.orient &&
+  } else if ((["nmos", "pmos", "igbt"].includes(e.kind)) && box && geo.centre && geo.orient &&
              !(geo.orient.u[0] === 0 && geo.orient.u[1] === 1 && !geo.orient.mirror)) {
     // turned or mirrored: draw the upright glyph in the switch's own frame
     const o = geo.orient, [cx, cy] = geo.centre;
-    const top = e.kind === "nmos" ? P.d : P.c, bot = e.kind === "nmos" ? P.s : P.e;
+    const top = e.kind === "pmos" ? P.s : e.kind === "nmos" ? P.d : P.c, bot = e.kind === "pmos" ? P.d : e.kind === "nmos" ? P.s : P.e;
     const h = Math.hypot(top[0] - bot[0], top[1] - bot[1]) / 2;
     const ang = Math.atan2(o.u[1], o.u[0]) * 180 / Math.PI - 90;
     const rg = el("g", {transform: `translate(${cx} ${-cy}) rotate(${-ang}) scale(${o.mirror ? -1 : 1} 1)`}, g);
-    drawElement({...e, pins: e.kind === "nmos" ? {d: [0, h], s: [0, -h]} : {c: [0, h], e: [0, -h]}, label: null},
-                {bodies: [o.box], labels: [], centre: [0, 0], orient: {u: [0, 1], mirror: false, k: o.k}}, rg, true);
+    drawElement({...e, pins: e.kind === "pmos" ? {s: [0, h], d: [0, -h]} : e.kind === "nmos" ? {d: [0, h], s: [0, -h]} : {c: [0, h], e: [0, -h]}, label: null},
+                {bodies: [o.box], labels: [], centre: [0, 0], orient: {...o, u: [0, 1], mirror: false}}, rg, true);
     el("rect", {x: box[0] - 0.04, y: -box[3] - 0.04, width: box[2] - box[0] + 0.08, height: box[3] - box[1] + 0.08, class: "hit"}, g);
-  } else if ((e.kind === "nmos" || e.kind === "igbt") && box && geo.centre && geo.orient) {
-    const top = e.kind === "nmos" ? P.d : P.c, bot = e.kind === "nmos" ? P.s : P.e, [cx, cy] = geo.centre;
+  } else if ((["nmos", "pmos", "igbt"].includes(e.kind)) && box && geo.centre && geo.orient) {
+    const top = e.kind === "pmos" ? P.s : e.kind === "nmos" ? P.d : P.c, bot = e.kind === "pmos" ? P.d : e.kind === "nmos" ? P.s : P.e, [cx, cy] = geo.centre;
     // symbol size from the server (across, along the pins); the offsets below
     // sketch the CircuitikZ glyph in those units
     const [kx, ky] = geo.orient.k, ch = cx - 0.22 * kx;
@@ -683,7 +746,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
     const hasD = (e.opts || {}).diode !== false;
     line(g, top, [cx, cy + 0.32 * ky], hasD ? "glyph ld" : "glyph"); line(g, [cx, cy - 0.32 * ky], bot, hasD ? "glyph ld" : "glyph");
     line(g, [cx, cy + 0.32 * ky], [cx, cy + 0.25 * ky]); line(g, [cx, cy - 0.25 * ky], [cx, cy - 0.32 * ky]);
-    if (e.kind === "nmos") {
+    if (e.kind === "nmos" || e.kind === "pmos") {
       line(g, [cx, cy + 0.25 * ky], [ch, cy + 0.25 * ky]); line(g, [cx, cy - 0.25 * ky], [ch, cy - 0.25 * ky]);
     } else {
       // IGBT: slanted collector and emitter, arrow on the emitter
@@ -695,6 +758,10 @@ function drawElement(e, geo, root, glyphOnly = false) {
     line(g, [ch, cy + 0.32 * ky], [ch, cy - 0.32 * ky]);
     line(g, [ch - 0.07 * kx, cy + 0.25 * ky], [ch - 0.07 * kx, cy - 0.25 * ky]);
     line(g, [box[0], cy], [ch - 0.07 * kx, cy]);
+    if (e.kind === "pmos") {
+      const [rx, ry] = geo.orient.gate_dot;
+      el("ellipse", {cx: ch - 0.07 * kx - rx, cy: -cy, rx, ry, class: "glyph gate-dot", fill: "currentColor"}, g);
+    }
     if ((e.opts || {}).diode !== false) {
       // class bd: the body diode, coloured on its own in the mode view
       const dx = cx + 0.2 * kx; line(g, [cx, cy + 0.32 * ky], [dx, cy + 0.32 * ky], "glyph bd"); line(g, [cx, cy - 0.32 * ky], [dx, cy - 0.32 * ky], "glyph bd");
@@ -704,6 +771,14 @@ function drawElement(e, geo, root, glyphOnly = false) {
     }
     el("rect", {x: box[0] - 0.04, y: -(Math.max(top[1], box[3]) + 0.04), width: box[2] - box[0] + 0.08,
                 height: Math.abs(top[1] - bot[1]) + 0.08, class: "hit"}, g);
+  } else if (e.kind === "pmsm" && box && geo.centre) {
+    geo.motor_leads.forEach(([a, b]) => line(g, a, b));
+    el("ellipse", {cx:geo.centre[0], cy:-geo.centre[1], rx:(box[2]-box[0])/2,
+      ry:(box[3]-box[1])/2, class:"el-body motor-body"}, g);
+    geo.motor_marks.forEach(mark => texToSvg(g, mark.text, ...mark.at, mark.height).setAttribute("font-style", "normal"));
+    const points = [...Object.values(P), [box[0],box[1]], [box[2],box[3]]], xs=points.map(p=>p[0]), ys=points.map(p=>p[1]);
+    el("rect", {x:Math.min(...xs)-.04, y:-Math.max(...ys)-.04, width:Math.max(...xs)-Math.min(...xs)+.08,
+      height:Math.max(...ys)-Math.min(...ys)+.08, class:"hit"}, g);
   } else if (e.kind === "transformer" && geo && geo.coils) {
     geo.coils.forEach((c, i) => {
       const [a, b] = c, vertical = Math.abs(a[0] - b[0]) < 1e-6, box = geo.bodies[i];
@@ -735,11 +810,22 @@ function drawElement(e, geo, root, glyphOnly = false) {
   if (geo && geo.source_wave) drawWavePath(g, geo.source_wave);
   // labels
   if (geo && geo.labels) {
-    const texts = e.kind === "transformer" ? (e.opts && e.opts.ratio ? [e.opts.ratio] : []) : (e.label ? [e.label] : []);
-    // a transformer's ratio box comes after its two dot boxes
+    const texts = e.kind === "transformer" ? [e.label, e.opts?.ratio].filter(Boolean) : (e.label ? [e.label] : []);
+    // Transformer name and ratio follow the polarity dot boxes.
     const boxes = e.kind === "transformer" ? geo.labels.slice(-texts.length || geo.labels.length) : geo.labels;
     const fs = 0.3 * (((e.opts || {}).label_size) || 8) / 8;
-    texts.forEach((tx, i) => { const b = boxes[i]; if (b) texToSvg(g, tx, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, fs); });
+    texts.forEach((tx, i) => { let b = boxes[i]; if (!b) return;
+      const draggable = e.kind !== "transformer" || i === texts.length - 1 && !!e.opts?.ratio;
+      if (draggable && drag?.label === e.id) {
+        const delta = drag.offset.map((v, k) => v - (geo.label_offset?.[k] || 0));
+        b = b.map((v, k) => v + delta[k % 2]);
+      }
+      const label = el("g", draggable ? {"data-element-label": e.id, style: "cursor:move"} : {}, g);
+      // Hit only the fill: SVG "all" also includes an unpainted 1-unit stroke.
+      el("rect", {x:b[0], y:-b[3], width:b[2]-b[0], height:b[3]-b[1], fill:"transparent", "pointer-events":"fill"}, label);
+      texToSvg(label, tx, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, fs);
+      el("title", {}, label).textContent = draggable ? "拖动标签（不移动元件）；Esc 取消" : "在右侧属性栏修改名称和标签位置";
+    });
   }
   if (glyphOnly) return;
   if (selected && selected.type === "el" && selected.id === e.id && e.kind !== "transformer")
@@ -951,32 +1037,48 @@ async function resizeModuleInstance(id, size, before = JSON.stringify(layout), v
   else inst.collapsed_size = size;
   render();
   try {
-    const checked = await api("/api/check", {layout: candidate, profile});
+    const previous = await api("/api/check", {layout: JSON.parse(before), profile});
+    const checked = await checkModuleGeometry(candidate, previous);
     if (JSON.stringify(layout) !== before || version !== resizeVersion) return; // a newer edit owns the canvas
-    if (!checked.ok) {
+    const remaining = new Map();
+    for (const i of previous.issues.filter(i => i.level === "error")) {
+      const key = i.code + "|" + i.message; remaining.set(key, (remaining.get(key) || 0) + 1);
+    }
+    const errors = checked.issues.filter(i => {
+      if (i.level !== "error") return false;
+      const key = i.code + "|" + i.message, count = remaining.get(key) || 0;
+      if (count && !i.code.startsWith("bad-")) { remaining.set(key, count - 1); return false; }
+      return true;
+    });
+    if (errors.length) {
       const notice = document.getElementById("resizeNotice");
+      const text = document.getElementById("resizeMessage");
       const message = "该尺寸未通过校验，已保留原尺寸。" +
-        checked.issues.filter(i => i.level === "error").map(i => i.message).join("；");
+        errors.map(i => zhModule(i.message)).join("；");
       document.getElementById("props").textContent = message;
-      notice.hidden = false; notice.textContent = message + " 正在校验可拖到的最小尺寸…";
+      notice.hidden = false; text.textContent = message + " 正在校验可拖到的最小尺寸…";
       try {
         const limit = await api("/api/module-resize-limit", {layout: JSON.parse(before), profile, id: inst.id, step: SNAP});
         if (JSON.stringify(layout) !== before || version !== resizeVersion || resizing || notice.hidden) return;
-        notice.textContent = message + (limit.minimum ? " 按原宽高比例、当前网格可拖到的最小尺寸：" : " 当前经校验可用尺寸：") +
+        text.textContent = message + (limit.minimum ? " 按原宽高比例、当前网格可拖到的最小尺寸：" : " 当前经校验可用尺寸：") +
           `${limit.size.w} × ${limit.size.h}（布局单位）。其他比例或位置需重新校验。`;
       } catch (err) {
         if (JSON.stringify(layout) === before && version === resizeVersion && !resizing && !notice.hidden)
-          notice.textContent = message + " 最小尺寸计算失败：" + err.message;
+          text.textContent = message + " 最小尺寸计算失败：" + err.message;
       }
       return;
     }
-    history.push(before); layout = candidate; report = checked;
+    pushHistory(); layout = candidate; report = checked;
     if (!report) { checking = false; checkAgain = false; return revalidate(); }
   showIssues(); render(); updateElectricalPanel();
   } catch (err) {
     document.getElementById("props").textContent = "尺寸未保存，原图保持不变：" + err.message;
   }
 }
+document.getElementById("dismissResize").onclick = () => {
+  document.getElementById("resizeNotice").hidden = true;
+  if (focusedModuleId) showInstanceProps(focusedModuleId);
+};
 document.addEventListener("keydown", ev => {
   if (!layout?.modules?.instances?.length || /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
   if (document.getElementById("dlg").open || selected) return;
@@ -1011,9 +1113,34 @@ async function toggleInstance(evt) {
   await setModuleDisplay(id, cycle[(cycle.indexOf(inst.display || "expanded") + 1) % cycle.length]);
 }
 async function setModuleDisplay(id, display) {
-  const inst = layout.modules.instances.find(i => i.id === id);
-  pushHistory(); inst.display = display;
-  selected = null; await revalidate(); fitView(); render();
+  const before = JSON.stringify(layout), candidate = clone(layout);
+  candidate.modules.instances.find(i => i.id === id).display = display;
+  try {
+    const result = await checkModuleGeometry(candidate, report);
+    if (JSON.stringify(layout) !== before) return;
+    pushHistory(); layout = candidate; report = result; selected = null;
+    await revalidate(); fitView(); render();
+  } catch (error) { flash(error.message, true); }
+}
+// Keep ordinary wire endpoints attached when the displayed public pins move.
+async function checkModuleGeometry(candidate, previous) {
+  ++pendingTrialChecks; checking = true;
+  try {
+    let result = await api("/api/check", {layout: candidate, profile});
+    const pins = {}, next = {};
+    for (const [ref, at] of Object.entries(previous?.module_info?.ports || {})) {
+      const target = result.module_info?.ports[ref];
+      if (target && !same(at, target)) { pins[ref] = at; next[ref] = target; }
+    }
+    if (Object.keys(pins).length) {
+      pinMover({pins}, candidate)(next);
+      result = await api("/api/check", {layout: candidate, profile});
+    }
+    return result;
+  } finally {
+    --pendingTrialChecks; checking = validating || pendingTrialChecks > 0;
+    if (!checking && checkAgain) { checkAgain = false; revalidate(); }
+  }
 }
 svg.addEventListener("dblclick", toggleInstance, true);
 svg.addEventListener("contextmenu", ev => {
@@ -1044,9 +1171,14 @@ document.getElementById("modules").onclick = () => {
   };
 };
 async function applyModuleSource(candidate) {
-  const result = await api("/api/check", {layout: candidate, profile});
+  const body = document.getElementById("dlgBody");
+  const before = JSON.stringify(layout), content = body.firstChild;
+  const result = JSON.stringify(candidate.wires) === JSON.stringify(layout.wires)
+    ? await checkModuleGeometry(candidate, report) : await api("/api/check", {layout: candidate, profile});
+  if (JSON.stringify(layout) !== before) throw new Error("等待模块操作时图纸已改变，已保留当前编辑，请重试。");
   if (!result.ok) throw new Error(result.issues.map(i => i.message).join("\n"));
-  pushHistory(); layout = candidate; selected = null; dlg.close();
+  pushHistory(); layout = candidate; selected = null;
+  if (body.firstChild === content) dlg.close();
   await revalidate(); fitView(); render();
 }
 // ---------- regions (background blocks) and callout arrows ----------
@@ -1280,7 +1412,9 @@ function grabRegion(ev, kind, i) {
   if (list(kind)[i].fit) return; // Derived regions follow their members until explicitly frozen.
   pushHistory();
   const r = list(kind)[i], f = r.from.slice(), t = r.to.slice(), start = toUnits(ev);
-  drag = {move(p) { const dx = snap(p[0] - start[0]), dy = snap(p[1] - start[1]);
+  const guides = drawingGuides(kind, i);
+  drag = {guides, move(p, ev) {
+    const [dx, dy] = guides.snap(p[0] - start[0], p[1] - start[1], ev.altKey);
     r.from = [r4(f[0] + dx), r4(f[1] + dy)]; r.to = [r4(t[0] + dx), r4(t[1] + dy)]; }};
 }
 let calloutGesture = 0;
@@ -1320,9 +1454,9 @@ function previewCalloutDrag(d) {
 function startDragCorner(ev, kind, i, corner, opposite) {
   if (ev.button !== 0) return;
   ev.stopPropagation(); pushHistory();
-  const r = list(kind)[i];
+  const r = list(kind)[i], guides = drawingGuides(kind, i, true);
   opposite = opposite.map(r4);
-  drag = {move(p) { const q = [r4(snap(p[0])), r4(snap(p[1]))];
+  drag = {guides, move(p, ev) { const q = guides.snap(p[0], p[1], ev.altKey).map(r4);
     r.from = [Math.min(q[0], opposite[0]), Math.min(q[1], opposite[1])];
     r.to = [Math.max(q[0], opposite[0]), Math.max(q[1], opposite[1])]; }};
 }
@@ -1726,13 +1860,10 @@ document.addEventListener("keydown", ev => {
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (ev.key === "]") stepMode(1); else if (ev.key === "[") stepMode(-1);
 });
-document.getElementById("modePreview").onclick = async () => {
+document.getElementById("modePreview").onclick = () => {
   if (modeIdx < 0) { flash("先在下拉框里选一个模态", true); return; }
-  try {
-    const r = await api("/api/preview", {layout, profile, grid: false, mode: modeIdx, style: modeStyle()});
-    const m = layout.modes[modeIdx];
-    showDialog(`${m.name}（CircuitikZ 编译结果）`, `<img src="data:image/png;base64,${r.png}">`);
-  } catch (e) { flash(e.message, true); }
+  return openCircuitPreview(`${layout.modes[modeIdx].name}（CircuitikZ 编译结果）`,
+    {grid: false, mode: modeIdx, style: modeStyle()});
 };
 document.getElementById("modeExport").onclick = () => openExport(true);
 document.getElementById("modeApply").onclick = () => {
@@ -1904,9 +2035,10 @@ function showIssues() {
       c.onclick = ev => { ev.stopPropagation(); pushHistory(); toNode(pts[0]); changed(); };
       li.appendChild(document.createElement("br")); li.appendChild(b); li.appendChild(document.createTextNode(" ")); li.appendChild(c);
     }
-    if (is.code === "netlist-short" || is.code === "netlist-open") {
+    if (is.code === "netlist-short" || is.code === "netlist-open" || is.code === "netlist-missing") {
       // usually a deliberate change of the connection: one click to accept it
-      const b = document.createElement("button"); b.textContent = "这是有意改的接法，按当前连接更新网表";
+      const b = document.createElement("button"); b.textContent = is.code === "netlist-missing"
+        ? "按当前连接记录新引脚" : "这是有意改的接法，按当前连接更新网表";
       b.onclick = ev => { ev.stopPropagation(); adoptNetlist(false); };
       li.appendChild(document.createElement("br")); li.appendChild(b);
     }
@@ -1927,7 +2059,7 @@ function intentButtons(li, is) {
   const button = (text, act, why) => {
     const b = document.createElement("button"); b.textContent = text; if (why) b.title = why;
     b.dataset.issueIntent='true';
-    b.onclick = ev => { ev.stopPropagation(); if (why && !confirm(why)) return; pushHistory(); act(); changed(); };
+    b.onclick = ev => { ev.stopPropagation(); if (why && !cdI18n.confirm(why)) return; pushHistory(); act(); changed(); };
     li.appendChild(document.createElement("br")); li.appendChild(b);
   };
   const index = name => { const m = is.message.match(new RegExp(name + "\\[(\\d+)\\]")); return m ? +m[1] : null; };
@@ -2073,8 +2205,8 @@ function wireName(i) {
     return `(${p[0]}, ${p[1]})`; };
   return `导线 ${at(w[0])}–${at(w[w.length - 1])}`;
 }
-function changed() { wirePick = null; ++resizeVersion; document.getElementById("resizeNotice").hidden = true;
-  cleanWires(); revalidate(); render(); if (selected) showProps();
+function changed(clean = true) { wirePick = null; ++resizeVersion; document.getElementById("resizeNotice").hidden = true;
+  if (clean) cleanWires(); revalidate(); render(); if (selected) showProps();
   window.dispatchEvent(new Event("circuit-drawer:layout-changed")); }
 
 // ---------- selection & properties ----------
@@ -2109,15 +2241,15 @@ function showProps() {
     const e = layout.elements.find(x => x.id === selected.id); if (!e) return;
     const s = document.createElement("span"); s.textContent = `${e.id}（${e.kind}）`; row(box, "元件", s);
     const ops = document.createElement("div"); ops.style.cssText = "display:flex;flex-wrap:wrap;gap:4px";
-    [["旋转 90°", rotateSelected, "R"], [["nmos", "igbt", "scr"].includes(e.kind) ? "镜像（门极换边）" : "反向", mirrorSelected, "F"],
+    [["旋转 90°", rotateSelected, "R"], [["nmos", "pmos", "igbt", "scr"].includes(e.kind) ? "镜像（门极换边）" : "反向", mirrorSelected, "F"],
      ["复制", () => { copySelected(); paste(); }, "Ctrl+C / Ctrl+V"]].forEach(([n, f, k]) => {
-      if (e.kind === "transformer" && n === "反向") return;
+      if (["transformer", "pmsm"].includes(e.kind) && n === "反向") return;
       const b = document.createElement("button"); b.textContent = n; b.title = k; b.onclick = f; ops.appendChild(b); });
     row(box, "操作", ops);
     {
       // Symbol dimensions are independent; the pins and text size stay fixed.
-      for (const [axis, title] of [["length", e.kind === "transformer" ? "绕组长度" : "长度倍率"],
-                                   ["width", e.kind === "transformer" ? "绕组宽度" : "宽度倍率"]]) {
+      for (const [axis, title] of [["length", e.kind === "transformer" ? "绕组长度" : e.kind === "pmsm" ? "引线倍率" : "长度倍率"],
+                                   ["width", e.kind === "transformer" ? "绕组宽度" : e.kind === "pmsm" ? "圆体倍率" : "宽度倍率"]]) {
         const i = document.createElement("input"); i.type = "number"; i.min = 0.5; i.max = 2; i.step = 0.1;
         i.id = "symbol-" + axis; i.setAttribute("aria-label", title);
         i.value = axisSize(e, axis);
@@ -2135,19 +2267,41 @@ function showProps() {
       const reset = document.createElement("button"); reset.textContent = "恢复默认尺寸";
       reset.onclick = () => { pushHistory(); setSize(e, 1); changed(); }; row(box, "", reset);
     }
-    if (e.kind !== "transformer") {
-      const t = document.createElement("input"); t.value = e.label || "";
+    {
+      const t = document.createElement("input"); t.id = "elementLabel"; t.value = e.label || "";
       t.onchange = () => { pushHistory(); if (t.value) e.label = t.value; else delete e.label; changed(); }; row(box, "标签", t);
       row(box, "标签字号", fontControl((e.opts || {}).label_size, v => { e.opts = e.opts || {}; if (v === 8) delete e.opts.label_size; else e.opts.label_size = v; }));
       {
-        const sel = document.createElement("select");
+        const sel = document.createElement("select"); sel.id = "elementLabelPosition";
         [["", "自动"], ["above", "上"], ["below", "下"], ["left", "左"], ["right", "右"]].forEach(([v, n]) => {
           const o = document.createElement("option"); o.value = v; o.textContent = n; sel.appendChild(o); });
         sel.value = e.label_pos || ""; sel.onchange = () => { pushHistory(); e.label_pos = sel.value || null; changed(); };
         row(box, "标签位置", sel);
       }
     }
+    if (e.kind === "transformer" ? e.opts?.ratio : e.label) {
+      const resetLabel = document.createElement("button");
+      resetLabel.id = "resetElementLabel"; resetLabel.textContent = "恢复默认标签位置";
+      resetLabel.disabled = e.opts?.label_offset === undefined;
+      resetLabel.onclick = () => { pushHistory(); delete e.opts.label_offset; if (!Object.keys(e.opts).length) delete e.opts; changed(false); };
+      row(box, "标签拖动", resetLabel);
+    }
     row(box, "颜色", inkControl((e.opts || {}).color, v => { e.opts = e.opts || {}; if (v) e.opts.color = v; else delete e.opts.color; }));
+    if (["R", "L", "C"].includes(e.kind)) {
+      const dash = document.createElement("select"); dash.id = "elementDash";
+      for (const value of report.region_options.callout_dashes) dash.add(new Option({solid:"实线",dashed:"虚线",dotted:"点线"}[value], value));
+      dash.value = e.opts?.dash || "solid";
+      dash.onchange = () => { pushHistory(); e.opts ||= {}; if (dash.value === "solid") delete e.opts.dash; else e.opts.dash = dash.value; changed(); };
+      row(box, "寄生符号线型", dash);
+    }
+    if (["nmos", "pmos", "igbt", "transformer"].includes(e.kind)) {
+      const core = e.kind === "transformer", key = core ? "core" : "diode";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = core ? "transformerCore" : "switchDiode";
+      cb.checked = e.opts?.[key] !== false;
+      cb.title = core ? "只控制磁芯线的画法，仿真参数不变" : "同时控制画图及仿真中的体／反并联二极管";
+      cb.onchange = () => { pushHistory(); e.opts ||= {}; if (cb.checked) delete e.opts[key]; else e.opts[key] = false; changed(); };
+      row(box, core ? "画磁芯" : "体／反并联二极管", cb);
+    }
     if (["V","I"].includes(e.kind)) sourceWaveProps(box,e);
     if (e.kind === "D") {
       const z = document.createElement("input"); z.type = "checkbox"; z.id = "diodeZener"; z.checked = !!e.opts?.zener;
@@ -2176,7 +2330,12 @@ function showProps() {
     }
     Object.keys(e.pins).forEach(k => {
       const d = document.createElement("div"); d.className = "xy";
-      d.appendChild(numInput(e.pins[k][0], v => e.pins[k][0] = v)); d.appendChild(numInput(e.pins[k][1], v => e.pins[k][1] = v));
+      for (let axis = 0; axis < 2; axis++) {
+        const input = numInput(e.pins[k][axis], v => {
+          const pins = clone(e.pins); pins[k][axis] = r4(v); pinMover(e)(pins);
+        });
+        input.setAttribute("aria-label", `引脚 ${k} ${axis ? "y" : "x"}`); d.appendChild(input);
+      }
       row(box, `引脚 ${k}`, d);
     });
   } else if (selected.type === "wave_symbols") {
@@ -2402,7 +2561,7 @@ function beginWireDrag(ev, index, move, keepEnds = false, stubs = null) {
   const original = clone(layout.wires[index]), others = clone(layout.wires), start = [ev.clientX, ev.clientY];
   drag = {wire: index, moved: false, keepEnds, move(p, event) {
     if (!this.moved && Math.hypot(event.clientX - start[0], event.clientY - start[1]) < WIRE_DRAG_PX) return;
-    const candidate = move(p);
+    const candidate = move(p, event);
     if (!this.moved && JSON.stringify(candidate) === JSON.stringify(original)) return;
     if (!this.moved) { pushHistory(); this.moved = true; }
     if (!stubs) { layout.wires[index] = candidate; return; }
@@ -2452,7 +2611,18 @@ function straightThrough(P, j) {
   const a = P[j - 1], b = P[j], c = P[j + 1];
   return a && c && (Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(c[0] - b[0]) < 1e-6 || Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(c[1] - b[1]) < 1e-6);
 }
-function moveWirePoint(P, j, q) {
+function moveWirePoint(P, j, q, keepDirection = false) {
+  // Attached pins keep the direction of a straight lead at both ends.
+  if (keepDirection && P.length === 2 && !same(P[0], P[1])) {
+    const other = P[1 - j], horizontal = Math.abs(P[0][1] - P[1][1]) < 1e-6;
+    const axis = horizontal ? 0 : 1;
+    if (Math.abs(q[1 - axis] - other[1 - axis]) > 1e-6) {
+      const mid = (q[axis] + other[axis]) / 2, a = other.slice(), b = q.slice();
+      a[axis] = mid; b[axis] = mid;
+      const path = [other.slice(), a, b, q.slice()];
+      return j === 0 ? path.reverse() : path;
+    }
+  }
   // sideways off a straight run would fold the wire back on itself: slide along it only
   if (straightThrough(P, j)) q = Math.abs(P[j - 1][1] - P[j][1]) < 1e-6 ? [q[0], P[j][1]] : [P[j][0], q[1]];
   const out = P.map(p => p.slice()); out[j] = q.slice();
@@ -2474,8 +2644,8 @@ function moveWirePoint(P, j, q) {
 // wire corners sitting on a pin move with it (the wire stretches and stays
 // orthogonal); a pin in the middle of a wire or on another part's pin keeps
 // its connection through a new stub.  Returns apply(newPins).
-function pinMover(e) {
-  const pins = clone(e.pins), wires = clone(layout.wires);
+function pinMover(e, table = layout) {
+  const pins = clone(e.pins), wires = clone(table.wires);
   const attached = [];
   wires.forEach((w, i) => w.forEach((p, j) => {
     for (const k in pins) if (same(pins[k], p)) attached.push([i, j, k]);
@@ -2484,9 +2654,11 @@ function pinMover(e) {
       p[0] > Math.min(a[0], b[0]) + 1e-6 && p[0] < Math.max(a[0], b[0]) - 1e-6) ||
     (Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(p[0] - a[0]) < 1e-6 &&
       p[1] > Math.min(a[1], b[1]) + 1e-6 && p[1] < Math.max(a[1], b[1]) - 1e-6);
-  const others = layout.elements.filter(x => x !== e).flatMap(x => Object.values(x.pins));
+  const others = table.elements.filter(x => x !== e).flatMap(x => Object.values(x.pins));
+  others.push(...Object.entries(report?.module_info?.ports || {}).filter(([ref])=>!Object.hasOwn(pins,ref)).map(([,p])=>p));
   const tees = Object.keys(pins).filter(k => others.some(o => same(o, pins[k])) ||
-    wires.some(w => w.some((q, j) => j > 0 && onSeg(pins[k], w[j - 1], q))));
+    wires.some(w => w.some((q, j) => j > 0 && (onSeg(pins[k], w[j - 1], q) ||
+      same(q, pins[k]) && straightThrough(w, j)))));
   // a wire end whose first segment carries other connections (a bus with
   // parts hanging on it) must not shrink past them: that pin gets a stub
   const stops = [...others, ...wires.flatMap(w => [w[0], w[w.length - 1]])];
@@ -2494,25 +2666,47 @@ function pinMover(e) {
     return stops.some(q => onSeg(q, w[j], n)); };
   for (let a = attached.length - 1; a >= 0; a--) {
     const [i, j, k] = attached[a], w = wires[i];
-    if ((j === 0 || j === w.length - 1) && w.length > 1 && busy(w, j)) {
+    if (tees.includes(k) || (j === 0 || j === w.length - 1) && w.length > 1 && busy(w, j)) {
       attached.splice(a, 1); if (!tees.includes(k)) tees.push(k); }
   }
   return newPins => {
     for (const k in pins) e.pins[k] = newPins[k].slice();
-    layout.wires = wires.map((w, i) => {
+    table.wires = wires.map((w, i) => {
       let cur = w;
       // highest index first: a corner inserted after j never shifts lower ones
       attached.filter(([wi]) => wi === i).sort((a, b) => b[1] - a[1]).forEach(([, j, k]) => {
-        if (!same(pins[k], newPins[k])) cur = moveWirePoint(cur, j === w.length - 1 ? cur.length - 1 : j, newPins[k].slice());
+        if (!same(pins[k], newPins[k])) cur = moveWirePoint(cur, j === w.length - 1 ? cur.length - 1 : j, newPins[k].slice(), true);
       });
-      return cur;
+      return cur === w ? cur : cur.filter((p, j) => j === 0 || j === cur.length - 1 ||
+        stops.some(q => same(p, q)) || !straightThrough(cur, j));
     });
     tees.forEach(k => {
       const p = pins[k], q = newPins[k];
       if (same(p, q) || wires.some(w => w.some((v, j) => same(q, v) || (j > 0 && onSeg(q, w[j - 1], v))))) return;
-      layout.wires.push(moveWirePoint([p, p.slice()], 1, q));
+      table.wires.push(moveWirePoint([p, p.slice()], 1, q));
     });
   };
+}
+
+function startDragLabel(ev, id) {
+  const e = layout.elements.find(x => x.id === id);
+  if (!e) return false;  // projected module children are edited in their definition
+  ev.preventDefault(); ev.stopImmediatePropagation();
+  svg.setPointerCapture(ev.pointerId);
+  select({type:"el", id});
+  svg.focus({preventScroll:true});
+  const start = toUnits(ev), stored = e.opts?.label_offset;
+  const offset = Array.isArray(stored) && stored.length === 2 && stored.every(Number.isFinite) ? stored.slice() : [0, 0];
+  const screen = [ev.clientX, ev.clientY];
+  drag = {label:id, offset:offset.slice(), moved:false, move(p, event) {
+    if (!this.moved) {
+      if (Math.hypot(event.clientX-screen[0], event.clientY-screen[1]) < WIRE_DRAG_PX) return;
+      pushHistory(); this.moved = true;
+    }
+    e.opts = e.opts || {};
+    this.offset = e.opts.label_offset = [r4(offset[0]+p[0]-start[0]), r4(offset[1]+p[1]-start[1])];
+  }};
+  return true;
 }
 
 function startDragElement(ev, id) {
@@ -2605,7 +2799,7 @@ function mirrorSelected() {
   if (!selected || selected.type !== "el") { flash("先选中一个元件", true); return; }
   const e = layout.elements.find(x => x.id === selected.id);
   pushHistory();
-  if (e.kind === "nmos" || e.kind === "igbt" || e.kind === "scr") {
+  if (["nmos", "pmos", "igbt", "scr"].includes(e.kind)) {
     // switches and thyristors: the gate goes to the other side
     e.opts = e.opts || {}; if (e.opts.mirror) delete e.opts.mirror; else e.opts.mirror = true;
   } else if (!TWO_TERMINAL.includes(e.kind)) {
@@ -2626,6 +2820,21 @@ let fileSections = null;
 function nextId(prefix) {
   const used = new Set(layout.elements.map(e => e.id));
   for (let n = 1; ; n++) if (!used.has(prefix + n)) return prefix + n;
+}
+function renameCopiedLabel(e, old) {
+  if (!e.label || e.id === old) return;
+  if (e.label === old) { e.label = e.id; return; }
+  if (e.label === `$${old}$`) { e.label = `$${e.id}$`; return; }
+  // Renumber reference labels only; leave values, formulas and prose untouched.
+  const match = e.label.match(/^\$([A-Za-z]+)(?:_\{([A-Za-z0-9]+)\}|_([A-Za-z0-9]+))?\$$/);
+  if (!match) return;
+  const n = e.id.match(/\d+$/)?.[0], previous = old.match(/\d+$/)?.[0];
+  if (!n) return;
+  let sub = match[2] ?? match[3] ?? "";
+  const number = sub.match(/\d+$/)?.[0];
+  if (number && number !== previous) return;
+  sub = (number ? sub.slice(0, -number.length) : sub) + n;
+  e.label = `$${match[1]}_${sub.length === 1 ? sub : `{${sub}}`}$`;
 }
 function copySelected() {
   if (selectionCount()) return copyGroup();
@@ -2651,12 +2860,11 @@ function paste(at = null) {
   if (clipboard?.decoration) { pasteDecoration(at); return; }
   if (clipboard?.group) { pasteGroup(at); return; }
   if (!clipboard?.single) { flash("还没有复制元件", true); return; }
-  const c = clipboard, e = clone(c.element), old = e.id, prefix = e.id.replace(/\d+$/, "") || e.id, num = (e.id.match(/\d+$/) || [""])[0];
+  const c = clipboard, e = clone(c.element), old = e.id, prefix = e.id.replace(/\d+$/, "") || e.id;
   const back = c.cut && !layout.elements.some(x => x.id === e.id);   // a cut's first paste: same id, same place
   if (!back && layout.elements.some(x => x.id === e.id)) {
     e.id = nextId(prefix);
-    const n2 = e.id.slice(prefix.length);
-    if (e.label && num && e.label.includes(num)) e.label = e.label.replace(new RegExp(num + "(?!.*" + num + ")"), n2);
+    renameCopiedLabel(e, old);
   }
   const delta = at ? pasteDelta(Object.values(e.pins), at) : back ? [0, 0] : PASTE_STEP;
   for (const k in e.pins) e.pins[k] = shiftedPoint(e.pins[k],delta);
@@ -2676,16 +2884,27 @@ function paste(at = null) {
 let TWO_TERMINAL = ["R", "L", "C", "D", "V", "vac", "I"];
 const LIBRARY = [["R", "电阻"], ["L", "电感"], ["C", "电容"], ["D", "二极管"], ["zener", "稳压管"], ["V", "电压源"], ["vac", "交流电源"], ["vac3", "三相电源"],
                  ["battery", "电池"], ["I", "电流源"], ["port", "端子"],
-                 ["scr", "晶闸管"], ["nmos", "MOSFET"], ["igbt", "IGBT"], ["transformer", "变压器"], ["coupled", "耦合电感"]];
+                 ["scr", "晶闸管"], ["nmos", "MOSFET"], ["pmos", "P 沟 MOSFET"], ["igbt", "IGBT"], ["transformer", "变压器"], ["coupled", "耦合电感"], ["pmsm", "永磁同步电机（PMSM）"]];
 function addFromLibrary(kind, at = null) {
-  const cx = r4(snap(at ? at[0] : view.x0 + view.w / 2)), cy = r4(snap(at ? at[1] : view.y0 + view.h / 2));
+  let cx = r4(snap(at ? at[0] : view.x0 + view.w / 2)), cy = r4(snap(at ? at[1] : view.y0 + view.h / 2));
   // a coupled inductor is a transformer drawn without core lines (opts.core = false)
   if (kind === "vac3") { addThreePhase(at ? [cx, cy] : null); return; }
-  const prefix = {nmos: "S", igbt: "S", scr: "T", transformer: "T", coupled: "L", vac: "V", battery: "E", zener: "Dz", port: "P"}[kind] || kind;
+  if (!at) {
+    const centres = layout.elements.map(e => [0, 1].map(k => {
+      const p = Object.values(e.pins).map(p => p[k]); return (Math.min(...p) + Math.max(...p)) / 2;
+    }));
+    // Only click-to-insert chooses a free centre; explicit drops stay at the pointer.
+    while (centres.some(p => Math.abs(p[0]-cx) < Math.abs(PASTE_STEP[0]) - 1e-6 && Math.abs(p[1]-cy) < Math.abs(PASTE_STEP[1]) - 1e-6)) {
+      cx = r4(cx + PASTE_STEP[0]); cy = r4(cy + PASTE_STEP[1]);
+    }
+  }
+  const prefix = {nmos: "S", pmos: "S", igbt: "S", scr: "T", transformer: "T", coupled: "L", pmsm: "M", vac: "V", battery: "E", zener: "Dz", port: "P"}[kind] || kind;
   const id = nextId(prefix), n = id.slice(prefix.length);
   let e;
-  if (kind === "nmos") e = {id, kind, pins: {d: [cx, r4(cy + 0.5)], s: [cx, r4(cy - 0.5)]}, label: `$S_${n}$`};
+  if (kind === "pmos") e = {id, kind, pins: {s: [cx, r4(cy + 0.5)], d: [cx, r4(cy - 0.5)]}, label: `$S_${n}$`};
+  else if (kind === "nmos") e = {id, kind, pins: {d: [cx, r4(cy + 0.5)], s: [cx, r4(cy - 0.5)]}, label: `$S_${n}$`};
   else if (kind === "igbt") e = {id, kind, pins: {c: [cx, r4(cy + 0.5)], e: [cx, r4(cy - 0.5)]}, label: `$S_${n}$`};
+  else if (kind === "pmsm") e = {id, kind, pins: {a: [cx, r4(cy + 0.3)], b: [cx, cy], c: [cx, r4(cy - 0.3)]}, label: `$M_${n}$`, label_pos: "below"};
   else if (kind === "transformer" || kind === "coupled") e = {id, kind: "transformer", pins: {p1: [r4(cx - 0.35), r4(cy + 0.6)], p2: [r4(cx - 0.35), r4(cy - 0.6)],
     s1: [r4(cx + 0.35), r4(cy + 0.6)], s2: [r4(cx + 0.35), r4(cy - 0.6)]}, opts: kind === "coupled" ? {dots: "same", core: false} : {dots: "same"}};
   else if (kind === "V" || kind === "I") e = {id, kind, pins: {a: [cx, r4(cy - 0.5)], b: [cx, r4(cy + 0.5)]}, label: `$${kind === "V" ? "V" : "I"}_${n}$`, label_pos: "left"};
@@ -2761,8 +2980,17 @@ function addThreePhase(at) {
 }
 function startDragVertex(ev, i, j) {
   ev.stopPropagation();
-  const orig = clone(layout.wires[i]);
-  beginWireDrag(ev, i, p => moveWirePoint(orig, j, [r4(snap(p[0])), r4(snap(p[1]))]));
+  const orig = clone(layout.wires[i]), guides = drawingGuides("wire", i, true);
+  const locked = straightThrough(orig, j) ? (Math.abs(orig[j - 1][1] - orig[j][1]) < 1e-6 ? 1 : 0) : null;
+  beginWireDrag(ev, i, (p, event) => {
+    const q = guides.snap(p[0], p[1], event.altKey).map(r4);
+    if (locked !== null) {
+      q[locked] = orig[j][locked];
+      guides.lines = guides.lines.filter(line => line.axis !== locked).map(line => ({...line, at: q}));
+    }
+    return moveWirePoint(orig, j, q);
+  });
+  drag.guides = guides;
 }
 function startDragAnn(ev, i) {
   i=sourceObjectIndex('ann',i);
@@ -2818,8 +3046,9 @@ window.addEventListener("pointerdown", () => { pressOrigin = layout ? {table: JS
 document.addEventListener("keydown", ev => {
   if (ev.key !== "Escape" || !drag || drag.group || drag.pan || !pressOrigin) return;
   ev.preventDefault();
+  const labelOnly = !!drag.label;
   layout = JSON.parse(pressOrigin.table); history.length = pressOrigin.history;
-  drag = null; pressOrigin = null; svg.style.cursor = ""; changed();
+  drag = null; pressOrigin = null; svg.style.cursor = ""; changed(!labelOnly);
 }, true);
 window.addEventListener("pointerup", async () => {
   if (drag?.group) { await finishGroupDrag(drag); return; }
@@ -2832,9 +3061,9 @@ window.addEventListener("pointerup", async () => {
   }
   if (drag && !drag.pan) {
     if (drag.guides) drag.guides = null;
-    if (drag.wire !== undefined && !drag.moved) { drag = null; return; }
+    if ((drag.wire !== undefined || drag.label) && !drag.moved) { drag = null; return; }
     if (drag.wire !== undefined && !drag.keepEnds) { const notes = fixLeadLandings(drag.wire); if (notes.length) flash(notes.join("；")); }
-    changed();
+    changed(!drag.label);
   }
   drag = null;
 });
@@ -2887,10 +3116,6 @@ function fixLeadLandings(wi) {
 }
 function finishWire() {
   if (!wireDraft) return;
-  if (wireDraft.pts.length >= 2 && typeof wireToModuleLink === "function" && wireToModuleLink(wireDraft.pts)) {
-    wireDraft = null; document.getElementById("modeTip").style.display = "none";
-    document.getElementById("drawWire").classList.remove("on"); return;
-  }
   if (wireDraft.pts.length >= 2) {
     pushHistory(); layout.wires.push(wireDraft.pts);
     const notes = fixLeadLandings(layout.wires.length - 1);
@@ -2929,7 +3154,7 @@ function restoreHistory(source, destination) {
   if (showLabels && !layout.electrical) showLabels.checked = false;
   selected = null; clearGroupSelection(); focusedLink = null;
   if (!focusedModule()) focusedModuleId = null;
-  showProps(); changed();
+  showProps(); changed(false); // restore the exact snapshot, including its wire vertices
 }
 function undo() { restoreHistory(history, redoHistory); }
 function redo() { restoreHistory(redoHistory, history); }
@@ -2938,7 +3163,8 @@ document.getElementById("redo").onclick = redo;
 // Use the same pin/wire movers as dragging, with an exact grid-sized delta.
 // No smart snapping here: each key press must move by the requested amount.
 function nudgeSelection(key, fast) {
-  if (selectionBusy || drag || wireDraft || boxDraft || moduleMarquee || pendingModule || instanceDrag || linkDrag) return false;
+  if ((selectionBusy && (!moduleNudges || selected || selectionCount())) || drag || wireDraft || boxDraft ||
+      moduleMarquee || pendingModule || instanceDrag || linkDrag) return false;
   const step = SNAP * (fast ? 10 : 1), delta = {
     ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step]
   }[key];
@@ -2950,7 +3176,7 @@ function nudgeSelection(key, fast) {
     if (!inst) return false;
     const at = inst.at || viewInfo().origins?.[inst.id];
     if (!at) return false;
-    apply = () => { inst.at = moved(at); };
+    nudgeModuleInstance(inst.id, delta); return true;
   } else if (selected.type === "el") {
     const e = layout.elements.find(e => e.id === selected.id);
     if (!e) return false;
@@ -3020,19 +3246,57 @@ function delSelected() {
   if (selected.type === "el") forgetElements(new Set([selected.id]));
   selected = null; showProps(); changed();
 }
-document.getElementById("save").onclick = async () => {
+function tableForSave() {
   const table = {...layout};
   for (const key of ["regions", "callouts", "blocks"])
     if (Array.isArray(table[key]) && !table[key].length && !fileSections?.has(key)) delete table[key];
-  try { const r = await api("/api/save", {layout: table}); flash(`已保存到 ${r.saved}`); } catch (e) { flash(e.message, true); }
+  return table;
+}
+document.getElementById("save").onclick = async () => {
+  try { const r = await api("/api/save", {layout: tableForSave()}); flash(`已保存到 ${r.saved}`); } catch (e) { flash(e.message, true); }
 };
-document.getElementById("preview").onclick = async () => {
+document.getElementById("saveAs").onclick = () => {
+  const split = Math.max(editorFilePath.lastIndexOf("/"), editorFilePath.lastIndexOf("\\"));
+  showDialog("另存为", `<form id="saveAsForm">
+    <p>保存文件夹：<span id="saveAsFolder" style="overflow-wrap:anywhere"></span></p>
+    <p><label for="saveAsName">新文件名</label><br><input id="saveAsName" style="width:100%" autocomplete="off"></p>
+    <p class="hint">保存在当前文件夹，自动补 .json；空格等符号替换为下划线，同名时加 _2、_3 等序号。保存成功后继续编辑新文件。</p>
+    <p><button id="saveAsGo" class="primary" type="submit">另存并切换</button> <button id="saveAsCancel" type="button">取消</button></p>
+    <p id="saveAsState" role="status" class="hint"></p></form>`);
+  const form = document.getElementById("saveAsForm"), name = form.querySelector("#saveAsName");
+  const button = form.querySelector("#saveAsGo"), state = form.querySelector("#saveAsState"), cancel = form.querySelector("#saveAsCancel");
+  form.querySelector("#saveAsFolder").textContent = editorFilePath.slice(0, split + 1);
+  name.value = editorFilePath.slice(split + 1); name.focus(); name.select();
+  cancel.onclick = () => document.getElementById("dlg").close();
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    if (button.disabled) return;
+    if (!name.value.trim()) { state.className = "bad"; state.textContent = "请填写新文件名。"; name.focus(); return; }
+    button.disabled = true; cancel.textContent = "关闭"; state.className = "hint"; state.textContent = "正在另存…关闭窗口后仍会继续保存。";
+    try {
+      const result = await api("/api/save-as", {layout: tableForSave(), name: name.value.trim()});
+      if (form.isConnected && document.getElementById("dlg").open) document.getElementById("dlg").close();
+      flash(`已另存到 ${result.saved}`);
+    } catch (e) { state.className = "bad"; state.textContent = "另存失败：" + e.message; flash(state.textContent, true); }
+    finally { button.disabled = false; cancel.textContent = "取消"; }
+  };
+};
+async function openCircuitPreview(title, options) {
+  showDialog(title, '<p id="previewState" role="status">编译中…</p>');
+  const state = document.getElementById("previewState");
+  const current = () => state.isConnected && document.getElementById("dlg").open;
   try {
-    const r = await api("/api/preview", {layout, profile, grid: document.getElementById("gridPrev").checked,
-                                         mono: document.getElementById("regionMono").checked});
-    showDialog("真实预览（CircuitikZ 编译结果）", `<img src="data:image/png;base64,${r.png}">`);
-  } catch (e) { flash(e.message, true); }
-};
+    const r = await api("/api/preview", {layout, profile, ...options});
+    if (!current()) return;
+    const image = document.createElement("img");
+    image.src = `data:image/png;base64,${r.png}`; image.alt = title;
+    state.replaceChildren(image);
+  } catch (e) {
+    if (current()) { state.className = "bad"; state.textContent = e.message; }
+  }
+}
+document.getElementById("preview").onclick = () => openCircuitPreview("真实预览（CircuitikZ 编译结果）",
+  {grid: document.getElementById("gridPrev").checked, mono: document.getElementById("regionMono").checked});
 document.getElementById("export").onclick = () => openExport(false);
 
 document.getElementById("spice").onclick = () => openSpiceForElement();
@@ -3046,12 +3310,25 @@ async function openSpiceForElement(id = null) {
     }
   } catch (e) { flash(e.message, true); }
 }
+function motorProbeName(element, quantity, probes) {
+  const base=(quantity+'_'+element).replace(/[^a-zA-Z0-9_]/g,'_');
+  const used=new Set(probes.map(p=>String(p?.name).toLowerCase()));
+  let name=base.slice(0,41); // SPICE channel names allow at most 41 characters.
+  for (let n=2;used.has(name.toLowerCase());n++) {
+    const suffix='_'+n; name=base.slice(0,41-suffix.length)+suffix;
+  }
+  return name;
+}
 function simulationExportOptions(inputId) {
   return `<details><summary>Simulink / PLECS 导出说明与近似设置</summary>
-    <p>共用当前接线和仿真参数。Simulink 导出 MATLAB 建模脚本，需要 MATLAB、Simulink 和 Simscape；PLECS 导出独立版 .plecs 文件。
+    <p>共用当前接线和仿真参数。Simulink 导出 MATLAB 建模脚本，需要 MATLAB、Simulink 和 Simscape；含 PMSM 时另需 Simscape Electrical（蓝库），普通电路不新增此依赖。PLECS 导出独立版 .plecs 文件。
       本编辑器只导出文件，在对应软件内运行。每份导出都附带接线清单和使用说明。</p>
     <p>二极管由 SPICE 指数模型改为 27 °C 下的分段线性近似；参考电流会影响结果。
-      Simscape 另保留 1e-12 S 数值电导。无法转换的 MOSFET LEVEL=1 映射会报错。不能用这些简化模型判断损耗或 ZVS。</p>
+      Simscape 另保留 1e-12 S 数值电导。LEVEL=1 开关导出需要勾选下方近似选项。不能用这些简化模型判断损耗或 ZVS。</p>
+    <label><input id="${inputId}ApproximateMosfet" type="checkbox"> 按导通电阻近似 LEVEL=1 开关</label>
+    <p class="hint">勾选后，LEVEL=1 通道按每个开关上方填写的导通电阻 Ron、关断电阻 Roff 和逻辑 PWM 导出。
+      请按工作点核对 Ron。VTO、KP、gate_voltage 的非线性通道和内部体结由上述近似替代，独立体二极管沿用现有设置。
+      此确认只用于本次导出，重新打开窗口时需要重新勾选。</p>
     <label>二极管线性化参考电流 (A)<input id="${inputId}" value="1" type="text"></label>
     <label>PLECS 数值稳定电容串联电阻 (Ω)<input id="${inputId}Resistance" value="1m" type="text"></label>
     <label>闭环控制器（启用闭环控制时）<select id="${inputId}Control">
@@ -3088,6 +3365,7 @@ function openSpice(info) {
   const input = (key, title, value="") => `<label>${esc(title)}<input data-field="${esc(key)}" value="${esc(String(value))}" required></label>`;
   const pins = mod ? Object.keys(mod.pins) : base.elements.flatMap(e => Object.keys(e.pins).map(p => `${e.id}.${p}`));
   const pinNet = p => (mod ? mod.pins[p] : base.netlist[p]) || "未声明";
+  const motors = (mod ? mod.devices.map(d=>({id:d.name,kind:d.kind})) : devices).filter(e=>e.kind==="pmsm");
   showDialog("SPICE 参数与导出", `
     <p>${esc(info.note)}</p><p class="hint">本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件；叠层不增加电气器件。完整性检查不验证工况。</p>
     <div class="export-row" ${mod ? "hidden" : ""}><button type="button" id="spiceBuck" title="单相 Buck，或 N 相交错 Buck（各相 PWM 依次错开 1/N 周期）">载入 Buck 示例参数（含多相交错）</button>
@@ -3106,6 +3384,10 @@ function openSpice(info) {
         <p class="hint">voltage：positive / negative 引脚；current：D、L、V、vac、IGBT、晶闸管或变压器的 element；drive：MOSFET / IGBT / 晶闸管的 element。
           变压器电流还要填 winding：primary，普通副边 secondary，中心抽头 upper / lower。
           二极管、稳压管、电感电流 a→b（稳压管反向击穿时为负），电压源电流 b→a，IGBT 总端口电流 c→e（反向二极管电流为负）；每个 name 使用不同的英文名称。CSV 列名包含单位。</p>
+        ${motors.length ? `<div class="spice-fields"><label>电机<select id="spiceMotorElement">${motors.map(e=>`<option>${esc(e.id)}</option>`).join("")}</select></label>
+          <label>测量量<select id="spiceMotorQuantity">${Object.entries(info.motor_quantities).map(([k,v])=>`<option value="${esc(k)}">${esc(v.label)} · ${esc(v.unit)}</option>`).join("")}</select></label>
+          <button type="button" id="spiceMotorAdd">添加电机测量</button></div>
+          <p class="hint">motor：element 为电机编号，quantity 为上方测量量。转速是机械 rad/s，转角是电角度 rad（= 极对数 × 机械角），可直接绑定 FOC 反馈；a、b、c 电流以流入电机为正。</p>` : ""}
         ${mod ? '<p class="hint">模块内的元件按上面“模块实例”里显示的名称填写，如 M1/L1、M1/S1.d。</p>' : ""}
         <textarea id="spiceProbes" rows="10" style="width:100%;font-family:monospace" required></textarea></details>
       <details id="loopBox"><summary>四、闭环控制（可选）</summary>
@@ -3119,7 +3401,7 @@ function openSpice(info) {
       <div class="export-row"><input id="spiceDir" type="text" value="${esc(joinPath(defaultExportDir, 'spice'))}" required>
         <button type="button" id="spiceBrowse">浏览文件夹…</button></div>
       <div id="spiceFolders" hidden></div>
-      <p class="hint">相对路径以当前电路文件所在目录为起点。只导出：.cir；导出并仿真：.cir、CSV、日志。同名文件会覆盖，仿真失败保留旧结果。</p>
+      <p class="hint">相对路径以当前电路文件所在目录为起点。只导出：.cir；导出并仿真：.cir、CSV、日志；启用晶闸管 dv/dt 检查时另有 .ratings.json。同名文件会覆盖，仿真失败保留旧结果。</p>
       <div class="export-row"><button type="submit" data-action="save">保存参数</button>
         <button type="submit" data-action="export" class="primary">导出 SPICE</button>
         <button type="submit" data-action="run" ${info.available ? "" : "disabled"}>导出并仿真</button></div>
@@ -3179,11 +3461,22 @@ function openSpice(info) {
     $("spiceProbes").value = JSON.stringify(sim.probes || [], null, 2);
   }
   fill(base.simulation || {});
+  if (motors.length) $("spiceMotorAdd").onclick = () => {
+    try {
+      const probes=JSON.parse($("spiceProbes").value);
+      if (!Array.isArray(probes)) throw new Error("测量通道须为 JSON 数组，请先修正现有内容");
+      if (probes.length>=report.probe_limit) throw new Error(`测量通道已达到 ${report.probe_limit} 个`);
+      const element=$("spiceMotorElement").value, quantity=$("spiceMotorQuantity").value;
+      const name=motorProbeName(element,quantity,probes);
+      probes.push({name,kind:'motor',element,quantity}); $("spiceProbes").value=JSON.stringify(probes,null,2);
+      $("spiceProbes").dispatchEvent(new Event('input'));
+    } catch(e) { flash(e.message,true); }
+  };
   if (mod) moduleSpiceSection($("spiceModules"), mod, info);
   // Closed loop: map the control table's inputs onto probes or fixed values,
   // and its outputs (duty 0..1) onto PWM switches.
-  const switches = mod ? mod.devices.filter(d => ["nmos","igbt"].includes(d.kind)).map(d => d.name)
-    : devices.filter(e => ["nmos","igbt"].includes(e.kind)).map(e => e.id);
+  const switches = mod ? mod.devices.filter(d => ["nmos","pmos","igbt"].includes(d.kind)).map(d => d.name)
+    : devices.filter(e => ["nmos","pmos","igbt"].includes(e.kind)).map(e => e.id);
   let loopInfo = null, loopInline = null;
   const probeNames = () => { try { return JSON.parse($("spiceProbes").value).map(p => p.name).filter(Boolean); } catch (e) { return []; } };
   function paintLoop(saved) {
@@ -3268,10 +3561,21 @@ function openSpice(info) {
   }
   $("spiceBuck").onclick = () => preset("buck");
   $("spiceBoost").onclick = () => preset("boost");
-  if (mod) $("spiceRecommendation").hidden = true;   // suggestions fill single-table devices only
-  else initSimulationRecommendations(info, base, profile, simulation => {
-    base.simulation = clone(simulation); fill(simulation);
-  });
+  initSimulationRecommendations(info, base, profile, proposal => {
+    base.simulation = clone(proposal.simulation); fill(base.simulation);
+    if (proposal.modules) {
+      base.modules = clone(proposal.modules);
+      for (const d of mod.devices) d.values = proposal.module_values[d.id] || d.values;
+      moduleSpiceSection($("spiceModules"), mod, info, base);
+    }
+    if (proposal.closed_loop) {
+      base.closed_loop = clone(proposal.closed_loop);
+      loopInline = typeof base.closed_loop.control === "object" ? base.closed_loop.control : null;
+      $("loopControl").value = loopInline ? "（内嵌在电路文件中的控制表）" : base.closed_loop.control;
+      $("loopControl").disabled = !!loopInline;
+      paintLoop(base.closed_loop);
+    }
+  }, readSpice);
   let browseVersion=0;
   async function browse(path) {
     const version=++browseVersion;
@@ -3289,9 +3593,7 @@ function openSpice(info) {
   }
   $("spiceBrowse").onclick=()=>browse($("spiceDir").value);
   const values = parent => Object.fromEntries([...parent.querySelectorAll("input[data-field]")].map(e=>[e.dataset.field,e.value.trim()]));
-  form.onsubmit=async ev=>{
-    ev.preventDefault();
-    try {
+  function readSpice() {
       const components=clone(base.simulation?.components || {});
       for(const row of form.querySelectorAll(".spice-component")) {
         const e=devices.find(e=>e.id===row.dataset.id), cfg={...components[row.dataset.id],...values(row)};
@@ -3302,7 +3604,7 @@ function openSpice(info) {
             .map(i=>[i.dataset.waveField,i.value.trim()]))};
         }
         if(e.kind==="D") cfg.model ??= "generic_diode";
-        if(e.kind==="nmos") cfg.model ??= "ideal_switch";
+        if(["nmos","pmos"].includes(e.kind)) cfg.model ??= "ideal_switch";
         if(e.kind==="igbt") cfg.model ??= "simplified_igbt";
         if(e.kind==="transformer") {
           cfg.model ??= "ideal_transformer";
@@ -3315,6 +3617,12 @@ function openSpice(info) {
         transient:values($("spiceTransient")),probes:JSON.parse($("spiceProbes").value)};
       const loop=loopSection();
       if (loop) candidate.closed_loop=loop; else delete candidate.closed_loop;
+      return candidate;
+  }
+  form.onsubmit=async ev=>{
+    ev.preventDefault();
+    try {
+      const candidate=readSpice();
       const action=ev.submitter?.dataset.action || "save";
       const externalTarget=["simulink","plecs"].includes(action) ? action : null;
       $("spiceOptions").disabled=true; $("spiceBuck").disabled=$("spiceBoost").disabled=true;
@@ -3323,6 +3631,7 @@ function openSpice(info) {
         {layout:candidate,profile,out_dir:$("spiceDir").value.trim(),run:action==="run",
           target:externalTarget,diode_current:$("spiceDiodeCurrent").value.trim(),
           numerical_resistance:$("spiceDiodeCurrentResistance").value.trim(),
+          approximate_mosfet:$("spiceDiodeCurrentApproximateMosfet").checked,
           control:$("spiceDiodeCurrentControl").value});
       if (!form.isConnected) return;
       // The server wrote this whole table, drawing edits included: it is now the saved file.
@@ -3331,12 +3640,14 @@ function openSpice(info) {
       if (candidate.closed_loop) base.closed_loop=clone(candidate.closed_loop); else delete base.closed_loop;
       setEditorFile(editorFilePath, JSON.stringify(candidate));
       changed();
-      state.className="ok"; state.textContent=(externalTarget ? `${externalTarget==="plecs" ? "PLECS 独立版" : "Simulink"} 已导出，参数已保存；请在对应软件内运行` : action==="save" ? "参数已保存到当前电路 JSON" : result.ran ? "仿真完成，已输出 CSV" : "SPICE 已导出，参数已保存") +
-        (drawingUnsaved ? "（图纸上未保存的修改也一并保存到了文件）" : "");
+      state.className=result.rating_checks?.some(r => r.status==="exceeded") ? "bad" : "ok"; state.textContent=(externalTarget ? `${externalTarget==="plecs" ? "PLECS 独立版" : "Simulink"} 已导出，参数已保存；请在对应软件内运行` : action==="save" ? "参数已保存到当前电路 JSON" : result.ran ? "仿真完成，已输出 CSV" : "SPICE 已导出，参数已保存") +
+        (drawingUnsaved ? "（图纸上未保存的修改也一并保存到了文件）" : "") +
+        (result.rating_checks?.length ? "；请查看下方额定值检查，关闭本窗口后可查看波形" : "");
       $("spiceResult").textContent=(result.files || [result.saved]).join("\n") +
-        (externalTarget ? "\n" + result.notes.join("\n") : "");
+        (externalTarget ? "\n" + result.notes.join("\n") :
+          (result.rating_checks || []).map(r => "\n" + r.message).join(""));
       const csv = result.ran && result.files?.find(file => file.toLowerCase().endsWith(".csv"));
-      if (csv) window.dispatchEvent(new CustomEvent("circuit-drawer:simulation-complete", {detail: {csv}}));
+      if (csv) window.dispatchEvent(new CustomEvent("circuit-drawer:simulation-complete", {detail: {csv,rating_checks:result.rating_checks}}));
     } catch(e) {state.className="bad";state.textContent=e.message;}
     finally {if(form.isConnected) {$("spiceOptions").disabled=false;$("spiceBuck").disabled=$("spiceBoost").disabled=false;}}
   };
@@ -3344,14 +3655,14 @@ function openSpice(info) {
 
 // The module instances' devices in the SPICE dialog: read-only effective
 // values, with the two places they are changed.
-function moduleSpiceSection(box, mod, info) {
+function moduleSpiceSection(box, mod, info, source=layout) {
   const groups = {};
   for (const d of mod.devices.filter(d => d.instance)) (groups[d.instance] ??= []).push(d);
   const title = (kind, key) => [...(info.fields[kind] || []), ...(info.optional_fields[kind] || [])].find(f => f[0] === key)?.[1] || key;
   box.innerHTML = `<p class="hint">模块内元件的参数来自模块定义（各实例共用）和实例差异，这里只读显示，标 * 的是本实例单独设定的值。
     第一份实例沿用封装前的元件名（如 S1），网表、测量通道与封装前一致；其余实例名为“实例/元件”（如 M1/S1）。</p>` +
     Object.entries(groups).map(([id, list]) => {
-      const inst = layout.modules.instances.find(i => i.id === id), def = layout.modules.definitions?.[inst?.definition];
+      const inst = source.modules.instances.find(i => i.id === id), def = source.modules.definitions?.[inst?.definition];
       const local = d => d.id.slice(id.length + 1);
       return `<div class="spice-module" style="border-top:1px solid var(--line);padding-top:8px" data-instance="${esc(id)}"><p><b>模块实例 ${esc(id)}（${esc(inst?.definition || "")}）</b>
         <button type="button" data-inst-params>实例参数…</button> <button type="button" data-inst-definition ${def ? "" : "disabled"}>编辑模块定义</button></p>
@@ -3458,10 +3769,9 @@ function openExport(modes) {
   };
 }
 document.getElementById("adopt").onclick = () => adoptNetlist(true);
-function adoptNetlist(ask) {
+async function adoptNetlist(ask) {
   if (!report || !report.nets) { flash("先等校验完成", true); return; }
-  if (ask && !confirm("把当前画出来的连接关系记为新的网表？只有在你确实有意改了接法时才这样做。")) return;
-  pushHistory();
+  if (ask && !cdI18n.confirm("把当前画出来的连接关系记为新的网表？只有在你确实有意改了接法时才这样做。")) return;
   // keep the old names: a drawn net takes the name(s) its pins had, joined
   // with "_" when two nets were merged on purpose; new nets get N1, N2, ...
   const old = layout.netlist || {}, names = {}, used = new Set();
@@ -3480,7 +3790,22 @@ function adoptNetlist(ask) {
     }
     out[k] = label[v];
   }
-  layout.netlist = out;
+  if (layout.modules) {
+    const candidate = clone(layout); candidate.netlist = out;
+    ++pendingTrialChecks; checking = true;
+    let failure = null;
+    try {
+      await moduleCommit("/api/module-contact", {}, candidate, false);
+    } catch (error) { failure = error; }
+    finally {
+      --pendingTrialChecks; checking = validating || pendingTrialChecks > 0;
+      if (!checking) checkAgain = false;
+      await revalidate();
+    }
+    flash(failure ? failure.message : "网表与模块端口连接已按当前接线更新", !!failure);
+    return;
+  }
+  pushHistory(); layout.netlist = out;
   changed();
   flash("网表已按当前连接更新");
 }
@@ -3528,13 +3853,25 @@ window.addEventListener("keydown", ev => {
     document.getElementById("drawWire").classList.remove("on"); render(); }
 });
 function esc(t) { return String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+let layoutGeneration = 0;
 function useLayout(lay) {
-  pushHistory(); layout = lay;
+  pushHistory(); layout = lay; ++layoutGeneration;
   layout.hops = layout.hops || []; layout.annotations = layout.annotations || []; layout.netlist = layout.netlist || {};
   selected = null; clearGroupSelection(); showProps(); fitView(); changed();
 }
 // ---------- describe a new topology (model writes the table) ----------
-let job = null;
+// Keep each AI form and its job alive when another dialog replaces dlgBody.
+let describeForm = null, tweakForm = null;
+function showAIForm(title, form, html) {
+  if (!form) { form = document.createElement('div'); form.innerHTML = html; }
+  showDialog(title, ''); document.getElementById('dlgBody').append(form);
+  const infoBox = form.querySelector('[data-ai-info]');
+  api('/api/ai-status').then(info => {
+    infoBox.innerHTML = info.problem ? `<span class="bad">${esc(info.problem).replace(/\n/g, '<br>')}</span>`
+      : `模型：${esc(info.provider)} / ${esc(info.model)}，接口 ${esc(info.base_url)}，单次请求最长等待 ${info.timeout_s} 秒<br>${fmtEfforts(info)}`;
+  }).catch(e => { infoBox.textContent = e.message; });
+  return form;
+}
 const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 // one line per model request: time to the first reply text, total time, tokens
 const fmtStat = t => `首个正文 ${t.first_text_s ?? "-"} 秒 · 共 ${t.total_s} 秒` +
@@ -3544,10 +3881,12 @@ const fmtEfforts = info => `请求思考强度：结构 ${esc(info.plan_effort ?
 const fmtStats = st => (st.stats || []).length
   ? `<p class="hint">模型用时：${st.stats.map(fmtStat).join("；")}</p>` : "";
 document.getElementById("describe").onclick = () => {
-  showDialog("描述新拓扑", `
-    <p id="aiInfo" class="hint">正在读取模型设置…</p>
+  const existing = !!describeForm;
+  describeForm = showAIForm("描述新拓扑", describeForm, `
+    <p id="aiInfo" data-ai-info class="hint">正在读取模型设置…</p>
     <p class="hint">写清楚是哪种拓扑（例如“二极管钳位型”还是“飞跨电容型”）、开关和二极管、无源元件怎么连、输出接什么。
-      只写名字也可以，但建议先点<b>先看结构</b>：模型列出它理解的元件和连接，你改对了再画。生成结果会另存为新文件，不会覆盖当前文件。</p>
+      只写名字也可以，但建议先点<b>先看结构</b>：模型列出它理解的元件和连接，你改对了再画。确认采用后另存为新文件，不会覆盖原文件。</p>
+    <p class="hint">关闭或切换窗口不会取消任务；在本页重新打开本窗口可查看进度和结果。刷新网页前请先下载或采用结果。</p>
     <textarea id="descText" rows="4" style="width:100%;box-sizing:border-box"
       placeholder="例：五电平逆变器，两个二极管钳位型三电平桥臂组成全桥，直流侧四个串联电容，交流输出接 L 和 R 负载"></textarea>
     <p id="descWarn" class="hint bad"></p>
@@ -3559,14 +3898,24 @@ document.getElementById("describe").onclick = () => {
       <span id="refThumbs"></span></p>
     <div id="planBox" style="display:none"><b>模型理解的结构</b>（可以直接修改，按这个画）
       <textarea id="planText" rows="10" style="width:100%;box-sizing:border-box"></textarea></div>
+    <p id="planNotice" class="hint"></p>
     <p>最多 <input id="descRounds" type="number" min="1" max="8" value="4" style="width:4em"> 轮
       <button id="planGo">先看结构</button>
       <button id="descGo" class="primary">直接生成</button>
       <button id="aiPing">测试连接</button>
       <button id="jobCancel" style="display:none">取消</button></p>
+    <p id="pingState" class="hint"></p>
     <div id="jobState"></div>`);
-  const $ = id => document.getElementById(id);
-  let images = [], matchTimer = null;
+  if (existing) return;
+  const form = describeForm, $ = id => form.querySelector('#' + id);
+  let job = null, images = [], matchTimer = null, revision = 0, planRevision = null, planContext = null;
+  const context = () => JSON.stringify([$("descText").value.trim(), images, profile]);
+  const invalidatePlan = () => {
+    ++revision; planRevision = null; planContext = null;
+    if ($("planBox").style.display !== 'none') $("planNotice").textContent = '描述、参考图或栏宽已改变，旧结构已失效。请重新看结构，或按最新描述直接生成。';
+    if (!job && !$("descApply")) $("jobState").replaceChildren();
+    $("planBox").style.display = 'none'; $("planText").value = ''; $("descGo").textContent = '直接生成';
+  };
   const BIG = /三相|三电平|四电平|五电平|多电平|npc|飞跨|级联|矩阵|双有源|dab|three[- ]?phase|multilevel/i;
   const checkSize = () => {
     const t = $("descText").value + "\n" + ($("planBox").style.display === "none" ? "" : $("planText").value);
@@ -3574,8 +3923,9 @@ document.getElementById("describe").onclick = () => {
     $("sizeWarn").style.display = profile !== "ieee-double" && (BIG.test(t) || parts >= 12) ? "" : "none";
   };
   $("sizeToDouble").onclick = () => { profile = "ieee-double"; document.getElementById("profile").value = profile;
-    revalidate(); checkSize(); };
+    revalidate(); invalidatePlan(); checkSize(); };
   $("descText").oninput = () => {
+    invalidatePlan();
     const t = $("descText").value.trim();
     $("descWarn").textContent = t && t.length < 15 ? "描述比较简略：模型会按它认为最常见的画法补全，建议先选下面的类型或点“先看结构”确认。" : "";
     checkSize();
@@ -3583,6 +3933,7 @@ document.getElementById("describe").onclick = () => {
     matchTimer = setTimeout(async () => {
       // a short name with several standard variants: offer them before any model call
       const c = await api("/api/clarify", {description: t}).catch(() => ({}));
+      if ($("descText").value.trim() !== t) return;
       $("clarifyBox").style.display = c.options ? "" : "none";
       if (c.options) {
         $("clarifyBox").innerHTML = `<p class="hint"><b>${esc(c.question)}</b> 点一个，描述会换成明确的一句话（还可以再改）：</p><p>` +
@@ -3591,6 +3942,7 @@ document.getElementById("describe").onclick = () => {
           $("descText").value = c.options[+b.dataset.opt].text; $("descText").oninput(); });
       }
       const m = await api("/api/match", {description: t}).catch(() => ({}));
+      if ($("descText").value.trim() !== t) return;
       if (!m.template) { $("tplHit").style.display = "none"; return; }
       $("tplHit").style.display = "";
       $("tplHit").innerHTML = `已有手画模板 <b>${esc(m.title)}</b>（<code>${esc(m.template)}</code>），是标准画法，不需要调用模型。
@@ -3608,6 +3960,7 @@ document.getElementById("describe").onclick = () => {
     }, 300);
   };
   $("refImg").onchange = async ev => {
+    invalidatePlan();
     const files = [...ev.target.files].slice(0, 3);
     images = await Promise.all(files.map(f => new Promise((ok, bad) => {
       const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = bad; rd.readAsDataURL(f); })));
@@ -3615,41 +3968,50 @@ document.getElementById("describe").onclick = () => {
     $("refThumbs").innerHTML = images.map(u => `<img src="${u}" style="height:48px;margin-left:6px;vertical-align:middle;border:1px solid #ccc">`).join("");
   };
   $("aiPing").onclick = async () => {
-    $("jobState").innerHTML = '<p class="hint">测试中（最多 10 秒）…</p>';
+    $("pingState").textContent = '测试中（最多 10 秒）…';
     try {
       const r = await api("/api/ai-ping");
-      $("jobState").innerHTML = r.problem ? `<p class="bad">${esc(r.problem)}</p>` : r.reachable
+      $("pingState").innerHTML = r.problem ? `<span class="bad">${esc(r.problem)}</span>` : r.reachable
         ? `<p class="ok">能连上 ${esc(r.base_url)}（${r.seconds} 秒，HTTP ${r.status}）。如果仍然很慢，多半是模型在思考，复杂电路每轮可能几分钟。</p>`
         : `<p class="bad">连不上 ${esc(r.base_url)}：${esc(r.error)}。国内网络一般需要设 HTTPS_PROXY，或用可访问的网关 / 国内兼容接口。</p>`;
-    } catch (e) { $("jobState").innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
+    } catch (e) { $("pingState").textContent = e.message; }
   };
-  const busy = on => { ["planGo", "descGo"].forEach(id => $(id).disabled = on); $("jobCancel").style.display = on ? "" : "none"; };
+  const busy = on => { ["planGo", "descGo", "aiPing"].forEach(id => $(id).disabled = on); $("jobCancel").style.display = on ? "" : "none"; };
   const start = async planOnly => {
     const text = $("descText").value.trim();
-    if (!text) return;
-    const structure = $("planBox").style.display === "none" ? "" : $("planText").value;
+    if (!text || job) return;
+    if (planContext !== context()) invalidatePlan();
+    const source = context(), sourceRevision = revision;
+    const structure = planRevision === revision ? $("planText").value : "";
+    const pending = {}; job = pending; busy(true);
+    $("planNotice").textContent = '';
+    $("jobState").textContent = '正在提交任务…';
     try {
-      job = await api("/api/generate", {description: text, profile, plan: planOnly, structure, images,
+      const started = await api("/api/generate", {description: text, profile, plan: planOnly, structure, images,
         rounds: +$("descRounds").value || 4});
-    } catch (e) { $("jobState").innerHTML = `<p class="bad">${esc(e.message).replace(/\n/g, "<br>")}</p>`; return; }
-    busy(true); poll(job.id, planOnly);
+      if (job !== pending) { await api('/api/cancel', {id: started.id}); return; }
+      job = started;
+    } catch (e) {
+      if (job === pending) { job = null; busy(false); $("jobState").textContent = e.message; }
+      return;
+    }
+    poll(job.id, planOnly, source, sourceRevision);
   };
   $("planGo").onclick = () => start(true);
   $("descGo").onclick = () => start(false);
-  api("/api/ai-status").then(info => {   // the dialog may be closed or replaced by now
-    const box = $("aiInfo"); if (!box) return;
-    box.innerHTML = info.problem ? `<span class="bad">${esc(info.problem).replace(/\n/g, "<br>")}</span>`
-      : `模型：${esc(info.provider)} / ${esc(info.model)}，接口 ${esc(info.base_url)}，单次请求最长等待 ${info.timeout_s} 秒<br>${fmtEfforts(info)}`;
-  }).catch(e => { const box = $("aiInfo"); if (box) box.textContent = e.message; });
   $("jobCancel").onclick = async () => {
-    if (job) await api("/api/cancel", {id: job.id});
+    const cancelled = job; job = null; busy(false);
     $("jobState").innerHTML = '<p class="hint">已取消。正在进行的那次请求会在后台结束，结果直接丢弃。</p>';
-    job = null; busy(false);
+    if (cancelled?.id) await api("/api/cancel", {id: cancelled.id}).catch(e => flash(e.message, true));
   };
-  async function poll(id, planOnly) {
-    if (!job || job.id !== id || !$("jobState")) return;
+  async function poll(id, planOnly, source, sourceRevision, failures = 0) {
+    if (!job || job.id !== id) return;
     let st;
-    try { st = await api("/api/job/" + id); } catch (e) { $("jobState").textContent = e.message; return; }
+    try { st = await api("/api/job/" + id); } catch (e) {
+      if (job?.id !== id) return;
+      retryAIProgress($("jobState"), e, failures, n => poll(id, planOnly, source, sourceRevision, n));
+      return;
+    }
     if (!job || job.id !== id) return;
     const rounds = st.attempts.map(a => `<li>第 ${a.round} 轮：${a.errors.length ? `<span class="bad">${a.errors.length} 个问题</span>` : '<span class="ok">通过</span>'}
       ${a.fixes && a.fixes.length ? `<span class="hint">（代码自动微调了 ${a.fixes.length} 处极小间距：${esc(a.fixes.join("；"))}）</span>` : ""}
@@ -3663,12 +4025,17 @@ document.getElementById("describe").onclick = () => {
         : planOnly ? `<p class="hint">模型正在写（写完前不能确认）：</p><pre style="white-space:pre-wrap;max-height:16em;overflow:auto">${esc(st.partial)}</pre>`
         : `<p class="hint">模型正在输出本轮坐标表，已收到 ${st.partial.length} 字…</p>`;
       $("jobState").innerHTML = `<p><b>${head}</b> <span class="hint">（启动编辑器的终端里也会打印进度）</span></p><ul>${rounds}</ul>${live}${fmtStats(st)}`;
-      setTimeout(() => poll(id, planOnly), 1000); return;
+      setTimeout(() => poll(id, planOnly, source, sourceRevision), 1000); return;
     }
     job = null; busy(false);
     if (st.state === "error") { $("jobState").innerHTML = `<p class="bad">出错：${esc(st.error).replace(/\n/g, "<br>")}</p><ul>${rounds}</ul>${fmtStats(st)}`; return; }
     if (st.state === "cancelled") return;
     if (planOnly) {
+      if (context() !== source || revision !== sourceRevision) {
+        invalidatePlan(); $("planNotice").textContent = '描述、参考图或栏宽已改变，本次返回的旧结构已失效。请重新看结构，或按最新描述直接生成。';
+        $("jobState").textContent = '旧结构任务已结束，未采用。'; return;
+      }
+      planContext = source; planRevision = revision;
       $("planBox").style.display = ""; $("planText").value = st.result.plan; checkSize();
       $("planText").oninput = checkSize;
       $("descGo").textContent = "按这个结构生成";
@@ -3676,38 +4043,60 @@ document.getElementById("describe").onclick = () => {
       return;
     }
     const r = st.result;
-    useLayout(r.layout);
-    let saved = "";
-    try { saved = (await api("/api/save-as", {layout, name: layout.name})).saved;
-      setEditorFile(saved); } catch (e) { saved = ""; }
-    $("jobState").innerHTML = `<p class="${r.ok ? "ok" : "bad"}"><b>${r.ok ? "校验通过" : "仍有问题，已载入问题最少的一版"}</b>
+    $("jobState").innerHTML = `<p class="${r.ok ? "ok" : "bad"}"><b>${r.ok ? "校验通过，等待确认采用" : "仍有问题，保留问题最少的一版供核对"}</b>
       · 共 ${r.rounds.length} 轮，用时 ${fmtTime(st.elapsed_s)}</p><ul>${rounds}</ul>${fmtStats(st)}
-      ${r.selected_round ? `<p class="hint">当前采用第 ${r.selected_round} 轮的坐标表。</p>` : ""}
+      <p><b>本次描述</b></p><pre style="white-space:pre-wrap">${esc(JSON.parse(source)[0])}</pre>
+      ${r.selected_round ? `<p class="hint">候选为第 ${r.selected_round} 轮的坐标表。</p>` : ""}
       ${r.notes && r.notes.length ? `<p class="hint">${r.notes.map(esc).join("<br>")}</p>` : ""}
-      ${saved ? `<p class="hint">已另存为 <code>${esc(saved)}</code>，原文件没有改动。</p>` : ""}
       ${r.passes_double ? `<p>${r.ok ? "" : "单栏放不下，但"}这张图在双栏下校验通过${r.ok ? "" : "，所以没有继续返工"}。<button id="toDouble">切到双栏</button></p>` : ""}
-      <p class="hint">请对照“模型的说明”核对拓扑本身：校验器只保证画得规整、与模型自己写的网表一致，管不了电路选得对不对。</p>`;
+      <p class="hint">请对照“模型的说明”核对拓扑本身：校验器只保证画得规整、与模型自己写的网表一致，管不了电路选得对不对。</p>
+      <button id="descApply">采用为当前图并另存…</button>
+      <a download="ai-candidate.json" href="data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(r.layout, null, 2))}">下载候选 JSON</a>
+      <p id="descSaved"></p>`;
+    $("descApply").onclick = async () => {
+      if (!cdI18n.confirm('采用这份 AI 生成结果为当前图并另存？当前画布会被替换，可用撤销恢复。')) return;
+      $("descApply").disabled = true; busy(true); $("jobCancel").style.display = 'none';
+      useLayout(clone(r.layout));
+      try {
+        const saved = (await api('/api/save-as', {layout, name: layout.name})).saved;
+        $("descSaved").textContent = `已另存为 ${saved}，原文件没有改动。`;
+      } catch (e) { $("descSaved").textContent = `另存失败：${e.message}。当前图尚未保存，请重试保存。`; }
+      finally { busy(false); }
+    };
     if (r.passes_double) $("toDouble").onclick = () => { profile = "ieee-double";
       document.getElementById("profile").value = profile; revalidate(); };
   }
 };
 // ---------- change the open figure with one sentence ----------
+// Three consecutive missed replies pause polling; the task remains recoverable.
+const AI_PROGRESS_FAILURE_LIMIT = 3;
+function retryAIProgress(state, error, failures, retry) {
+  if (++failures < AI_PROGRESS_FAILURE_LIMIT) {
+    state.textContent = `暂时无法读取进度，将重试：${error.message}`;
+    setTimeout(() => retry(failures), 1000);
+    return;
+  }
+  state.textContent = `连续读取进度失败，已暂停查询，服务可能已退出。后台任务状态未知，可重新查询或取消。${error.message} `;
+  const button = document.createElement('button');
+  button.textContent = '重新查询'; button.dataset.aiRetry = '';
+  button.onclick = () => { button.disabled = true; retry(0); };
+  state.appendChild(button);
+}
 document.getElementById("tweak").onclick = () => {
-  showDialog("AI 修改当前图", `
-    <p id="twInfo" class="hint">正在读取模型设置…</p>
-    <p class="hint">说清楚要改哪里，没提到的元件和导线会原样保留。改完照常校验和返工，结果另存为新文件；不满意就点“撤销”回到改之前。</p>
+  const existing = !!tweakForm;
+  tweakForm = showAIForm("AI 修改当前图", tweakForm, `
+    <p id="twInfo" data-ai-info class="hint">正在读取模型设置…</p>
+    <p class="hint">说清楚要改哪里、哪些位置必须保留。校验和返工后先核对“实际改动”，确认采用后才替换并另存；不满意可撤销。</p>
+    <p class="hint">关闭或切换窗口不会取消任务；在本页重新打开本窗口可查看进度和结果。刷新网页前请先下载或采用结果。</p>
     <div id="twWidth" class="hint"></div>
     <textarea id="twText" rows="3" style="width:100%;box-sizing:border-box"
       placeholder="例：把 v_sw 标签放到开关节点上方；输入侧加一个电容 Cin；RL 右移 0.5 格"></textarea>
     <p>最多 <input id="twRounds" type="number" min="1" max="8" value="3" style="width:4em"> 轮
       <button id="twGo" class="primary">修改</button> <button id="twCancel" style="display:none">取消</button></p>
     <div id="twState"></div>`);
-  const $ = id => document.getElementById(id);
-  api("/api/ai-status").then(info => {
-    const box = $("twInfo"); if (!box) return;
-    box.innerHTML = info.problem ? `<span class="bad">${esc(info.problem).replace(/\n/g, "<br>")}</span>`
-      : `模型：${esc(info.provider)} / ${esc(info.model)}，单次请求最长等待 ${info.timeout_s} 秒<br>${fmtEfforts(info)}`;
-  }).catch(e => { const box = $("twInfo"); if (box) box.textContent = e.message; });
+  if (existing) return;
+  const form = tweakForm, $ = id => form.querySelector('#' + id);
+  let job = null;
   if (profile === "ieee-single" && (report?.issues || []).some(i => ["too-cramped", "too-short"].includes(i.code))) {
     api("/api/check", {layout, profile: "ieee-double"}).then(r => {
       if (!$("twWidth")) return;
@@ -3724,25 +4113,41 @@ document.getElementById("tweak").onclick = () => {
   }
   const busy = on => { $("twGo").disabled = on; $("twCancel").style.display = on ? "" : "none";
     if ($("twDouble")) $("twDouble").disabled = on; };
+  let baseSnapshot = null, baseFile = null, baseGeneration = null, instruction = '';
   $("twCancel").onclick = async () => {
-    if (job) await api("/api/cancel", {id: job.id});
-    $("twState").innerHTML = '<p class="hint">已取消，当前图没有改动。</p>'; job = null; busy(false);
+    const cancelled = job; job = null; busy(false);
+    $("twState").innerHTML = '<p class="hint">已取消，当前图没有改动。</p>';
+    if (cancelled?.id) await api("/api/cancel", {id: cancelled.id}).catch(e => flash(e.message, true));
   };
   $("twGo").onclick = async () => {
     const text = $("twText").value.trim();
-    if (!text) return;
+    if (!text || job) return;
+    baseSnapshot = editorTableSnapshot(layout); baseFile = editorFilePath; baseGeneration = layoutGeneration;
+    instruction = text;
+    const pending = {}; job = pending; busy(true);
+    $("twState").textContent = '正在提交任务…';
     try {
-      job = await api("/api/generate", {description: text, profile, current: JSON.parse(JSON.stringify(layout)),
+      const started = await api("/api/generate", {description: text, profile, current: JSON.parse(JSON.stringify(layout)),
         rounds: +$("twRounds").value || 3});
-    } catch (e) { $("twState").innerHTML = `<p class="bad">${esc(e.message).replace(/\n/g, "<br>")}</p>`; return; }
-    busy(true); poll(job.id);
+      if (job !== pending) { await api('/api/cancel', {id: started.id}); return; }
+      job = started;
+    } catch (e) {
+      if (job === pending) { job = null; busy(false); $("twState").textContent = e.message; }
+      return;
+    }
+    poll(job.id);
   };
-  async function poll(id) {
-    if (!job || job.id !== id || !$("twState")) return;
+  async function poll(id, failures = 0) {
+    if (!job || job.id !== id) return;
     let st;
-    try { st = await api("/api/job/" + id); } catch (e) { $("twState").textContent = e.message; return; }
+    try { st = await api("/api/job/" + id); } catch (e) {
+      if (job?.id !== id) return;
+      retryAIProgress($("twState"), e, failures, n => poll(id, n));
+      return;
+    }
     if (!job || job.id !== id) return;
     const rounds = st.attempts.map(a => `<li>第 ${a.round} 轮：${a.errors.length ? `<span class="bad">${a.errors.length} 个问题</span>` : '<span class="ok">通过</span>'}
+      ${a.fixes?.length ? `<p class="hint">程序自动微调：${esc(a.fixes.join('；'))}</p>` : ''}
       ${a.errors.length ? `<details><summary>问题清单</summary><pre style="white-space:pre-wrap">${esc(a.errors.join("\n"))}</pre></details>` : ""}</li>`).join("");
     if (st.state === "running") {
       $("twState").innerHTML = `<p><b>第 ${st.round} / ${st.rounds_max} 轮 · 已用 ${fmtTime(st.elapsed_s)}</b></p><ul>${rounds}</ul>${fmtStats(st)}`;
@@ -3752,20 +4157,59 @@ document.getElementById("tweak").onclick = () => {
     if (st.state === "error") { $("twState").innerHTML = `<p class="bad">出错：${esc(st.error).replace(/\n/g, "<br>")}</p><ul>${rounds}</ul>${fmtStats(st)}`; return; }
     if (st.state === "cancelled") return;
     const r = st.result, last = st.attempts.find(a => a.round === r.selected_round) || {};
-    useLayout(r.layout);
-    let saved = "";
-    try { saved = (await api("/api/save-as", {layout, name: layout.name})).saved;
-      setEditorFile(saved); } catch (e) { saved = ""; }
-    $("twState").innerHTML = `<p class="${r.ok ? "ok" : "bad"}"><b>${r.ok ? "改好了，校验通过" : "改了，但仍有问题，已载入问题最少的一版"}</b>
-      · ${r.rounds.length} 轮，用时 ${fmtTime(st.elapsed_s)}</p>
-      ${last.note ? `<p><b>模型的说明</b></p><pre style="white-space:pre-wrap">${esc(last.note)}</pre>` : ""}
-      <p><b>实际改动</b>（代码逐项比对得出）</p><ul>${(r.changes || []).map(c => `<li>${esc(c)}</li>`).join("")}</ul>
+    const stateBox = $("twState");
+    if ((last.errors || []).some(e => e.startsWith('ai-simulation:'))) {
+      stateBox.innerHTML = `<p class="bad"><b>AI 修改后的仿真配置未通过检查，当前图没有改动。</b></p>
+        <p>请先补齐缺少的参数或调整引用，再重新请求修改。</p><ul>${rounds}</ul>
+        <pre style="white-space:pre-wrap">${esc(last.errors.join('\n'))}</pre>
+        <a id="twDownload" download="ai-candidate.json" href="data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(r.layout, null, 2))}">下载 AI 候选 JSON（尚未通过检查）</a>`;
+      return;
+    }
+    const changedSinceRequest = () => editorTableSnapshot(layout) !== baseSnapshot || editorFilePath !== baseFile || layoutGeneration !== baseGeneration;
+    const before = new Map(JSON.parse(baseSnapshot).elements.map(e => [e.id, e]));
+    const placementChanges = r.layout.elements.flatMap(e => {
+      const old = before.get(e.id); if (!old) return [];
+      const changed = [];
+      for (const [title, a, b] of [['引脚位置', old.pins, e.pins], ['标签方位', old.label_pos, e.label_pos],
+        ['标签偏移', old.opts?.label_offset, e.opts?.label_offset]]) {
+        if (editorTableSnapshot({value:a}) !== editorTableSnapshot({value:b})) changed.push(`${e.id} ${title}：${JSON.stringify(a) ?? '默认'} → ${JSON.stringify(b) ?? '默认'}`);
+      }
+      return changed;
+    });
+    stateBox.innerHTML = `<p class="${r.ok ? 'ok' : 'bad'}"><b>AI 结果尚未采用，当前图没有改动。${r.ok ? '校验通过，等待确认。' : '仍有校验问题，请先核对候选。'}</b></p>
+      ${changedSinceRequest() ? '<p class="bad">当前图已发生变化，保留了你后续的修改；替换会覆盖这些修改。</p>' : ''}
+      <p><b>本次要求</b></p><pre style="white-space:pre-wrap">${esc(instruction)}</pre>
+      ${placementChanges.length ? `<p class="bad"><b>发现排版变化，请核对是否与你的保留要求冲突：</b></p><ul>${placementChanges.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}
+      <p class="hint">校验通过不代表满足所有保留要求。发现不符请修改上方要求后重新请求，或下载候选另行查看。</p>
+      ${last.note ? `<p><b>模型的说明</b></p><pre style="white-space:pre-wrap">${esc(last.note)}</pre>` : ''}
+      <p><b>实际改动</b>（相对请求前图纸）</p><ul>${(r.changes || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
       <ul>${rounds}</ul>${fmtStats(st)}
-      ${r.notes && r.notes.length ? `<p class="hint">${r.notes.map(esc).join("<br>")}</p>` : ""}
-      ${r.passes_double ? '<p class="hint">该结果在双栏下校验通过。<button id="twResultDouble">切到双栏</button></p>' : ""}
-      ${saved ? `<p class="hint">已另存为 <code>${esc(saved)}</code>，原文件没有改动。不满意点工具栏“撤销”回到改之前。</p>` : ""}`;
-    if ($("twResultDouble")) $("twResultDouble").onclick = () => {
-      profile = "ieee-double"; document.getElementById("profile").value = profile; revalidate(); };
+      <button id="twReplace">确认采用并另存…</button>
+      <a id="twDownload" download="ai-candidate.json" href="data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(r.layout, null, 2))}">下载 AI 候选 JSON</a>`;
+    $("twReplace").onclick = async event => {
+      // Recheck on the click: the user may edit or switch files after reviewing.
+      if (!cdI18n.confirm(changedSinceRequest()
+        ? '用 AI 结果替换当前图？请求之后的手动修改不会保留；替换后可撤销。'
+        : '确认实际改动符合你的要求，并采用、另存这份 AI 结果？采用后可撤销。')) return;
+      event.target.disabled = true; busy(true); $("twCancel").style.display = 'none';
+      try { await applyResult(); } finally { busy(false); }
+    };
+    async function applyResult() {
+      useLayout(clone(r.layout));
+      let saved = "", saveError = "";
+      try { saved = (await api("/api/save-as", {layout, name: layout.name})).saved;
+      } catch (e) { saveError = e.message; }
+      stateBox.innerHTML = `<p class="${r.ok ? "ok" : "bad"}"><b>${r.ok ? "改好了，校验通过" : "改了，但仍有问题，已载入问题最少的一版"}</b>
+        · ${r.rounds.length} 轮，用时 ${fmtTime(st.elapsed_s)}</p>
+        ${last.note ? `<p><b>模型的说明</b></p><pre style="white-space:pre-wrap">${esc(last.note)}</pre>` : ""}
+        <p><b>实际改动</b>（代码逐项比对得出）</p><ul>${(r.changes || []).map(c => `<li>${esc(c)}</li>`).join("")}</ul>
+        <ul>${rounds}</ul>${fmtStats(st)}
+        ${r.notes && r.notes.length ? `<p class="hint">${r.notes.map(esc).join("<br>")}</p>` : ""}
+        ${r.passes_double ? '<p class="hint">该结果在双栏下校验通过。<button id="twResultDouble">切到双栏</button></p>' : ""}
+        ${saved ? `<p class="hint">已另存为 <code>${esc(saved)}</code>，原文件没有改动。不满意点工具栏“撤销”回到改之前。</p>` : `<p class="bad">另存失败：${esc(saveError)}。当前图尚未保存，请重试保存。</p>`}`;
+      if ($("twResultDouble")) $("twResultDouble").onclick = () => {
+        profile = "ieee-double"; document.getElementById("profile").value = profile; revalidate(); };
+    }
   }
 };
 document.getElementById("saveTpl").onclick = () => {
@@ -3788,13 +4232,13 @@ document.getElementById("saveTpl").onclick = () => {
 };
 function showDialog(title, html) { document.getElementById("dlgTitle").textContent = title;
   document.getElementById("dlgBody").innerHTML = html; document.getElementById("dlg").showModal(); }
-function flash(msg, bad) { const st = document.getElementById("status"); const old = [st.textContent, st.className];
+function flash(msg, bad) { const st = document.getElementById("status"); const old = [cdI18n.sourceText(st), st.className];
   showEditorNotice(msg, bad);
   st.textContent = msg; st.className = bad ? "bad" : "ok";
   // a check that finished meanwhile has written the current state: keep it
-  setTimeout(() => { if (st.textContent === msg) [st.textContent, st.className] = old; }, 3000); }
+  setTimeout(() => { if (cdI18n.sourceText(st) === msg) [st.textContent, st.className] = old; }, 3000); }
 
-(async () => {
+async function initializeEditor() {
   const st = await api("/api/state");
   layout = st.layout; profile = st.profile; TWO_TERMINAL = st.two_terminal;
   fileSections = new Set(Object.keys(st.layout));
@@ -3809,41 +4253,37 @@ function flash(msg, bad) { const st = document.getElementById("status"); const o
   fitView(); await revalidate();
   const lib = document.getElementById("library");
   buildElectricalLibrary(lib);
-  moduleControls(); if (layout.modules) { fitView(); render(); }
+  moduleControls(); fitView(); render();
   const cm = document.getElementById("crossMode");
   try { cm.value = localStorage.getItem("crossMode") || "hop"; } catch (e) { /* storage blocked */ }
   cm.onchange = () => { try { localStorage.setItem("crossMode", cm.value); } catch (e) { /* storage blocked */ } };
-})();
+
+  document.getElementById("menuFit").onclick = () => { fitView(); render(); };
+  document.getElementById("menuZoomIn").onclick = () => zoomView(1 / 1.1);
+  document.getElementById("menuZoomOut").onclick = () => zoomView(1.1);
+  // Menu adapters call existing editor actions without introducing new editing behavior.
+  document.getElementById("cutSelection").onclick = cutSelected;
+  document.getElementById("copySelection").onclick = copySelected;
+  document.getElementById("pasteSelection").onclick = paste;
+  document.getElementById("duplicateSelection").onclick = duplicateSelected;
+  document.getElementById("rotateSelection").onclick = rotateSelected;
+  document.getElementById("mirrorSelection").onclick = mirrorSelected;
+  document.getElementById("growSymbol").onclick = () => resizeSelected(0.1);
+  document.getElementById("shrinkSymbol").onclick = () => resizeSelected(-0.1);
+  document.querySelectorAll("[data-component]").forEach(button => {
+    button.onclick = () => document.querySelector(`#library button[data-kind="${button.dataset.component}"]`)?.click();
+  });
+}
 </script>
 <script src="/module-editor.js"></script>
 <script src="/selection.js"></script>
 <script src="/simulation-recommendations.js"></script>
+<script src="/emi.js"></script>
 <script src="/ai-settings.js"></script>
 <script src="/waveforms.js"></script>
 <script src="/layers.js"></script>
 <script src="/context-menu.js"></script>
 <script src="/guides.js"></script>
-<script>
-
-
-
-document.getElementById("menuFit").onclick = () => { fitView(); render(); };
-document.getElementById("menuZoomIn").onclick = () => zoomView(1 / 1.1);
-document.getElementById("menuZoomOut").onclick = () => zoomView(1.1);
-// Menu adapters call existing editor actions without introducing new editing behavior.
-document.getElementById("cutSelection").onclick = cutSelected;
-document.getElementById("copySelection").onclick = copySelected;
-document.getElementById("pasteSelection").onclick = paste;
-document.getElementById("duplicateSelection").onclick = duplicateSelected;
-document.getElementById("rotateSelection").onclick = rotateSelected;
-document.getElementById("mirrorSelection").onclick = mirrorSelected;
-document.getElementById("growSymbol").onclick = () => resizeSelected(0.1);
-document.getElementById("shrinkSymbol").onclick = () => resizeSelected(-0.1);
-document.querySelectorAll("[data-component]").forEach(button => {
-  button.onclick = () => document.querySelector(`#library button[data-kind="${button.dataset.component}"]`)?.click();
-});
-
-</script>
 <script src="/menu.js"></script>
 </body>
 </html>

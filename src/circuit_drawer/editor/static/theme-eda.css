@@ -1,0 +1,123 @@
+/* Shared EDA editor theme; presentation only, independent of paper rendering. */
+:root {
+  --bg: #d6d3cc; --panel: #efede8; --ink: #111; --muted: #555;
+  --line: #a7a39a; --accent: #1f4e8c; --accent-soft: #d3dff0;
+  --good: #1c6b2a; --bad: #b3261e; --radius: 0;
+  --font-body: 12px; --font-small: 12px; --font-caption: 11px;
+}
+body { font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", Tahoma, sans-serif;
+  font-size: 12px; background: var(--bg); height: 100dvh; }
+button, input, select, textarea, dialog { border-radius: 0 !important; }
+button { background: linear-gradient(#fff, #e6e3dc); border-color: #8c887f; color: var(--ink); }
+input, select, textarea { background: #fff; color: var(--ink); border: 1px solid #7f9db9; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.primary { background: var(--accent); color: #fff; }
+header { background: var(--panel); border-bottom: 1px solid #8c887f; }
+.menu-row { min-height: 24px; padding: 0 4px; border-bottom: 1px solid #c9c5bc; background: var(--panel); }
+.menu-bar > button { padding: 2px 9px; font-size: 12px; border: 1px solid transparent; background: transparent; }
+.menu-bar > button:hover, .menu-bar > button[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.app-label { font-size: 11px; color: #666; letter-spacing: 0; white-space: nowrap; }
+.app-label::after { content: " 1.6 | 原理图编辑器"; }
+html[lang="zh-TW"] .app-label::after { content: " 1.6 | 電路圖編輯器"; }
+html[lang="en"] .app-label::after { content: " 1.6 | Schematic editor"; }
+.quick-tools { padding: 3px 4px; min-height: 32px; gap: 4px;
+  background: linear-gradient(#f6f5f1, #e4e1da); border-bottom: 1px solid var(--line); }
+.tool-group { padding: 0 5px; border-right: 1px solid var(--line); box-shadow: 1px 0 0 #fff; }
+.tool-group:last-of-type { box-shadow: none; }
+.quick-tools button { min-height: 24px; padding: 2px 6px; border: 1px solid transparent;
+  font-size: 12px; gap: 4px; background: transparent; color: var(--ink); }
+.quick-tools button:hover:not(:disabled), .quick-tools button.on { background: #dfe8f5; border-color: #6d8bb8; color: #000; }
+.tool-icon { width: 16px; height: 16px; stroke-width: 1.5; stroke: #1f4e8c; }
+.document-tabs { background: var(--bg); border-top: 0; padding: 3px 4px 0; }
+.document-tab { min-height: 22px; padding: 2px 10px; background: #fff; border: 1px solid #8c887f;
+  border-bottom: 0; box-shadow: none; font-size: 12px; }
+main { background: var(--bg); }
+#componentPanel { background: var(--panel); padding: 0; border-right: 1px solid #8c887f; }
+.library-heading { padding: 0; background: var(--panel); }
+.library-heading h3 { margin: 0; padding: 3px 8px; background: linear-gradient(#4a6ea3, #2e5389);
+  color: #fff; font-size: 12px; font-weight: 600; }
+#componentSearch { margin: 4px 6px; width: calc(100% - 12px); border: 1px solid #7f9db9;
+  background: #fff; padding: 3px 5px; font-size: 12px; }
+#library, #moduleLibrary { padding: 0 6px; }
+#library details, #moduleLibrary details { margin: 0 0 2px; border: 1px solid #c2beb5; background: #fff; }
+#library summary, #moduleLibrary summary { padding: 2px 6px; background: #e4e1da;
+  color: #111; font-weight: 600; font-size: 12px; }
+#library .component-grid, #moduleLibrary .component-grid, #addModuleLibrary .component-grid {
+  grid-template-columns: 1fr; gap: 0; }
+#moduleLibrary .component-grid { border: 1px solid #c2beb5; background: #fff; }
+#library button, #moduleLibrary button, #addModuleLibrary button {
+  flex-direction: row; justify-content: flex-start; min-height: 24px; height: auto; margin: 0;
+  padding: 0 8px; gap: 8px; background: #fff; border: 0; font-size: 12px; }
+#library button:hover:not(:disabled), #moduleLibrary button:hover:not(:disabled),
+#addModuleLibrary button:hover:not(:disabled) { background: var(--accent); color: #fff; }
+#library button svg { width: 24px; height: 18px; }
+#moduleLibrary button svg, #addModuleLibrary button svg { width: 20px; height: 18px; }
+#inspector { background: var(--panel); border-left: 1px solid #8c887f; }
+#inspector > [role="tabpanel"] { padding: 6px; }
+#inspector h3, body:has(#world) aside h3 { margin: 0 0 4px; padding: 2px 4px;
+  background: #e4e1da; border: 1px solid #c2beb5; font-size: 12px; color: var(--ink); }
+.prop { grid-template-columns: 72px minmax(0, 1fr); gap: 0; border-top: 1px solid #d3cfc6; }
+.prop > * { padding: 2px 4px; border-bottom: 1px solid #d3cfc6; min-width: 0; }
+.prop input, .prop select { border: 1px solid #7f9db9; padding: 1px 4px; background: #fff; }
+.prop button { border: 1px solid #8c887f; background: linear-gradient(#fff, #e6e3dc); padding: 1px 8px; }
+#props.hint { background: #fff; border: 1px solid #c2beb5; }
+.inspector-tabs { padding: 3px 4px 0; background: var(--bg); border-bottom: 1px solid #8c887f; }
+.inspector-tabs button { flex: 0 0 auto; padding: 3px 12px; margin-right: 2px; color: #222; font-size: 12px;
+  border: 1px solid var(--line); border-bottom: 0; background: #e4e1da; }
+.inspector-tabs button[aria-selected="true"] { background: var(--panel); color: #000;
+  box-shadow: none; font-weight: 600; margin-bottom: -1px; }
+#validationBar { background: var(--panel); border-top: 1px solid #8c887f; padding: 2px 4px;
+  min-height: 22px; font-size: 11px; }
+#toolHint, #validationStatus, .status-stats > span { border: 1px solid var(--line);
+  border-right-color: #fff; border-bottom-color: #fff; padding: 1px 6px; }
+#validationStatus { font-weight: 600; background: transparent; }
+.status-stats { gap: 3px; font-family: "JetBrains Mono", Consolas, monospace; }
+#canvasWrap { background: #8c8a85; padding: 6px; min-width: 0; }
+svg#canvas { background: #fffef6; }
+#canvas rect.bg { fill: #fffef6; }
+#snapDots circle { fill: #9a9a9a; opacity: .5; }
+/* Keep existing symbol, selection and error colours inside the drawing. */
+body:has(#componentPanel) #canvas { --ink: #253247; --accent: #2563eb; --bad: #d12f2f; font-size: 13px; }
+body:has(#world) #canvas { --ink: #1d1d1f; --accent: #2457d6; --bad: #d12f2f; font-size: 14px; }
+.menu-panel, #canvasContext { border-radius: 0; border: 1px solid #6d6a63;
+  box-shadow: 2px 2px 0 #0003; padding: 2px; background: #f7f6f2; }
+.menu-panel > button, .menu-subpanel > button, #canvasContext button {
+  border-radius: 0; padding: 3px 18px; background: transparent; }
+.menu-panel button:hover:not(:disabled), .menu-panel button:focus-visible,
+#canvasContext button:hover:not(:disabled):not([aria-disabled="true"]),
+#canvasContext button:focus-visible { background: var(--accent); color: #fff; }
+.menu-panel button:hover:not(:disabled) kbd, .menu-panel button:focus-visible kbd,
+#canvasContext button:hover:not([aria-disabled="true"]) kbd,
+#canvasContext button:focus-visible kbd { color: #dfe6f1; }
+dialog { background: var(--panel); color: var(--ink); border: 1px solid #6d6a63; box-shadow: 2px 2px 0 #0003; }
+#aiSettingsDialog { border-color: #6d6a63 !important; }
+dialog h3 { color: var(--ink); }
+#issues li { border-radius: 0; border-left: 3px solid var(--bad); }
+#issues li.warning { border-left-color: #b7791f; }
+#issues li.note { border-left-color: #8c887f; }
+#issueCount, #editorNotice, #folderBrowser, #resizeNotice, #coords, #modeTip, #toast, #texPreview { border-radius: 0; }
+#emptyCanvas button { padding: 3px 10px; }
+#wavePanel, .wave-sidebar, #waveProperties { background: var(--panel); border-color: var(--line); }
+.wave-toolbar, .wave-paper-toolbar { background: linear-gradient(#f6f5f1, #e4e1da); border-color: var(--line); }
+.wave-chart-wrap { background: #8c8a85; }
+/* The control editor has a canvas and one inspector, not a component library. */
+body:has(#world) { grid-template-rows: auto minmax(0, 1fr); }
+body:has(#world) main { grid-template-columns: minmax(0, 1fr) 300px; }
+body:has(#world) aside { padding: 6px; min-width: 0; border-left-color: #8c887f; }
+body:has(#world) aside h3:not(:first-child) { margin-top: 12px; }
+body:has(#world) #coords { font-family: Consolas, monospace; background: var(--panel); }
+body:has(#world) #appearance .row { border-bottom: 1px solid #d3cfc6; padding-bottom: 3px; }
+@media (min-width: 1101px) {
+  body:has(#componentPanel) main { grid-template-columns: 220px minmax(200px, 1fr) 300px; }
+}
+@media (max-width: 760px) {
+  .app-label { display: block; margin-left: auto; }
+  html[lang] .app-label::after { content: " 1.6"; }
+  .menu-bar { gap: 0; }
+  .menu-bar > button { padding: 2px 6px; }
+  body:has(#world) main { grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(180px, 1fr) minmax(160px, .65fr); }
+  body:has(#world) aside { border-left: 0; border-top: 1px solid #8c887f; }
+  .loop-grid { grid-template-columns: minmax(0, 1fr); }
+}

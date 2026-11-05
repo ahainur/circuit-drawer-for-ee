@@ -31,13 +31,16 @@ PIN_NAMES: dict[str, tuple[str, ...]] = {
     "vac": ("a", "b"),          # sinusoidal source, a = reference end
     "I": ("a", "b"),            # current flows a -> b
     "nmos": ("d", "s"),
+    "pmos": ("d", "s"),       # same current reference d->s; body diode d->s
     "igbt": ("c", "e"),
     "transformer": ("p1", "p2", "s1", "s2"),  # optional "sct" centre tap
+    "pmsm": ("a", "b", "c"),   # three phase, floating star point inside the motor
     "port": ("p",),             # terminal: an open circle where a wire ends
 }
 
 TWO_TERMINAL = {"R", "L", "C", "D", "scr", "V", "vac", "I"}
-SWITCHES = {"nmos", "igbt"}
+MOSFETS = {"nmos", "pmos"}
+SWITCHES = MOSFETS | {"igbt"}
 
 
 def branch_pins(kind: str) -> tuple[str, str] | None:

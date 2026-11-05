@@ -2,21 +2,36 @@
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from copy import deepcopy
 
+from .electrical import synchronize
 from .layout import DECORATION_SECTIONS, Layout
 from .modules import ModuleError, _name, assemble
-from .modes import WireGraph
+from .modes import WireGraph, _k
 from .profiles import get_profile
 from .validate import check
 
 
-def _valid(lay, profile):
+def _valid(lay, profile, *, allow_open=False):
     report = check(lay, get_profile(profile))
-    if not report.ok:
-        raise ModuleError("请先修正电路：" + "；".join(i.message for i in report.errors[:8]))
+    errors = [i for i in report.errors if not (allow_open and i.code == "open-pin")]
+    if errors:
+        raise ModuleError("请先修正电路：" + "；".join(i.message for i in errors[:8]))
     return report
+
+
+def new_edit_errors(before, after):
+    """Existing draft diagnostics stay visible; a transaction may not add errors."""
+    remaining = Counter((i.code, i.message) for i in before.errors)
+    errors = []
+    for issue in after.errors:
+        key = issue.code, issue.message
+        if remaining[key] and not issue.code.startswith("bad-"):
+            remaining[key] -= 1
+        else:
+            errors.append(issue)
+    return errors
 
 
 def _assembles(lay, profile):
@@ -39,6 +54,24 @@ def _unique(base, used):
     return name
 
 
+def _rename_electrical(raw, names):
+    """Remap identities on the transaction's copy, before reconciliation."""
+    if "electrical" not in raw:
+        return
+    section = raw["electrical"]
+    for node in section["nodes"]:
+        pins = []
+        for pin in node["pins"]:
+            eid, _, terminal = pin.rpartition(".")
+            pins.append(names.get(eid, eid) + "." + terminal)
+        node["pins"] = pins
+    branches = {}
+    for branch, number in section["branches"].items():
+        eid, separator, winding = branch.partition(":")
+        branches[names.get(eid, eid) + separator + winding] = number
+    section["branches"] = branches
+
+
 def selection(source, ids, ports=(), profile="double"):
     """Split existing wire edges at explicit pins/vertices, never across a hop.
 
@@ -51,7 +84,9 @@ def selection(source, ids, ports=(), profile="double"):
     chosen = [e for e in source.elements if e.id in ids]
     if not chosen or len(chosen) != len(ids):
         raise ModuleError("请选择存在的普通元件；不能把展开的实例子元件再次封装")
-    _valid(source, profile)
+    _valid(source, profile, allow_open=True)
+    if any(f"{e.id}.{p}" not in source.netlist for e in source.elements for p in e.pins):
+        raise ModuleError("请先用“分析 → 以当前连接更新网表”记录已画出的连接，再设置模块端口")
     # The root has explicit geometry even when other instances already exist.
     graph = WireGraph(source)
     by_net, at_net, outside = defaultdict(list), {}, set()
@@ -279,9 +314,12 @@ def extract(source, ids, name, ports, exposed, profile="double"):
                          "port_layout": display, "editable": exposed, "title": name}
     spec["instances"].append({"id": instance, "definition": name, "at": origin,
                               "unconnected": unconnected, "display": "expanded"})
+    _rename_electrical(raw, {eid: instance + "/" + eid for eid in ids})
     result = direct_boundary_links(Layout.from_dict(raw))
-    _valid(result, profile)
-    if source.extra.get("simulation"):
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
+    _valid(result, profile, allow_open=True)
+    if source.extra.get("simulation") and check(source, get_profile(profile)).ok:
         from .spice import circuit_deck as make_deck
         if make_deck(source, profile).text != make_deck(result, profile).text:
             raise ModuleError("封装改变了网表；已取消保存，原图保持不变")
@@ -335,7 +373,7 @@ def spice_identity(source, flat, report):
     return flat, replace(report, nets=nets)
 
 
-def validate_metadata(source, full):
+def validate_metadata(source, full=None):
     meta = source.extra.get("module_authoring")
     if meta is None:
         return
@@ -346,6 +384,22 @@ def validate_metadata(source, full):
             or not isinstance(order, list) or not all(isinstance(i, str) for i in order) or len(set(order)) != len(order)
             or not isinstance(terminals, list) or not all(isinstance(i, str) for i in terminals)):
         raise ModuleError("module_authoring 需要唯一编号映射、元件顺序和辅助端口列表")
+    modes = meta.get("modes", [])
+    if not isinstance(modes, list):
+        raise ModuleError("module_authoring.modes 必须是模态对象列表")
+    for index, mode in enumerate(modes):
+        where = f"module_authoring.modes[{index}]"
+        if not isinstance(mode, dict):
+            raise ModuleError(f"{where} 必须是模态对象")
+        on, loops = mode.get("on"), mode.get("loops")
+        if on is not None and (not isinstance(on, list) or not all(isinstance(ref, str) for ref in on)):
+            raise ModuleError(f"{where}.on 必须是支路名称列表")
+        if loops is not None and (not isinstance(loops, list) or not (
+                all(isinstance(ref, str) for ref in loops) or
+                all(isinstance(loop, list) and all(isinstance(ref, str) for ref in loop) for loop in loops))):
+            raise ModuleError(f"{where}.loops 必须是支路名称列表或回路列表")
+    if full is None:
+        return
     actual_ids = {e.id for e in full.elements}
     port_ids = {e.id for e in full.elements if e.kind == "port"}
     if set(terminals) - port_ids:
@@ -362,39 +416,72 @@ def _prune_parameters(definition, raw, name):
     definition's ``defaults`` and ``editable``, every instance's
     ``overrides`` and the SPICE names kept for its parts keep only parts
     (and fields) the definition still has."""
+    # Validate the shapes once, before pruning references to deleted parts.
+    # The ordinary definition/assembly checks validate the surviving references.
+    if not isinstance(definition, dict) or not isinstance(definition.get("layout"), dict):
+        raise ModuleError(f"模块 {name}.layout 必须是坐标表对象")
     try:
         lay = Layout.from_dict(definition["layout"])
-    except (TypeError, ValueError, KeyError, AttributeError):
-        return  # the definition check below explains what is wrong
+    except (TypeError, ValueError, KeyError, AttributeError, IndexError) as exc:
+        raise ModuleError(f"模块 {name}.layout 无法读取：{exc}") from exc
     instances = raw["modules"].get("instances", [])
-    users = {i.get("id") for i in instances if isinstance(i, dict) and i.get("definition") == name}
+    if not isinstance(instances, list) or any(not isinstance(i, dict) or
+            not isinstance(i.get("id"), str) or not isinstance(i.get("definition"), str) for i in instances):
+        raise ModuleError("modules.instances 必须是含 id 和 definition 的实例对象列表")
+    tables = [(f"模块 {name}.defaults", definition.get("defaults", {}))]
+    tables.extend((f"实例 {i['id']}.overrides", i.get("overrides", {})) for i in instances)
+    for where, values in tables:
+        if not isinstance(values, dict) or any(not isinstance(eid, str) or not isinstance(params, dict)
+                or not all(isinstance(key, str) for key in params) for eid, params in values.items()):
+            raise ModuleError(f"{where} 必须是元件 ID 到参数对象的映射")
+    editable = definition.get("editable")
+    if "editable" in definition and (not isinstance(editable, list) or any(
+            not isinstance(p, dict) or set(p) != {"element", "field"} or
+            not all(isinstance(v, str) for v in p.values()) for p in editable)):
+        raise ModuleError(f"模块 {name}.editable 必须是含 element、field 的参数对象列表")
+    users = {i["id"] for i in instances if i["definition"] == name}
     meta = raw.get("module_authoring")
-    if isinstance(meta, dict) and isinstance(meta.get("aliases"), dict):
+    if meta is not None:
         drawn = {e.id for e in lay.elements}
-        meta["aliases"] = {k: v for k, v in meta["aliases"].items()
-                           if not (isinstance(k, str) and k.partition("/")[0] in users and k.partition("/")[2] not in drawn)}
+        removed = {k: v for k, v in meta["aliases"].items()
+                   if k.partition("/")[0] in users and k.partition("/")[2] not in drawn}
+        meta["aliases"] = {k: v for k, v in meta["aliases"].items() if k not in removed}
+        deleted = set(removed) | set(removed.values())
+        def touches(ref):
+            return any(r.strip().partition(":")[0] in deleted for r in ref.split("|"))
+        for mode in meta.get("modes", []):
+            if mode.get("on") is not None:
+                mode["on"] = [ref for ref in mode["on"] if not touches(ref)]
+            loops = mode.get("loops") or []
+            flat = bool(loops) and isinstance(loops[0], str)
+            kept = [loop for loop in ([loops] if flat else loops) if not any(touches(ref) for ref in loop)]
+            if len(kept) != (1 if flat else len(loops)):
+                # Removing just one branch could invent a different current path.
+                mode["loops"] = kept[0] if flat and kept else kept
+                mode.pop("arrows", None)
+        if deleted:
+            meta["order"] = [eid for eid in meta["order"] if eid not in deleted]
     from .spice import FIELDS, OPTIONAL_FIELDS
     parts = {e.id: e.kind for e in lay.elements if e.kind != "port"}
     fields = {(eid, key) for eid, kind in parts.items()
               for key, _, _ in FIELDS.get(kind, []) + OPTIONAL_FIELDS.get(kind, [])}
-    if isinstance(definition.get("defaults"), dict):
+    if "defaults" in definition:
         definition["defaults"] = {eid: v for eid, v in definition["defaults"].items() if eid in parts}
-    if isinstance(definition.get("editable"), list):
+    if "editable" in definition:
         definition["editable"] = [p for p in definition["editable"]
-                                  if not isinstance(p, dict) or (p.get("element"), p.get("field")) in fields]
-    editable = ({(p.get("element"), p.get("field")) for p in definition["editable"] if isinstance(p, dict)}
-                if isinstance(definition.get("editable"), list) else None)
+                                  if (p["element"], p["field"]) in fields]
+    editable = ({(p["element"], p["field"]) for p in definition["editable"]}
+                if "editable" in definition else None)
     for inst in instances:
-        if not isinstance(inst, dict) or inst.get("definition") != name or not isinstance(inst.get("overrides"), dict):
+        if inst["definition"] != name or "overrides" not in inst:
             continue
         kept = {}
         for eid, values in inst["overrides"].items():
             if eid not in parts:
                 continue
-            if isinstance(values, dict):
-                values = {k: v for k, v in values.items() if editable is None or (eid, k) in editable}
-                if not values:
-                    continue
+            values = {k: v for k, v in values.items() if editable is None or (eid, k) in editable}
+            if not values:
+                continue
             kept[eid] = values
         if kept:
             inst["overrides"] = kept
@@ -402,19 +489,46 @@ def _prune_parameters(definition, raw, name):
             inst.pop("overrides")
 
 
-def update_definition(source, name, definition, profile="double"):
+def update_definition(source, name, definition, profile="double", *, new_name=None):
+    validate_metadata(source)
     raw = deepcopy(source.to_dict())
     if name not in raw.get("modules", {}).get("definitions", {}):
         raise ModuleError("只能编辑项目中保存的模块定义")
+    new_name = name if new_name is None else _name(new_name, "模块名")
+    from .modules import _definitions
+    if new_name != name and new_name in _definitions(raw["modules"]):
+        raise ModuleError(f"模块名 {new_name} 已存在，请换一个名称")
     old = raw["modules"]["definitions"][name]
-    if set(old["ports"]) != set(definition["ports"]):
-        raise ModuleError("已有实例引用这些端口；请保留端口名，再调整节点、边或顺序")
     definition = deepcopy(definition)
     _prune_parameters(definition, raw, name)
-    raw["modules"]["definitions"][name] = definition
+    if new_name != name:
+        raw["modules"]["definitions"][new_name] = raw["modules"]["definitions"].pop(name)
+        for inst in raw["modules"]["instances"]:
+            if inst["definition"] == name:
+                inst["definition"] = new_name
+    # Compare diagnostics using the new identity, including empty drafts.
+    before = _assembles(source if new_name == name else Layout.from_dict(raw), profile)
+    from .modules import _read_definition
+    _read_definition(name, definition)
+    if not set(old["ports"]) <= set(definition["ports"]):
+        raise ModuleError("已有实例引用这些端口；请保留端口名，再调整节点、边或顺序")
+    added = [p for p in definition["ports"] if p not in old["ports"]]
+    for inst in raw["modules"]["instances"]:
+        if inst["definition"] == new_name:
+            if added:
+                inst.setdefault("unconnected", []).extend(added)
+    if new_name != name:
+        definition["title"] = new_name
+        definition["layout"]["name"] = new_name
+    raw["modules"]["definitions"][new_name] = definition
+    _move_port_wires(raw, assemble(source).ports, assemble(Layout.from_dict(raw)).ports)
     result = Layout.from_dict(raw)
-    _valid(result, profile)
-    if result.extra.get("simulation"):
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
+    errors = new_edit_errors(before, check(result, get_profile(profile)))
+    if errors:
+        raise ModuleError("定义未保存：" + "；".join(i.message for i in errors[:8]))
+    if result.extra.get("simulation") and before.ok:
         from .spice import circuit_deck as make_deck
         make_deck(result, profile)
     return result
@@ -460,6 +574,88 @@ def _drop_routes(spec, pairs):
         spec.pop("routes")
 
 
+def connect_touching_ports(source, profile="double", instance_id=None):
+    """Check a contact transaction; ordinary wires are the connection record."""
+    result = Layout.from_dict(source.to_dict())
+    if instance_id is not None and not any(i["id"] == instance_id for i in result.extra["modules"]["instances"]):
+        raise ModuleError("模块实例不存在")
+    contacts = assemble(result).wire_contacts
+    if not contacts:
+        return result
+    if any(len(nets) > 1 for nets in contacts.values()):
+        raise ModuleError("接触的导线与原网表不一致，请先确认原电路接法并更新网表")
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
+    _assembles(result, profile)
+    return result
+
+
+def _move_port_wires(raw, old_ports, new_ports):
+    """Keep authored wire contacts when a definition or its display changes."""
+    from .modules import _on
+    wires = deepcopy(raw["wires"])
+    fixed = [tuple(p) for e in raw["elements"] for p in e["pins"].values()]
+    stops = fixed + [tuple(p) for p in old_ports.values()] + [tuple(p) for w in wires for p in (w[0], w[-1])]
+    for ref, old in old_ports.items():
+        if ref not in new_ports or _k(old) == _k(new_ports[ref]):
+            continue
+        new = list(new_ports[ref])
+        attached = [(i, j) for i, w in enumerate(wires) for j, p in enumerate(w) if _k(p) == _k(old)]
+        tee = (tuple(old) in fixed or any(_on(old, a, b, interior=True) for w in wires for a, b in zip(w, w[1:]))
+               or any(0 < j < len(wires[i]) - 1 and _on(old, wires[i][j-1], wires[i][j+1], interior=True)
+                      for i, j in attached)
+               or any(j in (0, len(wires[i])-1) and any(_on(p, old, wires[i][1 if j == 0 else -2], interior=True)
+                      for p in stops) for i, j in attached)
+               or any(other != ref and _k(p) == _k(old) for other, p in old_ports.items()))
+        if tee:
+            if tuple(old) in fixed or attached or any(_on(old, a, b) for w in wires for a, b in zip(w, w[1:])):
+                path = [list(old), [old[0], new[1]], new]
+                if path not in raw["wires"]:
+                    raw["wires"].append(path)
+            continue
+        for i, j in sorted(attached, reverse=True):
+            path = raw["wires"][i]
+            target = len(path) - 1 if j == len(wires[i]) - 1 else j
+            if len(path) == 2:
+                other = path[1 - target]
+                axis = 0 if abs(old[1] - other[1]) < 1e-6 else 1
+                if abs(new[1 - axis] - other[1 - axis]) > 1e-6:
+                    a, b = list(other), new.copy()
+                    a[axis] = b[axis] = (new[axis] + other[axis]) / 2
+                    path = [list(other), a, b, new.copy()]
+                    raw["wires"][i] = path if target else path[::-1]
+                    continue
+            path[target] = new.copy()
+            for k in (target + 1, target - 1):
+                if not 0 <= k < len(path):
+                    continue
+                horizontal = abs(old[1] - path[k][1]) < 1e-6
+                if 0 < k < len(path) - 1:
+                    path[k][1 if horizontal else 0] = new[1 if horizontal else 0]
+                else:
+                    elbow = [new[0], path[k][1]] if horizontal else [path[k][0], new[1]]
+                    path.insert(min(k, target) + 1, elbow)
+    cleaned = []
+    for index, path in enumerate(raw["wires"]):
+        if index < len(wires) and path == wires[index]:
+            cleaned.append(path)
+            continue
+        path = [p for j, p in enumerate(path) if j == 0 or _k(p) != _k(path[j - 1])]
+        kept = []
+        for j, point in enumerate(path):
+            if j in (0, len(path) - 1) or tuple(point) in stops:
+                kept.append(point)
+                continue
+            previous, following = path[j - 1], path[j + 1]
+            vertical = abs(previous[0] - point[0]) < 1e-6 and abs(following[0] - point[0]) < 1e-6
+            horizontal = abs(previous[1] - point[1]) < 1e-6 and abs(following[1] - point[1]) < 1e-6
+            if not (vertical or horizontal):
+                kept.append(point)
+        if len(kept) > 1:
+            cleaned.append(kept)
+    raw["wires"] = cleaned
+
+
 def set_connections(source, iid, connections, profile="double"):
     """One connection per port, as the port dialog shows it: the first link
     of each port. A port left empty loses all its links; an unchanged choice
@@ -499,8 +695,24 @@ def set_connections(source, iid, connections, profile="double"):
     inst["unconnected"] = [p for p in definition["ports"] if not any(f"{iid}.{p}" in pair for pair in links)]
     _sync_unconnected(spec, joined, released)
     result = Layout.from_dict(raw)
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
     _valid(result, profile)
     return result
+
+
+def create_empty(source, at, profile="double"):
+    """A real, saved draft instance. Export still requires actual circuitry."""
+    _assembles(source, profile)
+    raw = deepcopy(source.to_dict())
+    spec = raw.setdefault("modules", {"version": 1, "definitions": {}, "instances": [], "links": []})
+    definitions = spec.setdefault("definitions", {})
+    name = _unique("Subsystem", set(definitions))
+    definitions[name] = {"layout": Layout(name).to_dict(), "ports": {}, "editable": [], "title": name}
+    if raw.get("modes"):
+        meta = raw.setdefault("module_authoring", {"aliases": {}, "order": [e.id for e in source.elements], "terminals": []})
+        meta["modes"] = raw.pop("modes")
+    return add_instance(Layout.from_dict(raw), name, at, {}, profile)
 
 
 def add_instance(source, name, at, connections, profile="double"):
@@ -510,7 +722,7 @@ def add_instance(source, name, at, connections, profile="double"):
     if set(connections) != set(definition["ports"]):
         raise ModuleError("请逐一选择端口连接，或明确留空")
     iid = _unique("M", {i["id"] for i in spec["instances"]} | {e.id for e in source.elements})
-    inst = {"id": iid, "definition": name, "at": at, "display": "expanded",
+    inst = {"id": iid, "definition": name, "at": at, "display": "expanded" if definition["layout"]["elements"] else "collapsed",
             "unconnected": [p for p, ref in connections.items() if not ref]}
     spec["instances"].append(inst)
     spec.setdefault("links", []).extend([f"{iid}.{p}", ref] for p, ref in connections.items() if ref)
@@ -518,6 +730,8 @@ def add_instance(source, name, at, connections, profile="double"):
     if "module_authoring" in raw:
         raw["module_authoring"]["terminals"].extend(f"{iid}/{ref[:-2]}" for ref in definition["ports"].values())
     result = Layout.from_dict(raw)
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
     _assembles(result, profile)
     return result
 
@@ -525,7 +739,7 @@ def add_instance(source, name, at, connections, profile="double"):
 def dissolve(source, instance_id, profile="double"):
     """Materialize just one instance; the project library and others survive."""
     source = direct_boundary_links(source)
-    _valid(source, profile)
+    before = _assembles(source, profile)
     assembly = assemble(source)
     raw = deepcopy(source.to_dict())
     spec = raw["modules"]
@@ -538,7 +752,10 @@ def dissolve(source, instance_id, profile="double"):
 
     def origin(other):
         """Where an instance sits in the full (all expanded) drawing."""
-        first = Layout.from_dict(definitions[other["definition"]]["layout"]).elements[0]
+        elements = Layout.from_dict(definitions[other["definition"]]["layout"]).elements
+        if not elements:
+            return assembly.origins[other["id"]]
+        first = elements[0]
         pin = next(iter(first.pins))
         return [round(full[other["id"] + "/" + first.id].pins[pin][j] - first.pins[pin][j], 4) for j in range(2)]
 
@@ -571,7 +788,11 @@ def dissolve(source, instance_id, profile="double"):
         raw["netlist"].update({f"{element.id}.{p}": assembly.full.netlist[f"{element.id}.{p}"] for p in element.pins})
     definition = definitions[inst["definition"]]
     local = Layout.from_dict(definition["layout"])
+    if not local.elements:
+        raise ModuleError("空子系统还没有可解散的元件；可进入定义搭电路，或删除实例")
     prefix = instance_id + "/"
+    targets = {f"{instance_id}.{p}": full[prefix + ref[:-2]].pins["p"] for p, ref in definition["ports"].items()}
+    _move_port_wires(raw, assembly.ports, targets)
     first = local.elements[0]
     pin = next(iter(first.pins))
     at = [full[prefix + first.id].pins[pin][j] - first.pins[pin][j] for j in range(2)]
@@ -602,10 +823,22 @@ def dissolve(source, instance_id, profile="double"):
     for key in ("wires", "hops", "annotations"):
         raw.setdefault(key, []).extend(part[key])
     for key in DECORATION_SECTIONS:
+        for obj in raw.get(key, []):
+            if "members" in obj:
+                obj["members"] = [rename.get(e, e) for e in obj["members"]]
         for obj in part.get(key, []):
             if "members" in obj:
                 obj["members"] = [rename.get(e, e) for e in obj["members"]]
         raw.setdefault(key, []).extend(part.get(key, []))
+    # A dissolved instance is now ordinary parts, not an omitted electrical copy.
+    for region in raw.get("regions", []):
+        usage = raw.get("stack_usage", {}).get(region.get("id"), {})
+        if usage.get("purpose") == "instances" and instance_id in usage.get("instances", []):
+            region.pop("stack", None)
+            raw["stack_usage"].pop(region["id"])
+            raw["module_view"] = "expanded"
+    if "stack_usage" in raw and not raw["stack_usage"]:
+        raw.pop("stack_usage")
     for pair in spec.get("links", []):
         for j, endpoint in enumerate(pair):
             iid, _, port = endpoint.rpartition(".")
@@ -648,10 +881,21 @@ def dissolve(source, instance_id, profile="double"):
         if meta.get("modes"):
             raw["modes"] = meta["modes"]
         meta["terminals"] = []
+    # Deliberately unused module ports remain deliberately open after flattening.
+    open_points = {full[prefix + definition["ports"][p][:-2]].pins["p"] for p in inst.get("unconnected", [])}
+    _rename_electrical(raw, rename)
     result = Layout.from_dict(raw)
+    if "electrical" in result.extra:
+        result.extra["electrical"] = synchronize(result, profile)
     report = check(result, get_profile(profile))
-    if not report.ok:
-        errors = report.errors
+    open_pins = {i.message.split(" at ", 1)[0] for i in report.errors if i.code == "open-pin"}
+    preserved = [f"{e.id}.{p}" for e in result.elements if e.id in rename.values()
+                 for p, point in e.pins.items() if point in open_points and f"{e.id}.{p}" in open_pins]
+    if preserved:
+        result.extra.setdefault("no_connect", []).extend(preserved)
+        report = check(result, get_profile(profile))
+    errors = new_edit_errors(before, report)
+    if errors:
         hit = [o["id"] for o in others
                if any(re.search(rf"(?<![\w/-]){re.escape(o['id'])}/", i.message) for i in errors)]
         detail = "；".join(i.message for i in errors[:4])
@@ -659,7 +903,23 @@ def dissolve(source, instance_id, profile="double"):
             raise ModuleError(f"解散 {instance_id} 后，展开的元件会与实例 {'、'.join(hit)} 重叠或相交，已取消；"
                               f"请先把 {instance_id} 或 {'、'.join(hit)} 拖开（留出 {instance_id} 展开后的位置）再解散。详情：{detail}")
         raise ModuleError(f"解散 {instance_id} 后电路未通过校验，已取消：{detail}")
-    if source.extra.get("simulation"):
+    # Compare actual connectivity even when unrelated unfinished parts prevent SPICE export.
+    after = assemble(result)
+    groups = []
+    for graph, links, rename_pin in ((assembly.full, assembly.links, ref), (after.full, after.links, lambda p: p)):
+        nets = check(graph, get_profile(profile), connections=links).nets
+        grouped = defaultdict(set)
+        for element in graph.elements:
+            if element.kind != "port":
+                for pin in element.pins:
+                    key = f"{element.id}.{pin}"
+                    if key not in nets:
+                        raise ModuleError("解散后的连接未能完整校验，已取消")
+                    grouped[nets[key]].add(rename_pin(key))
+        groups.append({frozenset(g) for g in grouped.values()})
+    if groups[0] != groups[1]:
+        raise ModuleError("解散改变了电气连接，已取消")
+    if source.extra.get("simulation") and before.ok:
         from .spice import circuit_deck as make_deck
         if make_deck(source, profile).text != make_deck(result, profile).text:
             raise ModuleError("解散改变了网表，已取消")

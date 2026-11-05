@@ -45,7 +45,7 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 从 [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases) 下载 wheel 安装：
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.5.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
 
 或直接从仓库安装：
@@ -96,7 +96,7 @@ circuit-drawer plecs my_buck_sim.json -o out/plecs
 circuit-drawer simulink my_buck_sim.json -o out/simulink
 ```
 
-在编辑器里拖动元件和导线，留意底部状态栏的校验结果，然后点 **文件 → 导出电路图…** 写出图。只有校验通过才能导出。编辑器界面为中文，英文说明书为每个菜单项附有英文含义。
+在编辑器里拖动元件和导线，留意底部状态栏的校验结果，然后点 **文件 → 导出电路图…** 写出图。只有校验通过才能导出。两个编辑器右上角均可选择 **简体中文 / 繁體中文 / English**，立即切换并保留未保存的编辑；浏览器会记住同一地址和端口的选择。
 
 ## 五、功能一览
 

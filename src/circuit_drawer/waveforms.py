@@ -24,6 +24,7 @@ from .emit import _callout, _n, preamble
 from .geometry import Scale, has_wide, text_size
 from .layout import Layout
 from .modes import modes_of
+from .pmsm import QUANTITIES as MOTOR_QUANTITIES
 from .pipeline import LayoutRejected, render_modes
 from .profiles import get_profile
 from .regions import INKS, LINE_HEAD, Callout, ink_rgb, ink_tikz, valid_ink
@@ -70,6 +71,17 @@ CHART_LEFT_CM, CHART_RIGHT_CM = 1.25, .3
 CHART_TOP_CM, CHART_BOTTOM_CM = .65, .75
 NOTE_LIMITS = {"font_pt": (5, 20), "line_pt": (.1, 2), "radius_cm": (.02, .3)}
 NUDGE_CM = .01  # ordinary arrow key; Shift moves ten times as far
+CHANNEL_UNITS = {unit: unit.replace("_", "/") for unit in
+                 ("V", "A", "1", *(q["unit"] for q in MOTOR_QUANTITIES.values()))}
+
+
+def column_defaults(column: str) -> dict[str, str]:
+    """CSV suffixes are hints for new channels, never replacements for edits."""
+    for unit in sorted(CHANNEL_UNITS, key=len, reverse=True):
+        suffix = "_" + unit
+        if column.endswith(suffix):
+            return {"label": column[:-len(suffix)], "unit": CHANNEL_UNITS[unit]}
+    return {"label": column, "unit": ""}
 
 
 @dataclass
@@ -371,10 +383,7 @@ class WaveStore:
         for key in data.columns:
             if key == time_column:
                 continue
-            label, sep, unit = key.rpartition("_")
-            if not sep or unit not in ("V", "A", "1"):
-                label, unit = key, ""
-            channels.append({"column": key, "label": label, "unit": unit,
+            channels.append({"column": key, **column_defaults(key),
                              "color": COLORS[len(channels)]})
             if len(channels) == 3:
                 break
@@ -412,6 +421,8 @@ class WaveStore:
             points = samples(data, c["column"], cfg["window"])
             channels.append({**c, "points": points, "axis": axis(c, points, cfg["window"])})
         return {"config": cfg, "columns": list(data.columns), "rows": len(data.time),
+                "column_defaults": {column: column_defaults(column) for column in data.columns
+                                    if column != cfg["time_column"]},
                 "paper": paper(cfg, profile, target, [m.get("name") for m in lay.modes]),
                 "extent": [data.time[0], data.time[-1]], "channels": channels,
                 "stale": cfg.get("circuit_signature") != circuit_signature(lay),

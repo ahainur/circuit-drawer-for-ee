@@ -27,7 +27,7 @@ from .. import templates
 from ..compile import FORMATS, CompileError, build
 from ..emit import emit
 from ..geometry import annotation_box, footprint, unscaled
-from ..layout import TWO_TERMINAL, Layout
+from ..layout import SWITCHES, TWO_TERMINAL, Layout
 from ..modes import ModeError
 from ..modules import ModuleError
 from ..profiles import PROFILES, get_profile
@@ -190,6 +190,7 @@ def analyse(layout: Layout, profile: str) -> dict:
             continue
         g = {"bodies": [_box(b, s) for b in fp.bodies],
              "labels": [_box(b, s) for b in fp.labels],
+             "label_offset": fp.extra.get("label_offset", [0, 0]),
              "side": fp.label_side}
         if "source_wave" in fp.extra:
             g["source_wave"] = [_pt(p, s) for p in fp.extra["source_wave"]["points"]]
@@ -198,8 +199,8 @@ def analyse(layout: Layout, profile: str) -> dict:
                                   for k, pts in fp.extra["current_arrow"].items()}
         if fp.centre:
             g["centre"] = _pt(fp.centre, s)
-        if el.kind in ("nmos", "igbt") and "u" in fp.extra:
-            from ..geometry import SW_HALF_H, SW_LEFT, SW_RIGHT, axis_sizes, sw_k
+        if el.kind in SWITCHES and "u" in fp.extra:
+            from ..geometry import PMOS_DOT_RADIUS, SW_HALF_H, SW_LEFT, SW_RIGHT, axis_sizes, sw_k
             length, width = axis_sizes(el)
             u, kl, kw = fp.extra["u"], sw_k(prof) * length, sw_k(prof) * width
             along, across = (s.y, s.x) if u[0] == 0 else (s.x, s.y)
@@ -209,6 +210,9 @@ def analyse(layout: Layout, profile: str) -> dict:
                            "box": [round(v, 4) for v in (-SW_LEFT * kw / across, -SW_HALF_H * kl / along,
                                                          SW_RIGHT * kw / across, SW_HALF_H * kl / along)],
                            "k": [round(kw / across, 6), round(kl / along, 6)]}
+            if el.kind == "pmos":
+                radius = PMOS_DOT_RADIUS * prof.bipole_len
+                g["orient"]["gate_dot"] = [radius * width / length / across, radius / along]
         if "diag" in fp.extra:
             d = fp.extra["diag"]           # square scale: one factor for both axes
             g["diag"] = {"u": [round(v, 6) for v in d["u"]],
@@ -223,6 +227,10 @@ def analyse(layout: Layout, profile: str) -> dict:
             g["coils"] = [[_pt(a, s), _pt(b, s)] for a, b in ex["coils"]]
             g["dots"] = [_pt(d, s) for d in ex.get("dots", [])]
             g["core_lines"] = [[_pt(a, s), _pt(b, s)] for a, b in ex["core_lines"]]
+        if el.kind == "pmsm" and "motor_marks" in fp.extra:
+            g["motor_leads"] = [[_pt(a, s), _pt(b, s)] for a, b in fp.leads]
+            g["motor_marks"] = [{"text": text, "at": _pt(at, s), "height": height / s.y}
+                                for text, at, height in fp.extra["motor_marks"]]
         geo[el.id] = g
     def ann_box(a):
         try:
@@ -279,7 +287,9 @@ def analyse(layout: Layout, profile: str) -> dict:
                          if isinstance(nc, list) and f"{e.id}.{k}" in nc]
     out["wire_nets"] = rep.wire_nets
     from ..spice import CURRENT_PROBE_KINDS, GATED, MAX_PROBES
+    from ..pmsm import QUANTITIES
     out["probe_kinds"] = {"current": CURRENT_PROBE_KINDS, "drive": GATED}
+    out["motor_quantities"] = QUANTITIES
     out["probe_limit"] = MAX_PROBES
     out.update(geometry=geo, annotations=ann, nets=rep.nets,
                junctions=[list(j) for j in rep.junctions],
@@ -413,13 +423,12 @@ def module_resize_limit(layout: Layout, profile: str, iid: str, step: float) -> 
     Routing is not monotonic in size, so check every smaller candidate rather
     than binary-searching a nominal symbol minimum. Only called on rejection.
     """
-    from ..modules import MIN_BOX, assemble, route_budget
+    from ..modules import MIN_BOX, ModuleError, assemble, route_budget
+    from ..module_authoring import _assembles, _move_port_wires, new_edit_errors
     prof = get_profile(profile)
     if type(step) not in (int, float) or not math.isfinite(step) or not .01 <= step <= 1:
         raise ValueError("缩放网格须在 0.01–1 之间")
-    rep = check(layout, prof)
-    if not rep.ok:
-        raise ValueError("请先修正原图的校验错误")
+    rep = _assembles(layout, profile)
     assembly = assemble(layout, rep.scale, prof)
     region = next((r for r in assembly.view.extra.get("regions", []) if r.get("id") == iid + "/box"), None)
     if region is None:
@@ -442,7 +451,13 @@ def module_resize_limit(layout: Layout, profile: str, iid: str, step: float) -> 
         inst["collapsed_size"] = size
         # a size that routes under the short search routes under the full one
         with route_budget(QUICK_ROUTE_BUDGET):
-            if check(candidate, prof).ok:
+            trial = candidate.to_dict()
+            try:
+                ports = assemble(candidate, rep.scale, prof).ports
+            except ModuleError:
+                continue
+            _move_port_wires(trial, assembly.ports, ports)
+            if not new_edit_errors(rep, check(Layout.from_dict(trial), prof)):
                 return {"size": size, "minimum": True}
     return {"size": {"w": w, "h": h}, "minimum": False}
 
@@ -493,7 +508,9 @@ LAYOUT_ROUTES = {
     "/api/module-resize-limit": "_module_resize_limit",
     "/api/module-selection": "_module_selection",
     "/api/module-extract": "_module_extract",
+    "/api/module-empty": "_module_empty",
     "/api/module-definition": "_module_definition",
+    "/api/module-contact": "_module_contact",
     "/api/module-dissolve": "_module_dissolve",
     "/api/module-add": "_module_add",
     "/api/module-connections": "_module_connections",
@@ -515,6 +532,9 @@ LAYOUT_ROUTES = {
     "/api/waveform-save": "_waveform_save",
     "/api/waveform-export": "_waveform_export",
     "/api/spice-info": "_spice_info",
+    "/api/emi-info": "_emi_info",
+    "/api/emi-prepare": "_emi_prepare",
+    "/api/emi-run": "_emi_run",
     "/api/spice-preset": "_spice_preset",
     "/api/spice-recommend": "_spice_recommend",
     "/api/spice-save": "_spice_save",
@@ -634,6 +654,8 @@ class Job:
         except (ModelError, ValueError) as exc:
             self.state, self.error = "error", str(exc)
         except Exception as exc:   # surface anything unexpected to the page
+            import traceback
+            traceback.print_exc()
             self.state, self.error = "error", f"{type(exc).__name__}: {exc}"
         self.finished = time.monotonic()
         self._log(f"结束：{self.state}" + (f"，{self.error}" if self.error else ""))
@@ -786,7 +808,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "index.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/simulation-recommendations.js", "/ai-settings.js", "/layers.js", "/guides.js"):
+                elif self.path in ("/i18n.js", "/i18n-messages.js", "/emi.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/theme-eda.css", "/simulation-recommendations.js", "/ai-settings.js", "/layers.js", "/guides.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js")
                                else "text/css; charset=utf-8")
@@ -866,6 +888,8 @@ class Editor:
             def _save_as_route(self, req: dict) -> None:
                 try:
                     self._save_as(req)
+                except OSError as exc:
+                    self._json({"error": f"无法另存文件，请检查文件名和文件夹权限：{exc}"}, 400)
                 except (KeyError, ValueError, TypeError) as exc:
                     self._json({"error": f"{type(exc).__name__}: {exc}"}, 400)
 
@@ -906,9 +930,14 @@ class Editor:
                 from ..module_authoring import extract
                 return {"layout": extract(lay, req["ids"], req["name"], req["ports"], req["exposed"], prof).to_dict()}
 
+            def _module_empty(self, lay, prof, req):
+                from ..module_authoring import create_empty
+                return {"layout": create_empty(lay, req["at"], prof).to_dict()}
+
             def _module_definition(self, lay, prof, req):
                 from ..module_authoring import update_definition
-                return {"layout": update_definition(lay, req["name"], req["definition"], prof).to_dict()}
+                return {"layout": update_definition(lay, req["name"], req["definition"], prof,
+                                                    new_name=req.get("new_name")).to_dict()}
 
             def _module_dissolve(self, lay, prof, req):
                 from ..module_authoring import dissolve
@@ -958,6 +987,10 @@ class Editor:
             def _module_connections(self, lay, prof, req):
                 from ..module_authoring import set_connections
                 return {"layout": set_connections(lay, req["id"], req["connections"], prof).to_dict()}
+
+            def _module_contact(self, lay, prof, req):
+                from ..module_authoring import connect_touching_ports
+                return {"layout": connect_touching_ports(lay, prof, req.get("id")).to_dict()}
 
             def _electrical(self, lay, prof, req):
                 from ..electrical import synchronize, NAME
@@ -1091,12 +1124,36 @@ class Editor:
                                           include_modes=req.get("include_modes", True) is True)
                 return result
 
+            def _emi_info(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..emi import INPUTS, FILTER_PARTS, FILTER_INPUTS, REFERENCES, SOURCES, CHANNELS, NOTE
+                return dict(inputs=INPUTS, filter_parts=FILTER_PARTS, filter_inputs=FILTER_INPUTS,
+                            references=REFERENCES, sources=SOURCES, channels=CHANNELS, note=NOTE)
+
+            def _emi_prepare(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..emi import settings, set_parasitic, import_parasitics
+                action = req.get("action", "settings")
+                if action == "parasitic":
+                    lay = set_parasitic(lay, req.get("item"), req.get("value"))
+                elif action == "import":
+                    lay = import_parasitics(lay, req.get("csv"), req.get("source"))
+                elif action != "settings":
+                    raise ValueError("不支持的 EMI 设置操作")
+                settings(lay)
+                return {"layout": lay.to_dict()}
+
+            def _emi_run(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..emi import run
+                output = editor.output_path(req.get("out_dir")) / ("emi-" + uuid.uuid4().hex[:12])
+                return run(lay, output, profile=prof, compare=req.get("compare") is True,
+                           base_dir=editor.path.parent)
+
             def _spice_info(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..spice import FIELDS, OPTIONAL_FIELDS, TRANSIENT_FIELDS, SOURCE_WAVE_FIELDS, LIMIT_NOTE, executable
                 from ..spice_recommend import INPUTS
+                from ..pmsm import QUANTITIES
                 from ..completeness import simulation_completeness
                 return {"fields": FIELDS, "optional_fields": OPTIONAL_FIELDS, "transient_fields": TRANSIENT_FIELDS,
-                        "source_wave_fields": SOURCE_WAVE_FIELDS,
+                        "source_wave_fields": SOURCE_WAVE_FIELDS, "motor_quantities": QUANTITIES,
                         "completeness": simulation_completeness(lay),
                         "available": executable() is not None, "note": LIMIT_NOTE, "recommendation_inputs": INPUTS,
                         **({"module": module_devices(lay, prof)} if "modules" in lay.extra else {})}
@@ -1148,6 +1205,7 @@ class Editor:
                                            diode_current=req.get("diode_current", 1),
                                            numerical_resistance=req.get("numerical_resistance", "1m"),
                                            control=req.get("control") or "continuous",
+                                           approximate_mosfet=req.get("approximate_mosfet", False),
                                            base_dir=editor.path.parent)
                 lay.save(editor.path)
                 return result
@@ -1156,8 +1214,8 @@ class Editor:
                 """Save into a new file next to the current one and switch to it,
                 so a generated figure never overwrites the open file."""
                 lay = Layout.from_dict(req["layout"])
-                stem = re.sub(r"[^\w\-]+", "_", req.get("name") or lay.name or "figure").strip("_")
-                stem = stem.removesuffix(".json").removesuffix(".layout") or "figure"
+                name = re.sub(r"(?:\.layout)?\.json$|\.layout$", "", req.get("name") or lay.name or "figure", flags=re.IGNORECASE)
+                stem = re.sub(r"[^\w\-]+", "_", name).strip("_") or "figure"
                 folder = editor.path.parent
                 path = folder / f"{stem}.json"
                 n = 2

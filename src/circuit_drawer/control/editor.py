@@ -256,7 +256,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "editor.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/menu.js", "/menu.css", "/ai-settings.js"):
+                elif self.path in ("/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/theme-eda.css", "/ai-settings.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js") else "text/css; charset=utf-8")
                 elif self.path == "/api/state":
@@ -308,7 +308,7 @@ class Editor:
 
             def _insert_snippet(self, req: dict) -> dict:
                 part = library.load_snippet(req.get("name", ""), editor.library_dir)
-                at = req.get("at") or library.below(req["table"], part)
+                at = req.get("at") or library.below(req["table"], part, editor.profile)
                 table, ids = library.insert(req["table"], part, (float(at[0]), float(at[1])))
                 return {"table": table, "ids": ids}
 
@@ -318,7 +318,9 @@ class Editor:
                 return {"part": part, "corner": list(corner)}
 
             def _paste(self, req: dict) -> dict:
-                at = req["at"]
+                at = req.get("at")
+                if at is None:
+                    at = library.below(req["table"], req["part"], editor.profile)
                 table, ids = library.insert(req["table"], req["part"], (float(at[0]), float(at[1])))
                 return {"table": table, "ids": ids}
 

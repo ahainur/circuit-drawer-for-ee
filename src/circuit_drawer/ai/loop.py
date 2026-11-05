@@ -30,11 +30,12 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
-from ..layout import PIN_NAMES, Layout
+from ..layout import DECORATION_SECTIONS, PIN_NAMES, Layout
 from ..profiles import get_profile
 from ..validate import check
 from .meter import Meter, describe
@@ -45,7 +46,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_ROUNDS = 4
 # top-level sections the model draws along with the circuit (module blocks
 # and arrows); every other extra section is carried over from the old table
-DRAWN_SECTIONS = ("regions", "callouts", "blocks", "wave_symbols", "modules", "module_view", "no_connect", "model_mapping")
+DRAWN_SECTIONS = (*DECORATION_SECTIONS, "modules", "module_view", "no_connect", "model_mapping")
 
 NO_KEY = (
     "没有找到大模型的 API 密钥。请先设置环境变量：\n"
@@ -331,6 +332,38 @@ class Generation:
         return self.best_attempt.layout if self.best_attempt else None
 
 
+def _data_changes(old, new, path):
+    """Cover every saved value, including sections unknown to this version."""
+    if old == new:
+        return []
+    def show(value):
+        text = json.dumps(value, ensure_ascii=False)
+        return text if len(text) <= 160 else text[:157] + "…"
+    if isinstance(old, dict) and isinstance(new, dict):
+        out = []
+        for key in sorted(old.keys() | new.keys()):
+            name = f"{path}.{key}" if path else key
+            if key not in old:
+                out.append(f"新增 {name}：{show(new[key])}")
+            elif key not in new:
+                out.append(f"删除 {name}：{show(old[key])}")
+            else:
+                out += _data_changes(old[key], new[key], name)
+        return out
+    if isinstance(old, list) and isinstance(new, list):
+        out = []
+        for i in range(max(len(old), len(new))):
+            name = f"{path}[{i + 1}]"
+            if i >= len(old):
+                out.append(f"新增 {name}：{show(new[i])}")
+            elif i >= len(new):
+                out.append(f"删除 {name}：{show(old[i])}")
+            else:
+                out += _data_changes(old[i], new[i], name)
+        return out
+    return [f"{path}：{show(old)} → {show(new)}"]
+
+
 def changes(old: Layout, new: Layout) -> list[str]:
     """What a change did, element by element, for the user to check."""
     def fmt(p) -> str:
@@ -345,6 +378,8 @@ def changes(old: Layout, new: Layout) -> list[str]:
                  if k in x.pins and x.pins[k] != y.pins[k]]
         if moved:
             out.append(f"移动 {i}：" + "，".join(moved))
+        if x.pins.keys() != y.pins.keys():
+            out += _data_changes(x.pins, y.pins, f"{i} 引脚")
         if x.kind != y.kind:
             out.append(f"{i} 换成 {y.kind}")
         if (x.label, x.label_pos) != (y.label, y.label_pos):
@@ -352,20 +387,24 @@ def changes(old: Layout, new: Layout) -> list[str]:
                        f"{y.label or ''} {y.label_pos or ''}".rstrip())
         if x.opts != y.opts:
             out.append(f"{i} 选项改为 {y.opts}")
-    wa = {tuple(map(tuple, w)) for w in old.wires}
-    wb = {tuple(map(tuple, w)) for w in new.wires}
+    if [e.id for e in old.elements] != [e.id for e in new.elements] and a.keys() == b.keys():
+        out.append("元件绘制顺序已改变")
+    wa = Counter(tuple(map(tuple, w)) for w in old.wires)
+    wb = Counter(tuple(map(tuple, w)) for w in new.wires)
     if wa != wb:
-        out.append(f"导线：去掉 {len(wa - wb)} 条，加上 {len(wb - wa)} 条")
-    if set(old.hops) != set(new.hops):
-        out.append(f"跨线：{len(old.hops)} → {len(new.hops)} 处")
-    ta = [(n.text, tuple(n.at)) for n in old.annotations]
-    tb = [(n.text, tuple(n.at)) for n in new.annotations]
-    if ta != tb:
-        moved = [f"{t} {fmt(p)} → {fmt(q)}" for t, p in ta for u, q in tb if t == u and p != q]
-        added = [t for t, _ in tb if t not in {u for u, _ in ta}]
-        gone = [t for t, _ in ta if t not in {u for u, _ in tb}]
-        out += [f"文字 {m}" for m in moved] + [f"新增文字 {t}" for t in added] + \
-               [f"删除文字 {t}" for t in gone]
+        out.append(f"导线：去掉 {(wa - wb).total()} 条，加上 {(wb - wa).total()} 条")
+    elif old.wires != new.wires:
+        out.append("导线绘制顺序已改变")
+    labels = {"name": "图名", "hops": "跨线", "annotations": "文字", "netlist": "网络连接",
+              "modes": "模态", "regions": "区域", "callouts": "箭头", "blocks": "功能方框",
+              "glyphs": "功能标志", "wave_symbols": "波形标记", "simulation": "仿真参数",
+              "modules": "模块", "module_view": "模块显示", "electrical": "电气标号"}
+    before, after = old.to_dict(), new.to_dict()
+    for key in sorted(before.keys() | after.keys()):
+        if key not in ("elements", "wires"):
+            label = labels.get(key, key)
+            out += _data_changes({label: before[key]} if key in before else {},
+                                 {label: after[key]} if key in after else {}, "")
     return sorted(out, key=lambda s: (s.startswith(("导线", "跨线")), s)) or ["没有任何改动"]
 
 
@@ -521,7 +560,15 @@ class CircuitWorkflow:
 
     def evaluate(self, reply):
         from .nudge import nudge
-        lay = Layout.from_dict(extract_table(reply))
+        data = extract_table(reply)
+        try:
+            lay = Layout.from_dict(data)
+        except (KeyError, TypeError, AttributeError, IndexError) as exc:
+            raise ValueError(f"坐标表格式有误（{type(exc).__name__}: {exc}）；请核对元件、引脚和坐标") from exc
+        for element in lay.elements:
+            if not isinstance(element.id, str) or not isinstance(element.kind, str):
+                raise ValueError(f"坐标表格式有误：元件 {element.id!r} 的 id 和 kind 必须是文字")
+        proposed_extra = deepcopy(lay.extra)
         drawn = {k: lay.extra[k] for k in DRAWN_SECTIONS if k in lay.extra}
         if self.current is None and "stack_usage" in lay.extra:
             drawn["stack_usage"] = lay.extra["stack_usage"]
@@ -547,12 +594,16 @@ class CircuitWorkflow:
                 for instance in proposed["instances"]:
                     if isinstance(instance, dict) and isinstance(instance.get("id"), str) and instance["id"] in old_instances:
                         instance["overrides"] = deepcopy(old_instances[instance["id"]].get("overrides", {}))
-        from ..electrical import instruction_targets, requested_simulation
-        if (self.current and "electrical" in self.extra
-                and any(instruction_targets(self.description, self.extra["electrical"]))
-                and "simulation" in lay.extra):
-            drawn["simulation"] = requested_simulation(self.description, self.extra, lay.extra["simulation"], lay)
-        lay.extra = {**deepcopy(self.extra), **drawn}
+        carried, simulation_errors, check_simulation = deepcopy(self.extra), [], False
+        lay.extra = {**carried, **drawn}
+        if self.current:
+            from .edit_data import simulation_edit
+            try:
+                carried, check_simulation = simulation_edit(
+                    Layout.from_dict(self.current), lay, proposed_extra, self.description)
+            except ValueError as exc:
+                simulation_errors.append(f"ai-simulation: {exc}")
+        lay.extra = {**carried, **drawn}
         # Geometry repair runs before program-owned identities are reconciled.
         # Never let a model-supplied ledger block that repair or replace saved IDs.
         lay.extra.pop("electrical", None)
@@ -560,13 +611,22 @@ class CircuitWorkflow:
         lay, fixes = (lay, []) if "modules" in lay.extra else nudge(lay, prof)
         if "electrical" in self.extra:
             from ..electrical import synchronize
-            lay.extra["electrical"] = deepcopy(self.extra["electrical"])
+            lay.extra["electrical"] = deepcopy(carried["electrical"])
             lay.extra["electrical"] = synchronize(lay, prof.name)
         rep = check(lay, prof)
         errors = [f"{i.code}: {i.message}" for i in rep.errors] + _missing_netlist(lay)
         double = get_profile("ieee-double")
         passes_double = (bool(errors) and prof.name != double.name and
                          not _missing_netlist(lay) and check(lay, double).ok)
+        if check_simulation:
+            from ..spice import circuit_deck
+            try:
+                circuit_deck(lay, double.name if passes_double else prof.name)
+            except ValueError as exc:
+                simulation_errors.append(f"ai-simulation: {exc}；请同步元件参数、接地和探针引用；"
+                                         "新器件缺参数时请先由用户配置，不要猜测或删除仿真设置")
+        errors += simulation_errors
+        passes_double = passes_double and not simulation_errors
         return Evaluation(lay, errors, fixes, passes_double, rep)
 
     def unreadable(self, exc):
@@ -656,7 +716,7 @@ def generate(description: str, profile: str = "ieee-single",
         try:
             result = workflow.evaluate(reply)
             lay, errors, fixes = result.layout, result.errors, result.fixes
-        except (ValueError, KeyError, TypeError) as exc:
+        except ValueError as exc:
             att = Attempt(n, [str(exc) if getattr(exc, "code", None) else f"bad-json: {exc}"], None, reply)
             gen.attempts.append(att)
             on_attempt(att)

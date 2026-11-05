@@ -5,4 +5,4 @@ from .pipeline import LayoutRejected, from_template, render
 
 __all__ = ["Annotation", "Element", "Layout", "LayoutRejected", "from_template",
            "render"]
-__version__ = "1.5.0"
+__version__ = "1.6.0"

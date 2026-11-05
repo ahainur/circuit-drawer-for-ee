@@ -23,9 +23,9 @@ def build(tex: str, out_dir: Path, stem: str,
           formats: tuple[str, ...] = FORMATS, png_dpi: int = 600) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     made: dict[str, Path] = {}
-    tex_path = out_dir / f"{stem}.tex"
-    tex_path.write_text(tex, encoding="utf-8")
     if "tex" in formats:
+        tex_path = out_dir / f"{stem}.tex"
+        tex_path.write_text(tex, encoding="utf-8")
         made["tex"] = tex_path
     if not set(formats) - {"tex"}:
         return made

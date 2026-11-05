@@ -118,18 +118,19 @@ def block_fill(value: Any, mono: bool = False) -> str:
     monochrome keeps the original tag greys and minimum 0.75 luminance.
     """
     name = block_fill_name(value)
+    if not isinstance(name, str) or not (name == "none" or name in TAG_FILLS or name in PALETTE
+                                        or re.fullmatch(r"#[0-9a-fA-F]{6}", name)):
+        raise ControlError(f"填充颜色 {value!r} 无效；可用 {', '.join(fill_names())}、"
+                           "对应中文别名或 #rrggbb")
     if name == "none":
         return "none"
     grey = None
-    if isinstance(name, str) and name in TAG_FILLS:
+    if name in TAG_FILLS:
         hex_, grey = TAG_FILLS[name]
-    elif isinstance(name, str) and name in PALETTE:
+    elif name in PALETTE:
         hex_ = PALETTE[name][0]
-    elif isinstance(name, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", name):
-        hex_ = name
     else:
-        raise ControlError(f"填充颜色 {value!r} 无效；可用 {', '.join(fill_names())}、"
-                           "对应中文别名或 #rrggbb")
+        hex_ = name
     if mono:
         if grey is None:
             r, g, b = (int(hex_[i:i + 2], 16) for i in (1, 3, 5))

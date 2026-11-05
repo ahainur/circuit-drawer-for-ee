@@ -238,7 +238,7 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                           f"move the pins apart by at least "
                           f"{(min_two - max(dx, dy)) / k:.2f} units"))
         elif el.kind in SWITCHES:
-            t, b = (P["d"], P["s"]) if el.kind == "nmos" else (P["c"], P["e"])
+            t, b = (P[p] for p in PIN_NAMES[el.kind])
             span = max(abs(t[0] - b[0]), abs(t[1] - b[1]))
             if abs(t[0] - b[0]) > EPS and abs(t[1] - b[1]) > EPS:
                 add(Issue("not-orthogonal", f"{el.id}: a switch's two pins must be on one "
@@ -247,6 +247,13 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                 k = s.y if abs(t[0] - b[0]) < EPS else s.x
                 add(Issue("too-short", f"{el.id}: its two pins must be at least "
                           f"{2 * SW_HALF_SPAN * sw_k(prof) * length / k:.2f} units apart"))
+        elif el.kind == "pmsm":
+            a, b, c = (P[k] for k in PIN_NAMES[el.kind])
+            if (abs(a[0]-c[0]) > EPS and abs(a[1]-c[1]) > EPS
+                    or any(abs(b[i]-(a[i]+c[i])/2) > EPS for i in (0, 1))):
+                add(Issue("not-orthogonal", f"{el.id}: PMSM 的 a、b、c 引脚须水平或竖直等距排列，b 在 a 与 c 正中"))
+            elif max(abs(a[0]-c[0]), abs(a[1]-c[1])) < 4*MIN_LEAD:
+                add(Issue("too-short", f"{el.id}: PMSM 相邻引脚至少间隔 {2*MIN_LEAD:.2f} cm；请分开 a、b、c 引脚"))
         elif el.kind == "transformer":
             axis, _, P = transformer_frame(el, s)
             along, across = (s.y, s.x) if axis[0] == 0 else (s.x, s.y)
@@ -447,7 +454,8 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
         rep.wire_nets.append(roots.setdefault(root, len(roots)))
     from .electrical import problems as electrical_problems
     from .model_mapping import problems as model_problems
-    for code, message in (*electrical_problems(layout, rep.nets), *model_problems(layout)):
+    from .emi import problems as emi_problems
+    for code, message in (*electrical_problems(layout, rep.nets), *model_problems(layout), *emi_problems(layout, rep.nets)):
         add(Issue(code, message))
 
     # ---- 6. drawing must match the declared netlist ----------------------

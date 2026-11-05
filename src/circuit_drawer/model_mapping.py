@@ -27,6 +27,10 @@ def problems(layout):
                     raise ValueError(f"{key} 必须大于 0")
             if cfg["model"] == "mosfet" and number(cfg["gate_voltage"], "gate_voltage") <= number(cfg["vto"], "vto"):
                 raise ValueError("gate_voltage 必须大于 vto")
+            if kind == "switch" and cfg["model"] == "igbt":
+                pmos = [e.id for e in layout.elements if e.kind == "pmos"]
+                if pmos:
+                    raise ValueError(f"{', '.join(pmos)}：P 沟 MOSFET 不能映射为单向 IGBT；请选择 ideal_switch 或 mosfet")
             if kind == "L" and cfg["model"] == "parasitic":
                 simulation = layout.extra.get("simulation", {})
                 components = simulation.get("components", {}) if isinstance(simulation, dict) else {}
@@ -67,9 +71,11 @@ def switch_lines(cfg, e, name, positive, negative, val, body="IS=1e-9 N=1 RS=0.0
                 f".model ms_{name} SW(RON={s('ron')} ROFF={s('roff')} VT=0.5 VH=0)"]
     elif cfg["model"] == "mosfet":
         gate = f"cd_{name}_gate"
-        out += [f"Egate_{name} {gate} {negative} ctl_{name} 0 {number(cfg['gate_voltage'], 'gate_voltage'):.15g}",
+        polarity = -1 if e.kind == "pmos" else 1
+        model = "PMOS" if e.kind == "pmos" else "NMOS"
+        out += [f"Egate_{name} {gate} {negative} ctl_{name} 0 {polarity * number(cfg['gate_voltage'], 'gate_voltage'):.15g}",
                 f"Mmap_{name} {channel} {gate} {negative} {negative} mm_{name}",
-                f".model mm_{name} NMOS(LEVEL=1 VTO={number(cfg['vto'], 'vto'):.15g} KP={number(cfg['kp'], 'kp'):.15g})"]
+                f".model mm_{name} {model}(LEVEL=1 VTO={polarity * number(cfg['vto'], 'vto'):.15g} KP={number(cfg['kp'], 'kp'):.15g})"]
     else:
         vce = f"v({channel},{negative})"
         out += [f"Bchannel_{name} {channel} {negative} I = {vce}/{s('roff')} + "
@@ -77,6 +83,7 @@ def switch_lines(cfg, e, name, positive, negative, val, body="IS=1e-9 N=1 RS=0.0
     if e.opts.get("diode", True) is not False:
         # Match the terminal-current convention: all parallel branches sit
         # behind Vsense, including the snubber appended by the shared exporter.
-        out += [f"Dbody_{name} {negative} {channel} mbody_{name}",
+        anode, cathode = (channel, negative) if e.kind == "pmos" else (negative, channel)
+        out += [f"Dbody_{name} {anode} {cathode} mbody_{name}",
                 f".model mbody_{name} D({body})"]
     return out

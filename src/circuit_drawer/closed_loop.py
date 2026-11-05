@@ -188,7 +188,7 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
             raise ClosedLoopError(f"{what}.switches 需要至少一个开关元件；complement 是开关列表")
         for key, group in (("switches", sws), ("complement", comp)):
             for sw in group:
-                if kinds.get(sw) not in ("nmos", "igbt") or sw not in components:
+                if kinds.get(sw) not in ("nmos", "pmos", "igbt") or sw not in components:
                     raise ClosedLoopError(f"{what}.{key}：{sw!r} 不是电路里的 MOSFET / IGBT")
                 if sw in seen:
                     raise ClosedLoopError(f"{what}.{key}：开关 {sw} 被两个输出同时驱动，或在一个桥臂里列了两次")

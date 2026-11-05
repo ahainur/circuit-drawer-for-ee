@@ -117,4 +117,5 @@
     <p><a href="${project}" target="_blank" rel="noopener">项目主页与版本说明</a></p><button>关闭</button>`;
   about.querySelector("button").onclick = () => about.close(); document.body.appendChild(about);
   byId("menuAboutOpen").onclick = () => about.showModal();
+  window.cdI18n?.start();
 })();

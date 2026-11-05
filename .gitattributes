@@ -1,2 +1,36 @@
 # CSV snapshot hashes in the coordinate table require byte-identical checkouts.
 **/waveforms-data/*.csv -text
+# Native PMSM evidence retains the bytes recorded by its SHA256 on every OS.
+docs/verification/pmsm-native/*.plecs -text
+docs/verification/pmsm-native/*.m -text
+docs/verification/pmsm-native/*.json -text
+docs/verification/pmsm-native/*.csv -text
+docs/verification/pmsm-native/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve the exact native solver evidence bytes recorded in the SHA256 index.
+docs/verification/thyristor-commutation/*.plecs -text
+docs/verification/thyristor-commutation/*.m -text
+docs/verification/thyristor-commutation/*.cir -text
+docs/verification/thyristor-commutation/*.log -text
+docs/verification/thyristor-commutation/*.xml -text
+docs/verification/thyristor-commutation/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Original ngspice Windows failure logs contain CRCRLF; retain those raw bytes.
+docs/verification/thyristor-commutation/before-*.log -whitespace
+# Native export evidence is hashed from the bytes saved by the tools.
+docs/verification/level1-export-native/* -text linguist-generated=true
+docs/verification/level1-export-native/README.md linguist-generated=false
+docs/verification/level1-export-native/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve Windows solver line endings and pytest's original failure excerpts.
+docs/verification/level1-export-native/*-ngspice.log -whitespace
+docs/verification/level1-export-native/initial-native.log -whitespace
+# Preserve original DAB solver evidence and its recorded SHA256 on every OS.
+docs/verification/dab-power/* -text linguist-generated=true
+docs/verification/dab-power/README.md linguist-generated=false
+docs/verification/dab-power/recompute.py linguist-generated=false
+docs/verification/dab-power/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/verification/dab-power/*-ngspice.log -whitespace
+# Keep the recorded LEVEL=1 convergence evidence byte-identical across platforms.
+docs/verification/level1-buck-convergence/* -text linguist-generated=true
+docs/verification/level1-buck-convergence/README.md linguist-generated=false
+docs/verification/level1-buck-convergence/recompute.py linguist-generated=false
+docs/verification/level1-buck-convergence/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/verification/level1-buck-convergence/*.log -whitespace

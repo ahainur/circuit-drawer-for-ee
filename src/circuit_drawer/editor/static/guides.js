@@ -58,6 +58,34 @@ function textGuides(i) {
   return guidesFor(boxOf(i), [...texts, ...parts]);
 }
 
+// Drawing objects use the visible geometry, including module children, as
+// targets. Only the source object's coordinates are edited by the caller.
+function drawingGuides(kind, index, point = false) {
+  const shown = layout.modules && report?.module_info ? currentView(layout, report.module_info) : layout;
+  const others = shown.elements.filter(e => e.pins).map(e => guideBox(e.id, e.pins));
+  shown.wires.forEach((wire, i) => {
+    if (kind === "wire" && sourceObjectIndex("wire", i) === index) return;
+    for (const p of wire) others.push({...textGuideBox([p[0], p[1], p[0], p[1]]), pins: [p]});
+  });
+  for (const section of ["regions", "blocks"]) {
+    (shown[section] || []).forEach((_, i) => {
+      if (kind === section && sourceObjectIndex(section, i) === index) return;
+      const box = section === "regions" ? report?.regions?.[i]?.rects?.[0] : report?.blocks?.[i]?.rect;
+      if (box) others.push(textGuideBox(box));
+    });
+  }
+  let me;
+  if (point) {
+    // A zero-origin point lets snap() keep the existing absolute grid for corners.
+    me = textGuideBox([0, 0, 0, 0]);
+    if (kind === "wire") me.pins = [[0, 0]];
+  } else {
+    const {from: a, to: b} = layout[kind][index];
+    me = textGuideBox([Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+  }
+  return guidesFor(me, others);
+}
+
 // Snapping and the lines to draw for a dragged box ``me`` among ``others``.
 function guidesFor(me, others) {
   const rect = svg.getBoundingClientRect();

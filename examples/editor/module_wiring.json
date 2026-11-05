@@ -1,0 +1,415 @@
+{
+ "name": "BoostOrdinaryWires",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.0
+    ]
+   },
+   "label": "$V_{in}$"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     9.0,
+     3.0
+    ],
+    "b": [
+     9.0,
+     0.0
+    ]
+   },
+   "label": "$R_L$"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0,
+    3
+   ],
+   [
+    4.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    0,
+    0
+   ],
+   [
+    3,
+    0
+   ],
+   [
+    3,
+    2
+   ],
+   [
+    4.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    6.0,
+    3.0
+   ],
+   [
+    9,
+    3
+   ]
+  ],
+  [
+   [
+    6.0,
+    2.0
+   ],
+   [
+    7,
+    2
+   ],
+   [
+    7,
+    0
+   ],
+   [
+    9,
+    0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vin.a": "GND",
+  "Vin.b": "IN",
+  "RL.a": "OUT",
+  "RL.b": "GND"
+ },
+ "modules": {
+  "version": 1,
+  "instances": [
+   {
+    "id": "M",
+    "definition": "boost",
+    "at": [
+     4,
+     0
+    ],
+    "display": "collapsed",
+    "unconnected": [
+     "P",
+     "N",
+     "OP",
+     "ON"
+    ]
+   }
+  ],
+  "links": [],
+  "definitions": {
+   "boost": {
+    "title": "Boost",
+    "symbol": "dcdc",
+    "ports": {
+     "P": "Port_P.p",
+     "N": "Port_N.p",
+     "OP": "Port_OP.p",
+     "ON": "Port_ON.p"
+    },
+    "port_layout": {
+     "P": {
+      "side": "left",
+      "order": 0
+     },
+     "N": {
+      "side": "left",
+      "order": 1
+     },
+     "OP": {
+      "side": "right",
+      "order": 2
+     },
+     "ON": {
+      "side": "right",
+      "order": 3
+     }
+    },
+    "editable": [
+     {
+      "element": "S1",
+      "field": "duty"
+     },
+     {
+      "element": "S1",
+      "field": "delay"
+     },
+     {
+      "element": "L1",
+      "field": "value"
+     },
+     {
+      "element": "Co",
+      "field": "value"
+     }
+    ],
+    "defaults": {
+     "L1": {
+      "value": "500u",
+      "initial": "0"
+     },
+     "D1": {
+      "is": "1n",
+      "n": "1",
+      "rs": "0.01",
+      "model": "generic_diode"
+     },
+     "S1": {
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.5",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n",
+      "model": "ideal_switch"
+     },
+     "Co": {
+      "value": "220u",
+      "initial": "0"
+     }
+    },
+    "layout": {
+     "name": "Boost",
+     "elements": [
+      {
+       "id": "L1",
+       "kind": "L",
+       "pins": {
+        "a": [
+         0.0,
+         3.0
+        ],
+        "b": [
+         1.3,
+         3.0
+        ]
+       },
+       "label": "$L_1$"
+      },
+      {
+       "id": "D1",
+       "kind": "D",
+       "pins": {
+        "a": [
+         2.0,
+         3.0
+        ],
+        "b": [
+         3.0,
+         3.0
+        ]
+       },
+       "label": "$D_1$"
+      },
+      {
+       "id": "S1",
+       "kind": "nmos",
+       "pins": {
+        "d": [
+         1.7,
+         2.1
+        ],
+        "s": [
+         1.7,
+         0.9
+        ]
+       },
+       "label": "$S_1$"
+      },
+      {
+       "id": "Co",
+       "kind": "C",
+       "pins": {
+        "a": [
+         3.6,
+         3.0
+        ],
+        "b": [
+         3.6,
+         0.0
+        ]
+       },
+       "label": "$C_o$",
+       "label_pos": "left"
+      },
+      {
+       "id": "Port_P",
+       "kind": "port",
+       "pins": {
+        "p": [
+         0.0,
+         3.0
+        ]
+       }
+      },
+      {
+       "id": "Port_N",
+       "kind": "port",
+       "pins": {
+        "p": [
+         1.7,
+         0.0
+        ]
+       }
+      },
+      {
+       "id": "Port_OP",
+       "kind": "port",
+       "pins": {
+        "p": [
+         3.6,
+         3.0
+        ]
+       }
+      },
+      {
+       "id": "Port_ON",
+       "kind": "port",
+       "pins": {
+        "p": [
+         3.6,
+         0.0
+        ]
+       }
+      }
+     ],
+     "wires": [
+      [
+       [
+        1.3,
+        3.0
+       ],
+       [
+        1.7,
+        3.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        3.0
+       ],
+       [
+        2.0,
+        3.0
+       ]
+      ],
+      [
+       [
+        3.0,
+        3.0
+       ],
+       [
+        3.6,
+        3.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        3.0
+       ],
+       [
+        1.7,
+        2.1
+       ]
+      ],
+      [
+       [
+        1.7,
+        0.9
+       ],
+       [
+        1.7,
+        0.0
+       ]
+      ],
+      [
+       [
+        1.7,
+        0.0
+       ],
+       [
+        3.6,
+        0.0
+       ]
+      ]
+     ],
+     "hops": [],
+     "annotations": [],
+     "netlist": {
+      "L1.a": "IN",
+      "L1.b": "SW",
+      "D1.a": "SW",
+      "S1.d": "SW",
+      "D1.b": "OUT",
+      "Co.a": "OUT",
+      "S1.s": "GND",
+      "Co.b": "GND",
+      "Port_P.p": "IN",
+      "Port_N.p": "GND",
+      "Port_OP.p": "OUT",
+      "Port_ON.p": "GND"
+     }
+    },
+    "source": {
+     "library": "builtin",
+     "name": "boost",
+     "revision": "596cbd130f84"
+    }
+   }
+  }
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "24"
+   },
+   "RL": {
+    "value": "30"
+   }
+  },
+  "transient": {
+   "step": "200n",
+   "stop": "20m",
+   "max_step": "200n"
+  },
+  "probes": [
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "M/L1"
+   }
+  ]
+ }
+}

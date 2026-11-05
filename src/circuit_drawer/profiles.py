@@ -42,6 +42,6 @@ ALIASES = {"single": "ieee-single", "double": "ieee-double",
 def get_profile(name: str) -> Profile:
     key = ALIASES.get(name, name)
     if key not in PROFILES:
-        raise KeyError(f"unknown profile {name!r}; choose from "
+        raise KeyError(f"未知栏宽 {name!r}；可用："
                        f"{sorted(PROFILES) + sorted(ALIASES)}")
     return PROFILES[key]

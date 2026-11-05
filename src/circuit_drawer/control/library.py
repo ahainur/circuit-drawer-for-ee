@@ -20,8 +20,8 @@ from typing import Any
 
 from ..profiles import get_profile
 from ..templates.saved import user_dir as circuit_template_dir
-from .check import check
-from .model import KIND, parse_end
+from .check import check, extent, fit_scale, geometry
+from .model import KIND, parse_end, parse_lenient
 
 SNIPPET_KIND = "control-snippet"
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
@@ -288,18 +288,19 @@ def load_snippet(name: str, directory: Path | None = None) -> dict:
 GAP_BELOW = 1.0        # layout units between a table and a snippet pasted under it
 
 
-def below(raw: dict, part: dict) -> tuple[float, float]:
-    """Where to paste a snippet so it does not widen the figure: under the
-    table's lowest block or region, aligned with its left edge."""
-    blocks = raw.get("blocks") or []
-    ys = [_bounds([b])[1] for b in blocks] + [min(r["from"][1], r["to"][1])
-                                              for r in raw.get("regions") or []]
-    xs = [_bounds([b])[0] for b in blocks] + [min(r["from"][0], r["to"][0])
-                                              for r in raw.get("regions") or []]
-    if not ys:
+def below(raw: dict, part: dict, profile: str | None = None) -> tuple[float, float]:
+    """Translate only the inserted items below all existing ink, including
+    text and links. Use the checker's geometry at the destination's scale."""
+    prof = get_profile(profile or raw.get("profile") or "ieee-double")
+    dia, _ = parse_lenient(raw)
+    added, _ = parse_lenient({**part, "kind": KIND})
+    scale = min(fit_scale(dia, prof), fit_scale(added, prof))
+    old_box = extent(dia, geometry(dia, scale, prof), prof)
+    new_box = extent(added, geometry(added, scale, prof), prof)
+    if old_box is None or new_box is None:
         return (0.0, 0.0)
-    height = _bounds(part["blocks"])[3] if part.get("blocks") else 0.0
-    return (round(min(xs), 4), round(min(ys) - GAP_BELOW - height, 4))
+    return (round((old_box.x0 - new_box.x0) / scale, 4),
+            round((old_box.y0 - new_box.y1) / scale - GAP_BELOW, 4))
 
 
 def insert(raw: dict, part: dict, at: tuple[float, float]) -> tuple[dict, list[str]]:

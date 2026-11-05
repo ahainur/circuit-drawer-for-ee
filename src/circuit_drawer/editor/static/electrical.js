@@ -107,10 +107,12 @@ function updateValidationBar() {
 }
 
 function buildElectricalLibrary(lib) {
-  const categories = {R:'无源器件',L:'无源器件',C:'无源器件',D:'半导体',scr:'半导体',V:'电源',vac:'电源',vac3:'电源',battery:'电源',I:'电源',port:'连接',nmos:'半导体',igbt:'半导体',transformer:'磁性器件',coupled:'磁性器件'};
-  const paths = {R:'M1 12 H7 V7 H25 V17 H7 V12 M25 12 H31',L:'M1 12 H6 C6 1 12 1 12 12 C12 1 18 1 18 12 C18 1 24 1 24 12 H31',C:'M1 12 H13 M13 4 V20 M19 4 V20 M19 12 H31',D:'M1 12 H10 M10 5 L22 12 L10 19 Z M22 5 V19 M22 12 H31',scr:'M1 12 H10 M10 5 L22 12 L10 19 Z M22 5 V19 M22 12 H31 M22 12 L28 6 V1',V:'M16 1 V5 M16 19 V23 M12 10 H20 M16 7 V13 M12 16 H20',vac:'M16 1 V5 M16 19 V23 M9 12 Q12 3 16 12 T23 12',vac3:'M4 4 V20 M4 4 H8 M4 12 H8 M4 20 H8 M8 4 Q11 0 14 4 T20 4 M8 12 Q11 8 14 12 T20 12 M8 20 Q11 16 14 20 T20 20 M20 4 H31 M20 12 H31 M20 20 H31',battery:'M16 1 V9 M7 9 H25 M11 14 H21 M16 14 V23',I:'M16 1 V5 M16 19 V23 M16 17 V7 L13 10 M16 7 L19 10',port:'M1 12 H13 M19 12 A3 3 0 1 0 13 12 A3 3 0 1 0 19 12',nmos:'M1 12 H11 M11 4 V20 M15 5 V19 M15 7 H26 V1 M15 17 H26 V23',igbt:'M1 12 H11 M11 4 V20 M15 5 V19 M15 8 L26 1 M15 16 L26 23',transformer:'M5 2 C18 2 18 9 5 9 C18 9 18 16 5 16 C18 16 18 23 5 23 M16 1 V23 M19 1 V23 M30 2 C20 2 20 9 30 9 C20 9 20 16 30 16 C20 16 20 23 30 23',coupled:'M5 2 C18 2 18 9 5 9 C18 9 18 16 5 16 C18 16 18 23 5 23 M30 2 C20 2 20 9 30 9 C20 9 20 16 30 16 C20 16 20 23 30 23'};
+  const categories = {R:'无源器件',L:'无源器件',C:'无源器件',D:'半导体',scr:'半导体',V:'电源',vac:'电源',vac3:'电源',battery:'电源',I:'电源',port:'连接',nmos:'半导体',pmos:'半导体',igbt:'半导体',transformer:'磁性器件',coupled:'磁性器件'};
+  const paths = {R:'M1 12 H7 V7 H25 V17 H7 V12 M25 12 H31',L:'M1 12 H6 C6 1 12 1 12 12 C12 1 18 1 18 12 C18 1 24 1 24 12 H31',C:'M1 12 H13 M13 4 V20 M19 4 V20 M19 12 H31',D:'M1 12 H10 M10 5 L22 12 L10 19 Z M22 5 V19 M22 12 H31',scr:'M1 12 H10 M10 5 L22 12 L10 19 Z M22 5 V19 M22 12 H31 M22 12 L28 6 V1',V:'M16 1 V5 M16 19 V23 M12 10 H20 M16 7 V13 M12 16 H20',vac:'M16 1 V5 M16 19 V23 M9 12 Q12 3 16 12 T23 12',vac3:'M4 4 V20 M4 4 H8 M4 12 H8 M4 20 H8 M8 4 Q11 0 14 4 T20 4 M8 12 Q11 8 14 12 T20 12 M8 20 Q11 16 14 20 T20 20 M20 4 H31 M20 12 H31 M20 20 H31',battery:'M16 1 V9 M7 9 H25 M11 14 H21 M16 14 V23',I:'M16 1 V5 M16 19 V23 M16 17 V7 L13 10 M16 7 L19 10',port:'M1 12 H13 M19 12 A3 3 0 1 0 13 12 A3 3 0 1 0 19 12',nmos:'M1 12 H11 M11 4 V20 M15 5 V19 M15 7 H26 V1 M15 17 H26 V23',pmos:'M1 12 H5 M9 12 H11 M5 12 A2 2 0 1 0 9 12 A2 2 0 1 0 5 12 M11 4 V20 M15 5 V19 M15 7 H26 V1 M15 17 H26 V23',igbt:'M1 12 H11 M11 4 V20 M15 5 V19 M15 8 L26 1 M15 16 L26 23',transformer:'M5 2 C18 2 18 9 5 9 C18 9 18 16 5 16 C18 16 18 23 5 23 M16 1 V23 M19 1 V23 M30 2 C20 2 20 9 30 9 C20 9 20 16 30 16 C20 16 20 23 30 23',coupled:'M5 2 C18 2 18 9 5 9 C18 9 18 16 5 16 C18 16 18 23 5 23 M30 2 C20 2 20 9 30 9 C20 9 20 16 30 16 C20 16 20 23 30 23'};
   categories.zener = categories.D;
   paths.zener = paths.D + ' M22 5 H19.6';
+  categories.pmsm = '电机';
+  paths.pmsm = 'M1 6 H11 M1 12 H9 M1 18 H11 M29 12 A10 10 0 1 0 9 12 A10 10 0 1 0 29 12 M14 16 V8 L19 13 L24 8 V16';
   // A summary folds its existing cards; search temporarily reveals matching groups.
   const groups = new Map();
   const ordered = [...LIBRARY].sort((a,b)=>Object.values(categories).indexOf(categories[a[0]])-Object.values(categories).indexOf(categories[b[0]]));
@@ -130,7 +132,10 @@ function buildElectricalLibrary(lib) {
   }
   document.getElementById('componentSearch').oninput=ev=>{
     const q=ev.target.value.trim().toLowerCase();
-    lib.querySelectorAll('button').forEach(b=>b.hidden=!(b.textContent+' '+b.dataset.kind+' '+categories[b.dataset.kind]).toLowerCase().includes(q));
+    lib.querySelectorAll('button').forEach(b=>{
+      const category=categories[b.dataset.kind];
+      b.hidden=![b.textContent,cdI18n.sourceText(b),b.dataset.kind,category,cdI18n.translate(category)].join(' ').toLowerCase().includes(q);
+    });
     for (const {group,cards,count} of groups.values()) {
       const visible=[...cards.children].filter(b=>!b.hidden).length;
       group.hidden=!visible; count.textContent=visible;
@@ -164,6 +169,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('showNetlist').onchange=async ev=>{document.getElementById('liveNetlist').hidden=!ev.target.checked;if(ev.target.checked)showSidebar('netlist');else if(sidebarPage==='netlist')showSidebar('properties');try{if(ev.target.checked){await enableElectrical();await revalidate();}updateElectricalPanel();}catch(e){flash(e.message,true);}};
   document.getElementById('modelMapping').onclick=openModelMapping;
   const canvas=document.getElementById('canvas');
+  document.addEventListener('editor-language-change',()=>document.getElementById('componentSearch').dispatchEvent(new Event('input')));
   canvas.addEventListener('dragover',ev=>{if([...ev.dataTransfer.types].includes('application/x-circuit-kind')){ev.preventDefault();ev.dataTransfer.dropEffect='copy';}});
   canvas.addEventListener('drop',ev=>{const kind=ev.dataTransfer.getData('application/x-circuit-kind');if(!LIBRARY.some(([k])=>k===kind))return;ev.preventDefault();addFromLibrary(kind,toUnits(ev));});
 });

@@ -1,0 +1,457 @@
+{
+ "name": "pmsm_foc",
+ "elements": [
+  {
+   "id": "Vdc",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.4
+    ]
+   },
+   "label": "$V_{dc}$"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     4.4
+    ],
+    "s": [
+     2.0,
+     3.4
+    ]
+   },
+   "label": "$S_{1}$"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     1.0
+    ],
+    "s": [
+     2.0,
+     0.0
+    ]
+   },
+   "label": "$S_{2}$"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     4.4
+    ],
+    "s": [
+     3.6,
+     3.4
+    ]
+   },
+   "label": "$S_{3}$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     1.0
+    ],
+    "s": [
+     3.6,
+     0.0
+    ]
+   },
+   "label": "$S_{4}$"
+  },
+  {
+   "id": "S5",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     4.4
+    ],
+    "s": [
+     5.2,
+     3.4
+    ]
+   },
+   "label": "$S_{5}$"
+  },
+  {
+   "id": "S6",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     1.0
+    ],
+    "s": [
+     5.2,
+     0.0
+    ]
+   },
+   "label": "$S_{6}$"
+  },
+  {
+   "id": "M1",
+   "kind": "pmsm",
+   "pins": {
+    "a": [
+     7,
+     3.1
+    ],
+    "b": [
+     7,
+     2.15
+    ],
+    "c": [
+     7,
+     1.2
+    ]
+   },
+   "label": "$M_1$",
+   "label_pos": "below"
+  }
+ ],
+ "wires": [
+  [
+   [
+    2,
+    3.4
+   ],
+   [
+    2,
+    1
+   ]
+  ],
+  [
+   [
+    3.6,
+    3.4
+   ],
+   [
+    3.6,
+    1
+   ]
+  ],
+  [
+   [
+    5.2,
+    3.4
+   ],
+   [
+    5.2,
+    1
+   ]
+  ],
+  [
+   [
+    2,
+    3.1
+   ],
+   [
+    7,
+    3.1
+   ]
+  ],
+  [
+   [
+    3.6,
+    2.15
+   ],
+   [
+    7,
+    2.15
+   ]
+  ],
+  [
+   [
+    5.2,
+    1.2
+   ],
+   [
+    7,
+    1.2
+   ]
+  ],
+  [
+   [
+    0,
+    4.4
+   ],
+   [
+    5.2,
+    4.4
+   ]
+  ],
+  [
+   [
+    0,
+    0
+   ],
+   [
+    5.2,
+    0
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   3.6,
+   3.1
+  ],
+  [
+   5.2,
+   3.1
+  ],
+  [
+   5.2,
+   2.15
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vdc.b": "P",
+  "S1.d": "P",
+  "S3.d": "P",
+  "S5.d": "P",
+  "Vdc.a": "N",
+  "S2.s": "N",
+  "S4.s": "N",
+  "S6.s": "N",
+  "S1.s": "A",
+  "S2.d": "A",
+  "S3.s": "B",
+  "S4.d": "B",
+  "S5.s": "C",
+  "S6.d": "C",
+  "M1.a": "A",
+  "M1.b": "B",
+  "M1.c": "C"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vdc.a",
+  "components": {
+   "Vdc": {
+    "dc": "48",
+    "series_resistance": "10m"
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "S2": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "S3": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "S4": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "S5": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "S6": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch",
+    "output_capacitance": "100p"
+   },
+   "M1": {
+    "resistance": "0.4",
+    "ld": "2m",
+    "lq": "3m",
+    "flux_linkage": "50m",
+    "pole_pairs": "4",
+    "inertia": "0.1m",
+    "friction": "1m",
+    "load_torque": "0.1"
+   }
+  },
+  "transient": {
+   "step": "2u",
+   "max_step": "2u",
+   "stop": "50m"
+  },
+  "probes": [
+   {
+    "name": "ia",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ia"
+   },
+   {
+    "name": "ib",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ib"
+   },
+   {
+    "name": "ic",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ic"
+   },
+   {
+    "name": "id",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "id"
+   },
+   {
+    "name": "iq",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "iq"
+   },
+   {
+    "name": "omega_m",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "omega_m"
+   },
+   {
+    "name": "theta_e",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "theta_e"
+   },
+   {
+    "name": "torque",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "torque"
+   },
+   {
+    "name": "vdc",
+    "kind": "voltage",
+    "positive": "Vdc.b",
+    "negative": "Vdc.a"
+   }
+  ]
+ },
+ "closed_loop": {
+  "control": "pmsm_foc.control.json",
+  "inputs": {
+   "ia": {
+    "probe": "ia",
+    "filter": "1u"
+   },
+   "ib": {
+    "probe": "ib",
+    "filter": "1u"
+   },
+   "theta": {
+    "probe": "theta_e",
+    "filter": "1u"
+   },
+   "wm": {
+    "probe": "omega_m",
+    "filter": "1u"
+   },
+   "wref": {
+    "value": 100,
+    "ramp": 0.02
+   },
+   "idref": {
+    "value": 0
+   },
+   "vdc": {
+    "value": 48
+   }
+  },
+  "outputs": {
+   "sv.da": {
+    "switches": [
+     "S1"
+    ],
+    "complement": [
+     "S2"
+    ],
+    "dead_time": "1u",
+    "model": "switching"
+   },
+   "sv.db": {
+    "switches": [
+     "S3"
+    ],
+    "complement": [
+     "S4"
+    ],
+    "dead_time": "1u",
+    "model": "switching"
+   },
+   "sv.dc": {
+    "switches": [
+     "S5"
+    ],
+    "complement": [
+     "S6"
+    ],
+    "dead_time": "1u",
+    "model": "switching"
+   }
+  }
+ },
+ "profile": "ieee-double"
+}

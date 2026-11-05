@@ -40,13 +40,13 @@ function pasteDecoration(at) {
 }
 function focusPropertyText() {
   showSidebar('properties'); showProps();
-  const label = [...document.querySelectorAll('#props > label')].find(n=>['标签','文字','变比'].includes(n.textContent));
+  const label = [...document.querySelectorAll('#props > label')].find(n=>['标签','文字','变比'].includes(cdI18n.sourceText(n)));
   const input = label?.nextElementSibling;
   if (input?.matches('input,textarea')) { input.focus(); input.select(); input.scrollIntoView({block:'nearest'}); }
 }
 function contextCommand(id, reason = '') {
   const original = document.getElementById(id);
-  return {label:[...original.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('').trim(),
+  return {label:[...original.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>cdI18n.sourceText(n)).join('').trim(),
     shortcut:original.querySelector('kbd')?.textContent, id:`context-${id}`,
     reason:reason || (original.disabled ? '当前选择不能执行此操作' : ''),
     run:()=>original.onclick ? original.onclick() : original.click()};
@@ -102,9 +102,13 @@ function issueEntries(ref) {
 function measurementEntries(e) {
   const max=(layout.simulation?.probes||[]).length>=report.probe_limit?`测量通道已达到 ${report.probe_limit} 个，请先在仿真窗口整理`:'';
   const entries=[];
-  if(e.pins.a && e.pins.b)entries.push({label:'测两端电压（a − b）',id:'contextMeasureVoltage',reason:max,
+  if(e.pins.a && e.pins.b)entries.push({label:e.kind==='pmsm'?'测线电压（a − b）':'测两端电压（a − b）',id:'contextMeasureVoltage',reason:max,
     run:()=>addContextMeasurement({kind:'voltage',positive:e.id+'.a',negative:e.id+'.b'},'v_'+e.id)});
-  if(e.kind!=='port')entries.push({label:'测电流',id:'contextMeasureCurrent',reason:max ||
+  if(e.kind==='pmsm')entries.push({label:'电机测量 ›',id:'contextMeasureMotor',reason:max,
+    children:Object.entries(report.motor_quantities).map(([quantity,{label,unit}])=>({
+      label:`${label} (${unit})`,id:'contextMotor-'+quantity,reason:max,
+      run:()=>addContextMeasurement({kind:'motor',element:e.id,quantity},quantity+'_'+e.id)}))});
+  if(!['port','pmsm'].includes(e.kind))entries.push({label:'测电流',id:'contextMeasureCurrent',reason:max ||
     (!(report?.probe_kinds?.current||[]).includes(e.kind)?'当前仿真模型尚不支持此器件的电流通道':
       e.kind==='transformer'?'变压器需指定绕组，请在仿真参数窗口添加电流通道':''),
     run:()=>addContextMeasurement({kind:'current',element:e.id},'i_'+e.id)});
@@ -117,8 +121,9 @@ async function addContextMeasurement(probe,prefix) {
   if(snapshot!==editorTableSnapshot(layout)){flash('图纸已变化，请重新添加测量');return;}
   const used=new Set((layout.simulation?.probes||[]).map(p=>String(p.name).toLowerCase()));
   if((layout.simulation?.probes||[]).length>=report.probe_limit){flash(`测量通道已达到 ${report.probe_limit} 个`,true);return;}
-  const base=prefix.replace(/[^a-zA-Z0-9_]/g,'_');let name=base;
-  for(let n=2;used.has(name.toLowerCase());n++)name=`${base}_${n}`;
+  const base=prefix.replace(/[^a-zA-Z0-9_]/g,'_');
+  let name=probe.kind==='motor'?motorProbeName(probe.element,probe.quantity,layout.simulation?.probes||[]):base;
+  if(probe.kind!=='motor')for(let n=2;used.has(name.toLowerCase());n++)name=`${base}_${n}`;
   pushHistory();layout.simulation||={version:1,ground:'',components:{},transient:{},probes:[]};
   layout.simulation.probes||=[];layout.simulation.probes.push({name,...probe});changed();
   openSpice(info);const field=document.getElementById('spiceProbes'),section=field.closest('details');
@@ -167,7 +172,7 @@ function componentContext(ev, id, pin=null) {
     id==='pasteSelection' && !clipboard ? '请先复制或剪切对象' : ''));
   // the toolbar's delete button has no shortcut label; the key is Delete
   const del=entries.at(-1); del.label='删除'; del.shortcut='Delete';
-  const mirrorReason=why || (!['nmos','igbt','scr',...TWO_TERMINAL].includes(kind)?'此类元件暂不支持镜像／反向':'');
+  const mirrorReason=why || (!['nmos','pmos','igbt','scr',...TWO_TERMINAL].includes(kind)?'此类元件暂不支持镜像／反向':'');
   entries.push(null,contextCommand('rotateSelection',why),contextCommand('mirrorSelection',mirrorReason),
     {label:'编辑标签…',id:'contextLabel',reason:why || (kind==='transformer'?'此元件使用变比标记，请在属性栏编辑变比':''),run:focusPropertyText},
     {label:'仿真参数…',id:'contextSpice',reason:why || (kind==='port'?'端子没有独立的仿真参数':''),run:()=>openSpiceForElement(id)});
@@ -240,6 +245,7 @@ function blankContext(ev,at) {
   components.push(null,contextCommand('addModule'));
   openCanvasContext(ev,'画布空白处',[
     {label:'粘贴到这里',id:'contextPasteHere',reason:!clipboard?'请先复制或剪切对象':pastePositionReason(),run:()=>paste(at)},
+    {label:'新建空子系统',id:'contextEmptySubsystem',reason:definitionEdit?'请先返回上层，当前只支持一层子系统':'',run:()=>newEmptySubsystem(at)},
     {label:'在这里插入 ›',id:'contextInsert',children:components},null,
     ...['drawRegion','drawBlock','drawCallout'].map(id=>contextCommand(id)),null,
     {label:'全选顶层对象',id:'contextSelectAll',reason:selectionCandidates().length?'':'没有可选的顶层对象',run:selectAllObjects},

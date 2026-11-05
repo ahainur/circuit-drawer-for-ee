@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>控制框图编辑器</title>
+<script src="/i18n-messages.js"></script>
+<script src="/i18n.js"></script>
 <style>
   :root {
     --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70;
@@ -76,6 +78,7 @@
 
 </style>
 <link rel="stylesheet" href="/menu.css">
+<link rel="stylesheet" href="/theme-eda.css">
 </head>
 <body>
 <header>
@@ -89,7 +92,7 @@
       <button data-menu="analysis" id="menu-analysis" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-analysis-panel">分析</button>
       <button data-menu="help" id="menu-help" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-help-panel">帮助</button>
     </nav>
-    <span class="file" id="file">控制框图</span><span id="dirty" class="hint"></span>
+    <span class="file" id="file" translate="no">Circuit Drawer</span><span id="dirty" class="hint"></span>
   </div>
   <div class="quick-tools" role="toolbar" aria-label="常用工具栏">
 <button id="saveBtn" title="Ctrl+S">保存</button>
@@ -229,17 +232,28 @@ const $ = (id) => document.getElementById(id);
 const SVGNS = "http://www.w3.org/2000/svg";
 let table = null, profile = "ieee-double", constants = null, analysis = null;
 let undoStack = [], redoStack = [], dirty = false;
+let savedTable = null, saveQueue = Promise.resolve();
 let sel = { blocks: new Set(), texts: new Set(), link: null, corner: null, region: null };
 let view = { tx: 60, ty: 300, z: 60 };
 let drag = null, linkMode = false, linkStart = null, checkTimer = null, checkSeq = 0;
 
 // ---------------------------------------------------------------- server
 async function api(path, body) {
-  const r = await fetch(path, body === undefined ? {} :
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const data = await r.json();
-  if (!r.ok) { const e = new Error(data.error || r.statusText); e.data = data; throw e; }
-  return data;
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  // Export also saves the control table on the server.
+  const snapshot = ['/api/save', '/api/export'].includes(path) && body?.table ? JSON.stringify(body.table) : null;
+  const request = async () => {
+    const r = await fetch(path, payload === undefined ? {} :
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+    const data = await r.json();
+    if (!r.ok) { const e = new Error(data.error || r.statusText); e.data = data; throw e; }
+    if (snapshot) { savedTable = snapshot; updateDirty(); }
+    return data;
+  };
+  if (!snapshot) return request();
+  const pending = saveQueue.then(request);
+  saveQueue = pending.catch(() => {});
+  return pending;
 }
 function toast(msg, ms = 2600) {
   const t = $("toast"); t.textContent = msg; t.style.display = "block";
@@ -255,7 +269,7 @@ async function runCheck() {
     const a = await api("/api/check", { table, profile });
     if (seq !== checkSeq) return;
     analysis = a; Object.assign(constants, a.constants); showIssues(); draw();
-  } catch (e) { $("status").textContent = "校验失败：" + e.message; $("status").className = "bad"; }
+  } catch (e) { if (seq === checkSeq) { $("status").textContent = "校验失败：" + e.message; $("status").className = "bad"; } }
 }
 
 // ---------------------------------------------------------------- history
@@ -268,9 +282,13 @@ function commit(next, base = table) {
   if (undoStack.length > 200) undoStack.shift();
   table = next; changed();
 }
+function updateDirty() {
+  dirty = savedTable !== null && JSON.stringify(table) !== savedTable;
+  $("dirty").textContent = dirty ? "未保存" : "";
+}
 function changed() {
-  dirty = true; $("dirty").textContent = "未保存";
   pruneSelection(); draw(); showSelection(); scheduleCheck();
+  updateDirty();
   $("tableJson").value = pretty(table);
 }
 function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify(table)); table = JSON.parse(undoStack.pop()); changed(); }
@@ -917,7 +935,12 @@ function viewCentre() {
   const svg = $("canvas");
   return [snap((svg.clientWidth / 2 - view.tx) / view.z), snap((view.ty - svg.clientHeight / 2) / view.z)];
 }
+let insertionQueue = Promise.resolve();
 function addItem(kind) {
+  insertionQueue = insertionQueue.then(() => insertItem(kind)).catch(e => toast(e.message, 5000));
+  return insertionQueue;
+}
+async function insertItem(kind) {
   const [x, y] = viewCentre(), next = clone(table);
   next.blocks = next.blocks || [];
   const [type, style] = kind.split(":");
@@ -928,9 +951,19 @@ function addItem(kind) {
   if (type === "sum") b = { id: nextId("sum"), type, at: [x, y], signs: { w: "+", s: "-" } };
   if (type === "mul" || type === "div") b = { id: nextId(type), type, at: [x, y] };
   if (type === "switch") b = { id: nextId("sw"), type, pole: [x, y], throws: { A: [r4(x - 0.5), r4(y + 0.4)], B: [r4(x - 0.5), r4(y - 0.4)] }, on: "A" };
-  if (b) { next.blocks.push(b); clearSel(); sel.blocks.add(b.id); commit(next); return; }
-  if (type === "text") { next.texts = next.texts || []; next.texts.push({ at: [x, y], text: "Text" });
-    clearSel(); sel.texts.add(next.texts.length - 1); commit(next); return; }
+  if (b || type === "text") {
+    const before = JSON.stringify(table);
+    const part = {blocks: b ? [b] : [], links: [], regions: [],
+      texts: b ? [] : [{at: [x, y], text: "Text"}]};
+    const r = await api("/api/paste", {table, part});
+    if (JSON.stringify(table) !== before || drag) {
+      toast("图纸已变化，本次插入未采用，请重新插入"); return;
+    }
+    clearSel();
+    if (b) r.ids.forEach(id => sel.blocks.add(id));
+    else sel.texts.add(r.table.texts.length - 1);
+    commit(r.table); fit(); return;
+  }
   if (type === "region") {
     if (!sel.blocks.size) { toast("先选中要框住的方块"); return; }
     let r = [Infinity, Infinity, -Infinity, -Infinity];
@@ -1159,6 +1192,17 @@ window.addEventListener("mouseup", () => {
   if (d.kind === "pan") return;
   if (d.moved) { const now = table; table = d.base; commit(now, d.base); }
 });
+function cancelDrag() {
+  const d = drag; drag = null;
+  $("band").setAttribute("display", "none");
+  if (d.kind === "pan") { view.tx = d.tx; view.ty = d.ty; }
+  if (d.base) {
+    table = d.base;
+    ++checkSeq; // A check of the abandoned drag must not replace the restored view.
+    changed();
+  } else { draw(); showSelection(); }
+  tip();
+}
 $("canvas").addEventListener("dblclick", (ev) => {
   const hit = hitTarget(ev); if (!hit || hit.key !== "link") return;
   const li = +hit.val, best = nearestOnLink(li, world(ev)), next = clone(table), lk = next.links[li];
@@ -1184,7 +1228,9 @@ window.addEventListener("keydown", (ev) => {
   const active = document.activeElement, ctrl = ev.ctrlKey || ev.metaKey, key = ev.key.toLowerCase();
   if (ctrl && key === "s") { ev.preventDefault(); save(); return; }
   // An open dialog (preview, loop analysis, help) owns the keyboard, not the diagram behind it
-  if (isTextField(active) || document.querySelector("dialog[open]")) return;
+  if (document.querySelector("dialog[open]")) return;
+  if (ev.key === "Escape" && drag) { ev.preventDefault(); cancelDrag(); return; }
+  if (isTextField(active)) return;
   if (ctrl && key === "z") { ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
   if (ctrl && key === "y") { ev.preventDefault(); redo(); return; }
   if (ctrl && key === "c") { ev.preventDefault(); copySelection(); return; }
@@ -1202,7 +1248,7 @@ window.addEventListener("keydown", (ev) => {
 });
 function setLinkMode(on) { linkMode = on; linkStart = null; $("linkBtn").classList.toggle("on", on); draw(); tip(); }
 async function save() {
-  try { const r = await api("/api/save", { table }); dirty = false; $("dirty").textContent = ""; toast("已保存 " + r.saved); }
+  try { const r = await api("/api/save", { table }); toast("已保存 " + r.saved); }
   catch (e) { toast("保存失败：" + e.message); }
 }
 function dialog(title, body) {
@@ -1213,13 +1259,18 @@ async function preview() {
   const box = document.createElement("div");
   box.innerHTML = `<div class="row"><label><input type="checkbox" id="pvGrid"> 网格</label><label><input type="checkbox" id="pvMono"> 黑白</label><button id="pvGo">刷新</button><span class="hint" id="pvMsg">编译中…</span></div><img id="pvImg" alt="">`;
   dialog("LaTeX 预览（与导出相同）", box);
+  const msg = box.querySelector("#pvMsg"), img = box.querySelector("#pvImg");
+  const grid = box.querySelector("#pvGrid"), mono = box.querySelector("#pvMono");
+  let seq = 0;
   const go = async () => {
-    $("pvMsg").textContent = "编译中…";
-    try { const r = await api("/api/preview", { table, profile, grid: $("pvGrid").checked, mono: $("pvMono").checked });
-      $("pvImg").src = "data:image/png;base64," + r.png; $("pvMsg").textContent = ""; }
-    catch (e) { $("pvMsg").textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
+    const request = ++seq, current = () => request === seq && box.isConnected && $("dlg").open;
+    msg.textContent = "编译中…";
+    try { const r = await api("/api/preview", { table, profile, grid: grid.checked, mono: mono.checked });
+      if (!current()) return;
+      img.src = "data:image/png;base64," + r.png; msg.textContent = ""; }
+    catch (e) { if (current()) msg.textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
   };
-  $("pvGo").onclick = go; go();
+  box.querySelector("#pvGo").onclick = go; go();
 }
 // ---------------------------------------------------------------- loop analysis
 function esc(t) { return String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
@@ -1306,7 +1357,6 @@ function exportDlg() {
     const formats = [...box.querySelectorAll("input[value]")].filter((i) => i.checked).map((i) => i.value);
     $("exMsg").textContent = "导出中…";
     try { const r = await api("/api/export", { table, profile, formats, out_dir: $("exDir").value, mono: $("exMono").checked });
-      dirty = false; $("dirty").textContent = "";
       $("exMsg").textContent = "已写出：" + r.files.join("，") + (r.warnings.length ? `（${r.warnings.length} 条提醒）` : ""); }
     catch (e) { $("exMsg").textContent = e.message; }
   };
@@ -1317,23 +1367,23 @@ function fillLists(d) {
   $("snipSel").innerHTML = sn.length ? sn.map(([n, t]) => `<option value="${n}">${n}：${t}</option>`).join("") : `<option value="">（还没有片段）</option>`;
 }
 async function saveTemplate() {
-  const name = prompt("模板名（小写字母、数字、下划线）："); if (!name) return;
-  const title = prompt("说明（可留空）：", table.title || "") || "";
+  const name = cdI18n.prompt("模板名（小写字母、数字、下划线）："); if (!name) return;
+  const title = cdI18n.prompt("说明（可留空）：", table.title || "") || "";
   try { const r = await api("/api/save-template", { table, profile, name, title }); fillLists(r); toast("已存为模板：" + r.saved); }
   catch (e) {
-    if (/已存在/.test(e.message) && confirm(e.message + "\n覆盖吗？")) {
+    if (/已存在/.test(e.message) && cdI18n.confirm(e.message + "\n覆盖吗？")) {
       const r = await api("/api/save-template", { table, profile, name, title, force: true }); fillLists(r); toast("已覆盖模板：" + r.saved);
     } else toast(e.message, 5000);
   }
 }
 async function saveSnippet() {
   if (!sel.blocks.size) { toast("先选中要保存的方块（Shift 点选或框选）"); return; }
-  const name = prompt(`把选中的 ${sel.blocks.size} 个方块存为片段，名字：`); if (!name) return;
-  const title = prompt("说明（可留空）：") || "";
+  const name = cdI18n.prompt(`把选中的 ${sel.blocks.size} 个方块存为片段，名字：`); if (!name) return;
+  const title = cdI18n.prompt("说明（可留空）：") || "";
   const body = { table, ids: [...sel.blocks], name, title };
   try { const r = await api("/api/save-snippet", body); fillLists(r); toast("已存为片段：" + r.saved); }
   catch (e) {
-    if (/已存在/.test(e.message) && confirm(e.message + "\n覆盖吗？")) { const r = await api("/api/save-snippet", { ...body, force: true }); fillLists(r); }
+    if (/已存在/.test(e.message) && cdI18n.confirm(e.message + "\n覆盖吗？")) { const r = await api("/api/save-snippet", { ...body, force: true }); fillLists(r); }
     else toast(e.message, 5000);
   }
 }
@@ -1345,7 +1395,7 @@ async function insertSnippet() {
   catch (e) { toast(e.message, 5000); }
 }
 async function loadTemplate() {
-  if (dirty && !confirm("当前修改尚未保存，换成模板会替换整张表（可撤销）。继续？")) return;
+  if (dirty && !cdI18n.confirm("当前修改尚未保存，换成模板会替换整张表（可撤销）。继续？")) return;
   try { const r = await api("/api/template", { name: $("tplSel").value }); clearSel(); commit(r.table); fit(); }
   catch (e) { toast(e.message, 5000); }
 }
@@ -1357,6 +1407,7 @@ async function boot() {
   $("file").textContent = state.file; fillLists(state);
   $("tableJson").value = pretty(table);
   await runCheck(); fit(); showSelection();
+  savedTable = JSON.stringify(table); updateDirty();
 }
 $("undoBtn").onclick = undo; $("redoBtn").onclick = redo;
 // leave the drop-down after adding, so arrow keys nudge the new block instead of adding another

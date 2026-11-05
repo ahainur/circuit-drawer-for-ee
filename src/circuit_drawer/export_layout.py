@@ -18,7 +18,7 @@ branches for the drive.
 
 Parts the drawing gives no place for (voltmeters, numerical capacitors,
 anything inside an element that is not a series/parallel branch) are listed in
-``Plan.loose`` and placed in rows under the drawing: parts that share a net
+``Plan.loose`` and placed in free space near their device: parts that share a net
 nothing else uses are wired together, every other terminal is in
 ``Plan.tags`` and the target joins it by net name, the way a schematic uses
 net labels.
@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from heapq import heapify, heappop, heappush
+from math import ceil, floor
 
 GRID = 5               # px: the target grid every point snaps to
 MIN_SCALE = 80         # px per layout unit; the exporters' previous projection
@@ -42,10 +44,10 @@ LOOSE_COLUMN = 110     # px between columns of loose parts
 MIN_GAP = 10           # px of wire between parts in one branch
 DIRS = {"right": (1, 0), "down": (0, 1), "left": (-1, 0), "up": (0, -1)}
 # the part kind that is the drawn element itself, as the exporters name it
-MAIN_KIND = {"nmos": ("S", "Q"), "igbt": ("Q", "S"), "vac": ("V",), "scr": ("SCR",)}
+MAIN_KIND = {"nmos": ("S", "Q"), "pmos": ("S",), "igbt": ("Q", "S"), "vac": ("V",), "scr": ("SCR",)}
 TWO_PIN = {"R": ("a", "b"), "L": ("a", "b"), "C": ("a", "b"), "D": ("a", "b"), "scr": ("a", "b"),
            "V": ("a", "b"), "vac": ("a", "b"), "I": ("a", "b"),
-           "nmos": ("d", "s"), "igbt": ("c", "e")}
+           "nmos": ("d", "s"), "pmos": ("s", "d"), "igbt": ("c", "e")}
 
 
 def direction_of(vector) -> str:
@@ -55,6 +57,33 @@ def direction_of(vector) -> str:
 
 def snap(v: float) -> int:
     return int(round(v / GRID) * GRID)
+
+
+def nearby(origin, size, occupied, clear=CLEAR):
+    """Nearest free rectangle on the target grid; reserve it for the next item.
+    Candidates touch obstacle edges, so a dense drawing cannot exhaust a
+    fixed-radius search. Only newly created simulation helpers use this."""
+    w, h = size[0] / 2, size[1] / 2
+    xs = {ceil(max(w + clear, origin[0]) / GRID) * GRID}
+    ys = {ceil(max(h + clear, origin[1]) / GRID) * GRID}
+    for x0, y0, x1, y1 in occupied:
+        xs.update((floor((x0 - w - clear) / GRID) * GRID, ceil((x1 + w + clear) / GRID) * GRID))
+        ys.update((floor((y0 - h - clear) / GRID) * GRID, ceil((y1 + h + clear) / GRID) * GRID))
+    ys = sorted((y for y in ys if y >= h + clear), key=lambda y: ((y - origin[1]) ** 2, y))
+    distance = lambda x, y: (x - origin[0]) ** 2 + (y - origin[1]) ** 2
+    candidates = [(distance(x, ys[0]), x, ys[0], 0) for x in xs if x >= w + clear]
+    heapify(candidates)
+    while candidates:
+        _, x, y, index = heappop(candidates)
+        box = (x - w, y - h, x + w, y + h)
+        if all(box[2] + clear <= a or c + clear <= box[0] or box[3] + clear <= b or d + clear <= box[1]
+               for a, b, c, d in occupied):
+            occupied.append(box)
+            return x, y
+        if index + 1 < len(ys):
+            yy = ys[index + 1]
+            heappush(candidates, (distance(x, yy), x, yy, index + 1))
+    raise ValueError("cannot find free space for simulation helper")
 
 
 @dataclass
@@ -76,27 +105,11 @@ class Plan:
     box: tuple[int, int, int, int] = (0, 0, 0, 0)    # drawing extent: x0, y0, x1, y1
     pins: dict[str, tuple[int, int]] = field(default_factory=dict)
     offset: tuple[int, int] = (0, 0)                 # px subtracted from every scaled point
+    occupied: list[tuple] = field(default_factory=list)
 
     def px(self, point):
         """A layout point in the plan's pixels, as ``pins`` are."""
         return snap(point[0] * self.scale) - self.offset[0], snap(-point[1] * self.scale) - self.offset[1]
-
-    def lower_loose(self, rects, half, reach=0, clear=CLEAR):
-        """Move the rows of loose parts down, together, until none of them
-        (a block ``half`` px from its spot, ``reach`` px more sideways for a
-        converter beside it) overlaps one of ``rects`` (x0, y0, x1, y1): the
-        target's own panels on the right can run below a short drawing."""
-        spots = [self.spots[n] for n in self.loose]
-        if not spots or not rects:
-            return
-        top = min(sp.pos[1] - half for sp in spots)
-        across = [r for r in rects if any(sp.pos[0] - half - reach < r[2] and r[0] < sp.pos[0] + half + reach
-                                          for sp in spots)]
-        if not any(sp.pos[1] - half < r[3] and r[1] < sp.pos[1] + half for r in across for sp in spots):
-            return
-        shift = snap(max(r[3] for r in across) + clear - top + GRID)
-        for sp in spots:
-            sp.pos = (sp.pos[0], sp.pos[1] + shift)
 
     def under(self, point, boxes, reach=(0, 0)):
         """``point`` moved down to the bottom of any of ``boxes`` ((x0, y0),
@@ -179,7 +192,7 @@ def _lanes(group, a_net, b_net):
 
 
 def plan(parts, elements, wires, pin_nodes, terminal, signal_side=lambda part, direction: None,
-         lane=LANE, drive_reach=DRIVE_REACH, column=LOOSE_COLUMN) -> Plan:
+         lane=LANE, drive_reach=DRIVE_REACH, column=LOOSE_COLUMN, boxes=()) -> Plan:
     """``parts``: objects with name, kind, nodes, source, role.  ``elements``:
     drawn element id -> (kind, {pin: (x, y) in layout units}).  ``wires``:
     drawn polylines in layout units.  ``pin_nodes``: "Elem.pin" -> net.
@@ -260,7 +273,36 @@ def plan(parts, elements, wires, pin_nodes, terminal, signal_side=lambda part, d
         if kind == "transformer":
             placed |= _place_transformer(out, eid, pins, [p for p in by_source[eid] if p.kind == "T"],
                                          pin_nodes, terminal, sensors)
-    _place_loose(out, [p for p in parts if p.name not in placed], terminal, span, column)
+        elif kind == "pmsm":
+            placed |= _place_motor(out, eid, pins, by_source[eid], terminal)
+    # Keep helpers clear of the original wires, devices and collapsed modules.
+    by_name = {p.name: p for p in parts}
+
+    def endpoint(node):
+        if node[0] != 'T':
+            return node
+        _, name, index = node
+        spot = out.spots[name]
+        dx, dy = terminal(by_name[name], index, spot.direction)
+        return spot.pos[0] + dx, spot.pos[1] + dy
+
+    for edges in out.edges.values():
+        for start, end in sorted(edges, key=str):
+            a, b = endpoint(start), endpoint(end)
+            out.occupied.append((min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])))
+    for box in boxes:
+        a, b = out.px((box[0], box[3])), out.px((box[2], box[1]))
+        out.occupied.append((*a, *b))
+    for p in parts:
+        if p.name not in placed:
+            continue
+        sp = out.spots[p.name]
+        side = signal_side(p, sp.direction)
+        reach = drive_reach if side is not None or p.kind in ('VM', 'AM', 'PMSM') else 0
+        x, y = sp.pos
+        out.occupied.append((x - PART_HALF - reach, y - PART_HALF - reach,
+                             x + PART_HALF + reach, y + PART_HALF + reach))
+    _place_loose(out, [p for p in parts if p.name not in placed], terminal, span, column, parts)
     # a placed part's terminal no drawn wire reaches (a sensor's inner net at a
     # transformer winding) is joined by net name too
     reached = {n for e in out.edges.values() for pair in e for n in pair if n[0] == "T"}
@@ -268,6 +310,31 @@ def plan(parts, elements, wires, pin_nodes, terminal, signal_side=lambda part, d
         if p.name in placed:
             out.tags += [(p.name, i) for i in range(len(p.nodes)) if ("T", p.name, i) not in reached]
     return out
+
+
+def _place_motor(out, eid, pins, parts, terminal):
+    """Project the shared symbol centre; join each phase to its own drawn pin."""
+    from .geometry import Scale, footprint
+    from .layout import Element
+    from .profiles import get_profile
+    fp = footprint(Element(eid, 'pmsm', pins), Scale(1, 1), get_profile('double'))
+    side = fp.extra['side']
+    direction = direction_of((-side[0], side[1]))
+    placed = set()
+    for p in parts:
+        if p.kind != 'PMSM':
+            continue
+        pos = out.px(fp.centre)
+        out.spots[p.name] = Spot(pos, direction, eid)
+        horizontal = direction in ('left', 'right')
+        for i, pin in enumerate(('a', 'b', 'c')):
+            target = out.pins[f'{eid}.{pin}']
+            dx, dy = terminal(p, i, direction)
+            corner = (target[0], pos[1] + dy) if horizontal else (pos[0] + dx, target[1])
+            out.edges[p.nodes[i]].add((('T', p.name, i), corner))
+            out.edges[p.nodes[i]].add((corner, target))
+        placed.add(p.name)
+    return placed
 
 
 def _scale(groups, elements) -> float:
@@ -399,8 +466,8 @@ def _place_transformer(out: Plan, eid, pins, parts, pin_nodes, terminal, sensors
     return placed
 
 
-def _place_loose(out: Plan, parts, terminal, span, column):
-    """Rows under the drawing.  Parts joined by nets nothing else uses form a
+def _place_loose(out: Plan, parts, terminal, span, column, all_parts):
+    """Near the owning device. Parts joined by nets nothing else uses form a
     chain, stacked top to bottom and wired; other terminals become tags."""
     if not parts:
         return
@@ -423,7 +490,22 @@ def _place_loose(out: Plan, parts, terminal, span, column):
     x, top = x0, y1 + LOOSE_GAP
     for group in clusters.values():
         chain = _chain(group, private)
-        y = top
+        sources = {p.source for p in group}
+        nets = {n for p in group for n in p.nodes if n != '0'}
+        anchors = [p for p in all_parts if p.name in out.spots and out.spots[p.name].element and p.source in sources]
+        if not anchors:
+            anchors = [p for p in all_parts if p.name in out.spots and nets.intersection(p.nodes)]
+        if anchors:
+            # Prefer the component sharing the most measured terminals, then
+            # file order. A voltage probe need not have the component's id.
+            anchor = max(anchors, key=lambda p: len(nets.intersection(p.nodes)))
+            origin = out.spots[anchor.name].pos
+        else:
+            origin = (x, top)
+        height = sum(span(p) + LOOSE_STEP for p, _ in chain) - LOOSE_STEP
+        cx, cy = nearby(origin, (column, height + 2 * CLEAR), out.occupied)
+        x, top_of_group = cx, cy - height / 2
+        y = top_of_group
         for part, flipped in chain:
             s = span(part)
             direction = "down" if flipped else "up"      # terminal facing up first

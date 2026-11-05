@@ -2,6 +2,11 @@
   header { display: block; padding: 0; }
   .menu-row, .quick-tools { display: flex; align-items: center; gap: 4px; padding: 5px 12px; }
   .menu-row { min-height: 38px; border-bottom: 1px solid var(--line); }
+  .menu-row { flex-wrap: wrap; }
+  .language-picker { display:flex; align-items:center; gap:5px; margin-left:auto; font-size:12px; white-space:nowrap; }
+  .language-picker select { max-width:125px; min-height:26px; padding:2px 4px; }
+  html[lang="en"] .prop { grid-template-columns:minmax(100px,auto) minmax(0,1fr); }
+  html[lang="en"] .menu-panel > button, html[lang="en"] .menu-subpanel > button { white-space:normal; }
   .menu-bar { display: flex; gap: 2px; flex-shrink: 0; }
   .menu-bar > button { border-color: transparent; padding: 4px 12px; }
   .menu-bar > button[aria-expanded="true"] { background: #e6edff; color: var(--accent); }

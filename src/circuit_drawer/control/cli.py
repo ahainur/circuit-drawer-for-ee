@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from .. import __version__
 from ..compile import FORMATS, CompileError
 from ..profiles import PROFILES, get_profile
 from .check import check
@@ -39,6 +40,7 @@ def _formats(text: str) -> tuple[str, ...]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="circuit-drawer-control", description=__doc__)
+    ap.add_argument("--version", action="version", version="%(prog)s " + __version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list", help="list the example control diagrams")
     e = sub.add_parser("export", help="write an example table as JSON to edit")

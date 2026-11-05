@@ -83,7 +83,20 @@ def synchronize(layout, profile):
             return deepcopy(layout.extra["electrical"])
         raise ValueError("请先修正元件/导线的几何错误，再启用电气标号")
     graph.extra["electrical"] = layout.extra.get("electrical", {})
-    return reconcile(graph, report.nets)
+    section = reconcile(graph, report.nets)
+    if "electrical" not in layout.extra:
+        # Import names once; later edits retain the user's stable identities.
+        candidates = []
+        for node in section["nodes"]:
+            names = {graph.netlist[p] for p in node["pins"] if p in graph.netlist}
+            name = next(iter(names)) if len(names) == 1 else ""
+            candidates.append(name if NAME.fullmatch(name) and not name.lower().startswith(("cd_", "ctl_")) else "")
+        reserved = {n["id"].lower() for n in section["nodes"]}
+        counts = [n.lower() for n in candidates]
+        for node, name in zip(section["nodes"], candidates):
+            if name and counts.count(name.lower()) == 1 and (name.lower() not in reserved or name.lower() == node["id"].lower()):
+                node["name"] = name
+    return section
 
 
 def problems(layout, nets, *, schema_only=False):
@@ -165,6 +178,9 @@ def instruction_targets(instruction, section=None):
 
 def validate_instruction(instruction, layout):
     """Reject explicit missing targets before contacting the model."""
+    bad = [message for code, message in problems(layout, {}, schema_only=True) if code == "bad-electrical"]
+    if bad:
+        raise ValueError("；".join(bad))
     section = layout.extra.get("electrical")
     nodes, branches = instruction_targets(instruction, section)
     if section is None:

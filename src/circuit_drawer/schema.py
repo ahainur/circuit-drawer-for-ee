@@ -16,6 +16,7 @@ from typing import Any
 
 from .geometry import FONT_RANGE, SIZE_RANGE
 from .layout import PIN_NAMES, SWITCHES, TWO_TERMINAL
+from .regions import CALLOUT_DASHES
 from .source_waves import POSITIONS as WAVE_POSITIONS, SCALE_RANGE as WAVE_SCALE, WAVES
 
 ALL_KINDS = frozenset(PIN_NAMES)
@@ -24,7 +25,7 @@ ALL_KINDS = frozenset(PIN_NAMES)
 @dataclass(frozen=True)
 class Field:
     name: str
-    type: str                                # text | bool | number | enum | ink
+    type: str                                # text | bool | number | enum | ink | point
     doc: str
     values: tuple[Any, ...] = ()             # enum: the accepted literals
     range: tuple[float, float] | None = None  # number: inclusive bounds
@@ -38,7 +39,7 @@ class Field:
             return "|".join("false" if v is False else str(v) for v in self.values)
         if self.type == "number" and self.range:
             return f"{self.range[0]:g}..{self.range[1]:g}"
-        return {"bool": "true|false", "ink": "ink name or #rrggbb"}.get(self.type, "text")
+        return {"bool": "true|false", "ink": "ink name or #rrggbb", "point": "[dx, dy]（两个有限数值，图纸坐标单位）"}.get(self.type, "text")
 
     def problem(self, value: Any) -> str | None:
         """Why ``value`` is not accepted, or None; owned values are checked elsewhere."""
@@ -48,6 +49,10 @@ class Field:
             ok = isinstance(value, bool)
         elif self.type == "text":
             ok = isinstance(value, str)
+        elif self.type == "point":
+            ok = (isinstance(value, (list, tuple)) and len(value) == 2
+                  and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                          and math.isfinite(v) for v in value))
         elif self.type == "number":
             ok = (isinstance(value, (int, float)) and not isinstance(value, bool)
                   and math.isfinite(value)
@@ -60,15 +65,21 @@ class Field:
 LABEL_SIDES = ("above", "below", "left", "right")
 
 LABEL_POS = Field("label_pos", "enum", "page side of the label; default above for horizontal "
-                  "parts, right for vertical ones (switches: the diode side)", LABEL_SIDES)
+                  "parts, right for vertical ones (switches: the diode side; transformer name: below; "
+                  "PMSM: below for a vertical phase row, right for a horizontal one)", LABEL_SIDES)
 
 # opts keys of an element, by the kinds they apply to.
 ELEMENT_OPTS: tuple[Field, ...] = (
+    Field("dash", "enum", "line pattern for an explicitly drawn parasitic R/L/C; drawing only",
+          CALLOUT_DASHES, default="solid", kinds=frozenset({"R", "L", "C"})),
+    Field("label_offset", "point", "user-dragged label offset [dx, dy] in layout units, "
+          "page right/up positive, relative to label_pos; transformer: ratio text only; "
+          "does not move pins, wires, current arrows or polarity dots", default=[0, 0]),
     Field("color", "ink", "draw the symbol and its label in this ink; only when the user "
           "asks for coloured marks", owner="bad-color"),
-    Field("scale_length", "number", "symbol size along the pin axis; pin spacing and "
+    Field("scale_length", "number", "symbol size along the pin axis (PMSM: phase lead stand-off); pin spacing and "
           "font unchanged", range=SIZE_RANGE, default=1),
-    Field("scale_width", "number", "symbol size across the pin axis", range=SIZE_RANGE, default=1),
+    Field("scale_width", "number", "symbol size across the pin axis (PMSM: circle size, at least enclosing the phase pins)", range=SIZE_RANGE, default=1),
     Field("scale", "number", "legacy uniform symbol size; scale_length/scale_width override it",
           range=SIZE_RANGE, default=1),
     Field("label_size", "number", "font size in pt of the label, current and ratio text; "

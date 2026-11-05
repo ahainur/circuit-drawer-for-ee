@@ -363,7 +363,9 @@ def _element(el: Element, s: Scale, prof: Profile, parts: dict | None = None,
     ``ink`` keeps labels in that colour when the symbol itself is restyled."""
     z, width = axis_sizes(el)
     body = _element_body(el, s, prof, parts, ink)
-    if abs(z - 1) < 1e-9 or el.kind == "transformer":
+    if el.opts.get("dash", "solid") != "solid":
+        body = "\\begin{scope}[" + el.opts["dash"] + "]\n" + body + "\\end{scope}\n"
+    if abs(z - 1) < 1e-9 or el.kind in ("transformer", "pmsm"):
         return body
     if el.kind in TWO_TERMINAL and abs(z - width) > 1e-9:
         return body                         # the local frame applies both axes
@@ -405,7 +407,7 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
         width = -width                  # the gate lead on the other side of the path
     stretched = abs(length - width) > 1e-9
     # a thyristor's label sits where the validator put it, clear of the gate lead
-    own_label = el.label and fp.labels and (stretched or "diag" in fp.extra or el.kind == "scr")
+    own_label = el.label and fp.labels and (stretched or "diag" in fp.extra or el.kind == "scr" or "label_offset" in fp.extra)
     a, b = el.pins["a"], el.pins["b"]
     side = fp.label_side
     if el.kind == "V":
@@ -489,6 +491,14 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
                                     **({"ratio": sized(el.opts["ratio"], pt)} if el.opts.get("ratio") else {})})
     if el.kind in TWO_TERMINAL:
         return _two_terminal(el, fp, s, prof)
+    if el.kind == "pmsm":
+        lines = [rf"\draw {_p(unscaled(a, s))} -- {_p(unscaled(b, s))};" for a, b in fp.leads]
+        lines.append(rf"\draw {_p(unscaled(fp.centre, s))} circle[radius={_n(fp.extra['radius'])}cm];")
+        for text, at, height in fp.extra["motor_marks"]:
+            lines.append(rf"\node at {_p(unscaled(at, s))} {{{sized(text, height*72.27/2.54)}}};")
+        if el.label:
+            lines.append(rf"\node at {_p(unscaled(fp.extra['label_at'], s))} {{{el.label}}};")
+        return "\n".join(lines) + "\n"
     if el.kind == "port":
         # a block terminal is where a wire meets a block's edge: no circle
         line = "" if el.opts.get("bare") else rf"\node[ocirc] at {_p(el.pins['p'])} {{}};" "\n"
@@ -498,9 +508,9 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
             line += rf"\node at {_p(at)} {{{el.label}}};" "\n"
         return line
     if el.kind in SWITCHES:
-        top, bot = PIN_NAMES[el.kind]
-        anchors = ("D", "S") if el.kind == "nmos" else ("C", "E")
-        shape = "nmos" if el.kind == "nmos" else "nigbt"
+        top, bot = ("s", "d") if el.kind == "pmos" else PIN_NAMES[el.kind]
+        anchors = (top.upper(), bot.upper())
+        shape = "nigbt" if el.kind == "igbt" else el.kind
         diode = ",bodydiode" if el.opts.get("diode", True) else ""
         c = unscaled(fp.centre, s)
         u, side = fp.extra["u"], fp.extra["side"]
@@ -521,7 +531,7 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
                  rf"\draw {_p(el.pins[top])} -- ({el.id}.{anchors[0]}) "
                  rf"({el.id}.{anchors[1]}) -- {_p(el.pins[bot])};"]
         if el.label:
-            if el.label_pos:
+            if el.label_pos or "label_offset" in fp.extra:
                 lines.append(rf"\node at {_p(unscaled(fp.extra['label_at'], s))} {{{el.label}}};")
             else:
                 lines.append(rf"\node[anchor=west] at ([xshift={_n(SW_LABEL_DX * sw_k(prof) * width)}cm]{el.id}.center) "
@@ -547,6 +557,8 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
             lines.append(rf"\draw{st('core')} {_p(u(a))} -- {_p(u(b))};")
         for dot in ex.get("dots", []):
             lines.append(rf"\fill {_p(u(dot))} circle (1.2pt);")
+        if "label_at" in ex:
+            lines.append(rf"\node at {_p(u(ex['label_at']))} {{{el.label}}};")
         if "ratio_at" in ex:
             lines.append(rf"\node at {_p(u(ex['ratio_at']))} {{{el.opts['ratio']}}};")
         return "\n".join(lines) + "\n"

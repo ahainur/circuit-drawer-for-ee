@@ -1,13 +1,11 @@
 /* Proposals stay outside the drawing until the user accepts and saves them. */
-function initSimulationRecommendations(info, base, profile, accept) {
+function initSimulationRecommendations(info, base, profile, accept, current) {
   const host = document.getElementById("spiceRecommendation");
-  if (base.closed_loop) {
-    host.innerHTML = '<summary>推荐仿真参数（暂不支持闭环）</summary><p class="hint">参数推荐本版用于展开的开环电路；当前闭环的功率级和控制器请配合设计。</p>';
-    return;
-  }
   host.innerHTML = `<summary>推荐仿真参数…</summary>
     <p class="hint">基础 Buck、Boost 和交错 Buck 按公式计算；其他电路或文字需求使用现有 AI 配置。
       留空时采用明确列出的演示工况。每项附理由，并自动做一次短 ngspice 检查。</p>
+    <p class="hint">模块和闭环使用 AI，从已有可运行工况调参：只改实例允许调整的参数和控制器已有数值。
+      调整外部控制表时，保存为本电路的内嵌副本，原控制表文件不变。短检查按连续控制模型运行，不证明离散控制稳定。</p>
     <fieldset id="recommendInputs" style="border:0;padding:0"><div class="spice-fields">
       ${Object.entries(info.recommendation_inputs).map(([key,label]) => `<label>${esc(label)}
         <input data-requirement="${esc(key)}" placeholder="留空使用建议工况" autocomplete="off"></label>`).join("")}</div>
@@ -21,7 +19,7 @@ function initSimulationRecommendations(info, base, profile, accept) {
     <p class="hint">采用会替换本窗口参数；点击“保存参数”或导出后才写入电路文件。短仿真不代表稳态、损耗或额定值合格。</p>`;
   const $ = id => host.querySelector("#" + id);
   const dialog = host.closest("dialog"), state = $("recommendState");
-  let jobId = null, proposal = null, snapshot = null, cancelled = false, serial = 0;
+  let jobId = null, proposal = null, snapshot = null, draftSnapshot = null, cancelled = false, serial = 0;
   function busy(value) {
     $("recommendInputs").disabled = value;
     $("recommendCancel").hidden = !value;
@@ -33,7 +31,14 @@ function initSimulationRecommendations(info, base, profile, accept) {
     cancelled = true;
     proposal = null; $("recommendApply").disabled = true;
     state.textContent = "已取消，返回的建议不会采用。";
-    if (jobId) await api("/api/cancel", {id: jobId}).catch(() => {});
+    if (jobId) await cancelRequest(jobId);
+  }
+  async function cancelRequest(id) {
+    try { await api("/api/cancel", {id}); }
+    catch (e) {
+      const message = `建议不会采用，但取消请求未送达，后台任务可能仍在运行：${e.message}`;
+      state.textContent = message; flash(message, true);
+    }
   }
   $("recommendCancel").onclick = cancel;
   dialog.addEventListener("close", cancel, {once:true});
@@ -59,10 +64,13 @@ function initSimulationRecommendations(info, base, profile, accept) {
       <p>${esc(check.message)}</p>
       ${check.stop_s ? `<p>检查至 ${(check.stop_s*1000).toPrecision(4)} ms；统计窗口从 ${(check.window_start_s*1000).toPrecision(4)} ms 开始。</p>` : ""}
       ${check.voltage_error_pct != null ? `<p>末段输出电压均值相对目标偏差：${check.voltage_error_pct.toFixed(2)}%。请核对是否已稳态，再判断是否需要调参。</p>` : ""}
+      ${check.loop ? `<p>控制表小信号环路模型（须自行核对与功率级是否一致）：${check.loop.loops.length ?
+        check.loop.loops.map(l=>`${esc(l.break)}：交越频率 ${esc(display(l.fc_hz))} Hz，相位裕度 ${esc(display(l.pm_deg))}°，${l.stable ? "模型未发现右半平面闭环极点" : "模型有不稳定闭环极点"}`).join("；") : "未配置可分析的环路，不能据此判断稳定性。"}</p>` : ""}
+      ${check.loop_note ? `<p class="hint">${esc(check.loop_note)}</p>` : ""}
       ${stats ? `<details><summary>短仿真统计</summary><table><thead><tr><th>通道</th><th>均值</th><th>最小值</th><th>最大值</th></tr></thead><tbody>${stats}</tbody></table></details>` : ""}
       <div style="max-height:300px;overflow:auto"><table style="width:100%;table-layout:fixed;text-align:left">
         <thead><tr><th>参数</th><th>原值</th><th>建议</th><th>理由</th></tr></thead><tbody>
-        ${result.parameters.map(p=>`<tr data-parameter="${esc(p.path)}">${[labels[p.path] || p.path,display(p.before),display(p.value),p.reason]
+        ${result.parameters.map(p=>`<tr data-parameter="${esc(p.path)}">${[p.label || labels[p.path] || p.path,display(p.before),display(p.value),p.reason]
           .map(s=>`<td style="overflow-wrap:anywhere;vertical-align:top">${esc(s)}</td>`).join("")}</tr>`).join("")}
         </tbody></table></div>`;
     $("recommendApply").hidden = false;
@@ -80,10 +88,11 @@ function initSimulationRecommendations(info, base, profile, accept) {
     try {
       const requirements = Object.fromEntries([...host.querySelectorAll("[data-requirement]")]
         .map(e=>[e.dataset.requirement,e.value.trim()]).filter(([,v])=>v!==""));
-      let job = await api("/api/spice-recommend", {layout:clone(base), profile, requirements,
+      const draft = current(); draftSnapshot = JSON.stringify(draft);
+      let job = await api("/api/spice-recommend", {layout:draft, profile, requirements,
         description:$("recommendDescription").value.trim()});
       jobId = job.id;
-      if (!present()) { await api("/api/cancel", {id:jobId}); return; }
+      if (!present()) { await cancelRequest(jobId); return; }
       while (job.state === "running") {
         state.textContent = `正在计算或等待 AI，并做短仿真（${job.elapsed_s} 秒）…`;
         await new Promise(resolve=>setTimeout(resolve,350));
@@ -109,7 +118,10 @@ function initSimulationRecommendations(info, base, profile, accept) {
       state.className = "bad"; state.textContent = "当前图已发生变化，请重新生成推荐。";
       $("recommendApply").disabled = true; return;
     }
-    accept(clone(proposal.simulation));
+    try {
+      if (JSON.stringify(current()) !== draftSnapshot) throw new Error("窗口参数已修改，请重新生成推荐。");
+      accept(clone(proposal));
+    } catch (e) { state.className = "bad"; state.textContent = e.message; $("recommendApply").disabled = true; return; }
     proposal = null; $("recommendApply").disabled = true;
     state.className = "ok"; state.textContent = "已采用到本窗口参数；点击“保存参数”或导出后写入电路文件。";
   };

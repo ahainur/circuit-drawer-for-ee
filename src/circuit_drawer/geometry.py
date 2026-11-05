@@ -66,10 +66,14 @@ LABEL_GAP = 0.08         # gap between a symbol body and its label
 SW_HALF_SPAN = 0.371
 SW_LEFT, SW_RIGHT, SW_HALF_H = 0.50, 0.30, 0.37
 SW_LABEL_DX = 0.33
+# CircuitikZ PMOS gate dot: nodes width (.04) times bipoles/length, unscaled.
+PMOS_DOT_RADIUS = 0.04
 COIL_HALF_W = 0.13
 CORE_GAP = 0.05          # half distance between the two core lines
 WINDING_GAP = (0.5, 1.0)  # cm between primary and secondary winding axes
 DOT_OFFSET, DOT_LIFT = 0.17, 0.28   # polarity dot position from the coil centre
+# The motor circle encloses its outer phase leads, leaving 0.08 cm clearance.
+PMSM_RADIUS, PMSM_LEAD, PMSM_EDGE = 0.42, 0.15, 0.08
 
 
 @dataclass(frozen=True)
@@ -328,6 +332,26 @@ def axis_sizes(el: Element) -> tuple[float, float]:
 
 
 def footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
+    fp = _base_footprint(el, s, prof)
+    offset = el.opts.get("label_offset")
+    if offset is not None:
+        # Malformed JSON still gets a usable editor sketch; the schema reports it.
+        from .schema import OPTS
+        if OPTS["label_offset"].problem(offset) is None and any(offset):
+            index = -1 if el.kind == "transformer" else 0
+            if fp.labels and (el.opts.get("ratio") if el.kind == "transformer" else el.label):
+                fp.extra["label_offset"] = list(offset)
+                dx, dy = scaled(offset, s)
+                b = fp.labels[index]
+                fp.labels[index] = Box(b.x0 + dx, b.y0 + dy, b.x1 + dx, b.y1 + dy)
+                for key in (("ratio_at",) if el.kind == "transformer" else ("label_at",)):
+                    if key in fp.extra:
+                        x, y = fp.extra[key]
+                        fp.extra[key] = (x + dx, y + dy)
+    return fp
+
+
+def _base_footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
     if el.kind in TWO_TERMINAL:
         fp = _two_terminal(el, s, prof)
         if symbol_kind(el) == "zener":
@@ -354,6 +378,8 @@ def footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
         return _switch(el, s, prof)
     if el.kind == "transformer":
         return _transformer(el, s, prof)
+    if el.kind == "pmsm":
+        return _pmsm(el, s, prof)
     if el.kind == "port":
         return _port(el, s, prof)
     raise ValueError(f"unknown element kind {el.kind!r}")
@@ -478,7 +504,8 @@ def switch_frame(el: Element) -> tuple[Point, Point] | None:
     to the top pin, side is where its default label goes; the gate is on the other
     side.  Upright and unmirrored: u = (0, 1), side = (1, 0).  None when the
     pins are not on one horizontal or vertical line."""
-    names = PIN_NAMES[el.kind]
+    # CircuitikZ's PMOS is source-up; electrical current still references d->s.
+    names = ("s", "d") if el.kind == "pmos" else PIN_NAMES[el.kind]
     (tx, ty), (bx, by) = el.pins[names[0]], el.pins[names[1]]
     if abs(tx - bx) > EPS and abs(ty - by) > EPS or (abs(tx - bx) < EPS and abs(ty - by) < EPS):
         return None
@@ -544,6 +571,46 @@ def _port(el: Element, s: Scale, prof: Profile) -> Footprint:
         cx, cy = {"left": (x - d - w / 2, y), "right": (x + d + w / 2, y),
                   "above": (x, y + d + h / 2), "below": (x, y - d - h / 2)}[el.label_pos or "left"]
         fp.labels.append(centred(cx, cy, w, h))
+    return fp
+
+
+def pmsm_frame(el: Element, s: Scale):
+    """Phase a to c fixes the cardinal axis; the motor is to its local right."""
+    points = {k: scaled(p, s) for k, p in el.pins.items()}
+    a, c = points["a"], points["c"]
+    dx, dy = a[0] - c[0], a[1] - c[1]
+    u = ((1.0 if dx >= 0 else -1.0), 0.0) if abs(dx) > abs(dy) else (0.0, 1.0 if dy >= 0 else -1.0)
+    return u, (u[1], -u[0]), points
+
+
+def _pmsm(el: Element, s: Scale, prof: Profile) -> Footprint:
+    if any(k not in el.pins for k in PIN_NAMES["pmsm"]):
+        return Footprint()  # Fit still runs before schema validation reports missing-pin.
+    u, v, points = pmsm_frame(el, s)
+    length, width = axis_sizes(el)
+    b = points["b"]
+    offsets = {k: (p[0]-b[0])*u[0] + (p[1]-b[1])*u[1] for k, p in points.items()}
+    radius = max(PMSM_RADIUS * width, max(abs(d) for d in offsets.values()) + PMSM_EDGE)
+    centre = tuple(b[i] + v[i] * (radius + PMSM_LEAD * length) for i in (0, 1))
+    leads = []
+    for k in PIN_NAMES["pmsm"]:
+        d = offsets[k]
+        reach = math.sqrt(max(0, radius*radius-d*d))
+        end = tuple(centre[i] + u[i]*d - v[i]*reach for i in (0, 1))
+        leads.append((points[k], end))
+    body = centred(*centre, 2*radius, 2*radius)
+    fp = Footprint(leads=leads, bodies=[body], centre=centre,
+                   extra={"radius": radius, "u": u, "side": v,
+                          "motor_marks": [("M", (centre[0], centre[1]+radius*.23), radius*.7),
+                                          (r"$3\sim$", (centre[0], centre[1]-radius*.4), radius*.38)]})
+    if el.label:
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        at = {"above": (centre[0], body.y1+LABEL_GAP+h/2),
+              "below": (centre[0], body.y0-LABEL_GAP-h/2),
+              "left": (body.x0-LABEL_GAP-w/2, centre[1]),
+              "right": (body.x1+LABEL_GAP+w/2, centre[1])}[el.label_pos or ("right" if u[0] else "below")]
+        fp.labels.append(centred(*at, w, h))
+        fp.extra["label_at"] = at
     return fp
 
 
@@ -630,6 +697,18 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
         fp.extra[key] = [(world(a), world(b)) for a, b in fp.extra[key]]
     if "ratio_at" in fp.extra:
         fp.extra["ratio_at"] = world(fp.extra["ratio_at"])
+    if el.label:
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        boxes = fp.bodies + fp.labels
+        x0, x1 = min(b.x0 for b in boxes), max(b.x1 for b in boxes)
+        y0, y1 = min(b.y0 for b in boxes), max(b.y1 for b in boxes)
+        # The name defaults below the windings, clear of the existing ratio.
+        at = {"above": ((x0+x1)/2, y1 + LABEL_GAP + h/2),
+              "below": ((x0+x1)/2, y0 - LABEL_GAP - h/2),
+              "left": (x0 - LABEL_GAP - w/2, (y0+y1)/2),
+              "right": (x1 + LABEL_GAP + w/2, (y0+y1)/2)}[el.label_pos or "below"]
+        fp.extra["label_at"] = at
+        fp.labels.insert(len(fp.labels) - bool(ratio), centred(*at, w, h))
     return fp
 
 

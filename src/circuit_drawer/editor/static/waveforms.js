@@ -80,7 +80,8 @@
     } catch(e) {note(e.message,true);} finally {button.disabled=false;}
   };
   window.addEventListener("circuit-drawer:simulation-complete",ev=> {
-    document.getElementById("dlg").close();
+    // Leave post-run rating results visible; the imported waveform waits behind.
+    if(!ev.detail.rating_checks?.length) document.getElementById("dlg").close();
     window.openWaveforms({source:ev.detail.csv});
   });
   window.addEventListener("circuit-drawer:layout-changed",async()=> {
@@ -145,7 +146,8 @@
       ${i>0 && i<cfg.boundaries.length-1?`<button data-remove="${i}" title="合并相邻区间，并清除其模态选择">删除分界</button>`:''}</div>`).join('')}</details>
       <details><summary>通道、标签和单位</summary><div id="waveChannels">
       ${info.columns.filter(c=>c!==cfg.time_column).map((column,i)=> {
-        const c=cfg.channels.find(c=>c.column===column) || {label:column,unit:'',color:colors[i%colors.length]};
+        const c=cfg.channels.find(c=>c.column===column) || {
+          ...(info.column_defaults?.[column] || {label:column,unit:''}),color:colors[i%colors.length]};
         return `<div class="wave-channel" data-column="${esc(column)}"><input type="checkbox" ${cfg.channels.some(c=>c.column===column)?'checked':''} aria-label="显示 ${esc(column)}">
         <input type="text" data-field="label" value="${esc(c.label)}" aria-label="${esc(column)} 标签">
         <input type="text" data-field="unit" value="${esc(c.unit)}" aria-label="${esc(column)} 单位">
@@ -443,7 +445,7 @@
   }
   function editNote(i) {
     const candidate=clone(layout.waveform), n=candidate.notes[i];
-    const text=prompt("标注文字（英文或 $数学$，如 $i_L$ peak；留空删除文字）",n.text || "");
+    const text=cdI18n.prompt("标注文字（英文或 $数学$，如 $i_L$ peak；留空删除文字）",n.text || "");
     if(text===null) return;
     if(text.trim()) n.text=text.trim(); else if(n.kind==="text") return removeNote(i); else delete n.text;
     change(candidate);
@@ -539,10 +541,10 @@
       const a=dataAt(g.px);
       if(g.draft==="arrow") {
         if(!moved) {note("箭头需要拖出一段：按住箭尾，拖到要指的点再松开。",true);draw();return;}
-        const text=prompt("箭尾文字（可留空；英文或 $数学$）","");
+        const text=cdI18n.prompt("箭尾文字（可留空；英文或 $数学$）","");
         addNote({kind:"arrow",channel:a.channel,from:a.point,to:dataAt(g.now,a.channel).point,...(text?.trim()?{text:text.trim()}:{})});
       } else {
-        const text=prompt(g.draft==="text"?"标注文字（英文或 $数学$，如 $i_L$ peak）":"关键点文字（可留空，如 $I_{L,\\max}$）","");
+        const text=cdI18n.prompt(g.draft==="text"?"标注文字（英文或 $数学$，如 $i_L$ peak）":"关键点文字（可留空，如 $I_{L,\\max}$）","");
         if(text===null || (g.draft==="text" && !text.trim())) {draw();return;}
         addNote({kind:g.draft,channel:a.channel,at:a.point,...(text.trim()?{text:text.trim()}:{})});
       }
@@ -563,7 +565,7 @@
   $("waveChart").onpointercancel=()=>{gesture=null;draw();};
   new ResizeObserver(()=>{if(!panel.hidden && !gesture) draw();}).observe(panel);
   $("waveSave").onclick=async()=> {
-    try {const r=await request("/api/waveform-save",layout.waveform);setEditorFile(r.saved,JSON.stringify(layout));note(`已保存到 ${r.saved}`);}
+    try {const r=await request("/api/waveform-save",layout.waveform);note(`已保存到 ${r.saved}`);}
     catch(e) {note(e.message,true);}
   };
   $("waveExport").onclick=()=> {

@@ -1,4 +1,4 @@
-"""MATLAB builder for a native Simulink + Simscape Foundation model."""
+"""MATLAB builder for native Simulink + Simscape electrical models."""
 from collections import defaultdict
 from types import SimpleNamespace
 import math
@@ -61,6 +61,11 @@ def emit(circuit, name):
     if circuit.subsystems:
         circuit.notes.append('Simulink：子系统的电气端子是 Simscape Connection Port（Side 按折叠框的左右，Port 全子系统连续编号，'
                              '左侧在前）；驱动信号经子系统 Inport 进入，内部传感器的读数经 Outport 引出。已在 MATLAB R2024b 上实机验收（llc_single 折叠与展开两版稳态一致）。')
+    has_motor = any(p.kind == 'PMSM' for p in circuit.parts)
+    if has_motor:
+        circuit.notes.append('PMSM 使用 Simscape Electrical 蓝库原生 PMSM（额外需要 Simscape Electrical），'
+                             '采用 expanded 三相端口、关闭零序以保留浮中性点、d 轴对齐 a 相；'
+                             '机械速度和电角由轴传感器取得，dq 电流由相电流按等幅值 Park 计算。')
     q = lambda value: "'" + str(value).replace("'", "''") + "'"
     def num(value):
         if not math.isfinite(value):
@@ -81,6 +86,8 @@ def emit(circuit, name):
              "set_param(model, 'SaveOutput', 'on', 'OutputSaveName', 'yout', 'SaveFormat', 'Dataset', 'SaveTime', 'on', 'TimeSaveName', 'tout', 'ReturnWorkspaceOutputs', 'on');",
              f"set_param(model, 'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', {q('unique([0:'+num(tr['step'])+':'+num(tr['stop'])+' '+num(tr['stop'])+'])')});",
              "workspace = get_param(model, 'ModelWorkspace');"]
+    if has_motor:
+        lines.append("load_system('ee_lib'); % PMSM requires Simscape Electrical; no SPS blocks.")
     links, outputs, derivatives = [], {}, {}
     electrical = 'fl_lib/Electrical/'
     # The drawing decides where each Simscape block sits and which way it
@@ -103,11 +110,14 @@ def emit(circuit, name):
                                              role='thyristor', level=level))
         else:
             parts.append(SimpleNamespace(name=p.name, kind=p.kind, nodes=p.nodes, source=p.source, role=p.role, level=level))
-    from .export_layout import DIRS, plan
+    from .export_layout import DIRS, nearby, plan
     half = BLOCK // 2
 
     def terminal(part, index, direction):
         """Approximate planning footprint; actual wiring uses native port handles."""
+        if part.kind == 'PMSM':
+            x, y = -44, (index - 1) * 30
+            return {'left': (x, y), 'right': (-x, -y), 'up': (-y, x), 'down': (y, -x)}[direction]
         dx, dy = DIRS[direction]
         sign = 1 if index % 2 == 0 else -1
         return dx * half * sign, dy * half * sign
@@ -124,9 +134,11 @@ def emit(circuit, name):
         elements = {k: (kind, {pin: tuple(xy) for pin, xy in pins.items()})
                     for k, (kind, pins) in drawing.get('elements', {}).items()}
         return plan([p for p in parts if p.level == level], elements, [[tuple(p) for p in w] for w in drawing.get('wires', [])],
-                    pin_nodes, terminal, signal_side, lane=LANE, drive_reach=SIDE + half, column=SIDE + 2 * BLOCK + 20)
+                    pin_nodes, terminal, signal_side, lane=LANE, drive_reach=SIDE + half, column=2 * (SIDE + BLOCK),
+                    boxes=[s.box for s in circuit.subsystems] if level is None else ())
 
     placed = defaultdict(list)     # system -> rectangles of the blocks added so far
+    handles = {}                  # native handles -> positions for local signal tags
 
     def add(system, path, block_name, pos, params=None, direction=None, size=(BLOCK, BLOCK)):
         x, y = round(pos[0]), round(pos[1])
@@ -138,11 +150,12 @@ def emit(circuit, name):
         lines.append(f"add_block({q(path)}, [{system} '/{block_name}'], 'Position', "
                      f"[{x - w} {y - h} {x + w} {y + h}]{arguments});")
         var = 'h_' + _ident(block_name)
+        handles[system, var] = (x, y)
         lines.append(f"{var} = get_param([{system} '/{block_name}'], 'PortHandles');")
         return var
 
     def connect(system, a, b):
-        links.append(f"add_line({system}, {a}, {b}, 'autorouting', 'smart');")
+        links.append((system, a, b))
 
     pin_nodes = dict(circuit.pin_nodes)
     for s in circuit.subsystems:
@@ -155,15 +168,21 @@ def emit(circuit, name):
     out_x = x1 + 300
     panel_rects = [(out_x - half, y0 + k * 70 - half, out_x + half, y0 + k * 70 + half) for k in range(len(circuit.outputs))]
     panel_rects.append((out_x + 140 - half, y0 + len(circuit.outputs) * 35 - half, out_x + 140 + half, y0 + len(circuit.outputs) * 35 + half))
-    layout.lower_loose(panel_rects, half, SIDE)
     bottom = max([y1] + [sp.pos[1] for sp in spots.values()] + [b[1][1] for b in boxes.values()]) + 120
 
-    # signal generators: a drive panel under the drawing, one row each; a
-    # closed-loop gate (kind control) comes from the control panel below it
+    # Reserve source/derivative pairs near their device, outside the original
+    # wires and helper footprints. A collapsed instance owns its top-level drive.
     panel = getattr(circuit, 'panel', None)
     generators = [s for s in circuit.signals if s.kind != 'control']
-    for row, s in enumerate(generators):
-        s.position = (x0 + 160, bottom + 120 + row * 2 * ROW)       # a derivative row under each
+    occupied = list(layout.occupied) + panel_rects
+    for s in generators:
+        device = next((p for p in circuit.parts if p.params.get('signal') == s.name), None)
+        anchor = spots[device.name].pos if device and device.name in spots else (x0 + 160, bottom)
+        if device and device.name in owner:
+            a, b = boxes[owner[device.name]]
+            anchor = ((a[0] + b[0]) / 2, a[1])
+        x, y = nearby(anchor, (140, 2 * ROW), occupied)
+        s.position = (x, y - ROW // 2)
     if panel:
         for signal_name, (block_name, port) in panel.exports.items():
             outputs[signal_name] = _source(panel, block_name, port)
@@ -174,11 +193,11 @@ def emit(circuit, name):
         handle = add('model', 'simulink/Sources/From Workspace', signal_name, pos,
                      {'VariableName': signal_name + '_data', 'SampleTime': '0',
                       'Interpolate': 'on' if interpolate else 'off', 'ZeroCross': 'on',
-                      'OutputAfterFinalValue': 'Holding final value'})
+                      'OutputAfterFinalValue': 'Holding final value'}, size=(100, BLOCK))
         return handle + '.Outport(1)'
 
     if any(s.kind == 'sine' for s in generators):
-        clock = add('model', 'simulink/Sources/Clock', 'time', (x0 + 40, bottom + 120)) + '.Outport(1)'
+        clock = add('model', 'simulink/Sources/Clock', 'time', nearby((x0, y0), (BLOCK, BLOCK), occupied)) + '.Outport(1)'
     # Supply analytic first derivatives to physical source converters; using
     # their default zero derivative would give a wrong current in a capacitor
     # driven directly by a sine or ramp voltage source.
@@ -261,6 +280,105 @@ def emit(circuit, name):
             if p.kind in ('V', 'I'):
                 connect(system, slopes[p.params['signal']], converter + '.Inport(2)')
             connect(system, converter + '.RConn(1)', handle + '.RConn(1)')
+
+        def motor(p, spot):
+            """Native blue-library machine, with sensors only for requested feedback."""
+            v, name = p.params, p.name
+            params = {'port_option': 'ee.enum.threePhasePort.expanded',
+                      'zero_sequence': 'ee.enum.park.zerosequence.exclude',
+                      'winding_type': 'ee.enum.electromech.statorconfiguration.wye',
+                      'machine_param': 'ee.enum.pmsm.parameterization.constant',
+                      'pmflux_param': 'ee.enum.pmflux.fluxlinkage',
+                      'stator_param': 'ee.enum.statorparam.LdLqL0',
+                      'axes_param': 'ee.enum.rotorangle.daxis',
+                      'loss_param': 'ee.enum.ironloss.none',
+                      'Rs': v['resistance'], 'Ld': v['ld'], 'Lq': v['lq'],
+                      'pm_flux_linkage': v['flux_linkage'], 'nPolePairs': v['pole_pairs'],
+                      'J': v['inertia'], 'lam': v['friction'],
+                      'angular_velocity_unit': 'rad/s', 'angular_position_unit': 'rad'}
+            for state, value in {'i_d': v['initial_id'], 'i_q': v['initial_iq'],
+                                 'angular_velocity': v['initial_speed'],
+                                 'angular_position': v['initial_angle'] / v['pole_pairs']}.items():
+                params.update({state: value, state + '_specify': 'on', state + '_priority': 'High'})
+            h = add(system, 'ee_lib/Electromechanical/Permanent Magnet/PMSM', name,
+                    spot.pos, params, spot.direction, size=(80, 100))
+            requested = {o['quantity'] for o in circuit.outputs if o.get('part') == name}
+            need = set(requested)
+            if 'torque' in need:
+                need.update(('id', 'iq'))
+            if need & {'id', 'iq'}:
+                need.update(('ia', 'ib', 'theta_e'))
+            if 'ic' in need:
+                need.update(('ia', 'ib'))
+            values, consumed = {}, set()
+            obstacles = list(layout.occupied) + list(placed[system])
+
+            def helper(path, suffix, params=None, size=(BLOCK, BLOCK)):
+                pos = nearby((spot.pos[0] + 140, spot.pos[1] + 80), size, obstacles, clear=40)
+                return add(system, path, name + '_' + suffix, pos, params, size=size)
+
+            def reading(suffix, source, unit):
+                cv = helper('nesl_utility/PS-Simulink Converter', suffix, {'Unit': unit})
+                connect(system, source, cv + '.LConn(1)')
+                return cv + '.Outport(1)'
+
+            def formula(quantity, inputs, expression):
+                f = helper('simulink/User-Defined Functions/Fcn', quantity, {'Expr': expression}, (100, BLOCK))
+                if len(inputs) == 1:
+                    connect(system, values[inputs[0]], f + '.Inport(1)')
+                else:
+                    mux = helper('simulink/Signal Routing/Mux', quantity + '_mux', {'Inputs': len(inputs)}, (10, 60))
+                    for i, key in enumerate(inputs, 1):
+                        connect(system, values[key], mux + f'.Inport({i})')
+                    connect(system, mux + '.Outport(1)', f + '.Inport(1)')
+                consumed.update(inputs)
+                values[quantity] = f + '.Outport(1)'
+
+            for i, node in enumerate(p.nodes):
+                end = h + f'.LConn({i + 1})'
+                quantity = ('ia', 'ib', 'ic')[i]
+                if quantity in need and quantity != 'ic':
+                    am = helper(electrical + 'Electrical Sensors/Current Sensor', quantity + '_sensor')
+                    connect(system, am + '.RConn(2)', end)
+                    end = am + '.LConn(1)'
+                    values[quantity] = reading(quantity + '_measurement', am + '.RConn(1)', 'A')
+                nets[node].append((end, (name, i)))
+            mech = 'fl_lib/Mechanical/'
+            ref = helper(mech + 'Rotational Elements/Mechanical Rotational Reference', 'case')
+            connect(system, h + '.RConn(2)', ref + '.LConn(1)')
+            if v['load_torque']:
+                load = helper(mech + 'Mechanical Sources/Ideal Torque Source', 'load')
+                cv = helper('nesl_utility/Simulink-PS Converter', 'load_input',
+                            {'Unit': 'N*m', 'FilteringAndDerivatives': 'provide', 'UdotUserProvided': '0'})
+                constant = helper('simulink/Sources/Constant', 'load_torque', {'Value': -v['load_torque']})
+                connect(system, constant + '.Outport(1)', cv + '.Inport(1)')
+                connect(system, cv + '.RConn(1)', load + '.RConn(1)')
+                connect(system, load + '.LConn(1)', h + '.RConn(1)')
+                connect(system, load + '.RConn(2)', ref + '.LConn(1)')
+            if need & {'omega_m', 'theta_e'}:
+                sensor = helper(mech + 'Mechanical Sensors/Ideal Rotational Motion Sensor', 'motion',
+                                {'offset': v['initial_angle'] / v['pole_pairs'], 'wrap_angle': 'false'})
+                connect(system, sensor + '.LConn(1)', h + '.RConn(1)')
+                connect(system, sensor + '.RConn(1)', ref + '.LConn(1)')
+                values['omega_m'] = reading('speed_measurement', sensor + '.RConn(2)', 'rad/s')
+                values['theta_m'] = reading('angle_measurement', sensor + '.RConn(3)', 'rad')
+                if 'theta_e' in need:
+                    formula('theta_e', ['theta_m'], num(v['pole_pairs']) + '*u')
+            if 'ic' in need:
+                formula('ic', ['ia', 'ib'], '-u[1]-u[2]')
+            if 'id' in need:
+                formula('id', ['ia', 'ib', 'theta_e'], 'u[1]*cos(u[3])+(u[1]+2*u[2])/sqrt(3)*sin(u[3])')
+            if 'iq' in need:
+                formula('iq', ['ia', 'ib', 'theta_e'], '-u[1]*sin(u[3])+(u[1]+2*u[2])/sqrt(3)*cos(u[3])')
+            if 'torque' in need:
+                formula('torque', ['id', 'iq'], f'{num(1.5*v["pole_pairs"])}*({num(v["flux_linkage"])}'
+                        f'+({num(v["ld"]-v["lq"])})*u[1])*u[2]')
+            for key, output in values.items():
+                if key in requested:
+                    readings[name + '_' + key] = output
+                elif key not in consumed:
+                    end = helper('simulink/Sinks/Terminator', key + '_unused')
+                    connect(system, output, end + '.Inport(1)')
 
         def clear_of(system, spot, shape):
             """``at(k, side)`` for a thyristor's latch logic (``shape``: k
@@ -380,6 +498,9 @@ def emit(circuit, name):
             if owner.get(p.name) != level:
                 continue
             spot = spots[p.name]
+            if p.kind == 'PMSM':
+                motor(p, spot)
+                continue
             pos, turn = spot.pos, spot.direction
             v, nodes = p.params, p.nodes[:]
             params = {}
@@ -506,6 +627,8 @@ def emit(circuit, name):
         (bx0, by0), (bx1, by1) = boxes[s.name]
         lines.append(f"add_block('built-in/Subsystem', [model '/{s.name}'], 'Position', [{bx0} {by0} {bx1} {by1}]);")
         lines.append(f"{system} = [model '/{s.name}'];")
+        placed['model'].append((bx0, by0, bx1, by1))
+        handles['model', block] = ((bx0 + bx1) / 2, (by0 + by1) / 2)
         inner = layout_of(s.name, s.drawing, pin_nodes)
         ix0, iy0, ix1, iy1 = inner.box
         terminals = defaultdict(list)
@@ -550,6 +673,11 @@ def emit(circuit, name):
         wire(system, inner, nets)
         lines.append(f"{block} = get_param([model '/{s.name}'], 'PortHandles');")
     nets = sheet('model', None, layout, outputs, derivatives, outputs, top_terminals)
+    if has_motor:
+        # Motor sensors/axis helpers extend beyond the electrical drawing.
+        # Put the output/control panels beyond their actual occupied bounds.
+        out_x = max(out_x, max(r[2] for r in placed['model']) + 160)
+        bottom = max(bottom, max(r[3] for r in placed['model']) + 120)
     if panel:
         _control_panel(circuit, panel, lambda *a, **k: add('model', *a, **k), lambda a, b: connect('model', a, b),
                        outputs, lines, (x0 + 100, bottom + 120 + max(len(generators), 1) * 2 * ROW + 60))
@@ -561,7 +689,31 @@ def emit(circuit, name):
         connect('model', origin, h + '.Inport(1)')
         connect('model', origin, scope + f'.Inport({index})')
     wire('model', layout, nets)
-    lines += links
+    # Long ordinary signals travel through local tags. Physical Simscape
+    # ports and all signal endpoints stay unchanged; tags never cross a sheet.
+    sent = {}
+    receiver_index = 0
+    for system, a, b in links:
+        start = handles.get((system, a.split('.')[0]))
+        end = handles.get((system, b.split('.')[0]))
+        in_controller = a.startswith('h_ctl_') and b.startswith('h_ctl_')
+        if '.Outport(' in a and '.Inport(' in b and start and end and not in_controller and math.dist(start, end) > 2 * SIDE:
+            key = (system, a)
+            if key not in sent:
+                tag = 'cd_local_' + str(len(sent) + 1)
+                pos = nearby((start[0] + SIDE, start[1]), (60, 20), list(placed[system]))
+                h = add(system, 'simulink/Signal Routing/Goto', 'send_' + tag, pos,
+                        {'GotoTag': tag, 'TagVisibility': 'local', 'ShowName': 'off'}, size=(60, 20))
+                lines.append(f"add_line({system}, {a}, {h}.Inport(1), 'autorouting', 'smart');")
+                sent[key] = tag
+            tag = sent[key]
+            pos = nearby((end[0] - SIDE, end[1]), (60, 20), list(placed[system]))
+            receiver_index += 1
+            h = add(system, 'simulink/Signal Routing/From', 'cd_read_' + str(receiver_index), pos,
+                    {'GotoTag': tag, 'ShowName': 'off'}, size=(60, 20))
+            lines.append(f"add_line({system}, {h}.Outport(1), {b}, 'autorouting', 'smart');")
+        else:
+            lines.append(f"add_line({system}, {a}, {b}, 'autorouting', 'smart');")
     lines += ["set_param(model, 'SimulationCommand', 'update');", 'save_system(model, destination);',
               'catch exception', 'close_system(model, 0);', 'rethrow(exception);', 'end',
               "if usejava('desktop'), open_system(model); end", 'end']

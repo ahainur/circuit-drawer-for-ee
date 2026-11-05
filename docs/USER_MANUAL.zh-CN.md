@@ -2,7 +2,7 @@
 
 简体中文 | [English](USER_MANUAL.en.md)
 
-本书对应 Circuit Drawer for EE 1.5.0。先读第一、二章完成安装，再按需要查阅后面的章节。命令、菜单名和字段名都按程序中的原样书写。
+本书对应 Circuit Drawer for EE 1.6.0。先读第一、二章完成安装，再按需要查阅后面的章节。命令、菜单名和字段名都按程序中的原样书写。
 
 ## 目录
 
@@ -75,10 +75,10 @@ Circuit Drawer 是给电力电子论文和报告画电路图的工具。你在�
 
 ### 2、安装程序
 
-方法一，从 [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases) 下载 wheel 文件 `circuit_drawer_for_ee-1.5.0-py3-none-any.whl`，在它所在的文件夹运行：
+方法一，从 [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases) 下载 wheel 文件 `circuit_drawer_for_ee-1.6.0-py3-none-any.whl`，在它所在的文件夹运行：
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.5.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
 
 方法二，直接从仓库安装：
@@ -268,11 +268,19 @@ circuit-drawer draw 四开关升降压 switch=igbt
 
 3、编辑器 **文件 → 存为模板…** 效果相同。
 
+4、保存后的提示和 `list` 按模板内容列出选项。有开关符号才提供 `switch`，有电流参考箭头才提供 `currents`。名称会去掉首尾空白并转为小写。用 `--dir` 保存到自定义位置后，使用时将 `CIRCUIT_DRAWER_TEMPLATES` 设为同一目录。
+
+5、`circuit-drawer --version` 和 `circuit-drawer-control --version` 可查看当前运行的版本。
+
 ---
 
 ## 四、编辑器界面导览
 
 ![电路编辑器总览](images/manual/editor-overview.png)
+
+右上角 **文 / A** 选项可立即切换 **简体中文 / 繁體中文 / English**。切换保留未保存的编辑、已打开的窗口和输入值；同一浏览器、地址和端口会记住选择，不同编辑器端口各自保存偏好。翻译随安装包离线提供。图纸文字、自定义名称、JSON 和外部工具原始输出保持原样；命令行与 Windows 启动器沿用原有文字。本书使用简体菜单名。
+
+![繁體中文界面](images/manual/editor-language-zh-TW.png)
 
 ### 1、整体布局
 
@@ -305,7 +313,7 @@ circuit-drawer draw 四开关升降压 switch=igbt
 
 | 菜单 | 内容 |
 | --- | --- |
-| 文件 | 保存、存为模板…、存为模块…、导出电路图…、导出全部模态… |
+| 文件 | 保存、另存为…、存为模板…、存为模块…、导出电路图…、导出全部模态… |
 | 编辑 | 撤销、重做、剪切、复制、粘贴、创建副本、旋转 90°、镜像 / 反向、增大符号、缩小符号、删除所选、同类对象图层（上移一层、下移一层、置顶、置底）；有模块时还有编辑选中模块定义、解散选中实例为普通元件，旧式模块表还有模块定义…、转换为端口连接 |
 | 视图 | 适应窗口、放大、缩小、模块显示（子菜单）、显示节点/支路标号、显示画布坐标刻度、实时网表面板、全图器件模型…、栏宽、预览带坐标网、色块灰度、真实预览 |
 | 插入 | 画导线、画区域、画方框、画箭头、添加模块…、阶跃 / 脉冲标记、导线交叉方式、元件库（全部器件） |
@@ -318,6 +326,8 @@ circuit-drawer draw 四开关升降压 switch=igbt
 ### 3、保存、预览和导出
 
 1、**保存**：写回当前 JSON。电路编辑器没有保存快捷键，请点工具栏“保存”或 **文件 → 保存**。
+
+   **文件 → 另存为…**：输入新名字，保存在原文件旁边并切换到新文件，后续“保存”写入新文件。自动补 `.json`，空格等符号改为下划线；同名时加 `_2`、`_3` 等序号，不覆盖已有文件。提交前取消不写文件；提交后关闭窗口仍继续保存，期间的新修改仍标为未保存。编辑模块定义时需先保存或取消定义编辑。
 
 2、**预览**（真实预览）：调用 LaTeX 显示最终效果。**视图 → 预览带坐标网** 决定预览是否叠加坐标网，方便对照坐标。
 
@@ -348,6 +358,7 @@ circuit-drawer draw 四开关升降压 switch=igbt
 | 稳压管 | `D`，`opts.zener: true` | 同二极管 | 画成稳压管符号；仿真需另填击穿参数 |
 | 晶闸管 | `scr` | `a`（阳极）、`b`（阴极） | 只能水平或竖直；门极引线画在 a→b 的左侧，`F` 键换到右侧；门极由仿真触发脉冲驱动，不是引脚 |
 | MOSFET | `nmos` | `d`、`s` | 默认带体二极管（`opts.diode: false` 去掉） |
+| P 沟 MOSFET | `pmos` | `d`、`s` | 源极在上、门极带点；体二极管 d→s；逻辑 PWM 1 为导通。在“分析 → SPICE 仿真…”填写参数。 |
 | IGBT | `igbt` | `c`、`e` | 默认带反并联二极管 |
 | 电压源 | `V` | `a`（负）、`b`（正） | 直流电压源 |
 | 交流电源 | `vac` | `a`（参考端）、`b` | 正弦交流源 |
@@ -1137,9 +1148,13 @@ circuit-drawer spice-init my_boost.json --preset boost -o my_boost_sim.json
 
 3、点“生成推荐并检查”：结果逐项列出原值、建议值、理由和假设，并在临时文件夹做一次不超过 10 ms 的短 ngspice 检查。
 
-4、核对后点“采用到参数表”，再点“保存参数”或导出才写入文件。没有 ngspice、校验失败、图纸已变化或取消时不会采用。模块实例和闭环控制器暂不支持推荐。
+4、核对后点“采用到参数表”，再点“保存参数”或导出才写入文件，可撤销。推荐读取本窗口当前参数；没有 ngspice、校验失败、生成后图纸或窗口参数变化、取消时不能采用。
 
 5、这是基于理想 CCM 公式的初稿，不自动补偿压降，也不选器件额定值；短仿真完成不等于指标达标。
+
+6、开发版还支持已有可运行工况的模块实例与闭环控制器调参，复用现有 AI 配置。模块只改允许调整的实例数值，共用默认值和其他实例保持不变；闭环只改已有数值，保留连接、公式和测量绑定。外部控制表调参后保存为本电路内嵌副本，原控制文件不动，副本不再随原文件更新。
+
+7、可打开 `examples/modules/boost_parallel_authored.json`，输入“只把模块 M 的 L1 调到 600u，其余参数保持不变”。闭环示例 `examples/closed_loop/buck_vmode.json` 可输入“只把 Type III 的 fi 调到 14000 Hz”。先看建议和短仿真，再采用、保存。闭环会显示已有环路模型的分析；该模型是否与功率级一致仍需核对，短检查不证明稳态或离散稳定性。
 
 ### 7、全图器件模型
 
@@ -1157,6 +1172,14 @@ circuit-drawer spice-init my_boost.json --preset boost -o my_boost_sim.json
 ### 8、限制
 
 模型都是简化模型：不含反向恢复、磁饱和、温度特性、尾电流、厂商子电路。实际验证覆盖 Buck / Boost、LLC、DAB、IGBT 正反向换流、晶闸管整流、三相正弦。`.cir` 使用 ngspice 控制语法，不保证兼容其他 SPICE。不能用于器件损耗、效率或 ZVS 结论。
+
+### 9、传导 EMI 估算
+
+从 `buck_emi` 模板或 [Buck LISN 示例](../examples/emi/buck_lisn.json) 开始。电路中须显式画出两条供电线的 LISN、50 Ω 接收机端口和机壳回路。在 **分析 → SPICE 仿真…** 设置电源与采样参数，再打开 **分析 → 传导 EMI 估算…**。
+
+选择正、负线 LISN 电压通道和分析时间窗，点“运行当前参数”执行 ngspice，显示各线及共模／差模频谱。寄生电容部分支持几何公式或实测／Q3D CSV；“滤波初算并重跑对比”会在候选中修改指定滤波元件并重新仿真，核对比较结果后再明确采用，采用可撤销。
+
+结果是使用 Hann 窗与正弦 RMS 幅值的工程估算，不是准峰值／平均值接收机读数。CISPR 32 曲线只作指定 AC 电源端口参考，不构成 DC 端口合规结论。结果受开关边沿、寄生、接线、机壳回路、时间窗漂移与采样步长影响，须比较更小步长并结合实测；示例候选仍高于参考线。
 
 ---
 
@@ -1563,7 +1586,17 @@ circuit-drawer tweak buck.json "把 D 挪到右边"                           # 
 
 ## 二十二、命令行参考
 
-模板的附加选项须与文件名／模板名连写，再写 `-t`、`-o` 等开关。例如 `circuit-drawer edit fb.json 二极管在下 -t flyback`；不要写成 `edit fb.json -t flyback 二极管在下`。
+1、`draw`、`modes`、`export`、`edit` 的模板附加选项可放在 `-t`、`-o` 等开关前后。例如 `circuit-drawer edit fb.json -t flyback 二极管在下` 与 `edit fb.json 二极管在下 -t flyback` 等价；拼错的命令开关仍会报错。
+
+2、`circuit-drawer export` 自动创建输出父目录；已有 JSON 必须换文件名或明确加 `--force` 才覆盖。
+
+3、`-f pdf` 等未包含 `tex` 的出图不再额外生成或覆盖同名 `.tex`。需要源码时把 `tex` 写进格式列表。
+
+4、`check` 单栏失败但双栏通过时，在错误输出给出 `--profile double` 建议；JSON 报告和失败退出码不变，不自动改图。
+
+5、`waveforms` 需要先在编辑器“分析 → 波形与模态”导入 CSV、核对曲线与模态对应关系并保存。
+
+6、`new --image` 按文件头识别 PNG、JPEG、GIF、WebP，不靠扩展名猜测。图片和 `--structure` 的读取错误会先报告，再判断模板或检查密钥；结构文件须为 UTF-8 文本。图片只识别格式，完整性由模型服务进一步检查。
 
 ### 1、circuit-drawer
 
@@ -1571,7 +1604,7 @@ circuit-drawer tweak buck.json "把 D 挪到右边"                           # 
 | --- | --- | --- |
 | `list` | 列出模板和选项 | |
 | `draw <模板> [选项…]` | 模板出图 | `-p`、`-o`、`-f`、`--name`、`--grid`、`--mono` |
-| `export <模板> [选项…] -o x.json` | 导出模板的坐标表 | `-o`（必填） |
+| `export <模板> [选项…] -o x.json` | 导出模板的坐标表 | `-o`（必填）、`--force`（覆盖已有 JSON） |
 | `edit x.json [选项…]` | 打开网页编辑器 | `-t`、`-p`、`--port`、`-o`、`--no-browser`、`--provider`、`--model` |
 | `check x.json` | 只校验，输出 JSON 报告；不通过时返回 1 | `-p` |
 | `render x.json` | 校验并出图 | `-p`、`-o`、`-f`、`--name`、`--grid`、`--mono` |

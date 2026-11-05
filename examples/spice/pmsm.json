@@ -1,0 +1,274 @@
+{
+ "name": "pmsm",
+ "profile": "ieee-double",
+ "elements": [
+  {
+   "id": "Va",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0,
+     3.6
+    ],
+    "b": [
+     1.5,
+     3.6
+    ]
+   },
+   "label": "$v_a$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Vb",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0,
+     2
+    ],
+    "b": [
+     1.5,
+     2
+    ]
+   },
+   "label": "$v_b$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Vc",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0,
+     0.4
+    ],
+    "b": [
+     1.5,
+     0.4
+    ]
+   },
+   "label": "$v_c$",
+   "label_pos": "above"
+  },
+  {
+   "id": "M1",
+   "kind": "pmsm",
+   "pins": {
+    "a": [
+     6,
+     2.6
+    ],
+    "b": [
+     6,
+     2
+    ],
+    "c": [
+     6,
+     1.4
+    ]
+   },
+   "label": "$M_1$",
+   "label_pos": "below"
+  }
+ ],
+ "wires": [
+  [
+   [
+    1.5,
+    3.6
+   ],
+   [
+    4.5,
+    3.6
+   ],
+   [
+    4.5,
+    2.6
+   ],
+   [
+    6,
+    2.6
+   ]
+  ],
+  [
+   [
+    1.5,
+    2
+   ],
+   [
+    6,
+    2
+   ]
+  ],
+  [
+   [
+    1.5,
+    0.4
+   ],
+   [
+    4.5,
+    0.4
+   ],
+   [
+    4.5,
+    1.4
+   ],
+   [
+    6,
+    1.4
+   ]
+  ],
+  [
+   [
+    0,
+    0.4
+   ],
+   [
+    0,
+    2
+   ],
+   [
+    0,
+    3.6
+   ]
+  ]
+ ],
+ "netlist": {
+  "Va.a": "N",
+  "Va.b": "a",
+  "M1.a": "a",
+  "Vb.a": "N",
+  "Vb.b": "b",
+  "M1.b": "b",
+  "Vc.a": "N",
+  "Vc.b": "c",
+  "M1.c": "c"
+ },
+ "annotations": [],
+ "simulation": {
+  "version": 1,
+  "ground": "Va.a",
+  "components": {
+   "Va": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "12.36931687685298",
+     "frequency": "31.830988618379067",
+     "delay": "0",
+     "phase": "-165.96375653207352"
+    }
+   },
+   "Vb": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "12.36931687685298",
+     "frequency": "31.830988618379067",
+     "delay": "0",
+     "phase": "74.03624346792648"
+    }
+   },
+   "Vc": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "12.36931687685298",
+     "frequency": "31.830988618379067",
+     "delay": "0",
+     "phase": "-45.96375653207352"
+    }
+   },
+   "M1": {
+    "resistance": "0.4",
+    "ld": "2m",
+    "lq": "3m",
+    "flux_linkage": "50m",
+    "pole_pairs": "4",
+    "inertia": "1m",
+    "friction": "1m",
+    "load_torque": "1.45",
+    "initial_speed": "50",
+    "initial_angle": "0",
+    "initial_id": "0",
+    "initial_iq": "5"
+   }
+  },
+  "transient": {
+   "step": "10u",
+   "max_step": "10u",
+   "stop": "100m"
+  },
+  "probes": [
+   {
+    "name": "ia",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ia"
+   },
+   {
+    "name": "ib",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ib"
+   },
+   {
+    "name": "ic",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "ic"
+   },
+   {
+    "name": "id",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "id"
+   },
+   {
+    "name": "iq",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "iq"
+   },
+   {
+    "name": "omega_m",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "omega_m"
+   },
+   {
+    "name": "theta_e",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "theta_e"
+   },
+   {
+    "name": "torque",
+    "kind": "motor",
+    "element": "M1",
+    "quantity": "torque"
+   },
+   {
+    "name": "va",
+    "kind": "voltage",
+    "positive": "M1.a",
+    "negative": "Va.a"
+   },
+   {
+    "name": "vb",
+    "kind": "voltage",
+    "positive": "M1.b",
+    "negative": "Va.a"
+   },
+   {
+    "name": "vc",
+    "kind": "voltage",
+    "positive": "M1.c",
+    "negative": "Va.a"
+   }
+  ]
+ }
+}

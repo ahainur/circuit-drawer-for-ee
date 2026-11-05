@@ -351,11 +351,11 @@ function pasteGroup(at = null) {
   const delta = at && points.length ? pasteDelta(points,at) : clip.cut ? [0,0] : PASTE_STEP;
   const used = new Set([...layout.elements.map(e=>e.id),...(layout.modules?.instances || []).map(e=>e.id)]), mapping = {};
   for (const e of clip.elements) {
-    const old = e.id, prefix = old.replace(/\d+$/, '') || old, num = (old.match(/\d+$/) || [''])[0];
+    const old = e.id, prefix = old.replace(/\d+$/, '') || old;
     let name = old;
     for (let n=1; used.has(name); n++) name = prefix+n;
     used.add(name); mapping[old] = name; e.id = name;
-    if (name !== old && num && e.label?.includes(num)) e.label = e.label.replace(new RegExp(num+'(?!.*'+num+')'),name.slice(prefix.length));
+    renameCopiedLabel(e, old);
     e.pins = Object.fromEntries(Object.entries(e.pins).map(([k,p])=>[k,shiftedPoint(p,delta)]));
   }
   const ref = r => mapping[r.slice(0,r.lastIndexOf('.'))]+r.slice(r.lastIndexOf('.'));

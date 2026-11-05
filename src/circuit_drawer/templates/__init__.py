@@ -40,7 +40,7 @@ def get(name: str) -> ModuleType | SavedTemplate:
     for t in saved.values():
         if name.lower() in (a.lower() for a in getattr(t, "ALIASES", ())):
             return t
-    raise KeyError(f"unknown template {name!r}; available: {sorted(saved)}")
+    raise KeyError(f"未知模板 {name!r}；可用：{sorted(saved)}")
 
 
 # Words that make a description a different circuit from a plain template:

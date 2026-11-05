@@ -87,7 +87,7 @@ def formula(layout, topology, preset, requested):
         fallback = f"；Vin 未填写，采用默认 {vin:g} V" if "vin" not in requested else ""
         raise spice.SpiceError(f"parameter-ratio: {topology.title()} 要求输出{relation}输入"
                                f"（Vin={vin:g} V，Vout={vo:g} V）{fallback}；请修改需求")
-    n = sum(e.kind == "nmos" for e in layout.elements)
+    n = sum(e.kind in ("nmos", "pmos") for e in layout.elements)
     duty = vo / vin if topology == "buck" else 1 - vin / vo
     diode_loss = (1 - duty) * EXAMPLE_DIODE_DROP if topology == "buck" else EXAMPLE_DIODE_DROP
     io = power / vo
@@ -118,7 +118,7 @@ def formula(layout, topology, preset, requested):
         elif e.kind == "C":
             set_value(e, "value", capacitance, ("C ≥ N·ΔIL/(8·fs·ΔVout)，按各相纹波相加保守估算" if topology == "buck" else
                       "C ≥ Iout·D/(fs·ΔVout)") + "；未计入 ESR 和负载瞬态余量。")
-        elif e.kind == "nmos":
+        elif e.kind in ("nmos", "pmos"):
             set_value(e, "duty", duty, "理想 CCM 占空比：" + ("D=Vout/Vin" if topology == "buck" else "D=1−Vin/Vout") +
                       f"；若 VF={EXAMPLE_DIODE_DROP:g} V（仅举例，并非当前模型的固定压降），"
                       + ("ΔVout≈(1−D)·VF" if topology == "buck" else "ΔVout≈VF") +
@@ -184,6 +184,75 @@ class Proposal:
         return deepcopy(self.data)
 
 
+def tuning_parameters(layout, profile, base_dir):
+    """A whitelist of existing numbers, with destinations in the authored table."""
+    full, _, assembly = spice.resolved_layout(layout, profile)
+    source = assembly.full if assembly else full
+    catalog = {}
+    def add(keys, value, label, name=None):
+        path = name or ".".join(map(str, keys))
+        catalog[path] = {"keys": keys, "value": value, "label": label}
+
+    spec = layout.extra.get("modules", {})
+    instances = {i["id"]: (n, i) for n, i in enumerate(spec.get("instances", []))}
+    for e in source.elements:
+        values = source.extra.get("simulation", {}).get("components", {}).get(e.id, {})
+        owner, _, local = e.id.partition("/")
+        fields = [(k, label, (k,)) for k, label, _ in
+                  [*spice.FIELDS.get(e.kind, []), *spice.OPTIONAL_FIELDS.get(e.kind, [])] if k in values]
+        wave = values.get("wave", {})
+        fields += [("wave", label, ("wave", k)) for k, label, _ in
+                   spice.SOURCE_WAVE_FIELDS.get(wave.get("kind"), []) if k in wave]
+        for field, label, tail in fields:
+            value = values[tail[0]] if len(tail) == 1 else wave[tail[1]]
+            if owner in instances and local:
+                n, instance = instances[owner]
+                definition = spec["definitions"][instance["definition"]]
+                if "editable" in definition and not any(p["element"] == local and p["field"] == field
+                                                        for p in definition["editable"]):
+                    continue
+                keys = ("modules", "instances", n, "overrides", local, *tail)
+                name = ".".join(("modules", owner, local, *tail))
+            else:
+                keys = ("simulation", "components", e.id, *tail)
+                name = None
+            add(keys, value, f"{e.id} · {label}", name)
+    for k, label, _ in spice.TRANSIENT_FIELDS:
+        values = layout.extra["simulation"]["transient"]
+        if k in values:
+            add(("simulation", "transient", k), values[k], label)
+
+    control = None
+    if "closed_loop" in layout.extra:
+        from .closed_loop import controller, INPUT_KEYS
+        control, _, _ = controller(layout.extra["closed_loop"]["control"], base_dir)
+        def numeric_leaves(value, keys):
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    if k not in ("model", "out", "port", "note"):
+                        numeric_leaves(v, (*keys, k))
+            elif isinstance(value, list):
+                for i, v in enumerate(value):
+                    numeric_leaves(v, (*keys, i))
+            elif not isinstance(value, bool):
+                try:
+                    number = float(value)
+                except (ValueError, TypeError):
+                    return  # symbolic relationships remain formulas, not independent knobs
+                if math.isfinite(number):
+                    add(("closed_loop", "control", *keys), value, "控制器 · " + ".".join(map(str, keys)))
+        for k in ("params", "tf"):
+            numeric_leaves(control.get("loop", {}).get(k, {}), ("loop", k))
+        numeric_leaves(control.get("code", {}).get("blocks", {}), ("code", "blocks"))
+        if "fs" in control.get("code", {}):
+            numeric_leaves(control["code"]["fs"], ("code", "fs"))
+        for bid, cfg in layout.extra["closed_loop"]["inputs"].items():
+            for k in INPUT_KEYS:
+                if k != "probe" and k in cfg:
+                    add(("closed_loop", "inputs", bid, k), cfg[k], f"控制输入 {bid} · {k}")
+    return full, catalog, control
+
+
 class RecommendationWorkflow:
     document_kind = "仿真参数建议"
     max_rounds = 3
@@ -191,25 +260,36 @@ class RecommendationWorkflow:
     def __init__(self, layout, profile="ieee-single", requested=None, description="", base_dir=None):
         self.layout = Layout.from_dict(layout.to_dict())
         self.profile, self.base_dir = profile, base_dir
-        if "modules" in layout.extra or "closed_loop" in layout.extra:
-            raise spice.SpiceError("parameter-scope: 本版参数推荐只处理展开的开环电路；模块 defaults/overrides 和闭环控制器需单独设计")
-        spice.connected_layout(self.layout, profile)
+        self.tuning = "modules" in layout.extra or "closed_loop" in layout.extra
+        self.catalog, self.control = {}, None
+        if self.tuning:
+            # Tuning starts from a runnable operating point; it never invents bindings or probes.
+            spice.make_deck(self.layout, profile, base_dir)
+            self.full, self.catalog, self.control = tuning_parameters(self.layout, profile, base_dir)
+        else:
+            spice.connected_layout(self.layout, profile)
+            self.full = self.layout
         self.requested = requirements({} if requested is None else requested)
         if not isinstance(description, str) or len(description) > 8000:
             raise spice.SpiceError("parameter-description: 文字需求必须是最多 8000 字的文本")
         self.description = description.strip()
-        self.topology, self.preset = recognize(self.layout, profile)
+        self.topology, self.preset = (None, None) if self.tuning else recognize(self.layout, profile)
         self.use_ai = self.topology is None or bool(self.description)
 
     def system_prompt(self):
         from .ai.prompt import simulation_parameter_prompt
-        return simulation_parameter_prompt(self.topology, INPUTS)
+        return simulation_parameter_prompt(self.topology, INPUTS, tuning=self.tuning)
 
     def first_message(self, description):
         graph = {"elements": [{"id": e.id, "kind": e.kind, "pins": list(e.pins), "opts": e.opts}
-                               for e in self.layout.elements], "netlist": self.layout.netlist,
-                 "simulation": self.layout.extra.get("simulation"), "model_mapping": self.layout.extra.get("model_mapping")}
-        return ("需求为空时按此拓扑常见的演示工况提议，明确列出假设。文字需求：" + (self.description or "未指定") +
+                               for e in self.full.elements], "netlist": self.full.netlist,
+                 "simulation": self.full.extra.get("simulation"), "model_mapping": self.layout.extra.get("model_mapping")}
+        if self.tuning:
+            graph["adjustable"] = {k: {"value": v["value"], "label": v["label"]} for k, v in self.catalog.items()}
+            if self.control is not None:
+                graph["closed_loop"] = {**self.layout.extra["closed_loop"], "control": self.control}
+        basis = "需求为空时以当前工况为基准调参，保留或调整均说明理由。" if self.tuning else "需求为空时按此拓扑常见的演示工况提议，明确列出假设。"
+        return (basis + "文字需求：" + (self.description or "未指定") +
                 "\n已填写的固定要求（优先遵守）：" + json.dumps(self.requested, ensure_ascii=False) +
                 "\n当前连接与参数：" + json.dumps(graph, ensure_ascii=False))
 
@@ -217,26 +297,55 @@ class RecommendationWorkflow:
         return self._check(formula(self.layout, self.topology, self.preset, self.requested))
 
     def _check(self, data):
-        if not isinstance(data, dict) or set(data) - {"simulation", "requirements", "reasons", "assumptions", "method"}:
-            raise spice.SpiceError("parameter-fields: 只能返回 simulation、requirements、reasons、assumptions；不能修改坐标、接线、模型映射或控制器")
+        allowed = {"updates" if self.tuning else "simulation", "requirements", "reasons", "assumptions", "method"}
+        if not isinstance(data, dict) or set(data) - allowed:
+            raise spice.SpiceError(f"parameter-fields: 只能返回 {sorted(allowed)}；不能修改坐标、接线、模型映射或控制结构")
         req = requirements(data.get("requirements", {}))
         if any(k not in req or not math.isclose(v, req[k], rel_tol=1e-9) for k, v in self.requested.items()):
             raise spice.SpiceError("parameter-requirements: 返回的 requirements 必须保留所有固定要求")
         data = deepcopy(data)
         candidate = Layout.from_dict(self.layout.to_dict())
-        candidate.extra["simulation"] = deepcopy(data.get("simulation"))
+        if self.tuning:
+            candidate, values = self._tuned(data.get("updates"))
+        else:
+            candidate.extra["simulation"] = deepcopy(data.get("simulation"))
         spice.make_deck(candidate, self.profile, self.base_dir)
-        values = parameter_values(data["simulation"])
+        if not self.tuning:
+            values = parameter_values(data["simulation"])
         reasons = data.get("reasons")
         if not isinstance(reasons, dict) or any(not isinstance(reasons.get(k), str) or not reasons[k].strip() for k in values):
-            raise spice.SpiceError("parameter-reasons: reasons 必须为每个参数路径提供非空理由，含 ground、probes、transient.*、components.<ID>.*")
+            raise spice.SpiceError("parameter-reasons: reasons 必须为每个建议参数路径提供非空理由（普通电路还包括 ground、probes、transient.*、components.<ID>.*）")
         assumptions = data.get("assumptions")
         if not isinstance(assumptions, list) or not assumptions or any(not isinstance(x, str) or not x.strip() for x in assumptions):
             raise spice.SpiceError("parameter-assumptions: assumptions 必须列出至少一项明确的工况或模型假设")
         data["verification"] = quick_check(candidate, self.profile, self.base_dir)
+        if self.tuning:
+            for key in ("simulation", "modules", "closed_loop"):
+                if key in candidate.extra:
+                    data[key] = deepcopy(candidate.extra[key])
+            if "modules" in candidate.extra:
+                _, _, assembly = spice.resolved_layout(candidate, self.profile)
+                data["module_values"] = assembly.full.extra["simulation"]["components"]
+            data["parameters"] = [{"path": k, "label": self.catalog[k]["label"],
+                                   "before": self.catalog[k]["value"], "value": v, "reason": reasons[k]}
+                                  for k, v in values.items()]
+            if self.control is not None:
+                from .closed_loop import controller
+                from .control.check import check
+                from .control.loop import analyse, LoopError
+                from .profiles import get_profile
+                control, _, _ = controller(candidate.extra["closed_loop"]["control"], self.base_dir)
+                try:
+                    data["verification"]["loop"] = analyse(check(control, get_profile(control.get("profile", "double"))))
+                except (LoopError, ValueError, ArithmeticError) as exc:
+                    data["verification"]["loop_note"] = f"现有环路模型无法给出裕度：{exc}；短仿真不证明稳定性。"
+                if isinstance(self.layout.extra["closed_loop"]["control"], str) and isinstance(candidate.extra["closed_loop"]["control"], dict):
+                    data["assumptions"].append("控制器调参保存为当前电路内的控制表副本，原外部控制表文件保持不变。")
         if "vout" in req and "v_out_V" in data["verification"].get("channels", {}):
             measured = data["verification"]["channels"]["v_out_V"]["mean"]
             data["verification"]["voltage_error_pct"] = 100 * (measured - req["vout"]) / req["vout"]
+        if self.tuning:
+            return Proposal(data)
         before = self.layout.extra.get("simulation")
         try:
             old = parameter_values(before) if isinstance(before, dict) else {}
@@ -244,6 +353,25 @@ class RecommendationWorkflow:
             old = {}  # an incomplete old configuration must not prevent repair
         data["parameters"] = [{"path": k, "before": old.get(k), "value": v, "reason": reasons[k]} for k, v in values.items()]
         return Proposal(data)
+
+    def _tuned(self, updates):
+        if not isinstance(updates, dict) or not updates or set(updates) - self.catalog.keys():
+            raise spice.SpiceError("parameter-updates: updates 只允许当前 adjustable 清单中的参数路径，至少提供一项；不能修改模块定义、连线、模型或控制结构")
+        raw, values = self.layout.to_dict(), {}
+        for name, value in updates.items():
+            p = self.catalog[name]
+            value = spice.number(value, name)
+            values[name] = value
+            if value == spice.number(p["value"], name):
+                continue  # keeping a default must not freeze it as an instance override
+            keys = p["keys"]
+            if keys[:2] == ("closed_loop", "control") and not isinstance(raw["closed_loop"]["control"], dict):
+                raw["closed_loop"]["control"] = deepcopy(self.control)
+            target = raw
+            for key in keys[:-1]:
+                target = target[key] if isinstance(target, list) else target.setdefault(key, {})
+            target[keys[-1]] = value
+        return Layout.from_dict(raw), values
 
     def evaluate(self, reply):
         data = extract_table(reply)

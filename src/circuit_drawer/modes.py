@@ -335,7 +335,7 @@ def solve(layout: Layout, mode: Mode, report: Report, graph: WireGraph | None = 
                     k = layout.element(m.el).kind
                     fwd = seq[i] == net(m, 0)          # entering at its first pin
                     if (k in ONE_WAY or k == "igbt" and not m.diode) and not fwd or \
-                            k in SWITCHES and m.diode and fwd:
+                            k in SWITCHES and m.diode and fwd != (k == "pmos"):
                         what = "its diode" if k in ONE_WAY or m.diode else "an IGBT channel"
                         lit.problems.append(f"{mode.name}: loop {li + 1} runs {m.el} against "
                                             f"the direction {what} can conduct")
@@ -559,16 +559,36 @@ def _place_arrows(layout: Layout, graph: WireGraph, report: Report, prof: Profil
 # drawing style
 # ---------------------------------------------------------------------------
 _HEX = re.compile(r"^#?([0-9a-fA-F]{6})$")
+# xcolor's 19 predefined names (manual section 2.4), not the editor ink palette.
+XCOLOR_NAMES = ("black", "blue", "brown", "cyan", "darkgray", "gray", "green",
+                "lightgray", "lime", "magenta", "olive", "orange", "pink", "purple",
+                "red", "teal", "violet", "white", "yellow")
 
 
 def tikz_color(text: str) -> str:
-    """'#c8102e' -> an xcolor rgb spec; anything else is passed to xcolor."""
-    m = _HEX.match(text.strip())
-    if not m:
-        return text.strip()
-    h = m.group(1)
-    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-    return f"{{rgb,255:red,{r};green,{g};blue,{b}}}"
+    """Convert hex and check standard xcolor names/mixes before any files are made."""
+    text = text.strip()
+    m = _HEX.fullmatch(text)
+    if m:
+        h = m.group(1)
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        return f"{{rgb,255:red,{r};green,{g};blue,{b}}}"
+    # shortcut: advanced TeX syntax stays with xcolor; extend only for a concrete need.
+    if any(c in text for c in "{}:,;>\\[]") or "!!" in text:
+        return text
+    for i, part in enumerate(text.lstrip("-").split("!")):
+        part = part.strip()
+        if i % 2:
+            if re.fullmatch(r"[+\-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", part) and 0 <= float(part) <= 100:
+                continue
+            reason = "混色比例须为 0～100 的数字"
+        else:
+            if part in XCOLOR_NAMES or part in (".", "pgfstrokecolor", "pgffillcolor"):
+                continue
+            reason = f"未知颜色 {part!r}"
+        raise ModeError(f"模态颜色 {text!r} 无效，{reason}。请使用 #rrggbb、xcolor 基本色名"
+                        f"（{', '.join(XCOLOR_NAMES)}）或混色表达式，例如 red!50!blue")
+    return text
 
 
 @dataclass
@@ -597,7 +617,7 @@ class Paint:
         self.on = (f"color={col}, line width={style.width * prof.line_pt:.3g}pt, "
                    f"line cap=round, line join=round")
         self.on_symbol = f"color={col}, line width={style.symbol_width * prof.line_pt:.3g}pt"
-        self.off = f"color={style.off_color}"
+        self.off = f"color={tikz_color(style.off_color)}"
         self.off_wire = self.off + (", dash pattern=on 1.6pt off 1.2pt"
                                     if style.off == "dashed" else "")
         self.ink = "black"
@@ -766,7 +786,7 @@ def complete_loops(layout: Layout, report: Report, on: dict[str, str],
     for m in active:
         dev_cov = set().union(*[els(l) for l in loops if has_device(l)]) if loops else set()
         if layout.element(m.el).kind in DEVICES and m.el not in dev_cov:
-            loop = _shortest_loop(m, active, net)
+            loop = _shortest_loop(m, active, net, layout)
             if loop:
                 loops.append(loop)
     dev_cov = set().union(*[els(l) for l in loops if has_device(l)]) if loops else set()
@@ -779,7 +799,7 @@ def complete_loops(layout: Layout, report: Report, on: dict[str, str],
                                            else rank.get(layout.element(m.el).kind, 6), m.ref)):
         if m.el in covered:
             continue
-        loop = _shortest_loop(m, active, net)
+        loop = _shortest_loop(m, active, net, layout)
         if loop:
             loops.append(loop)
             covered |= {_member(layout, r).el for b in loop for r in b.split("|")}
@@ -805,11 +825,12 @@ def _regroup(layout: Layout, loop: list[str], active: list[Member], net) -> list
     return out
 
 
-def _shortest_loop(dev: Member, active: list[Member], net) -> list[str] | None:
+def _shortest_loop(dev: Member, active: list[Member], net, layout: Layout) -> list[str] | None:
     """Fewest-branch closed path through ``dev`` leaving it in its
     conducting direction; parallel parts between the same two nets are
     written as one A|B branch."""
-    start, goal = (net(dev, 0), net(dev, 1)) if not dev.diode else (net(dev, 1), net(dev, 0))
+    reverse = dev.diode and layout.element(dev.el).kind != "pmos"
+    start, goal = (net(dev, 1), net(dev, 0)) if reverse else (net(dev, 0), net(dev, 1))
     # leave from goal (the net the current enters after dev), come back to start
     adj: dict[int, list[tuple[int, Member]]] = {}
     for m in active:

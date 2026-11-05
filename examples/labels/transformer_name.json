@@ -1,0 +1,664 @@
+{
+ "name": "dab",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.9
+    ]
+   },
+   "label": "$V_1$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     3.9
+    ],
+    "s": [
+     1.0,
+     2.9
+    ]
+   },
+   "label": "$S_{1}$"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     1.0
+    ],
+    "s": [
+     1.0,
+     0.0
+    ]
+   },
+   "label": "$S_{2}$"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     3.9
+    ],
+    "s": [
+     2.35,
+     2.9
+    ]
+   },
+   "label": "$S_{3}$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     1.0
+    ],
+    "s": [
+     2.35,
+     0.0
+    ]
+   },
+   "label": "$S_{4}$"
+  },
+  {
+   "id": "L",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.6,
+     2.5
+    ],
+    "b": [
+     3.65,
+     2.5
+    ]
+   },
+   "label": "$L$"
+  },
+  {
+   "id": "T",
+   "kind": "transformer",
+   "pins": {
+    "p1": [
+     3.9,
+     2.5
+    ],
+    "p2": [
+     3.9,
+     1.2
+    ],
+    "s1": [
+     4.5,
+     2.5
+    ],
+    "s2": [
+     4.5,
+     1.2
+    ]
+   },
+   "label": "$T_1$",
+   "label_pos": "below",
+   "opts": {
+    "ratio": "$2:1$"
+   }
+  },
+  {
+   "id": "S5",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     3.9
+    ],
+    "s": [
+     5.2,
+     2.9
+    ]
+   },
+   "label": "$S_{5}$"
+  },
+  {
+   "id": "S6",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     1.0
+    ],
+    "s": [
+     5.2,
+     0.0
+    ]
+   },
+   "label": "$S_{6}$"
+  },
+  {
+   "id": "S7",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     6.55,
+     3.9
+    ],
+    "s": [
+     6.55,
+     2.9
+    ]
+   },
+   "label": "$S_{7}$"
+  },
+  {
+   "id": "S8",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     6.55,
+     1.0
+    ],
+    "s": [
+     6.55,
+     0.0
+    ]
+   },
+   "label": "$S_{8}$"
+  },
+  {
+   "id": "V2",
+   "kind": "V",
+   "pins": {
+    "a": [
+     8.55,
+     0.0
+    ],
+    "b": [
+     8.55,
+     3.9
+    ]
+   },
+   "label": "$V_2$",
+   "label_pos": "left"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.9
+   ],
+   [
+    2.35,
+    3.9
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    2.35,
+    0.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.9
+   ],
+   [
+    1.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    2.35,
+    2.9
+   ],
+   [
+    2.35,
+    1.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.5
+   ],
+   [
+    2.6,
+    2.5
+   ]
+  ],
+  [
+   [
+    3.65,
+    2.5
+   ],
+   [
+    3.9,
+    2.5
+   ]
+  ],
+  [
+   [
+    3.9,
+    1.2
+   ],
+   [
+    2.35,
+    1.2
+   ]
+  ],
+  [
+   [
+    4.5,
+    2.5
+   ],
+   [
+    6.55,
+    2.5
+   ]
+  ],
+  [
+   [
+    4.5,
+    1.2
+   ],
+   [
+    5.2,
+    1.2
+   ]
+  ],
+  [
+   [
+    5.2,
+    2.9
+   ],
+   [
+    5.2,
+    1.0
+   ]
+  ],
+  [
+   [
+    6.55,
+    2.9
+   ],
+   [
+    6.55,
+    1.0
+   ]
+  ],
+  [
+   [
+    5.2,
+    3.9
+   ],
+   [
+    8.55,
+    3.9
+   ]
+  ],
+  [
+   [
+    5.2,
+    0.0
+   ],
+   [
+    8.55,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   2.35,
+   2.5
+  ],
+  [
+   5.2,
+   2.5
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vin.b": "DCP",
+  "S1.d": "DCP",
+  "S3.d": "DCP",
+  "Vin.a": "DCN",
+  "S2.s": "DCN",
+  "S4.s": "DCN",
+  "S1.s": "NA",
+  "S2.d": "NA",
+  "S3.s": "NB",
+  "S4.d": "NB",
+  "L.a": "NA",
+  "L.b": "NP",
+  "T.p1": "NP",
+  "T.p2": "NB",
+  "T.s2": "NC",
+  "S5.s": "NC",
+  "S6.d": "NC",
+  "T.s1": "ND",
+  "S7.s": "ND",
+  "S8.d": "ND",
+  "S5.d": "OP",
+  "S7.d": "OP",
+  "S6.s": "ON",
+  "S8.s": "ON",
+  "V2.b": "OP",
+  "V2.a": "ON"
+ },
+ "modes": [
+  {
+   "name": "Mode 1",
+   "caption": "$[t_0, t_1]$: $v_p = V_1$, $v_s = -V_2$, $i_L < 0$",
+   "on": [
+    "S1",
+    "S4",
+    "S5",
+    "S8"
+   ],
+   "loops": [
+    [
+     "L",
+     "S1",
+     "Vin",
+     "S4",
+     "T:p"
+    ],
+    [
+     "T:s",
+     "S5",
+     "V2",
+     "S8"
+    ]
+   ],
+   "condition": "single phase shift, primary leading"
+  },
+  {
+   "name": "Mode 2",
+   "caption": "$[t_1, t_2]$: $v_p = V_1$, $v_s = -V_2$, $i_L > 0$",
+   "on": [
+    "S1",
+    "S4",
+    "S5",
+    "S8"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L",
+     "T:p",
+     "S4"
+    ],
+    [
+     "T:s",
+     "S8",
+     "V2",
+     "S5"
+    ]
+   ],
+   "condition": "single phase shift, primary leading"
+  },
+  {
+   "name": "Mode 3",
+   "caption": "$[t_2, t_3]$: $v_p = V_1$, $v_s = V_2$, $i_L > 0$",
+   "on": [
+    "S1",
+    "S4",
+    "S6",
+    "S7"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L",
+     "T:p",
+     "S4"
+    ],
+    [
+     "T:s",
+     "S7",
+     "V2",
+     "S6"
+    ]
+   ],
+   "condition": "single phase shift, primary leading"
+  },
+  {
+   "name": "Mode 4",
+   "caption": "$[t_3, t_4]$: $v_p = -V_1$, $v_s = V_2$, $i_L > 0$",
+   "on": [
+    "S2",
+    "S3",
+    "S6",
+    "S7"
+   ],
+   "loops": [
+    [
+     "L",
+     "T:p",
+     "S3",
+     "Vin",
+     "S2"
+    ],
+    [
+     "T:s",
+     "S7",
+     "V2",
+     "S6"
+    ]
+   ],
+   "condition": "single phase shift, primary leading"
+  }
+ ],
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "48",
+    "wave": {
+     "kind": "step",
+     "initial": "0",
+     "final": "48",
+     "delay": "0",
+     "rise": "2u"
+    }
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "1e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "S2": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "2e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "S3": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "2e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "S4": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "1e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "L": {
+    "value": "40u",
+    "initial": "0",
+    "series_resistance": "0.05"
+   },
+   "T": {
+    "ratio": ".5",
+    "reference_resistance": "1T",
+    "model": "ideal_transformer",
+    "polarity": "same"
+   },
+   "S5": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "2e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "phase_shift": "30",
+    "phase_ramp": "1m",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "S6": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "1e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n",
+    "phase_shift": "30",
+    "phase_ramp": "1m"
+   },
+   "S7": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "1e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "phase_shift": "30",
+    "phase_ramp": "1m",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n"
+   },
+   "S8": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50000",
+    "duty": ".49",
+    "delay": "2e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch",
+    "snubber_resistance": "47",
+    "snubber_capacitance": "2.2n",
+    "phase_shift": "30",
+    "phase_ramp": "1m"
+   },
+   "V2": {
+    "dc": "24",
+    "wave": {
+     "kind": "step",
+     "initial": "0",
+     "final": "24",
+     "delay": "0",
+     "rise": "2u"
+    }
+   }
+  },
+  "transient": {
+   "step": "100n",
+   "max_step": "100n",
+   "node_capacitance": "1n",
+   "stop": "25m"
+  },
+  "probes": [
+   {
+    "name": "v_p",
+    "kind": "voltage",
+    "positive": "T.p1",
+    "negative": "T.p2"
+   },
+   {
+    "name": "i_p",
+    "kind": "current",
+    "element": "T",
+    "winding": "primary"
+   },
+   {
+    "name": "i_in",
+    "kind": "current",
+    "element": "Vin"
+   },
+   {
+    "name": "v_s",
+    "kind": "voltage",
+    "positive": "T.s1",
+    "negative": "T.s2"
+   },
+   {
+    "name": "i_s",
+    "kind": "current",
+    "element": "T",
+    "winding": "secondary"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "L"
+   },
+   {
+    "name": "i_out",
+    "kind": "current",
+    "element": "V2"
+   }
+  ]
+ }
+}

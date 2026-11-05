@@ -1,0 +1,759 @@
+{
+ "name": "buck_emi",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     8.0
+    ]
+   },
+   "label": "$V_{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Lp",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.0,
+     8.0
+    ],
+    "b": [
+     4.0,
+     8.0
+    ]
+   },
+   "label": "$L_{+}$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Ln",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.0,
+     0.0
+    ],
+    "b": [
+     4.0,
+     0.0
+    ]
+   },
+   "label": "$L_{-}$",
+   "label_pos": "below"
+  },
+  {
+   "id": "Ccp",
+   "kind": "C",
+   "pins": {
+    "a": [
+     5.0,
+     8.0
+    ],
+    "b": [
+     5.0,
+     6.0
+    ]
+   },
+   "label": "$C_{c+}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Rp",
+   "kind": "R",
+   "pins": {
+    "a": [
+     5.0,
+     6.0
+    ],
+    "b": [
+     5.0,
+     4.0
+    ]
+   },
+   "label": "$50\\,\\Omega$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Ccn",
+   "kind": "C",
+   "pins": {
+    "a": [
+     6.0,
+     0.0
+    ],
+    "b": [
+     6.0,
+     -2.0
+    ]
+   },
+   "label": "$C_{c-}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Rn",
+   "kind": "R",
+   "pins": {
+    "a": [
+     6.0,
+     -2.0
+    ],
+    "b": [
+     6.0,
+     -4.0
+    ]
+   },
+   "label": "$50\\,\\Omega$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Tcm",
+   "kind": "transformer",
+   "pins": {
+    "p1": [
+     8.0,
+     6.0
+    ],
+    "p2": [
+     10.0,
+     6.0
+    ],
+    "s1": [
+     8.0,
+     6.7
+    ],
+    "s2": [
+     10.0,
+     6.7
+    ]
+   },
+   "label": "$L_{CM}$",
+   "label_pos": "above",
+   "opts": {
+    "dots": "same"
+   }
+  },
+  {
+   "id": "Lfp",
+   "kind": "L",
+   "pins": {
+    "a": [
+     11.0,
+     6.0
+    ],
+    "b": [
+     13.0,
+     6.0
+    ]
+   },
+   "label": "$L_{D+}$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Lfn",
+   "kind": "L",
+   "pins": {
+    "a": [
+     11.0,
+     2.0
+    ],
+    "b": [
+     13.0,
+     2.0
+    ]
+   },
+   "label": "$L_{D-}$",
+   "label_pos": "below"
+  },
+  {
+   "id": "Cx",
+   "kind": "C",
+   "pins": {
+    "a": [
+     14.0,
+     6.0
+    ],
+    "b": [
+     14.0,
+     2.0
+    ]
+   },
+   "label": "$C_X$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Cyp",
+   "kind": "C",
+   "pins": {
+    "a": [
+     15.5,
+     6.0
+    ],
+    "b": [
+     15.5,
+     4.0
+    ]
+   },
+   "label": "$C_{Y+}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Cyn",
+   "kind": "C",
+   "pins": {
+    "a": [
+     16.5,
+     2.0
+    ],
+    "b": [
+     16.5,
+     0.0
+    ]
+   },
+   "label": "$C_{Y-}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Cin",
+   "kind": "C",
+   "pins": {
+    "a": [
+     17.0,
+     6.0
+    ],
+    "b": [
+     17.0,
+     2.0
+    ]
+   },
+   "label": "$C_{in}$",
+   "label_pos": "right"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     18.0,
+     6.0
+    ],
+    "s": [
+     20.0,
+     6.0
+    ]
+   },
+   "label": "$S_1$",
+   "label_pos": "below"
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     21.0,
+     2.0
+    ],
+    "b": [
+     21.0,
+     5.0
+    ]
+   },
+   "label": "$D_1$",
+   "label_pos": "left"
+  },
+  {
+   "id": "Lout",
+   "kind": "L",
+   "pins": {
+    "a": [
+     22.0,
+     6.0
+    ],
+    "b": [
+     24.0,
+     6.0
+    ]
+   },
+   "label": "$L_o$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     25.0,
+     6.0
+    ],
+    "b": [
+     25.0,
+     2.0
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     27.0,
+     6.0
+    ],
+    "b": [
+     27.0,
+     2.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  },
+  {
+   "id": "Cstray",
+   "kind": "C",
+   "pins": {
+    "a": [
+     21.0,
+     6.0
+    ],
+    "b": [
+     21.0,
+     8.0
+    ]
+   },
+   "label": "$C_p$",
+   "label_pos": "left",
+   "opts": {
+    "dash": "dashed"
+   }
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    8.0
+   ],
+   [
+    2.0,
+    8.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    2.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    -4.0
+   ],
+   [
+    30.0,
+    -4.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    8.0
+   ],
+   [
+    7.0,
+    8.0
+   ],
+   [
+    7.0,
+    6.0
+   ],
+   [
+    8.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    0.0
+   ],
+   [
+    7.5,
+    0.0
+   ],
+   [
+    7.5,
+    6.7
+   ],
+   [
+    8.0,
+    6.7
+   ]
+  ],
+  [
+   [
+    5.0,
+    4.0
+   ],
+   [
+    5.0,
+    -4.0
+   ]
+  ],
+  [
+   [
+    10.0,
+    6.0
+   ],
+   [
+    11.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    10.0,
+    6.7
+   ],
+   [
+    10.5,
+    6.7
+   ],
+   [
+    10.5,
+    2.0
+   ],
+   [
+    11.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    13.0,
+    6.0
+   ],
+   [
+    18.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    13.0,
+    2.0
+   ],
+   [
+    27.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    15.5,
+    4.0
+   ],
+   [
+    15.5,
+    -4.0
+   ]
+  ],
+  [
+   [
+    16.5,
+    0.0
+   ],
+   [
+    16.5,
+    -4.0
+   ]
+  ],
+  [
+   [
+    20.0,
+    6.0
+   ],
+   [
+    22.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    21.0,
+    5.0
+   ],
+   [
+    21.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    24.0,
+    6.0
+   ],
+   [
+    27.0,
+    6.0
+   ]
+  ],
+  [
+   [
+    21.0,
+    8.0
+   ],
+   [
+    30.0,
+    8.0
+   ],
+   [
+    30.0,
+    -4.0
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   5.0,
+   0.0
+  ],
+  [
+   15.5,
+   2.0
+  ],
+  [
+   7.5,
+   6.0
+  ],
+  [
+   10.5,
+   6.0
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vin.a": "CH",
+  "Vin.b": "SUP",
+  "Lp.a": "SUP",
+  "Lp.b": "LP",
+  "Ln.a": "CH",
+  "Ln.b": "LN",
+  "Ccp.a": "LP",
+  "Ccp.b": "MP",
+  "Rp.a": "MP",
+  "Rp.b": "CH",
+  "Ccn.a": "LN",
+  "Ccn.b": "MN",
+  "Rn.a": "MN",
+  "Rn.b": "CH",
+  "Tcm.p1": "LP",
+  "Tcm.p2": "FP",
+  "Tcm.s1": "LN",
+  "Tcm.s2": "FN",
+  "Lfp.a": "FP",
+  "Lfp.b": "IN",
+  "Lfn.a": "FN",
+  "Lfn.b": "RET",
+  "Cx.a": "IN",
+  "Cx.b": "RET",
+  "Cyp.a": "IN",
+  "Cyp.b": "CH",
+  "Cyn.a": "RET",
+  "Cyn.b": "CH",
+  "Cin.a": "IN",
+  "Cin.b": "RET",
+  "S1.d": "IN",
+  "S1.s": "SW",
+  "D1.a": "RET",
+  "D1.b": "SW",
+  "Lout.a": "SW",
+  "Lout.b": "OUT",
+  "Co.a": "OUT",
+  "Co.b": "RET",
+  "RL.a": "OUT",
+  "RL.b": "RET",
+  "Cstray.a": "SW",
+  "Cstray.b": "CH"
+ },
+ "model_mapping": {
+  "switch": {
+   "model": "mosfet",
+   "vto": "3",
+   "kp": "10",
+   "gate_voltage": "10"
+  }
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "24"
+   },
+   "Lp": {
+    "value": "5u",
+    "initial": "0"
+   },
+   "Ln": {
+    "value": "5u",
+    "initial": "0"
+   },
+   "Ccp": {
+    "value": "100n",
+    "initial": "24"
+   },
+   "Rp": {
+    "value": "50"
+   },
+   "Ccn": {
+    "value": "100n",
+    "initial": "0"
+   },
+   "Rn": {
+    "value": "50"
+   },
+   "Tcm": {
+    "model": "ideal_transformer",
+    "ratio": "1.0050251256281406",
+    "polarity": "same",
+    "reference_resistance": "1T",
+    "magnetizing_inductance": "9.900250000000002e-10",
+    "leakage_inductance": "9.974999999999956e-12"
+   },
+   "Lfp": {
+    "value": "1n",
+    "initial": "0"
+   },
+   "Lfn": {
+    "value": "1n",
+    "initial": "0"
+   },
+   "Cx": {
+    "value": "1p",
+    "initial": "24"
+   },
+   "Cyp": {
+    "value": "1p",
+    "initial": "24"
+   },
+   "Cyn": {
+    "value": "1p",
+    "initial": "0"
+   },
+   "Cin": {
+    "value": "2.2u",
+    "initial": "24"
+   },
+   "S1": {
+    "model": "ideal_switch",
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "100k",
+    "duty": ".5",
+    "delay": "0",
+    "rise": "20n",
+    "fall": "20n",
+    "output_capacitance": "300p"
+   },
+   "D1": {
+    "model": "generic_diode",
+    "is": "1n",
+    "n": "1",
+    "rs": ".1"
+   },
+   "Lout": {
+    "value": "100u",
+    "initial": "1.17",
+    "series_resistance": ".05"
+   },
+   "Co": {
+    "value": "22u",
+    "initial": "11.7"
+   },
+   "RL": {
+    "value": "10"
+   },
+   "Cstray": {
+    "value": "100p",
+    "initial": "0"
+   }
+  },
+  "transient": {
+   "step": "2n",
+   "stop": "400u",
+   "max_step": "2n"
+  },
+  "probes": [
+   {
+    "name": "lisn_p",
+    "kind": "voltage",
+    "positive": "Rp.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "lisn_n",
+    "kind": "voltage",
+    "positive": "Rn.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "RL.b"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "Lout"
+   }
+  ]
+ },
+ "emi": {
+  "version": 1,
+  "positive": "lisn_p",
+  "negative": "lisn_n",
+  "start": "100u",
+  "stop": "400u",
+  "f_min": "150k",
+  "f_max": "30Meg",
+  "reference": "cispr32_b_mains",
+  "parasitics": [
+   {
+    "element": "Cstray",
+    "net": "S1.s",
+    "source": "manual"
+   }
+  ],
+  "filter": {
+   "choke": "Tcm",
+   "dm_positive": "Lfp",
+   "dm_negative": "Lfn",
+   "x": "Cx",
+   "y_positive": "Cyp",
+   "y_negative": "Cyn",
+   "coupling": 0.995,
+   "x_capacitance": "1u",
+   "y_capacitance": "2.2n",
+   "margin_db": 6
+  }
+ }
+}

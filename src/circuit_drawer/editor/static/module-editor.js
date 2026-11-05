@@ -18,8 +18,8 @@ function drawModuleFocus() {
 }
 // The folded box whose resize corner (drawn by drawResizeHandles) is under the pointer.
 function resizeCornerAt(ev) {
-  if (!layout?.modules?.links || typeof boxRect !== "function") return null;
-  const [x, y] = toUnits(ev), grab = typeof RESIZE_GRAB === "number" ? RESIZE_GRAB : .3;
+  if (!layout?.modules?.links) return null;
+  const [x, y] = toUnits(ev), grab = RESIZE_GRAB;
   return layout.modules.instances.find(i => {
     const r = i.display === "collapsed" && boxRect(i.id);
     return r && Math.abs(x - r[2]) < grab && Math.abs(y - r[1]) < grab;
@@ -41,6 +41,7 @@ window.addEventListener("pointerdown", ev => {
 function syncModuleMenus() {
   const instances = layout?.modules?.instances || [], inst = focusedModule();
   const enabled = !!layout?.modules?.links && instances.length > 0 && !definitionEdit && !checking;
+  moduleButton("menuModuleDisplay").disabled = !enabled;
   const pick = moduleButton("menuInstanceSelect"), previous = focusedModuleId || "";
   pick.replaceChildren(new Option("请点选实例", ""), ...instances.map(i => new Option(i.id, i.id)));
   pick.value = inst ? previous : ""; pick.disabled = !enabled;
@@ -108,6 +109,8 @@ function modulePointerDown(ev) {
   if (ev.button !== 0 || wireDraft || boxDraft) return false;
   const ref = objectAtTarget(ev.target);
   if (selectionBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return true; }
+  const label = ev.target.closest('[data-element-label]');
+  if (label && !ev.shiftKey && !modePick && startDragLabel(ev, label.dataset.elementLabel)) return true;
   if (ev.shiftKey && ref) {
     ev.preventDefault(); ev.stopImmediatePropagation();
     svg.focus({preventScroll:true});
@@ -164,11 +167,32 @@ svg.addEventListener("pointerup", ev => {
 }, true);
 svg.addEventListener('pointercancel', () => { moduleBox=null; render(); }, true);
 
-async function moduleCommit(path, data, source = layout) {
+async function moduleCommit(path, data, source = layout, refit = true) {
+  const before = JSON.stringify(layout);
+  const dialogContent = document.getElementById("dlgBody").firstChild;
   const result = await api(path, {layout: source, profile, ...data});
+  if (JSON.stringify(layout) !== before) throw new Error("等待模块操作时图纸已改变，已保留当前编辑，请重试。");
   pushHistory(); layout = result.layout; selected = null; clearGroupSelection();
-  dlg.close(); await revalidate(); fitView(); render();
+  if (document.getElementById("dlgBody").firstChild === dialogContent) dlg.close();
+  await revalidate();
+  if (refit) fitView(); render();
 }
+
+async function newEmptySubsystem(at) {
+  try {
+    await moduleCommit("/api/module-empty", {at: at.map(v => r4(snap(v)))});
+    focusedModuleId = layout.modules.instances.at(-1).id;
+    render(); showInstanceProps(focusedModuleId); refreshModuleLibrary();
+    flash("空子系统已放置。选中后按 Enter 或右键“编辑模块定义”，进入内部搭电路。");
+  } catch (error) { flash(error.message, true); }
+}
+
+document.addEventListener("keydown", ev => {
+  if (ev.key !== "Enter" || ev.ctrlKey || ev.metaKey || ev.altKey || definitionEdit || dlg.open ||
+      /INPUT|TEXTAREA|SELECT|BUTTON/.test(ev.target.tagName) || !focusedModuleId || checking ||
+      wireDraft || boxDraft || pendingModule || selectionBusy || drag || moduleBox || instanceDrag || linkDrag || resizing) return;
+  ev.preventDefault(); ev.stopImmediatePropagation(); editModuleDefinition(focusedModuleId);
+}, true);
 
 moduleButton("saveModule").onclick = openSaveModule;
 async function openSaveModule() {
@@ -186,11 +210,19 @@ async function openSaveModule() {
 function openPortForm(state) {
   const {info} = state;
   showDialog(state.editing ? "模块端口与共用参数" : "存为模块", `
-    <p><label>模块名 <input id="moduleName" value="${esc(state.name)}" ${state.editing ? "readonly" : ""} placeholder="如 Buck、LLC_HB"></label></p>
-    <p>点击图上的节点标端口；红圈是仍与外部相连的节点。端口行可拖动排序，也可用上下按钮。</p>
-    <div id="portDrawing" style="height:260px;border:1px solid #ddd"></div>
+    <p><label>模块名 <input id="moduleName" value="${esc(state.name)}" placeholder="如 Buck、LLC_HB"></label>
+      <span class="hint">以英文字母开头，可用字母、数字、下划线和短横线。${state.editing ? "改名会同步所有引用此定义的实例。" : ""}</span></p>
+    <p>点击图上的圆点，把该节点设为子系统的对外端口，再在下方填写端口名并选择左边或右边。
+      可直接选元件引脚或导线节点。红圈表示与所选电路外部相连的节点，必须设为端口。</p>
+    <p><button id="portZoomIn" aria-label="放大端口画布">放大</button> <button id="portZoomOut" aria-label="缩小端口画布">缩小</button>
+      <button id="portFit">适应所选电路</button> <button id="portExpand" aria-expanded="false">扩大画布</button>
+      <span class="hint">滚轮缩放；空白处左键或中键拖动平移。</span></p>
+    <div id="portDrawing" style="height:260px;border:1px solid #ddd;overflow:hidden"></div>
     <div id="portRows"></div><p id="portWarning" role="status"></p>
-    <details open><summary>元件参数：勾选允许每个实例单独修改的项</summary><div id="moduleParameterRows" style="max-height:160px;overflow:auto"></div></details>
+    <details open><summary>元件参数：勾选允许每个实例单独修改的项</summary>
+      <p><button id="moduleParametersAll">全选</button> <button id="moduleParametersNone">全不选</button>
+        <span class="hint">参数列表内按 Ctrl+A 全选，Ctrl+Shift+A 全不选。</span></p>
+      <div id="moduleParameterRows" tabindex="0" aria-label="可按实例修改的元件参数" style="max-height:160px;overflow:auto"></div></details>
     ${layout.modes?.length ? "<p>当前模态将保存在项目中；最后一个实例解散后恢复。模块期间不编辑跨端口模态。</p>" : ""}
     ${state.editing ? "" : '<p><label><input type="checkbox" id="moduleToLibrary"> 同时存进我的模块库（其他电路文件也能用）</label></p>'}
     <p><button id="moduleSaveConfirm" class="primary">${state.editing ? "保存定义并同步所有实例" : "保存并原地替换"}</button> <span id="moduleSaveError" role="status"></span></p>`);
@@ -202,16 +234,18 @@ function openPortForm(state) {
   moduleButton("portDrawing").appendChild(copy);
   // The thumbnail shows the whole canvas view in a small box: size the port
   // names and dots in screen pixels so they stay readable at any zoom.
-  const shown = copy.getBoundingClientRect(), vb = copy.viewBox?.baseVal;
-  const perUnit = vb?.width && vb?.height && shown.width ? Math.min(shown.width / vb.width, shown.height / vb.height) : 0;
-  const units = (px, least) => perUnit ? Math.max(least, px / perUnit) : least;
-  const fontSize = units(13, .18), dotR = units(5, .075), gap = units(5, .12);
+  const vb = copy.viewBox.baseVal;
+  copy.style.touchAction = "none";
   const nodes = el("g", {}, copy);
   const drawNodes = () => {
+    const shown = copy.getBoundingClientRect(), perUnit = Math.min(shown.width / vb.width, shown.height / vb.height);
+    const fontSize = 13 / perUnit, dotR = 5 / perUnit, gap = 5 / perUnit;
     nodes.innerHTML = "";
     info.nodes.forEach(n => {
       const port = state.ports.find(p => same(p.at,n.at));
       const dot = el("circle", {cx:n.at[0],cy:-n.at[1],r:dotR,fill:port ? "#2457d6" : "white",stroke:n.boundary ? "#d12f2f" : "#2457d6","stroke-width":dotR/3,style:"cursor:pointer"},nodes);
+      dot.dataset.portNode = "true";
+      dot.setAttribute("aria-label", `${port ? "端口 " + port.name : "设为端口"}，节点 ${n.net}，坐标 ${n.at.join(", ")}`);
       const title = el("title",{},dot); title.textContent = `${n.net}${n.boundary ? "（外连节点，必须标端口）" : ""}`;
       if (port) { const t = el("text",{x:n.at[0]+dotR+gap/2,y:-n.at[1]-dotR-gap/2,"font-size":fontSize,"font-weight":600,fill:"#2457d6",stroke:"white","stroke-width":fontSize/8,"paint-order":"stroke"},nodes); t.textContent=port.name; }
       dot.onclick = () => {
@@ -221,6 +255,40 @@ function openPortForm(state) {
         state.ports.push({name:`P${state.ports.length+1}`,at:n.at.slice(),side:n.at[0] > mid ? "right" : "left"}); drawRows();
       };
     });
+  };
+  const point = ev => {
+    const p = copy.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+    return p.matrixTransform(copy.getScreenCTM().inverse());
+  };
+  const zoom = (factor, p = {x:vb.x + vb.width / 2, y:vb.y + vb.height / 2}) => {
+    vb.x = p.x - (p.x - vb.x) * factor; vb.y = p.y - (p.y - vb.y) * factor;
+    vb.width *= factor; vb.height *= factor; drawNodes();
+  };
+  copy.addEventListener("wheel", ev => { ev.preventDefault(); zoom(ev.deltaY > 0 ? 1.1 : 1 / 1.1, point(ev)); }, {passive:false});
+  let pan = null;
+  copy.onpointerdown = ev => {
+    if (ev.button !== 1 && (ev.button !== 0 || ev.target.closest("[data-port-node]"))) return;
+    ev.preventDefault(); pan = point(ev); copy.setPointerCapture(ev.pointerId);
+  };
+  copy.onpointermove = ev => {
+    if (!pan) return;
+    const p = point(ev); vb.x += pan.x - p.x; vb.y += pan.y - p.y;
+  };
+  copy.onpointerup = copy.onpointercancel = ev => {
+    pan = null; if (copy.hasPointerCapture(ev.pointerId)) copy.releasePointerCapture(ev.pointerId);
+  };
+  moduleButton("portZoomIn").onclick = () => zoom(1 / 1.25);
+  moduleButton("portZoomOut").onclick = () => zoom(1.25);
+  moduleButton("portFit").onclick = () => {
+    const xs = info.nodes.map(n => n.at[0]), ys = info.nodes.map(n => -n.at[1]);
+    if (!xs.length) return;
+    vb.x = Math.min(...xs) - 1; vb.y = Math.min(...ys) - 1;
+    vb.width = Math.max(...xs) - vb.x + 1; vb.height = Math.max(...ys) - vb.y + 1; drawNodes();
+  };
+  moduleButton("portExpand").onclick = ev => {
+    const expanded = ev.target.getAttribute("aria-expanded") !== "true";
+    ev.target.setAttribute("aria-expanded", expanded); ev.target.textContent = expanded ? "恢复画布高度" : "扩大画布";
+    moduleButton("portDrawing").style.height = expanded ? "60vh" : "260px"; drawNodes();
   };
   let dragged = null;
   const drawRows = () => {
@@ -233,13 +301,22 @@ function openPortForm(state) {
       const side = row.querySelector("select"); side.value=p.side; side.onchange=e=>p.side=e.target.value;
       const move = j => { if(j<0 || j>=state.ports.length)return; state.ports.splice(j,0,state.ports.splice(i,1)[0]); drawRows(); };
       const buttons=row.querySelectorAll("button"); buttons[0].onclick=()=>move(i-1); buttons[1].onclick=()=>move(i+1);
-      buttons[2].onclick=()=>{ if(state.editing){moduleButton("moduleSaveError").textContent="已有实例引用端口，请保留名称；可在画布里移动端口节点。";return;} state.ports.splice(i,1);drawRows(); };
+      buttons[2].onclick=()=>{ if(state.editing && Object.hasOwn(definitionEdit.definition.ports,p.name)){moduleButton("moduleSaveError").textContent="已有实例引用端口，请保留名称；可在画布里移动端口节点。";return;} state.ports.splice(i,1);drawRows(); };
       row.ondragstart=ev=>{dragged=i;ev.dataTransfer.setData("text/plain",String(i));};
       row.ondragover=ev=>ev.preventDefault(); row.ondrop=ev=>{ev.preventDefault(); if(dragged===null)return;state.ports.splice(i,0,state.ports.splice(dragged,1)[0]);dragged=null;drawRows();};
       box.appendChild(row);
     });
     const missing=info.missing.filter(at=>!state.ports.some(p=>same(p.at,at)));
-    moduleButton("portWarning").textContent=missing.length ? `还缺 ${missing.length} 个外连端口：${missing.map(p=>p.join(", ")).join("；")}` : "外连节点已全部标注。";
+    const shared = new Map();
+    for (const p of state.ports) {
+      const net = info.nodes.find(n => same(n.at,p.at))?.net;
+      if (!shared.has(net)) shared.set(net, []);
+      shared.get(net).push(p.name);
+    }
+    const joined = [...shared.values()].filter(names => names.length > 1);
+    moduleButton("portWarning").textContent=(missing.length ? `还缺 ${missing.length} 个外连端口：${missing.map(p=>p.join(", ")).join("；")}`
+      : `已设置 ${state.ports.length} 个对外端口。` + (state.ports.length ? "保存后，它们会出现在子系统方框两侧。" : "请点击上图要引出的节点。"))
+      + joined.map(names => ` ${names.join("、")} 属于同一内部网络，电气上互通。若要引出不同电位，请选择未被导线连通的节点。`).join("");
     moduleButton("portWarning").style.color=missing.length ? "#d12f2f" : "#1f8a4c";
     drawNodes();
   };
@@ -253,11 +330,32 @@ function openPortForm(state) {
     row.querySelector("input:not([type=checkbox])").oninput=ev=>p.value=ev.target.value;
     paramRows.appendChild(row);
   });
+  const setAllParameters = checked => {
+    state.exposed = checked ? state.parameters.map(p => ({element:p.element, field:p.field})) : [];
+    paramRows.querySelectorAll('input[type="checkbox"]').forEach(input => input.checked = checked);
+  };
+  moduleButton("moduleParametersAll").onclick = () => setAllParameters(true);
+  moduleButton("moduleParametersNone").onclick = () => setAllParameters(false);
+  paramRows.onkeydown = ev => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.key.toLowerCase() !== "a" ||
+        ev.target.matches('input:not([type="checkbox"])')) return;
+    ev.preventDefault(); ev.stopPropagation(); setAllParameters(!ev.shiftKey);
+  };
   moduleButton("moduleSaveConfirm").onclick=async ev=>{
     ev.target.disabled=true;
     try {
       if(state.editing){
         const d=clone(definitionEdit.definition);d.layout=clone(layout);delete d.layout.simulation;d.defaults??={};
+        for (const p of state.ports) {
+          if (Object.hasOwn(d.ports,p.name)) continue;
+          const terminal = d.layout.elements.find(e => e.kind === "port" && same(e.pins.p,p.at));
+          if (terminal) { d.ports[p.name] = terminal.id + ".p"; continue; }
+          const used = new Set(d.layout.elements.map(e => e.id));
+          let id = "Port_" + p.name, n = 1; while (used.has(id)) id = "Port_" + p.name + n++;
+          d.layout.elements.push({id,kind:"port",pins:{p:p.at.slice()}});
+          d.layout.netlist[id+".p"] = info.nodes.find(node => same(node.at,p.at)).net;
+          d.ports[p.name] = id + ".p";
+        }
         d.port_layout={};state.ports.forEach((p,i)=>d.port_layout[p.name]={side:p.side,order:i});
         // Preserve the unrestricted legacy form when the user leaves every
         // permission enabled; a current field list would also limit future fields.
@@ -265,10 +363,11 @@ function openPortForm(state) {
         if(d.editable!==undefined || !allExposed)d.editable=state.exposed;
         for(const p of state.parameters)if(p.value!==""){d.defaults[p.element]??={};d.defaults[p.element][p.field]=p.value;}
         const source=definitionEdit.source;
-        const result=await api("/api/module-definition",{layout:source,profile,name:definitionEdit.name,definition:d});
+        const result=await api("/api/module-definition",{layout:source,profile,name:definitionEdit.name,
+          new_name:moduleButton("moduleName").value.trim(),definition:d});
         history=definitionEdit.history;redoHistory=definitionEdit.redoHistory;redoBase=definitionEdit.redoBase;
         layout=source;definitionEdit=null;moduleButton("definitionActions").hidden=true;
-        pushHistory();layout=result.layout;selected=null;clearGroupSelection();dlg.close();await revalidate();fitView();render();
+        pushHistory();layout=result.layout;selected=null;clearGroupSelection();dlg.close();await revalidate();fitView();render();refreshModuleLibrary();
       }else{
         const name=moduleButton("moduleName").value.trim(),toLibrary=moduleButton("moduleToLibrary")?.checked;
         await moduleCommit("/api/module-extract",{ids:state.ids,name,ports:state.ports,exposed:state.exposed});
@@ -281,11 +380,11 @@ function openPortForm(state) {
 
 async function editModuleDefinition(id) {
   const inst=layout.modules.instances.find(i=>i.id===id),definition=layout.modules.definitions?.[inst.definition];
-  if(!definition){moduleButton("contextError").textContent="这是内置模块；请先将其定义保存到项目库再编辑。";return;}
+  if(!definition){flash("这是内置模块；请先将其定义保存到项目库再编辑。",true);return;}
   definitionEdit={source:clone(layout),history:history.slice(),redoHistory:redoHistory.slice(),redoBase,name:inst.definition,definition:clone(definition)};
   layout=clone(definition.layout);history=[];redoHistory=[];redoBase=null;selected=null;clearGroupSelection();dlg.close();
   moduleButton("definitionActions").hidden=false;
-  await revalidate();fitView();render();flash("正在编辑共用定义；改完后点击“保存模块定义”，所有实例一起更新。");
+  await revalidate();fitView();render();flash("正在编辑子系统内部。搭好电路后点“设置端口并保存…”，在图上点选要引出的节点，再保存返回上层。");
 }
 moduleButton("cancelDefinition").onclick=async()=>{
   if(!definitionEdit)return;
@@ -296,6 +395,8 @@ moduleButton("saveDefinition").onclick=async()=>{
   if(!definitionEdit)return;
   const d=definitionEdit.definition;
   try{
+    if(checking){flash("请等当前连接检查完成后再保存定义");return;}
+    if(!d.layout.elements.length)adoptNetlist(false);
     // Ask the existing parameter schema without exposing a JSON text editor.
     // parameters of parts deleted in this draft leave with them (the server
     // drops them from defaults, editable and every instance's overrides too)
@@ -331,7 +432,7 @@ function moduleParameters(id){
 
 moduleButton("addModule").onclick=async()=>{
   if(definitionEdit){flash("请先保存或取消模块定义",true);return;}
-  showDialog("添加模块",`<p>点击模块后在画布点选位置，或将按钮拖到画布。随后选择端口连接。左侧器件库的“模块（子系统）”分组也能直接放。</p><div id="addModuleLibrary"></div>`);
+  showDialog("添加模块",`<p>点击模块后在画布点选位置，或将按钮拖到画布直接放置。放好后从端口画线，或把端口拖到已有导线上。左侧器件库的“模块（子系统）”分组也能直接放。</p><div id="addModuleLibrary"></div>`);
   await refreshModuleLibrary();
   if(dlg.open)drawModuleLibrary(moduleButton("addModuleLibrary"),true);
 };
@@ -387,7 +488,7 @@ function portEndpoints(existing){
   const endpoints=layout.elements.flatMap(e=>Object.keys(e.pins).map(p=>`${e.id}.${p}`));
   const drawn=new Map((report?.module_info?.view?.elements||[]).map(e=>[e.id,e]));
   for(const part of layout.modules?.parts||[])
-    endpoints.push(...Object.keys(drawn.get(part.id)?.pins||{a:0,b:0}).map(p=>`${part.id}.${p}`));
+    endpoints.push(...Object.keys(drawn.get(part.id)?.pins||{}).map(p=>`${part.id}.${p}`));
   for(const inst of layout.modules?.instances||[])
     if(inst.id!==existing)endpoints.push(...(definitionPorts(inst.definition)||[]).map(p=>`${inst.id}.${p}`));
   return endpoints;
@@ -395,7 +496,6 @@ function portEndpoints(existing){
 // Server messages quote the validator after a Chinese lead-in ("请先修正电路：…；…"):
 // word each quoted problem as the issue list does.
 function zhModule(msg){
-  if(typeof zh!=="function")return msg;
   const parts=[];let depth=0,cur="";
   for(const ch of String(msg)){
     if(ch==="（")depth++;else if(ch==="）")depth=Math.max(0,depth-1);
@@ -429,13 +529,26 @@ function placementAdvice(id,before){
 }
 // name: a definition in this table; entry: a library module ({library, name, title, ports}),
 // copied into the table when it is placed
-function openModulePlacement(name,point,existing=null,entry=null){
+async function openModulePlacement(name,point,existing=null,entry=null){
   const connections={},ports=entry?entry.ports:definitionPorts(name);
   if(!ports){flash(`还没读到模块 ${name} 的端口；请稍候再试`,true);refreshModuleLibrary();return;}
+  if(!existing){
+    const at=placedAt(point,pickBox(entry||name));
+    const before={scale:report?.scale_cm_per_unit?.[0],issues:new Set((report?.issues||[]).map(i=>i.code+"|"+i.message))};
+    for(const port of ports)connections[port]="";
+    try{
+      if(entry)await moduleCommit("/api/module-library-place",{library:entry.library,name:entry.name,at,connections});
+      else await moduleCommit("/api/module-add",{name,at,connections});
+      focusedModuleId=layout.modules.instances.at(-1).id;
+      render();showInstanceProps(focusedModuleId);refreshModuleLibrary();
+      flash(report?.ok ? "模块已放置。可直接从端口画线，或把端口拖到已有导线上。" : placementAdvice(focusedModuleId,before));
+    }catch(error){flash(zhModule(error.message),true);}
+    return;
+  }
   const endpoints=portEndpoints(existing);
-  showDialog(existing?`实例 ${existing} 的端口连接`:`添加 ${entry?entry.title:name}`,`<p>为每个端口选择连接。明确留空的端口保留供后续接线，也可以放好后从引脚画导线到端口。</p><div id="moduleConnections"></div><button id="modulePlace" class="primary">放置实例</button><p id="modulePlaceError" role="status"></p>`);
+  showDialog(`实例 ${existing} 的端口连接`,`<p>这里设置按名称指定的连接。画布上的普通导线按实际接触接通，需在画布上编辑或删除。</p><div id="moduleConnections"></div><button id="modulePlace" class="primary">保存连接</button><p id="modulePlaceError" role="status"></p>`);
   for(const port of ports){
-    const me=`${existing}.${port}`,links=existing?(layout.modules.links||[]).filter(pair=>pair.includes(me)):[];
+    const me=`${existing}.${port}`,links=(layout.modules.links||[]).filter(pair=>pair.includes(me));
     connections[port]=links[0]?.find(ref=>ref!==me)||"";
     // a connection this list does not offer is kept as it is, never dropped
     const options=connections[port]&&!endpoints.includes(connections[port])?[...endpoints,connections[port]]:endpoints;
@@ -444,23 +557,14 @@ function openModulePlacement(name,point,existing=null,entry=null){
       (links.length>1?` <span class="hint">另有 ${links.length-1} 条连接（${esc(links.slice(1).map(pair=>pair.find(ref=>ref!==me)).join("、"))}）保持不变；选“留空”会一并断开</span>`:"");
     row.querySelector("select").value=connections[port];row.querySelector("select").onchange=ev=>connections[port]=ev.target.value;moduleButton("moduleConnections").appendChild(row);
   }
-  moduleButton("modulePlace").textContent=existing ? "保存连接" : "放置实例";
   moduleButton("modulePlace").onclick=async()=>{try{
-    const at=placedAt(point,existing?null:pickBox(entry||name));
-    const before={scale:report?.scale_cm_per_unit?.[0],issues:new Set((report?.issues||[]).map(i=>i.code+"|"+i.message))};
-    if(existing)await moduleCommit("/api/module-connections",{id:existing,connections});
-    else if(entry)await moduleCommit("/api/module-library-place",{library:entry.library,name:entry.name,at,connections});
-    else await moduleCommit("/api/module-add",{name,at,connections});
-    if(!existing){   // select the new instance: if it landed on something, drag it clear
-      focusedModuleId=layout.modules.instances.at(-1).id;render();showInstanceProps(focusedModuleId);
-      if(!report?.ok)flash(placementAdvice(focusedModuleId,before));
-    }
+    await moduleCommit("/api/module-connections",{id:existing,connections});
     refreshModuleLibrary();
   }catch(e){moduleButton("modulePlaceError").textContent=zhModule(e.message);}};
 }
 
 // A definition draft is not a whole project and must never overwrite its file.
-for(const id of ["save","saveTpl","describe","tweak","addModule","spice","waveforms"]){
+for(const id of ["save","saveAs","saveTpl","describe","tweak","addModule","spice","waveforms"]){
   moduleButton(id).addEventListener("click",ev=>{
     if(!definitionEdit)return;ev.preventDefault();ev.stopImmediatePropagation();
     flash("请先保存模块定义或取消编辑，再操作整个项目。",true);
@@ -481,6 +585,7 @@ function instanceOfTarget(ev) {
   const ids = new Set((layout.modules?.instances || []).map(i => i.id));
   const eid = ev.target?.closest?.("g.element[data-id]")?.dataset.id;
   if (eid?.includes("/") && ids.has(eid.split("/")[0])) return eid.split("/")[0];
+  if (eid && layout.elements.some(e => e.id === eid)) return null;
   const wire = ev.target?.closest?.("[data-wire]");
   if (wire) return instanceOfWire(+wire.dataset.wire);
   const region = ev.target?.closest?.("[data-region]");
@@ -551,10 +656,45 @@ svg.addEventListener("pointerup", ev => {
   const {id, origin, d} = instanceDrag; instanceDrag = null;
   document.getElementById("instanceGhost")?.remove();
   if (!d[0] && !d[1]) return;
-  pushHistory();
-  layout.modules.instances.find(i => i.id === id).at = [r4(origin[0] + d[0]), r4(origin[1] + d[1])];
-  changed(); flash(`已移动实例 ${id}；连线按端口重新连接`);
+  moveModuleInstance(id, [r4(origin[0] + d[0]), r4(origin[1] + d[1])]);
 }, true);
+
+async function moveModuleInstance(id, at) {
+  const candidate = clone(layout);
+  const inst = candidate.modules.instances.find(i => i.id === id);
+  const origin = viewInfo().origins[id];
+  const pins = Object.fromEntries(Object.entries(viewInfo().ports).filter(([ref])=>ref.startsWith(id+".")));
+  const newPins = Object.fromEntries(Object.entries(pins).map(([ref,p])=>[ref,p.map((v,k)=>r4(v+at[k]-origin[k]))]));
+  pinMover({pins}, candidate)(newPins);
+  inst.at = at;
+  selectionBusy = true; ++pendingTrialChecks; checking = true;
+  let failure = null;
+  try {
+    await moduleCommit("/api/module-contact", {id}, candidate, false);
+  } catch (error) { failure = error; }
+  finally {
+    --pendingTrialChecks; checking = validating || pendingTrialChecks > 0;
+    if (!checking) checkAgain = false;
+    await revalidate(); selectionBusy = false;
+  }
+  flash(failure ? failure.message : `已移动实例 ${id}，连接状态见问题栏`, !!failure);
+  return !failure;
+}
+
+let moduleNudges = null;
+async function nudgeModuleInstance(id, delta) {
+  if (moduleNudges) { moduleNudges.push({id, delta}); return; }
+  moduleNudges = [{id, delta}];
+  try {
+    while (moduleNudges.length) {
+      const {id, delta} = moduleNudges.shift();
+      const inst = layout.modules?.instances.find(i => i.id === id);
+      if (!inst) break;
+      const at = inst.at || viewInfo().origins?.[id];
+      if (!at || !await moveModuleInstance(id, at.map((v, k) => r4(v + delta[k])))) break;
+    }
+  } finally { moduleNudges = null; }
+}
 
 function showInstanceProps(id) {
   const inst = layout.modules.instances.find(i => i.id === id), box = moduleButton("props");
@@ -586,7 +726,7 @@ function showInstanceProps(id) {
   moduleButton("instDelete").onclick = () => deleteInstance(id);
 }
 function deleteInstance(id) {
-  if (!confirm(`删除实例 ${id} 及其所有端口连接？模块定义保留在项目库里。`)) return;
+  if (!cdI18n.confirm(`删除实例 ${id} 及其所有端口连接？模块定义保留在项目库里。`)) return;
   pushHistory();
   const m = layout.modules, touches = ref => ref.split(".")[0] === id;
   const cut = (m.links || []).filter(pair => pair.some(touches));
@@ -606,6 +746,7 @@ function deleteInstance(id) {
     if (inst && !m.links.some(pair => pair.includes(ref)) && !(inst.unconnected || []).includes(port))
       inst.unconnected = [...(inst.unconnected || []), port];
   }
+  if (!m.instances.length && layout.module_authoring?.modes) layout.modes = clone(layout.module_authoring.modes);
   focusedModuleId = null; changed(); flash(`已删除实例 ${id}`);
 }
 function moduleFocusActive() { return !!(focusedModuleId || focusedLink); }
@@ -638,7 +779,10 @@ function showLinkProps() {
 // meanwhile, so nothing treats the page as settled or checks it in between.
 async function trialCheck(candidate) {
   ++pendingTrialChecks; checking = true;
-  try { return await api("/api/check", {layout: candidate, profile}); }
+  try {
+    const result = await api("/api/check", {layout: candidate, profile});
+    return Array.isArray(result?.issues) ? result : null;
+  }
   catch (e) { return null; }
   finally {
     --pendingTrialChecks; checking = validating || pendingTrialChecks > 0;
@@ -660,8 +804,13 @@ async function deleteLink([a, b]) {
   // touch in the full (expanded) drawing, which a folded view does not show.
   const trial = await trialCheck(candidate);
   if (JSON.stringify(layout) !== before) return;   // a newer edit owns the table
+  if (!trial?.module_info || trial.issues.some(i => i.code === "bad-module")) {
+    flash("校验没有完成，未删除连接。请检查服务和模块连接后重试", true); return;
+  }
   const known = new Set((report?.issues || []).map(i => i.message));
-  if (trial?.issues?.some(i => i.code === "netlist-short" && !known.has(i.message))) {
+  const ports = trial.module_info.ports;
+  if ((ports[a] && ports[b] && same(ports[a], ports[b])) ||
+      trial.issues.some(i => i.code === "netlist-short" && !known.has(i.message))) {
     flash(`没有删除连接 ${a} ↔ ${b}：两个实例的端口在展开图里重合，去掉连接后仍碰在一起，会成为看不见的短接。请先按住实例拖开，留出间距，再删除连接`, true);
     return;
   }
@@ -726,36 +875,10 @@ function drawLinkFocus() {
     stroke: "var(--accent)", "stroke-width": .07, opacity: .35, "pointer-events": "none"}, svg);
 }
 
-// A wire drawn to an instance port becomes a link: connections to modules are
-// stored by name, so moving or folding an instance never breaks them. The
-// wire's own bend points become the link's hand route.
+// Public module pins take part in the ordinary wire tool.
 const PORT_SNAP = 0.06;
 function portAt(q) {
   return Object.entries(viewInfo().ports || {}).find(([, at]) => Math.abs(at[0] - q[0]) <= PORT_SNAP && Math.abs(at[1] - q[1]) <= PORT_SNAP)?.[0] || null;
-}
-function pinAt(q) {
-  for (const e of layout.elements) for (const [p, at] of Object.entries(e.pins)) if (same(at, q)) return `${e.id}.${p}`;
-  return null;
-}
-function wireToModuleLink(pts) {
-  if (!layout.modules?.instances?.length) return false;
-  const first = pts[0], last = pts[pts.length - 1];
-  if (!portAt(first) && !portAt(last)) return false;          // an ordinary wire
-  const a = portAt(first) || pinAt(first), b = portAt(last) || pinAt(last);
-  if (!a || !b) { flash("接到模块端口的导线，另一端要落在元件引脚或另一个模块端口上；这条线没有保存", true); return true; }
-  if (a === b) return true;
-  pushHistory();
-  const m = layout.modules; m.links = m.links || [];
-  if (!m.links.some(pr => (pr[0] === a && pr[1] === b) || (pr[0] === b && pr[1] === a))) m.links.push([a, b]);
-  const via = pts.slice(1, -1).map(q => [r4(q[0]), r4(q[1])]);
-  if (via.length) { m.routes = m.routes || {}; delete m.routes[`${b}|${a}`]; m.routes[`${a}|${b}`] = via; }
-  for (const ref of [a, b]) {       // a port now connected is no longer open on purpose
-    const iid = ref.split(".")[0], port = ref.split(".").slice(1).join(".");
-    const inst = m.instances.find(i => i.id === iid);
-    if (inst?.unconnected) inst.unconnected = inst.unconnected.filter(p => p !== port);
-  }
-  changed(); flash(`已连接 ${a} ↔ ${b}；连接按端口名保存，移动或折叠模块不会断开`);
-  return true;
 }
 
 // ---------- appearance ----------
@@ -777,15 +900,21 @@ function propRow(box, label, control) {
 function instanceAppearance(inst, box) {
   const choices = report?.region_options || {fills: [], borders: []}, a = inst.appearance || {};
   box.innerHTML = "<p><b>折叠方框外观</b> <span class=\"hint\">（折叠显示时生效）</span></p>";
-  const set = (key, value, fallback) => {
+  const set = async (key, value, fallback) => {
     const next = {...(inst.appearance || {}), [key]: value};
     if (next.border === "none" && (next.fill || "none") === "none") {
       flash("无边框时要先选填充色，否则方框看不见", true); showInstanceProps(inst.id); return;
     }
-    pushHistory(); inst.appearance = {...(inst.appearance || {})};
-    if (!value || value === fallback) delete inst.appearance[key]; else inst.appearance[key] = value;
-    if (!Object.keys(inst.appearance).length) delete inst.appearance;
-    changed();
+    const before = JSON.stringify(layout), candidate = clone(layout);
+    const target = candidate.modules.instances.find(i => i.id === inst.id);
+    target.appearance = {...(target.appearance || {})};
+    if (!value || value === fallback) delete target.appearance[key]; else target.appearance[key] = value;
+    if (!Object.keys(target.appearance).length) delete target.appearance;
+    try {
+      if (key === "title") await checkModuleGeometry(candidate, report);
+      if (JSON.stringify(layout) !== before) return;
+      pushHistory(); layout = candidate; changed();
+    } catch (error) { flash(error.message, true); }
   };
   const title = document.createElement("input"); title.id = "instTitle"; title.value = a.title || "";
   title.placeholder = inst.label?.text || inst.definition; title.onchange = () => set("title", title.value.trim(), "");
@@ -809,8 +938,7 @@ function instanceGroup(inst, box) {
   box.innerHTML = "<p><b>一组显示</b> <span class=\"hint\">（只画本实例，勾选的同类实例画成背后的底板，仿真照样包含它们）</span></p>";
   if (!peers.length && !inst.group) { box.insertAdjacentHTML("beforeend", "<p class=\"hint\">没有其他同类实例。</p>"); return; }
   const g = inst.group || {members: []};
-  // Tried before it is taken: a member is drawn as a panel without its ports,
-  // so a part placed beside them (modules.parts, such as RL) has nowhere to go.
+  // Check the derived view before replacing the current drawing.
   const apply = async change => {
     const before = JSON.stringify(layout), candidate = JSON.parse(before);
     const target = candidate.modules.instances.find(i => i.id === inst.id);
@@ -821,7 +949,7 @@ function instanceGroup(inst, box) {
     if (JSON.stringify(layout) !== before) return;   // a newer edit owns the table
     const broken = !trial ? "校验没有完成" : trial.issues?.find(i => i.code === "bad-module")?.message || (trial.module_info ? "" : "模块拼装失败");
     if (broken) {
-      flash(`没有改一组显示：${zhModule(broken)}。被代表的实例不画端口，接在这些端口上的自动放置元件或连接就没有落点；可换一个实例来代表，或先改接线`, true);
+      flash(`没有改一组显示：${zhModule(broken)}。请检查模块定义和端口连接；原图已保留`, true);
       showInstanceProps(inst.id); return;
     }
     pushHistory(); layout = candidate; changed();
@@ -886,7 +1014,7 @@ function drawModuleLibrary(box = moduleButton("moduleLibrary"), dialog = false) 
     for (const entry of entries) {
       const b = document.createElement("button"); b.draggable = true; b.type = "button";
       b.dataset.moduleLibrary = entry.library; b.dataset.moduleName = entry.name;
-      b.innerHTML = `${MODULE_ICON}<span>${esc(entry.title)}</span>`;
+      b.innerHTML = `${MODULE_ICON}<span${entry.library === "builtin" ? "" : ' translate="no"'}>${esc(entry.title)}</span>`;
       b.title = `${entry.title}${entry.note ? "：" + entry.note : ""}　端口 ${entry.ports.join("、")}${entry.update ? "\n模块库里有新版本" : ""}${entry.library === "user" ? "\n右键可从我的模块库删除" : ""}`;
       b.classList.toggle("has-update", !!entry.update);
       b.onclick = () => {
@@ -903,7 +1031,7 @@ function drawModuleLibrary(box = moduleButton("moduleLibrary"), dialog = false) 
       };
       if (entry.library === "user") b.oncontextmenu = async ev => {
         ev.preventDefault();
-        if (!confirm(`从我的模块库删除 ${entry.title}？已经放进电路文件的副本不受影响。`)) return;
+        if (!cdI18n.confirm(`从我的模块库删除 ${entry.title}？已经放进电路文件的副本不受影响。`)) return;
         try {
           moduleCatalogue = (await api("/api/module-library-delete", {layout, profile, name: entry.name})).catalogue;
           drawModuleLibrary(); flash(`已从我的模块库删除 ${entry.title}`);
@@ -919,12 +1047,12 @@ function drawModuleLibrary(box = moduleButton("moduleLibrary"), dialog = false) 
 function filterModuleLibrary() {
   const q = (document.getElementById("componentSearch")?.value || "").trim().toLowerCase();
   moduleButton("moduleLibrary")?.querySelectorAll("button").forEach(b =>
-    b.hidden = !!q && !(b.textContent + " 模块 子系统 " + b.dataset.moduleName).toLowerCase().includes(q));
+    b.hidden = !!q && ![b.textContent, cdI18n.sourceText(b), cdI18n.translate(cdI18n.sourceText(b)), "模块 子系统", cdI18n.translate("模块（子系统）"), b.dataset.moduleName].join(" ").toLowerCase().includes(q));
 }
 document.getElementById("componentSearch")?.addEventListener("input", filterModuleLibrary);
 async function saveToLibrary(definition, quiet = false) {
   const existing = (moduleCatalogue?.user || []).some(e => e.name === definition);
-  if (existing && !confirm(`我的模块库里已有 ${definition}，覆盖它？用过旧版本的电路文件不受影响，打开时会提示有新版本。`)) return;
+  if (existing && !cdI18n.confirm(`我的模块库里已有 ${definition}，覆盖它？用过旧版本的电路文件不受影响，打开时会提示有新版本。`)) return;
   try {
     const result = await api("/api/module-library-save", {layout, profile, definition, force: existing});
     if (!quiet) pushHistory();
@@ -941,7 +1069,7 @@ function showLibraryUpdate(definition, box) {
   box.innerHTML = `<p class="hint">模块库里的 ${esc(entry.source.name)} 有新版本${entry.edited ? "；本文件里的副本也改过，更新会覆盖这些修改" : ""}。</p>
     <p><button id="instLibraryUpdate">更新本文件的定义</button></p>`;
   moduleButton("instLibraryUpdate").onclick = async () => {
-    if (entry.edited && !confirm("本文件里的这个模块改过，更新会用模块库的版本替换它。继续？")) return;
+    if (entry.edited && !cdI18n.confirm("本文件里的这个模块改过，更新会用模块库的版本替换它。继续？")) return;
     try {
       await moduleCommit("/api/module-library-update", {definition});
       refreshModuleLibrary(); flash(`已按模块库更新 ${definition}，所有实例一起更新`);

@@ -1,4 +1,4 @@
-"""Command line: list / draw / modes / export / check / render / edit / new / tweak / save-template."""
+"""Circuit figures, editor, operating modes, waveforms, AI, and ngspice / Simulink / PLECS exports."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import templates
+from . import __version__, templates
 from .compile import FORMATS, CompileError
 from .layout import Layout
 from .options import OptionError
@@ -22,11 +22,11 @@ def _formats(text: str) -> tuple[str, ...]:
     fmts = tuple(f.strip() for f in text.split(",") if f.strip())
     bad = [f for f in fmts if f not in FORMATS]
     if bad:
-        raise argparse.ArgumentTypeError(f"unknown formats {bad}; use {FORMATS}")
+        raise argparse.ArgumentTypeError(f"未知输出格式 {bad}；可用：{', '.join(FORMATS)}")
     return fmts
 
 
-SIMULATION_COMMANDS = ("spice-init", "spice", "simulink", "plecs")
+SIMULATION_COMMANDS = ("spice-init", "spice", "simulink", "plecs", "emi")
 SIMULATION_PROFILE_HELP = ("column width the drawing is checked at; default ieee-single, or ieee-double "
                            "when only that passes (the exported model is the same at any width)")
 
@@ -58,8 +58,17 @@ def _table_kind(path) -> str | None:
     return "control" if raw.get("kind") == "control" else "circuit" if "elements" in raw else None
 
 
+def _print_options(options) -> None:
+    for o in options:
+        choices = "|".join(map(str, o.choices)) if o.choices else \
+            ("yes|no" if isinstance(o.default, bool) else "text")
+        kw = f"  keywords: {', '.join(o.keywords)}" if o.keywords else ""
+        print(f"  {o.name}={choices} (default {o.default}) {o.help}{kw}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="circuit-drawer", description=__doc__)
+    ap.add_argument("--version", action="version", version="%(prog)s " + __version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("list", help="list templates and their options")
@@ -78,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
     sp.add_argument("--run", action="store_true", help="run ngspice; write genuine CSV with SI unit headers")
     sp.add_argument("--ngspice", help="ngspice executable (or CIRCUIT_DRAWER_NGSPICE / PATH)")
+    em = sub.add_parser("emi", help="run a drawn two-line LISN circuit and estimate conducted-noise spectra")
+    em.add_argument("layout")
+    em.add_argument("--out", "-o", default="out/emi")
+    em.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
+    em.add_argument("--compare", action="store_true", help="also simulate explicitly bound filter components with proposed values")
+    em.add_argument("--ngspice")
 
     for target, description in (("simulink", "MATLAB builder for Simulink + Simscape Foundation"),
                                 ("plecs", "native PLECS Standalone .plecs model")):
@@ -87,7 +102,11 @@ def main(argv: list[str] | None = None) -> int:
         ex.add_argument("--name", help="model name (converted to a safe ASCII identifier)")
         ex.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
         ex.add_argument("--diode-current", default="1", help="diode tangent reference current in A (default 1)")
-        ex.add_argument("--numerical-resistance", default="1m", help="PLECS only: series resistance of numerical node capacitors in ohm (default 1m)")
+        ex.add_argument("--numerical-resistance", default="1m",
+                        help="series resistance of numerical node capacitors in ohm (default 1m)"
+                        if target == "plecs" else argparse.SUPPRESS)
+        ex.add_argument("--approximate-mosfet", action="store_true",
+                        help="explicitly replace LEVEL=1 channels with switches using each device's ron/roff")
         ex.add_argument("--control", default="continuous", choices=("continuous", "discrete"),
                         help="closed_loop controller: continuous (as ngspice, default) or discrete (code.fs and code.method)")
 
@@ -119,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--no-sheet", action="store_true",
                    help="skip <name>_modes, the overview with all modes on one page")
     m.add_argument("--color", default=None, help="highlight colour, #rrggbb or an "
-                                                 "xcolor name (default #c8102e)")
+                                                 "xcolor name/mix such as red!50!blue (default #c8102e)")
     m.add_argument("--mono", action="store_true",
                    help="black and white: heavy black paths, grey dashed rest")
     m.add_argument("--off", choices=("grey", "dashed"), default=None,
@@ -131,10 +150,12 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("template")
     e.add_argument("options", nargs="*")
     e.add_argument("--out", "-o", required=True, help="JSON file to write")
+    e.add_argument("--force", action="store_true", help="replace an existing output JSON")
 
     c = sub.add_parser("check", help="validate a JSON coordinate table")
     c.add_argument("layout")
-    c.add_argument("--profile", "-p", default="ieee-single")
+    c.add_argument("--profile", "-p", default="ieee-single",
+                   help=f"style profile: {sorted(PROFILES)} or single/double (default: single)")
 
     ed = sub.add_parser("edit", help="open the local web editor on a JSON coordinate table")
     ed.add_argument("layout", help="JSON file; created from --template if missing")
@@ -207,9 +228,18 @@ def main(argv: list[str] | None = None) -> int:
                                   "~/.circuit_drawer/templates)")
     st.add_argument("--force", action="store_true", help="overwrite an existing one")
 
-    a = ap.parse_args(argv)
-    if _table_kind(getattr(a, "layout", None)) == "control":
-        print(f"error: {a.layout} 是控制框图表，请用 circuit-drawer-control {a.cmd} 打开或处理", file=sys.stderr)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    mixed = {"draw": d, "modes": m, "export": e, "edit": ed}
+    if argv and argv[0] in mixed:
+        # Subparsers cannot parse intermixed arguments; use the selected parser.
+        a = mixed[argv[0]].parse_intermixed_args(argv[1:])
+        a.cmd = argv[0]
+    else:
+        a = ap.parse_args(argv)
+    table = getattr(a, "layout", None) or (a.template if a.cmd == "modes" else None)
+    if _table_kind(table) == "control":
+        command = a.cmd if a.cmd in ("edit", "check", "render") else "check"
+        print(f"error: {table} 是控制框图表，请用 circuit-drawer-control {command} 打开或处理", file=sys.stderr)
         return 2
     if a.cmd in SIMULATION_COMMANDS and a.profile is None:
         a.profile, note = _simulation_profile(a.layout)
@@ -224,6 +254,14 @@ def main(argv: list[str] | None = None) -> int:
             a.profile = None
         a.profile = a.profile or "ieee-single"
     try:
+        if a.cmd == "emi":
+            from .emi import run
+            result = run(Layout.load(a.layout), a.out, profile=a.profile, compare=a.compare,
+                         ngspice=a.ngspice, base_dir=Path(a.layout).resolve().parent)
+            print(result["note"])
+            for path in result["files"]:
+                print(path)
+            return 0
         if a.cmd == "spice-init":
             from .spice import circuit_deck, example_settings
             lay = Layout.load(a.layout)
@@ -242,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
                                        a.name or Path(a.layout).stem.removesuffix(".layout"),
                                        target=a.cmd, profile=a.profile, diode_current=a.diode_current,
                                        numerical_resistance=a.numerical_resistance, control=a.control,
+                                       approximate_mosfet=a.approximate_mosfet,
                                        base_dir=Path(a.layout).parent)
             for note in result["notes"]:
                 print(note, file=sys.stderr)
@@ -263,14 +302,19 @@ def main(argv: list[str] | None = None) -> int:
             for name, tpl in templates.available().items():
                 src = f"  [saved: {tpl.path}]" if hasattr(tpl, "path") else ""
                 print(f"{name}: {tpl.TITLE}{src}")
-                for o in tpl.OPTIONS:
-                    choices = "|".join(map(str, o.choices)) if o.choices else \
-                        ("yes|no" if isinstance(o.default, bool) else "text")
-                    kw = f"  keywords: {', '.join(o.keywords)}" if o.keywords else ""
-                    print(f"  {o.name}={choices} (default {o.default}) {o.help}{kw}")
+                aliases = [alias for alias, target in templates.ALIASES.items() if target == name]
+                aliases.extend(getattr(tpl, "ALIASES", ()))
+                if aliases:
+                    print(f"  aliases: {', '.join(dict.fromkeys(aliases))}")
+                _print_options(tpl.OPTIONS)
             return 0
         if a.cmd == "export":
-            from_template(a.template, " ".join(a.options)).save(a.out)
+            target = Path(a.out)
+            if target.exists() and not a.force:
+                raise ValueError(f"{target} 已存在；用新文件名或 --force")
+            layout = from_template(a.template, " ".join(a.options))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            layout.save(target)
             print(a.out)
             return 0
         if a.cmd == "edit":
@@ -296,19 +340,36 @@ def main(argv: list[str] | None = None) -> int:
                                   aliases=tuple(a.alias), profile=a.profile,
                                   directory=Path(a.dir) if a.dir else None,
                                   force=a.force)
-            print(f"saved template {a.name.lower()} -> {path}")
-            print(f"use it: circuit-drawer draw {a.name.lower()} [switch=igbt] [currents=no]")
+            saved = templates.SavedTemplate(path)
+            print(f"saved template {saved.NAME} -> {path}")
+            if a.name != saved.NAME:
+                print(f"模板名已规范为 {saved.NAME!r}（去掉首尾空白并转为小写）")
+            if a.dir:
+                print(f"自定义模板目录：{path.parent}；使用前请将 CIRCUIT_DRAWER_TEMPLATES 设为此目录。")
+            print(f"use it: circuit-drawer draw {saved.NAME}")
+            if saved.OPTIONS:
+                print("此模板可用选项：")
+                _print_options(saved.OPTIONS)
+            else:
+                print("此模板按保存的画法出图，可在编辑器中继续修改。")
             return 0
         if a.cmd == "modes":
             return _modes(a)
         if a.cmd == "check":
-            rep = check(Layout.load(a.layout), get_profile(a.profile))
+            layout, prof = Layout.load(a.layout), get_profile(a.profile)
+            rep = check(layout, prof)
             print(json.dumps(rep.to_dict(), indent=1, ensure_ascii=False))
+            if not rep.ok and prof.name == "ieee-single" and check(layout, get_profile("double")).ok:
+                print("提示：这张表单栏校验不通过，但双栏通过；可加 --profile double 重新校验。原图未修改。", file=sys.stderr)
             return 0 if rep.ok else 1
         if a.cmd == "waveforms":
             from .waveforms import WaveStore, export_waveforms
             path = Path(a.layout).resolve()
-            result = export_waveforms(Layout.load(path), WaveStore(path), Path(a.out),
+            layout = Layout.load(path)
+            cfg = layout.extra.get("waveform")
+            if not isinstance(cfg, dict) or not cfg.get("source"):
+                raise ValueError("这张表没有已保存的波形数据；请先在编辑器“分析 → 波形与模态”导入 CSV，核对曲线和模态对应关系并保存，再运行 waveforms。")
+            result = export_waveforms(layout, WaveStore(path), Path(a.out),
                                       a.name or path.stem.removesuffix(".layout"), a.profile,
                                       a.formats, not a.wave_only)
             for file in result["files"]:
@@ -328,15 +389,18 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd in ("draw", "render", *SIMULATION_COMMANDS) and get_profile(a.profile).name != "ieee-double":
             shown = layout if a.cmd in ("draw", "render") else Layout.load(a.layout)
             if check(shown, get_profile("ieee-double")).ok:
-                print("hint: this layout passes with --profile double", file=sys.stderr)
+                print("提示：这张表双栏校验通过，可加 --profile double 出图；原图未修改。", file=sys.stderr)
         return 1
     except (OptionError, KeyError, CompileError, templates.TemplateError, ModeError, SpiceError, ValueError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
+        print(f"error: {message}", file=sys.stderr)
         return 2
 
 
 def _modes(a: argparse.Namespace) -> int:
     from .pipeline import render_modes
+    if a.arrows is not None and a.arrows < 0:
+        raise ValueError("--arrows 要填非负整数，0 表示不添加自动电流箭头")
     src = Path(a.template)
     if src.suffix.lower() == ".json" and src.exists():
         layout = Layout.load(src)
@@ -349,7 +413,7 @@ def _modes(a: argparse.Namespace) -> int:
         modes = [Mode.from_dict(d) for d in raw]
     if a.list:
         if not (modes or layout.modes):
-            print("这张图没有模态；可在编辑器“分析 → 波形与模态”里新增，或用 --mode-file 给出", file=sys.stderr)
+            print("这张图没有模态；可在编辑器“分析 → 波形与模态”里新增，或用 --modes file.json 给出", file=sys.stderr)
             return 1
         for i, m in enumerate(modes or [Mode.from_dict(d) for d in layout.modes], 1):
             print(f"{i}. {m.name}  {m.caption}" + (f"  [{m.condition}]" if m.condition else ""))
@@ -359,7 +423,7 @@ def _modes(a: argparse.Namespace) -> int:
                 print(f"   loop: {' -> '.join(loop)}")
         return 0
     style = Style.mono() if a.mono else Style()
-    if a.color:
+    if a.color is not None:
         style.color = a.color
     if a.off:
         style.off = a.off
@@ -387,21 +451,34 @@ def _modes(a: argparse.Namespace) -> int:
 
 def _new(a: argparse.Namespace) -> int:
     import base64
-    import mimetypes
     from .ai import ModelError, generate, plan, provider_info
+    images = []
+    for path in a.image:
+        try:
+            data = Path(path).read_bytes()
+        except OSError as exc:
+            raise ValueError(f"无法读取参考图 {path}：{exc}") from None
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            mime = "image/png"
+        elif data.startswith(b"\xff\xd8\xff"):
+            mime = "image/jpeg"
+        elif data.startswith((b"GIF87a", b"GIF89a")):
+            mime = "image/gif"
+        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            mime = "image/webp"
+        else:
+            raise ValueError(f"参考图 {path} 的文件头不是 PNG / JPEG / GIF / WebP；请重新导出图片，不能只改扩展名。")
+        images.append((mime, base64.b64encode(data).decode()))
+    try:
+        structure = Path(a.structure).read_text(encoding="utf-8") if a.structure else None
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"无法读取结构文件 {a.structure}（需要 UTF-8 文本）：{exc}") from None
     hit = templates.match(a.description)
     if hit and not a.anyway:
         print(f"已有手画模板 {hit}（{templates.get(hit).TITLE}），是标准画法，不需要调用模型：\n"
               f"  circuit-drawer draw {hit}\n  circuit-drawer edit x.json -t {hit}\n"
               f"仍要让模型画，加 --anyway。", file=sys.stderr)
         return 0
-    images = []
-    for path in a.image:
-        mt = mimetypes.guess_type(path)[0]
-        if mt not in ("image/png", "image/jpeg", "image/webp", "image/gif"):
-            print(f"error: {path} 不是 png/jpg/webp/gif 图片", file=sys.stderr)
-            return 2
-        images.append((mt, base64.b64encode(Path(path).read_bytes()).decode()))
     info = provider_info(a.provider, a.model)
     if info.get("problem"):
         print(f"error: {info['problem']}", file=sys.stderr)
@@ -418,7 +495,6 @@ def _new(a: argparse.Namespace) -> int:
             print(f"\n核对并修改 {a.out} 后：circuit-drawer new \"{a.description}\" "
                   f"--structure {a.out} -o figure.json", file=sys.stderr)
             return 0
-        structure = Path(a.structure).read_text(encoding="utf-8") if a.structure else None
         gen = generate(a.description, a.profile, a.rounds, model=a.model,
                        provider=a.provider, structure=structure, images=images or None,
                        log=lambda m: print(m, file=sys.stderr))

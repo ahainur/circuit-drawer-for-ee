@@ -38,7 +38,7 @@ Circuit Drawer needs Python 3.10 or newer. The core package has no third-party P
 Install the wheel attached to a [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases):
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.5.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
 
 or install straight from the repository:
@@ -89,7 +89,7 @@ circuit-drawer plecs my_buck_sim.json -o out/plecs
 circuit-drawer simulink my_buck_sim.json -o out/simulink
 ```
 
-In the editor, drag parts and wires, watch the status bar for problems, then use **文件 → 导出电路图…** (File > Export circuit figure) to write the figure. Export is only possible when the checker passes. The editor's interface is in Chinese; the user manual gives each menu item with its English meaning.
+In the editor, drag parts and wires, watch the status bar for problems, then use **File → Export circuit figure…** to write the figure. Export is only possible when the checker passes. Both editors offer **简体中文 / 繁體中文 / English** in the top-right language selector. Switching is immediate and preserves unsaved edits; the browser remembers the choice for that address and port.
 
 ## What you can do
 
@@ -104,6 +104,7 @@ In the editor, drag parts and wires, watch the status bar for problems, then use
 | Operating-mode figures | **模态** (Modes) tab, or `circuit-drawer modes` |
 | Waveforms bound to modes | **分析 → 波形与模态…** (Analysis > Waveforms and modes), or `circuit-drawer waveforms` |
 | ngspice simulation | **分析 → SPICE 仿真…** (Analysis > SPICE simulation), or `circuit-drawer spice` |
+| Conducted EMI engineering estimates and filter comparison | **Analysis → Conducted EMI estimate…**; start with the `buck_emi` template |
 | Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | Same window, or `circuit-drawer simulink` / `circuit-drawer plecs` |
 | Control diagrams, loop analysis, C code | `circuit-drawer-control` |
 | New topology from a description, or a one-sentence change | **AI** menu, or `circuit-drawer new` / `circuit-drawer tweak` |

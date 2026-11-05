@@ -1,0 +1,78 @@
+{
+ "name": "dragged_labels",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.0
+    ]
+   },
+   "label": "$V_\\mathrm{in}$",
+   "label_pos": "left",
+   "opts": {
+    "label_offset": [
+     -0.3,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "R1",
+   "kind": "R",
+   "pins": {
+    "a": [
+     0.0,
+     3.0
+    ],
+    "b": [
+     3.0,
+     3.0
+    ]
+   },
+   "label": "$R_1$",
+   "opts": {
+    "label_offset": [
+     0.3,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "C1",
+   "kind": "C",
+   "pins": {
+    "a": [
+     3.0,
+     3.0
+    ],
+    "b": [
+     3.0,
+     0.0
+    ]
+   },
+   "label": "$C_1$"
+  }
+ ],
+ "wires": [
+  [
+   [
+    3,
+    0
+   ],
+   [
+    0,
+    0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {}
+}

@@ -172,11 +172,15 @@ def _time_table(cfg, stop, *, pwm=False):
 
 
 def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CURRENT, *,
-                  control='continuous', base_dir=None):
+                  control='continuous', base_dir=None, approximate_mosfet=False):
     """Run the existing complete SPICE validation, then translate its graph.
     ``control``: how a ``closed_loop`` controller is exported (control_export.MODES);
-    ``base_dir``: where its control table path is read from (the circuit file's folder)."""
+    ``base_dir``: where its control table path is read from (the circuit file's folder).
+    ``approximate_mosfet`` explicitly permits LEVEL=1 channels to use each
+    device's ron/roff, without changing the source model mapping."""
     from .control_export import MODES
+    if not isinstance(approximate_mosfet, bool):
+        raise SpiceError('LEVEL=1 开关近似选项 approximate_mosfet 必须为 true 或 false')
     if control not in MODES:
         raise SpiceError(f'闭环控制器导出模式须为 {list(MODES)}，不是 {control!r}')
     deck = make_deck(layout, profile, base_dir)
@@ -185,8 +189,12 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
     if reference <= 0:
         raise SpiceError('二极管线性化参考电流必须大于 0 A')
     mapping = flat.extra.get('model_mapping', {})
-    if mapping.get('switch', {}).get('model') == 'mosfet':
-        raise SpiceError('Simulink / PLECS 暂不支持 SPICE LEVEL=1 MOSFET 映射；请另存副本并显式选择 ideal_switch 或 igbt，不能自动降级')
+    level1 = mapping.get('switch', {}).get('model') == 'mosfet'
+    if level1 and not approximate_mosfet:
+        raise SpiceError('Simulink / PLECS 的 SPICE LEVEL=1 MOSFET 需要明确确认近似。'
+                         '请在“导出说明与近似设置”勾选“按导通电阻近似 LEVEL=1 开关”，'
+                         '或在命令行加 --approximate-mosfet。导出使用各器件填写的 Ron/Roff，'
+                         '请先核对这两个值与实际工作点。')
     sim = flat.extra['simulation']
     tr = {k: number(v, k) for k, v in sim['transient'].items()}
     loop = None
@@ -209,6 +217,15 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
              '不包含器件损耗、反向恢复、电压相关的 Coss 或磁饱和，不能据此判断损耗。',
              f'二极管采用 27 °C、{reference:g} A 处的指数模型切线：Vf + Ron·I，反向截止；与 ngspice 指数模型不完全等价。']
     circuit = Circuit([], [], [], pin_nodes, tr, deck.columns, notes, reference, _drawing(flat))
+    if level1:
+        notes.append('已明确启用 LEVEL=1 开关近似，通道按各器件 simulation.components 中的 ron/roff '
+                     '导出为双向电阻开关，由逻辑 PWM 的 0.5 阈值控制。'
+                     '此近似替代 LEVEL=1 的 VTO、KP 和 gate_voltage 非线性通道计算，'
+                     '请按工作点填写 Ron。体二极管沿用独立支路及其线性化设置，'
+                     'LEVEL=1 内部体结不另行保留。目标模型用于电路级近似，不能据此判断损耗或 ZVS。')
+    if any(e.kind == 'pmos' for e in flat.elements):
+        notes.append('P 沟 MOSFET：使用双向理想开关通道和独立 d→s 体二极管；PWM 1 导通、0 关断。'
+                     '目标开关图标不表示沟道极性；没有把 P 沟器件改成 N 沟 LEVEL=1 模型。')
     owner = {}        # element id -> the collapsed instance (subsystem) it is inside
     if assembly is not None and assembly.boxed:
         owner = _subsystems(circuit, assembly, flat, (layout.extra.get('module_authoring') or {}).get('aliases', {}))
@@ -256,7 +273,10 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                -sum(p[1] for p in e.pins.values()) / len(e.pins) * PIXELS_PER_UNIT)
         n = lambda pin: pin_nodes[f'{e.id}.{pin}']
         first = len(circuit.parts)
-        if e.kind in ('V', 'vac', 'I'):
+        if e.kind == 'pmsm':
+            from .pmsm import parameters
+            part('PMSM', [n(pin) for pin in ('a', 'b', 'c')], parameters(cfg, e.id, number), pos, e.id)
+        elif e.kind in ('V', 'vac', 'I'):
             excitation = {'kind': 'dc', 'dc': values['dc']}
             if 'wave' in cfg:
                 excitation = {k: (v if k == 'kind' else number(v, k)) for k, v in cfg['wave'].items()}
@@ -325,6 +345,9 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                 if values.get('turn_off_time', 0):
                     params['tq'] = values['turn_off_time']
             part('SCR', [a, b], params, pos, e.id)
+            if values.get('dv_dt_limit', 0):
+                notes.append(f"{e.id}: dv_dt_limit 仅在 ngspice 运行后检查；"
+                             "本目标模型未执行该额定值检查，请在目标软件按阻断电压波形复核。")
             if values.get('snubber_resistance', 0):
                 middle = internal()
                 part('R', [a, middle], {'value': values['snubber_resistance']}, pos, e.id)
@@ -366,11 +389,16 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
             mapped = mapping.get('switch', {})
             kind = mapped.get('model', 'igbt' if e.kind == 'igbt' else 'ideal_switch')
             params = {'ron': values['ron'], 'roff': values['roff'], 'signal': drive}
+            if kind == 'mosfet':
+                notes.append(f"{e.id} 的 LEVEL=1 通道采用 Ron = {values['ron']:g} Ω、"
+                             f"Roff = {values['roff']:g} Ω。")
             if kind == 'igbt':
                 params['vce0'] = number(mapped.get('vce0', values.get('vce0', 0)), 'vce0')
-            part('Q' if kind == 'igbt' else 'S', [a, b], params, pos, e.id)
+            # A bidirectional channel has no polarity. Source-first keeps the
+            # exported gate on the same side as the source-up PMOS paper symbol.
+            part('Q' if kind == 'igbt' else 'S', [b, a] if e.kind == 'pmos' else [a, b], params, pos, e.id)
             if e.opts.get('diode', True) is not False:
-                diode([b, a], {'is': values.get('diode_is', 1e-9), 'n': values.get('diode_n', 1.),
+                diode([a, b] if e.kind == 'pmos' else [b, a], {'is': values.get('diode_is', 1e-9), 'n': values.get('diode_n', 1.),
                                'rs': values.get('diode_rs', .01)}, pos, e.id)
             if values.get('snubber_resistance', 0):
                 middle = internal()
@@ -417,6 +445,12 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
         kind = probe['kind']
         if kind == 'drive':
             origin = drives[probe['element']]
+        elif kind == 'motor':
+            motor = next(p for p in circuit.parts if p.source == probe['element'] and p.kind == 'PMSM')
+            circuit.outputs.append({'name': deck.columns[index + 1], 'kind': kind,
+                                    'origin': motor.name + '_' + probe['quantity'],
+                                    'part': motor.name, 'quantity': probe['quantity']})
+            continue
         elif kind == 'voltage':
             p = part('VM', [pin_nodes[probe['positive']], pin_nodes[probe['negative']]], {}, (0, 0), probe['name'])
             place(p, level(p.nodes, f'电压测量 {probe["name"]}'))
@@ -436,6 +470,11 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
         circuit.outputs.append({'name': deck.columns[index + 1], 'origin': origin, 'kind': kind})
     if loop:
         _controller(circuit, loop, control, driven, {p['name']: o for p, o in zip(sim['probes'], circuit.outputs)}, tr)
+    if any(p.kind == 'PMSM' for p in circuit.parts):
+        notes.append('PMSM：三相三线星形、浮中性点，固定 Rs/Ld/Lq/永磁磁链及机械惯量，'
+                     '不含饱和、铁损和温升。等幅值 Clarke/Park，零电角时 d 轴对齐 a 相；'
+                     'omega_m 为机械 rad/s，theta_e 为连续电角 rad，电角速度为极对数乘机械转速。'
+                     '正 iq 产生正电磁转矩，正负载转矩阻碍正向旋转。')
     # Export-only sensors and numerical elements get separate side columns.
     # The original device positions are projected directly; no coordinates or
     # generated routes are installed in the source JSON.
@@ -488,17 +527,21 @@ def model_stem(value):
 def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-single',
                       diode_current=DEFAULT_DIODE_CURRENT,
                       numerical_resistance=DEFAULT_NUMERICAL_RESISTANCE,
-                      control='continuous', base_dir=None):
+                      control='continuous', base_dir=None, approximate_mosfet=False):
     """``control``: continuous or discrete controller for a ``closed_loop`` table;
-    ``base_dir``: the circuit file's folder, where its control table path is read from."""
+    ``base_dir``: the circuit file's folder, where its control table path is read from.
+    ``approximate_mosfet`` is per-export consent, never a saved layout field."""
     if target not in ('simulink', 'plecs'):
         raise SpiceError('仿真导出目标必须为 simulink 或 plecs')
-    circuit = build_circuit(layout, profile, diode_current, control=control, base_dir=base_dir)
+    circuit = build_circuit(layout, profile, diode_current, control=control, base_dir=base_dir,
+                            approximate_mosfet=approximate_mosfet)
     name = model_stem(stem)
     if target == 'simulink':
         from .simulink import emit
         filename = f'build_{name}.m'
         requirements = 'MATLAB + Simulink + Simscape（Foundation Library）；已使用 R2024b 验证。'
+        if any(p.kind == 'PMSM' for p in circuit.parts):
+            requirements += ' 本电路含 PMSM，另需 Simscape Electrical（ee_lib 蓝库）。'
         how = f'在 MATLAB 中切换到本目录，执行 model = build_{name}; 然后 sim(model)。脚本保存 {name}.slx。'
         content = emit(circuit, name)
         options = {}
@@ -514,6 +557,8 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
         options = {'numerical_capacitor_series_resistance_ohm': resistance}
     if circuit.control:
         options['closed_loop_controller'] = control
+    if approximate_mosfet:
+        options['approximate_mosfet'] = True
     manifest = {'format_version': 1, 'target': target, 'model': name, 'target_options': options, **asdict(circuit)}
     if not circuit.subsystems:
         del manifest['subsystems']       # a table without collapsed instances exports as before, byte for byte

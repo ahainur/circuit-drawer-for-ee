@@ -1,0 +1,482 @@
+{
+ "kind": "control",
+ "name": "pmsm_foc",
+ "title": "PMSM FOC：机械转速 PI、dq 电流 PI、编码器电角反馈、SVPWM",
+ "profile": "ieee-double",
+ "blocks": [
+  {
+   "id": "ia",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.5,
+    1.4
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$i_{a}$"
+  },
+  {
+   "id": "ib",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.5,
+    0.6
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$i_{b}$"
+  },
+  {
+   "id": "cli",
+   "type": "block",
+   "at": [
+    2.2,
+    1.0
+   ],
+   "size": [
+    1.2,
+    1.2
+   ],
+   "text": "Clarke"
+  },
+  {
+   "id": "parki",
+   "type": "block",
+   "at": [
+    4.2,
+    1.0
+   ],
+   "size": [
+    1.2,
+    1.2
+   ],
+   "text": "Park"
+  },
+  {
+   "id": "idref",
+   "type": "tag",
+   "style": "ref",
+   "at": [
+    5.9,
+    2.2
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$i_{d}^{*}$"
+  },
+  {
+   "id": "sd",
+   "type": "sum",
+   "at": [
+    5.9,
+    1.4
+   ],
+   "signs": {
+    "n": "+",
+    "w": "-"
+   }
+  },
+  {
+   "id": "sq",
+   "type": "sum",
+   "at": [
+    5.9,
+    0.6
+   ],
+   "signs": {
+    "s": "+",
+    "w": "-"
+   }
+  },
+  {
+   "id": "pid",
+   "type": "block",
+   "at": [
+    7.3,
+    1.4
+   ],
+   "size": [
+    1.0,
+    0.5
+   ],
+   "text": "PI"
+  },
+  {
+   "id": "piq",
+   "type": "block",
+   "at": [
+    7.3,
+    0.6
+   ],
+   "size": [
+    1.0,
+    0.5
+   ],
+   "text": "PI"
+  },
+  {
+   "id": "ipk",
+   "type": "block",
+   "at": [
+    9.3,
+    1.0
+   ],
+   "size": [
+    1.2,
+    1.2
+   ],
+   "text": "Park$^{-1}$"
+  },
+  {
+   "id": "vdc",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    11.3,
+    2.2
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$V_{dc}$"
+  },
+  {
+   "id": "sv",
+   "type": "block",
+   "at": [
+    11.3,
+    1.0
+   ],
+   "size": [
+    1.2,
+    1.2
+   ],
+   "text": "SVPWM"
+  },
+  {
+   "id": "theta",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    2.2,
+    3.3
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$\\theta_e$"
+  },
+  {
+   "id": "wref",
+   "type": "tag",
+   "style": "ref",
+   "at": [
+    0.5,
+    -2
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$\\omega_m^*$"
+  },
+  {
+   "id": "wm",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.5,
+    -3.2
+   ],
+   "size": [
+    0.8,
+    0.5
+   ],
+   "text": "$\\omega_m$"
+  },
+  {
+   "id": "sw",
+   "type": "sum",
+   "at": [
+    2.2,
+    -2
+   ],
+   "signs": {
+    "w": "+",
+    "s": "-"
+   }
+  },
+  {
+   "id": "piw",
+   "type": "block",
+   "at": [
+    3.7,
+    -2
+   ],
+   "size": [
+    1.4,
+    0.6
+   ],
+   "text": "Speed PI"
+  }
+ ],
+ "links": [
+  {
+   "from": "ia.e",
+   "to": "cli.w+0.4"
+  },
+  {
+   "from": "ib.e",
+   "to": "cli.w-0.4"
+  },
+  {
+   "from": "cli.e+0.3",
+   "to": "parki.w+0.3"
+  },
+  {
+   "from": "cli.e-0.3",
+   "to": "parki.w-0.3"
+  },
+  {
+   "from": "parki.e+0.4",
+   "to": "sd.w",
+   "label": "$i_{d}$"
+  },
+  {
+   "from": "parki.e-0.4",
+   "to": "sq.w",
+   "label": "$i_{q}$",
+   "label_pos": "below"
+  },
+  {
+   "from": "idref.s",
+   "to": "sd.n"
+  },
+  {
+   "from": "sd.e",
+   "to": "pid.w"
+  },
+  {
+   "from": "sq.e",
+   "to": "piq.w"
+  },
+  {
+   "from": "pid.e",
+   "to": "ipk.w+0.4",
+   "label": "$v_{d}^{*}$"
+  },
+  {
+   "from": "piq.e",
+   "to": "ipk.w-0.4",
+   "label": "$v_{q}^{*}$",
+   "label_pos": "below"
+  },
+  {
+   "from": "ipk.e+0.3",
+   "to": "sv.w+0.3"
+  },
+  {
+   "from": "ipk.e-0.3",
+   "to": "sv.w-0.3"
+  },
+  {
+   "from": "vdc.s",
+   "to": "sv.n"
+  },
+  {
+   "from": "sv.e+0.4",
+   "to": [
+    13.2,
+    1.4
+   ],
+   "open": true,
+   "label": "$d_{a}$",
+   "label_at": 0.55
+  },
+  {
+   "from": "sv.e",
+   "to": [
+    13.2,
+    1.0
+   ],
+   "open": true,
+   "label": "$d_{b}$",
+   "label_at": 0.55
+  },
+  {
+   "from": "sv.e-0.4",
+   "to": [
+    13.2,
+    0.6
+   ],
+   "open": true,
+   "label": "$d_{c}$",
+   "label_at": 0.55,
+   "label_pos": "below"
+  },
+  {
+   "from": "theta.e",
+   "via": [
+    [
+     9.3,
+     3.3
+    ]
+   ],
+   "to": "ipk.n"
+  },
+  {
+   "from": [
+    4.2,
+    3.3
+   ],
+   "to": "parki.n"
+  },
+  {
+   "from": "wref.e",
+   "to": "sw.w"
+  },
+  {
+   "from": "wm.e",
+   "via": [
+    [
+     2.2,
+     -3.2
+    ]
+   ],
+   "to": "sw.s"
+  },
+  {
+   "from": "sw.e",
+   "to": "piw.w"
+  },
+  {
+   "from": "piw.e",
+   "via": [
+    [
+     5.9,
+     -2
+    ]
+   ],
+   "to": "sq.s",
+   "label": "$i_q^*$",
+   "label_at": 0.3
+  }
+ ],
+ "functions": {
+  "cli": {
+   "fn": "clarke",
+   "in": {
+    "a": "w+0.4",
+    "b": "w-0.4"
+   },
+   "out": {
+    "alpha": "e+0.3",
+    "beta": "e-0.3"
+   }
+  },
+  "parki": {
+   "fn": "park",
+   "in": {
+    "alpha": "w+0.3",
+    "beta": "w-0.3",
+    "theta": "n"
+   },
+   "out": {
+    "d": "e+0.4",
+    "q": "e-0.4"
+   }
+  },
+  "ipk": {
+   "fn": "ipark",
+   "in": {
+    "d": "w+0.4",
+    "q": "w-0.4",
+    "theta": "n"
+   },
+   "out": {
+    "alpha": "e+0.3",
+    "beta": "e-0.3"
+   }
+  },
+  "sv": {
+   "fn": "svpwm",
+   "in": {
+    "alpha": "w+0.3",
+    "beta": "w-0.3",
+    "vdc": "n"
+   },
+   "out": {
+    "da": "e+0.4",
+    "db": "e",
+    "dc": "e-0.4"
+   }
+  }
+ },
+ "loop": {
+  "params": {
+   "R": 0.4,
+   "Ld": 0.002,
+   "Lq": 0.003,
+   "J": 0.0001,
+   "B": 0.001,
+   "Kt": 0.3,
+   "wc": 3000,
+   "wn": 300,
+   "zeta": 1.2
+  },
+  "tf": {
+   "pid": {
+    "pi": {
+     "kp": "wc*Ld",
+     "ki": "wc*R"
+    }
+   },
+   "piq": {
+    "pi": {
+     "kp": "wc*Lq",
+     "ki": "wc*R"
+    }
+   },
+   "piw": {
+    "pi": {
+     "kp": "(2*zeta*wn*J-B)/Kt",
+     "ki": "wn*wn*J/Kt"
+    }
+   }
+  }
+ },
+ "code": {
+  "fs": 10000.0,
+  "method": "tustin",
+  "arith": "float",
+  "outputs": [
+   "sv.da",
+   "sv.db",
+   "sv.dc"
+  ],
+  "blocks": {
+   "pid": {
+    "min": -27,
+    "max": 27
+   },
+   "piq": {
+    "min": -27,
+    "max": 27
+   },
+   "piw": {
+    "min": -5,
+    "max": 5
+   }
+  }
+ }
+}

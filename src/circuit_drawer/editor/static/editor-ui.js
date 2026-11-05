@@ -18,6 +18,13 @@ function editorTableSnapshot(table) {
     ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 }
 
+window.addEventListener('beforeunload', event => {
+  if (document.querySelector('#startupDialog[open]')) return;
+  if (savedEditorTable !== null && editorTableSnapshot(layout) !== savedEditorTable) {
+    event.preventDefault(); event.returnValue = '';
+  }
+});
+
 function showSidebar(name, focus = false) {
   sidebarPage = name;
   document.querySelectorAll('[data-sidebar]').forEach(tab => {
@@ -54,7 +61,7 @@ function updateEditorChrome() {
     (layout.callouts || []).length || (layout.blocks || []).length || (layout.wave_symbols || []).length);
   if (view && fittedViewWidth) document.getElementById('zoomStatus').textContent = `${Math.round(fittedViewWidth / view.w * 100)}%`;
   const tip = document.getElementById('modeTip');
-  const text = wireDraft || boxDraft ? tip.textContent :
+  const text = wireDraft || boxDraft ? cdI18n.sourceText(tip) :
     (typeof moduleMarquee !== 'undefined' && moduleMarquee) ? '框选：拖出矩形，Shift 点选可追加' :
     selected ? `${selected.id || '已选对象'} · 拖动或方向键调整，属性页编辑` : '左键框选；中键或空格加左键平移';
   document.getElementById('toolHint').textContent = text;
@@ -127,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelectorAll('.menu-panel button').forEach(button => {
     const key = button.querySelector('kbd')?.textContent;
-    const action = [...button.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join('').trim();
+    const action = [...button.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => cdI18n.sourceText(n)).join('').trim();
     button.title = action + (key ? ` (${key})` : '');
   });
   document.querySelectorAll('[data-sidebar]').forEach(tab => {

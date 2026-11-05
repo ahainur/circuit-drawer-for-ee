@@ -74,7 +74,12 @@ PORT LINKS (preferred for module figures; write connections, not coordinates):
 modules.links is a list of name pairs, like a netlist: ["Vin.b","M1.P"],
 ["M1.ON","M2.OP"]. Each end is an instance port (instance.PORT) or a top-level
 part pin (Vin.b). The program draws every link as an orthogonal wire from the
-current port positions, so never write wires, hops or coordinates for links.
+current port positions. Do not duplicate a named link with a wire.
+The editor also stores ordinary wires connected to public module pins. These
+use the same contact graph as ordinary parts, including module-to-module wires
+and a draft wire awaiting a part at its free end. Preserve these wires and hops.
+When moving a module, resizing it or changing display, move their attached
+endpoints to the new public pin positions while preserving buses and branches.
 Library modules need no definitions: "definition":"buck", "boost", "llc_halfbridge" or "dab"
 (ports P, N on the left; OP, ON on the right). Omit "at" and the program
 stacks the instances top to bottom. modules.parts lists two-pin parts the
@@ -96,7 +101,10 @@ wrote: modules.routes {"A|B":[[x,y],...]} holds bend points the user drew for a
 link (drop a key only when its link is removed); an instance's "appearance"
 {"fill","border","border_color","title"} styles its collapsed box; "group"
 {"members":[same-definition instance IDs],"fill","label"} draws one instance
-for several (the members become stacked panels behind it, still simulated); a
+for several (the members become stacked panels behind it, still simulated).
+Linked member ports stay visible as named terminals when they are on different
+nets; same-name ports on the same net reuse the representative's port. Keep
+the original links: grouping must never turn series outputs into parallel ones. A
 definition's "source" {"library","name","revision"} records the module library it
 was copied from.
 Two LLC modules, input parallel, output series, collapsed:
@@ -215,7 +223,7 @@ amplitude is positive PEAK V/A, not RMS; phase is degrees (-360..360), negative
 means lag. vac requires this explicit sine wave. dc remains required as the DC
 operating-point value; transient uses wave. Voltage is b-a, source current I is
 a->b. A current probe on V/vac measures b->a; on igbt it measures total c->e
-terminal current including its antiparallel diode. drive probes accept nmos/igbt/scr.
+terminal current including its antiparallel diode. drive probes accept nmos/pmos/igbt/scr.
 Current probes on D measure a->b, so reverse breakdown reads negative; the
 same probe includes both diode branches in Simulink and PLECS.
 A thyristor is {"model":"simplified_thyristor"} with ron, roff, vf (forward drop,
@@ -227,7 +235,11 @@ default 0: off only at zero current, latched at once; latching_current >= holdin
 it turns off below the holding current, and a gate pulse that ends below the latching
 current leaves it off. Optional turn_off_time (s, default 0): after it turns off it
 must be reverse biased for that long; forward voltage sooner fires it again without a
-gate pulse (commutation failure). Only fill values the user gives; no closed-loop drive.
+gate pulse (commutation failure). Optional dv_dt_limit (V/us, default 0 disables
+checking) is a user-supplied off-state forward rating: ngspice compares it with
+positive Vak slopes after simulation, using adaptive solver samples. It does not
+model dv/dt firing or reverse recovery. Never invent a device rating from its label.
+Only fill values the user gives; no closed-loop drive.
 Sine is transient excitation, not small-signal AC analysis. No simulation values
 are inferred from the source symbol, colour, labels or omitted phases.
 Transformer simulation is explicit and separate from opts.ratio (display text).
@@ -258,10 +270,10 @@ default 0: the source's internal impedance between its EMF and the + terminal b
 them when the user gives them. For a balanced three-phase supply given as a
 line-to-line RMS voltage V_LL, each vac's peak is V_LL*sqrt(2)/sqrt(3) and the
 phases are 0, -120, 120 degrees (positive sequence).
-PWM nmos/igbt accept snubber_resistance (ohms) and snubber_capacitance (farads),
+PWM nmos/pmos/igbt accept snubber_resistance (ohms) and snubber_capacitance (farads),
 both positive to enable a series RC across d-s/c-e, or both 0 (default) to disable.
 These are explicit damping components, not automatically fitted device parasitics.
-PWM nmos/igbt also accept output_capacitance (farads, linear Coss/Coes across the
+PWM nmos/pmos/igbt also accept output_capacitance (farads, linear Coss/Coes across the
 switch, default 0 = not modelled) and the body / antiparallel diode's diode_is,
 diode_n (both > 0, defaults 1n and 1) and diode_rs (ohms, default 0.01). Fill them
 only from user-given or datasheet values, e.g. "output_capacitance":"150p".
@@ -316,12 +328,29 @@ Element kinds and pins:
   a = reference end (the star point side), b = the line side. A three-phase
   supply is three vac in star: their a pins on one neutral net.
 - I: current source, current flows a -> b.
+- pmsm: three-phase permanent-magnet synchronous motor for FOC, pins a/b/c.
+  Keep a,b,c equally spaced on one horizontal or vertical line, b in the middle;
+  the body lies to the local right of c->a. It is a three-wire star winding with
+  floating neutral; never add a neutral/ground or model it as a DC load.
+  Use explicit simulation parameters from the generated reference, not its label.
+  Clarke/Park is amplitude invariant: d aligns with phase a at theta_e=0, positive
+  iq gives positive torque. omega_m is mechanical rad/s, theta_e is continuous
+  electrical radians; initial_angle is electrical radians, initial_speed mechanical.
+  A motor probe is {"name":"speed","kind":"motor","element":"M1","quantity":"omega_m"};
+  bind its name to a closed_loop input exactly as any other probe.
 - port: a terminal (open circle) with one pin p where a wire ends, e.g. the
   input lines a/b/c or the P/O/N outputs; its label goes left unless label_pos says otherwise.
 - nmos: n-MOSFET with body diode; d = drain, s = source. Its pins may share
   x OR y, in either order: rotating 90/180/270 degrees is supported. Keep
   the electrical d/s assignment when rotating. opts.mirror mirrors the gate
   side; opts.diode=false removes the body diode. Typical pin spacing is 1.0.
+- pmos: P-channel MOSFET, d = drain, s = source; native symbol source-up,
+  gate marked by a dot. Body diode conducts d->s (NMOS s->d). High-side PMOS
+  source connects to the positive supply, drain to the load. Rotation/mirror
+  preserve these electrical pins. PWM 1 means on, 0 off in both channels.
+  Use pmos only for an explicitly P-channel device; never change nmos silently.
+  Global mosfet LEVEL=1 uses PMOS, negative VTO and negative source-referenced
+  gate voltage; vto/gate_voltage settings remain positive magnitudes.
 - igbt: same geometry; c = collector, e = emitter, also rotatable.
 - transformer: p1, p2 = primary winding; s1, s2 = secondary winding. Both
   windings must be parallel and horizontal or vertical; rotation is supported.
@@ -337,6 +366,12 @@ of an upright unmirrored device). Explicit label_pos selects a page direction
 above/below/left/right; along the pin axis the label uses the corner on the
 diode side to avoid its own lead. For label collisions first change label_pos,
 leaving pins and wires unchanged; do not move a device just to move its text.
+Only when the user requests a label position adjustment, use opts.label_offset=[dx,dy]
+relative to its normal label_pos anchor, in layout units (right/up positive).
+Example: "opts":{"label_offset":[0.3,0.2]}. Keep pins and wires unchanged.
+For transformers this moves opts.ratio, not the polarity dots. Omit it otherwise.
+Transformer label is the device name (e.g. "$T_1$"), below the windings by default;
+label_pos chooses its page side. opts.ratio remains separate display-only turns-ratio text.
 All parts support opts.scale_length and opts.scale_width, each @SIZE@;
 these scale the symbol along/across its pin axis, not the pin spacing or font.
 Default label_pos is
@@ -384,7 +419,13 @@ positive or both zero. Nonzero phase ramps must exceed the absolute phase time
 (abs(phase_shift)/360/frequency) and leave at least one settled period before stop.
 Fixed phase must leave a nonnegative effective delay and one full period.
 
-Modules must have complete local netlists and actual devices. Bind every declared
+Completed modules must have complete local netlists and actual devices.
+An explicitly requested empty subsystem draft
+may have layout.elements=[], layout.netlist={} and ports={}, with no other drawing
+content. It stays editable but an instantiated empty draft raises empty-module and
+cannot be exported. Never replace existing circuitry with an empty draft to pass
+validation. New public ports on an edited definition start unconnected in its
+instances until the user wires them. Bind every declared
 terminal exactly once, use both ends of global networks, and namespace internal
 devices. Bad definitions/bindings/view values produce bad-module; hidden instances
 must remain in the full electrical graph. Collapsed boxes must not overlap each
@@ -432,7 +473,7 @@ def _sizes(profile: str) -> str:
         rows.append(f"- {k}: body {body:.2f} cm long x {2 * HALF_HEIGHT[k]:.2f} cm wide; "
                     f"pin spacing >= {body + 2 * MIN_LEAD:.2f} cm")
     k = prof.transistor_scale / 0.9
-    rows.append(f"- nmos/igbt: body about {0.8 * k:.2f} cm wide x {0.74 * k:.2f} cm tall, "
+    rows.append(f"- nmos/pmos/igbt: body about {0.8 * k:.2f} cm wide x {0.74 * k:.2f} cm tall, "
                 f"its label needs about 0.6 cm to the right")
     rows.append(f"- transformer: primary and secondary axes {WINDING_GAP[0]}-"
                 f"{WINDING_GAP[1]} cm apart; each winding body is {0.75 * BODY_FRAC['L']:.2f} cm tall plus leads")
@@ -453,16 +494,34 @@ def _field(f, kinds: bool = False) -> str:
     return f"- {f.name}{scope}: {f.accepted()}{default}. {f.doc}"
 
 
-def simulation_parameter_prompt(topology, inputs) -> str:
+def simulation_parameter_prompt(topology, inputs, *, tuning=False) -> str:
     """Parameter-only proposals use the same field declarations as the exporter."""
     import json
     from ..spice import FIELDS, OPTIONAL_FIELDS, SOURCE_WAVE_FIELDS, TRANSIENT_FIELDS
+    from ..pmsm import QUANTITIES
     intro = ("你是仿真参数建议助手。只返回一个完整 JSON 对象，不能输出坐标、接线、元件类型、"
-             "模型映射或控制器，也不能输出 SPICE 语句、表达式、文件路径或可执行代码。"
+             "模型映射或控制结构，也不能输出 SPICE 语句、表达式、文件路径或可执行代码。"
              "缺少需求时给出明确标为假设的常见演示工况，不声称是器件额定值或最优设计。"
              "有需求时遵守它；固定要求优先于文字中的冲突要求。数值用 SI 或 SPICE 后缀（兆为 Meg）。"
              "参数会通过原导出校验器并做短 ngspice 检查；错误会回传，最多三次完整回答。\n")
     fields = json.dumps(inputs, ensure_ascii=False)
+    if tuning:
+        return intro + ("当前为模块实例／闭环调参，已有可运行工况。只返回 "
+                        "{\"updates\":{\"adjustable 中的完整路径\":数值,...},\"requirements\":{...},"
+                        "\"reasons\":{\"同一路径\":\"理由\",...},\"assumptions\":[\"假设和限制\"]}。"
+                        "updates 至少一项，只用当前消息中由程序生成的 adjustable 清单；其他参数原样保留。"
+                        "parameter-updates 表示路径不在该清单，请按清单改正，不要新增键或返回完整图。"
+                        "模块参数写入各实例 overrides，不能改共享 definitions/defaults 或未开放的 editable 参数。"
+                        "控制器只调已有数值：loop.params、loop.tf、code.blocks 的限幅、code.fs，"
+                        "以及已存在的输入定值／软启动／滤波时间；不能改方块、公式关系、阶次、"
+                        "测量绑定、PWM 绑定、模型、函数代码或控制表路径。依赖关系仍由原公式求值。"
+                        "协调实际功率级与控制表内用于环路分析的模型数值；不能仅改分析模型而声称电路已改变。"
+                        "缺少需求时以当前已验证工况为基准，保守调整或明确建议保留，不能无依据大改增益。"
+                        "有需求时同时核对参考值、反馈增益、补偿与限幅；每个 updates 路径都在 reasons 中解释。"
+                        "数值必须有限；用 SI 或 SPICE 后缀，不能用新表达式替代数值。"
+                        "外部控制表调参后会内嵌为本电路副本，原控制表文件不写入。"
+                        "短 ngspice 按连续控制模型检查，不证明离散控制、稳定裕度、纹波、损耗或额定值达标。"
+                        "requirements 允许字段：" + fields + "；所有已填固定要求必须保留。")
     if topology:
         return intro + (f"已按真实接线识别 {topology}。你只需从文字里提取需求，"
                         "返回 {\"requirements\":{...}}；未提及的字段省略，不能自己计算元件值。"
@@ -477,10 +536,11 @@ def simulation_parameter_prompt(topology, inputs) -> str:
                     "components 必须与当前器件 ID 一一对应，不能增加、遗漏或改名。"
                     "参考地和电压探针只用现有引脚；不能用标签猜电气数值。"
                     "probes 可为 {name,kind:'voltage',positive,negative}、"
-                    "{name,kind:'current',element}、{name,kind:'drive',element}；"
+                    "{name,kind:'current',element}、{name,kind:'drive',element}、"
+                    "{name,kind:'motor',element,quantity}；电机 quantity 与单位：" + json.dumps(QUANTITIES, ensure_ascii=False) + "。"
                     "变压器 current 需 winding（primary/secondary；中心抽头为 upper/lower）。"
                     "给出一个名为 v_out 的输出电压测量，以便显示目标偏差。"
-                    "D 的 model 为 generic_diode，nmos 为 ideal_switch，IGBT 为 simplified_igbt，"
+                    "D 的 model 为 generic_diode，nmos/pmos 为 ideal_switch，IGBT 为 simplified_igbt，"
                     "变压器为 ideal_transformer，需 polarity=same/opposite。"
                     "V/vac 的电压是 b−a，I 电流 a→b；vac 需要 sine 激励，幅值为峰值。"
                     "保留已指定的模型映射，不要从映射模型降级。开关相移、互补、变压器极性应逐项核对连接。"
@@ -494,10 +554,12 @@ def simulation_parameter_prompt(topology, inputs) -> str:
 
 
 def field_reference() -> str:
+    from ..emi import field_reference as emi_reference
     """Every table field and accepted value, generated from the declarations
     the validator uses (schema.py and the modules owning each value list)."""
     from ..model_mapping import SCHEMA as MODEL_MAPPINGS
     from ..spice import FIELDS, OPTIONAL_FIELDS, SOURCE_WAVE_FIELDS, TRANSIENT_FIELDS
+    from ..pmsm import QUANTITIES
     names = lambda fields: ", ".join(name for name, _, _ in fields)
     lines = ["# Field reference (generated from the validator's declarations; "
              "other keys or values are rejected)", "",
@@ -534,8 +596,9 @@ def field_reference() -> str:
         lines.append(f"- {kind}: {names(fields)}" + (f"; optional {names(optional)}" if optional else ""))
     lines += ["simulation.components.<V|vac|I id>.wave kind: " + " | ".join(
                   f"{kind} ({names(fields)})" for kind, fields in SOURCE_WAVE_FIELDS.items()) + ".",
-              f"simulation.transient: {names(TRANSIENT_FIELDS)}."]
-    return "\n".join(lines) + "\n"
+              f"simulation.transient: {names(TRANSIENT_FIELDS)}.",
+              "simulation.probes motor quantity: " + "; ".join(f"{k} ({v['label']}, {v['unit']})" for k, v in QUANTITIES.items()) + "."]
+    return "\n".join([*lines, emi_reference()]) + "\n"
 
 
 def _example(name: str, text: str = "") -> str:
@@ -543,7 +606,22 @@ def _example(name: str, text: str = "") -> str:
     return json.dumps(from_template(name, text).to_dict(), ensure_ascii=False)
 
 
+_RULES += """
+EMI voltage probes must refer to two distinct receiver nodes with the same chassis
+reference and explicitly drawn 50-ohm terminations. Bind only existing devices.
+The declared filter connection and polarity must match the drawing; parasitic
+capacitors connect their a pin to the recorded net and b to chassis.
+"""
+
 _FORMAT += """
+Conducted EMI is an explicit engineering estimate. Only when requested, draw
+the LISNs, 50-ohm receivers, chassis paths and filter using ordinary components.
+Never infer parasitics or silently insert a filter. Use opts.dash="dashed" on
+an explicitly drawn parasitic R/L/C; it changes appearance, not connectivity.
+The emi section binds existing voltage probes and components. Its declarations
+are in the generated reference. Formula/import values must be explicitly adopted
+in the editor. Preserve emi and related physical values in drawing-only edits;
+do not claim FFT amplitudes are CISPR quasi-peak/average readings or compliance.
 Project module authoring: modules.definitions is the project's reusable library,
 including user names such as Boost or LLC_HB. Reuse a supplied definition by
 name in instances and use its exact public port names in modules.links. Never
@@ -558,7 +636,9 @@ Definition editable is an optional list of {element, field}, e.g.
 simulation fields may appear in instance overrides. defaults still holds all
 shared physical values, including fields that are not independently editable.
 An explicitly unused public port must be listed in instance unconnected, e.g.
-"unconnected":["OP"]. Default is []; do not use it to suppress a missing link.
+"unconnected":["OP"]. Default is []; ordinary wires may connect these ports.
+Their open marking disappears only while the port physically touches a wire
+or pin. Do not use the list to suppress an unfinished required connection.
 It cannot name a port already in links or bindings. Never invent a connection.
 module_authoring is editor-owned provenance: aliases (expanded device ID to
 original ID), order (original device ordering), terminals (synthetic port IDs),
@@ -660,13 +740,13 @@ def system_prompt(profile: str) -> str:
 
 
 PLAN_SYSTEM = """\
-List a paper circuit for confirmation: no drawing, coordinates or JSON.
+Plan a paper circuit: no drawing, coordinates or JSON.
 
-Part kinds and their pins:
+Parts/pins:
 - R, L, C: a, b.  D: a = anode, b = cathode.  V: DC source, a = minus, b = plus.
 - vac: sinusoidal voltage source, a = reference, voltage b-a. I: current a -> b.
-- nmos: d, s (body diode included unless stated).  igbt: c, e (anti-parallel diode
-  included unless stated); igbt forward channel c->e, antiparallel diode e->c.
+- nmos/pmos: d=drain, s=source; body diode s->d/d->s respectively.
+  igbt: c,e; forward c->e, diode e->c. Diodes included unless disabled.
 - Source peak/frequency/phase and IGBT physical model values are separate SPICE
   settings, not inferred from labels or source symbols. Preserve user values.
 - Zener: D with opts.zener; reverse current b->a. Preserve explicit ratings;
@@ -709,8 +789,10 @@ Reply in Chinese, plain text, exactly these three sections and nothing else:
 """
 
 
-PLAN_SYSTEM += "\nUse exact requested node/branch IDs and physical values; never guess IDs or rewrite the program-owned electrical ledger. Mention intentional NoConn and requested global model mappings.\n"
+PLAN_SYSTEM += "\n保留用户指定的节点/支路编号、物理数值、NoConn和模型映射；不猜编号，不重写程序管理的electrical。\n"
 PLAN_SYSTEM += "Arrows: foreground/over_parts only when explicitly requested; keep electrical data unchanged.\n"
+PLAN_SYSTEM += "PMSM/FOC用pmsm，a/b/c三相；保留参数/反馈、区分机械转速与电角度；不改成直流/固定反电势负载。\n"
+PLAN_SYSTEM += "EMI列出双LISN、50Ω接收端、机壳及用户指定的滤波/寄生器件；缺参数先询问，保留emi绑定，FFT不保证CISPR合规。\n"
 
 
 def plan_message(description: str) -> str:
@@ -830,20 +912,26 @@ def tweak_message(instruction: str, table: dict, errors: list[str] | None = None
             "Rules for a change:\n"
             "- Keep every element id, pin coordinate, label, wire, hop and annotation the "
             "change does not need to touch exactly as it is; do not tidy or re-space the rest.\n"
+            "- If a validator repair conflicts with an explicit preservation requirement, explain the conflict in 改动说明 and propose the adjustment for review; do not claim all requirements were met. The editor waits for the user's confirmation before adopting the candidate.\n"
             "- When you move a part, move the wire vertices on its pins with it and keep "
             "the wires orthogonal; when you add or remove a part, update the netlist.\n"
             "- Do not return electrical or its IDs/counters/membership. Use the read-only node/branch targets; the program preserves and updates the ledger. Keep no_connect and model_mapping unless explicitly requested.\n"
+            "- Preserve emi measurement/filter/parasitic bindings and opts.dash. Do not replace a measured parasitic with a guessed value. Bound EMI devices must remain; pure device renames are reconciled by the program.\n"
             "- Preserve unrelated callout border_color/border_width/fill_opacity/foreground/over_parts. Only explicit requests to cover parts/text authorize over_parts; never use it merely to silence a layout error.\n"
             "- Keep the name and the same validator rules as always.\n"
+            "- Preserve opts.label_offset unless the user asks to move/reset that label; never move pins to satisfy a label-only request.\n"
+            "- Preserve nmos/pmos channel type, d/s electrical pins and body-diode direction unless explicitly asked to replace that device; a P-channel high-side switch has source at the positive supply.\n"
             "- Keep opts.zener and breakdown_voltage/breakdown_current/zener_resistance unchanged unless explicitly asked to edit that diode or its ratings.\n"
-            "- Keep regions (module blocks), blocks (control boxes) and callouts unless the change is about them; "
+            "- Preserve pmsm phase order, motor parameters, motor probe quantity and closed_loop feedback bindings; rotating the symbol must not exchange phases or reset initial_angle/initial_speed.\n"
+            "- Keep regions (module blocks), blocks (control boxes), glyphs (function marks), wave_symbols and callouts unless the change is about them; "
             "when you add a part to a module, add its id to that region's members. "
             "Preserve fit=members and its member IDs; do not replace derived bounds with coordinates.\n"
+            "- When renaming a device, keep its kind, pin positions and physical values; update netlist, modes, members, simulation.components keys, ground and probe references together. Split simultaneous moving/renaming into separate edits if identities would be ambiguous. For a replacement of a different kind, supply its own explicitly requested simulation parameters, never reuse the removed kind's parameters or silently drop probes. If required values are unknown, explain what the user must configure.\n"
             "- Copy waveform (CSV binding, intervals, notes including color/font_pt/line_pt/radius_cm/offset, label_offsets) unchanged; it is edited only in the waveform panel.\n"
-            "- For an explicit node/branch-targeted physical-value edit, update only the named simulation.components value and label; otherwise preserve simulation unchanged, including simplified_igbt/vce0, sine amplitude/phase/timing, ideal_transformer ratio/polarity/reference_resistance/magnetizing_inductance/leakage_inductance, winding probes, node_capacitance, series_resistance, snubber_resistance/snubber_capacitance, output_capacitance, diode_is/diode_n/diode_rs, holding_current/latching_current/turn_off_time and phase_shift/phase_ramp. Preserve all unrelated physical values and PWM during drawing edits.\n"
+            "- For an explicit node/branch-targeted physical-value edit, update only the named simulation.components value and label; otherwise preserve simulation physical values (update references for renamed/replaced devices as above), including simplified_igbt/vce0, sine amplitude/phase/timing, ideal_transformer ratio/polarity/reference_resistance/magnetizing_inductance/leakage_inductance, winding probes, node_capacitance, series_resistance, snubber_resistance/snubber_capacitance, output_capacitance, diode_is/diode_n/diode_rs, holding_current/latching_current/turn_off_time/dv_dt_limit and phase_shift/phase_ramp. Preserve all unrelated physical values and PWM during drawing edits.\n"
             "- For problems beginning with 模块定义, fix the shared definitions/layout local coordinates; do not move instance at.\n"
             "- For modules, edit definitions/layouts, instance placements or explicit bindings in the source JSON; never write expanded children to elements. Preserve module defaults, instance overrides, links and stack_usage. module_view is expanded or folded; per instance, display is expanded or collapsed. Links are port-name pairs; never add coordinates or wires for them.\n"
-            "- Reuse user modules from the supplied project library by definition name and exact public port names. Preserve saved definitions, port_layout, editable and module_authoring. Never use unconnected to hide a missing connection.\n"
+            "- Reuse user modules from the supplied project library by definition name and exact public port names. Preserve saved definitions, port_layout, editable and module_authoring. Keep ordinary wires attached to public module pins; move their endpoints with the pins and preserve the other bus branches. Keep an existing empty subsystem draft unless the user asks to build it; never replace real devices with a draft. Never use unconnected to hide a missing connection.\n"
             "Before the JSON block, write a short section in Chinese headed \"改动说明\" "
             "(at most 6 lines) saying what you changed, then return the whole new table in "
             "one ```json block.")
@@ -864,6 +952,8 @@ def regression_message(report_lines: list[str], best_lines: list[str],
 
 # how to fix each kind of problem, sent along with the report
 HINTS = {
+    "bad-emi": "Use the declared emi fields, existing voltage probes referred to the same chassis, and existing C/L/transformer IDs. Keep the explicitly drawn LISN/filter and parasitic paths connected; preserve bound devices. Correct bad values or ask the user to revise EMI settings; never erase settings to hide an error.",
+    "ai-simulation": "Keep unrelated physical values and measurement channels. Update renamed device references consistently; different device kinds need their own simulation parameters. Return complete simulation data with the table. Do not guess missing ratings/PWM or clear simulation to hide an error; ask the user to configure missing values. Split ambiguous rename/move edits.",
     "module-box-overlap": "Shrink collapsed_size or move the named instances/devices so their rendered boxes do not overlap each other or cover external symbols, leads, labels or pins. Boundary contact and the box's own ports are allowed. Preserve links, port names, hidden internals and electrical parameters; do not delete a device to silence the error.",
     "electrical-label-space": "Do not write electrical metadata. Make space around the named element by moving its requested geometry or nearby text; network names can be shortened in the editor.",
     "bad-electrical": "electrical is program-owned: omit it from your reply. Edit only the requested drawing geometry/netlist; the program reconciles saved identities.",
@@ -871,6 +961,7 @@ HINTS = {
     "bad-model-mapping": "Use switch/R/L/C and documented model values/fields; all parameters positive, gate_voltage > vto. Do not combine L parasitic mapping with nonzero per-device series_resistance; choose one explicitly requested resistance configuration, preserving existing damping otherwise.",
     "module-definition": '“模块定义”开头的问题改 definitions 里的局部坐标，不动实例 at。'
                          '库模块应修正库定义；不要逐个改副本来掩盖共享错误。',
+    "empty-module": "The named definition is an empty editing draft. Build the requested real circuit and its complete local netlist/ports before export. Keep it as a draft when the user is only editing other parts; never invent a placeholder device or delete the subsystem to silence this error.",
     "bad-region": 'For fit="members", supply a non-empty list of existing element IDs; '
                   'use local IDs in definitions or expanded IDs such as A/S1 in the assembled table. '
                   'Only fit="members" is supported; otherwise supply explicit from/to.',
@@ -879,7 +970,7 @@ HINTS = {
     "region-cuts-symbol": "The region boundary cuts the named symbol. Correct the members or manually "
                           "adjust the circuit/region; fitting never moves non-member parts.",
     "module-route": "a module link could not be routed and is drawn as a plain right-angle line; give it bend points in modules.routes[\"A|B\"] (layout units) clear of parts, or adjust collapsed_size / instance spacing; never drop the link",
-    "bad-module": "Check modules version 1, definitions or library names (buck, boost, llc_halfbridge, dab), real devices, complete local netlists, public port.p references, bindings or links. A dangling port needs a link; a misspelt port must use one of the names listed in the error; parts need both pins linked to module ports on one side. Each global port name needs both ends. Use unique instance IDs; folded groups must reference existing instances. Do not drop hidden modules or change electrical parameters to silence errors. display is expanded / collapsed / partial (partial only for modules that define one); symbol is one of the listed marks; collapsed_size is {w, h} of at least 0.8. For 该尺寸无法布线, adjust collapsed_size or instance spacing while preserving links and parameters. User modules use their saved public port names. port_layout covers every port with side left/right and unique nonnegative order; editable lists allowed override fields. unconnected lists only explicitly unused existing ports. Preserve module_authoring; never hide devices in terminals or rewrite aliases to suppress an error.",
+    "bad-module": "Check modules version 1, definitions or library names (buck, boost, llc_halfbridge, dab), real devices, complete local netlists, public port.p references, bindings or links. A dangling port needs a link; a misspelt port must use one of the names listed in the error; parts need both pins linked to module ports on one side. Each global port name needs both ends. Use unique instance IDs; folded groups must reference existing instances. Do not drop hidden modules or change electrical parameters to silence errors. display is expanded / collapsed / partial (partial only for modules that define one); symbol is one of the listed marks; collapsed_size is {w, h} of at least 0.8. For 该尺寸无法布线, adjust collapsed_size or instance spacing while preserving links and parameters. User modules use their saved public port names. port_layout covers every port with side left/right and unique nonnegative order; editable lists allowed override fields. unconnected lists existing ports awaiting a connection or intentionally left open; ordinary wires may connect them. Preserve their actual contacts when moving ports. Preserve module_authoring; never hide devices in terminals or rewrite aliases to suppress an error.",
     "bad-option": "Use only the label_pos values and opts keys listed for that element kind in the "
                   "Field reference, with a value in the stated range; delete a misspelt or "
                   "inapplicable key instead of inventing one.",

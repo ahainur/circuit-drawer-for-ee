@@ -122,6 +122,8 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 
 1、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
 
+[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
+
 2、[User manual (English)](docs/USER_MANUAL.en.md)
 
 3、[更新记录](CHANGELOG.md)

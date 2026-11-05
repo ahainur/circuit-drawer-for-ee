@@ -8,14 +8,21 @@ Circuit Drawer turns one hand-placed, validated coordinate table into paper-read
 
 ## Highlights
 
-- **One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, and a native PLECS Standalone model.
-- **Paper-ready by default.** Figures fit IEEE single (8.79 cm) or double (17.99 cm) columns with 8 pt Times text. Symbol sizes stay fixed; only the spacing between parts is scaled, so you insert the PDF at 100 % and the text matches your captions.
-- **No automatic layout, strict checking.** Every pin and every wire corner comes from a template or from you. The checker rejects slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and any difference between the drawing and its netlist, and tells you where and why.
-- **Web editor.** Drag parts from a categorised library, draw wires, select with a box, edit groups, use context menus, undo and redo, nudge with the arrow keys, and see every problem the moment it appears.
-- **Modules.** Define a converter cell once, place it several times, fold it into a box with an IEC symbol, and wire modules by port name. Folding changes the picture only; simulation always uses the full circuit.
-- **Operating modes and waveforms.** Highlight the conducting path of each switching state, export a mode sheet, and line up simulated or measured waveforms with t0, t1, ... and the matching mode figures.
-- **Control block diagrams.** A separate editor for PI loops, FOC, MPC and similar diagrams, with loop analysis (margins, Bode plots, Type I/II/III compensators) and fixed- or floating-point C code generation. A control table can close the loop around a circuit in ngspice, Simulink and PLECS.
-- **AI drawing assistant (optional).** Describe a topology that has no template, or ask for a change to the current figure in one sentence. Circuit AI writes coordinates; control-diagram AI writes structure that the program lays out. Both go through validation. It uses your own API key with an Anthropic-compatible or OpenAI-compatible interface.
+1、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, and a native PLECS Standalone model.
+
+2、**Paper-ready by default.** Figures fit IEEE single (8.79 cm) or double (17.99 cm) columns with 8 pt Times text. Symbol sizes stay fixed; only the spacing between parts is scaled, so you insert the PDF at 100 % and the text matches your captions.
+
+3、**No automatic layout, strict checking.** Every pin and every wire corner comes from a template or from you. The checker rejects slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and any difference between the drawing and its netlist, and tells you where and why.
+
+4、**Web editor.** Drag parts from a categorised library, draw wires, select with a box, edit groups, use context menus, undo and redo, nudge with the arrow keys, and see every problem the moment it appears.
+
+5、**Modules.** Define a converter cell once, place it several times, fold it into a box with an IEC symbol, and wire modules by port name. Folding changes the picture only; simulation always uses the full circuit.
+
+6、**Operating modes and waveforms.** Highlight the conducting path of each switching state, export a mode sheet, and line up simulated or measured waveforms with t0, t1, ... and the matching mode figures.
+
+7、**Control block diagrams.** A separate editor for PI loops, FOC, MPC and similar diagrams, with loop analysis (margins, Bode plots, Type I/II/III compensators) and fixed- or floating-point C code generation. A control table can close the loop around a circuit in ngspice, Simulink and PLECS.
+
+8、**AI drawing assistant (optional).** Describe a topology that has no template, or ask for a change to the current figure in one sentence. Circuit AI writes coordinates; control-diagram AI writes structure that the program lays out. Both go through validation. It uses your own API key with an Anthropic-compatible or OpenAI-compatible interface.
 
 ## Gallery
 
@@ -29,7 +36,7 @@ Circuit Drawer turns one hand-placed, validated coordinate table into paper-read
 
 The web editor:
 
-![Circuit editor](docs/images/manual/editor-overview.png)
+![Circuit editor](docs/images/manual/en/editor-overview.png)
 
 ## Installation
 
@@ -114,10 +121,15 @@ What the checker does not do: it verifies connections, geometry and text placeme
 
 ## Documentation
 
-- [User manual (English)](docs/USER_MANUAL.en.md)
-- [使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
-- [Change log](CHANGELOG.md)
-- [Examples](examples/)
+1、[User manual (English)](docs/USER_MANUAL.en.md)
+
+2、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
+
+[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
+
+1、[Change log](CHANGELOG.md)
+
+2、[Examples](examples/)
 
 ## License
 

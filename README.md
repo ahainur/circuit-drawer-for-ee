@@ -4,6 +4,18 @@
 
 Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink and PLECS.
 
+<p align="center">
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.6.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.6.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <br>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for Windows — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.6.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.6.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+</p>
+
+All four buttons download the same **universal Python package (`.whl`, Python 3.10+)**. See [installation](#installation) below. macOS and Linux currently have preview support.
+
+[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.6.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-trial-1.6.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-manuals-1.6.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-public-source-1.6.0.zip)
+
 ![Full-bridge LLC converter, IEEE single column](docs/images/manual/example-llc-fullbridge.png)
 
 ## Highlights
@@ -42,13 +54,25 @@ The web editor:
 
 Circuit Drawer needs Python 3.10 or newer. The core package has no third-party Python dependencies.
 
-Install the wheel attached to a [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases):
+Download the wheel using a button above, then open a terminal in its download folder.
 
-```bash
+On Windows:
+
+```powershell
 python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
 
-or install straight from the repository:
+On macOS or Linux, install it in a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+```
+
+Keep this environment active when running the commands below. On Debian or Ubuntu, install `python3-venv` if the `venv` module is missing.
+
+Or install straight from the repository:
 
 ```bash
 python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"

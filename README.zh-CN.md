@@ -4,6 +4,18 @@
 
 Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直接放进论文的电力电子 CircuiTikZ 电路图，并把同一张表导出为 ngspice、Simulink 和 PLECS 仿真模型。
 
+<p align="center">
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.6.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.6.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <br>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 Windows 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.6.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.6.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+</p>
+
+四个按钮均下载同一份 **通用 Python 安装包（`.whl`，需要 Python 3.10+）**，安装步骤见下方[安装说明](#三安装)。macOS 和 Linux 当前为预览支持。
+
+[新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.6.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-trial-1.6.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-manuals-1.6.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-public-source-1.6.0.zip)
+
 ![全桥 LLC 变换器，IEEE 单栏](docs/images/manual/example-llc-fullbridge.png)
 
 ## 一、主要特点
@@ -42,11 +54,23 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 
 需要 Python 3.10 或更新版本。核心功能不依赖任何第三方 Python 包。
 
-从 [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases) 下载 wheel 安装：
+点击上方按钮下载 wheel，在下载文件所在目录打开终端。
 
-```bash
+Windows：
+
+```powershell
 python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
 ```
+
+macOS 或 Linux：在虚拟环境中安装。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+```
+
+运行后文命令时保持此环境已激活。Debian／Ubuntu 若提示缺少 `venv` 模块，先安装 `python3-venv`。
 
 或直接从仓库安装：
 

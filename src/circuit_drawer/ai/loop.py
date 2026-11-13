@@ -31,11 +31,11 @@ import os
 import re
 import sys
 from collections import Counter
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
-from ..layout import DECORATION_SECTIONS, PIN_NAMES, Layout
+from ..layout import DECORATION_SECTIONS, OPTIONAL_PINS, PIN_NAMES, Layout
 from ..profiles import get_profile
 from ..validate import check
 from .meter import Meter, describe
@@ -46,7 +46,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_ROUNDS = 4
 # top-level sections the model draws along with the circuit (module blocks
 # and arrows); every other extra section is carried over from the old table
-DRAWN_SECTIONS = (*DECORATION_SECTIONS, "modules", "module_view", "no_connect", "model_mapping")
+DRAWN_SECTIONS = (*DECORATION_SECTIONS, "modules", "module_view", "no_connect", "model_mapping", "control_view", "drawing_scale")
 
 NO_KEY = (
     "没有找到大模型的 API 密钥。请先设置环境变量：\n"
@@ -168,6 +168,13 @@ class ClaudeChat:
         except TypeError as exc:
             raise ModelError(NO_KEY) from exc
 
+    def fork(self, system: str):
+        """Fresh conversation using this job's captured credentials and model."""
+        chat = copy(self)
+        chat.system = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+        chat.messages, chat.stats, chat.on_text = [], [], None
+        return chat
+
     def send(self, text: str, images: list[tuple[str, str]] | None = None) -> str:
         a = self._anthropic
         content: str | list = text
@@ -269,7 +276,8 @@ def _missing_netlist(lay: Layout) -> list[str]:
         return ["netlist-missing: the table has no netlist; declare every pin's net"]
     out = []
     for el in lay.elements:
-        for pin in PIN_NAMES.get(el.kind, ()):
+        extra = [p for p in OPTIONAL_PINS.get(el.kind, ()) if p in el.pins and p != "sct"]
+        for pin in (*PIN_NAMES.get(el.kind, ()), *extra):
             if f"{el.id}.{pin}" not in lay.netlist:
                 out.append(f"netlist-missing: {el.id}.{pin} has no net")
     return out
@@ -597,6 +605,16 @@ class CircuitWorkflow:
         carried, simulation_errors, check_simulation = deepcopy(self.extra), [], False
         lay.extra = {**carried, **drawn}
         if self.current:
+            sources = {m["name"]: m["source"] for m in self.current.get("modes", [])
+                       if isinstance(m, dict) and "source" in m and isinstance(m.get("name"), str)}
+            for mode in lay.modes:
+                if not isinstance(mode, dict):
+                    continue
+                name = mode.get("name")
+                if isinstance(name, str) and name in sources:
+                    mode["source"] = deepcopy(sources[name])
+                elif mode.get("source") not in sources.values():
+                    mode.pop("source", None)
             from .edit_data import simulation_edit
             try:
                 carried, check_simulation = simulation_edit(
@@ -652,7 +670,8 @@ def generate(description: str, profile: str = "ieee-single",
              structure: str | None = None,
              images: list[tuple[str, str]] | None = None,
              patience: int = 2, current: dict | None = None,
-             on_text: Callable[[str], None] | None = None, workflow=None) -> Generation:
+             on_text: Callable[[str], None] | None = None, workflow=None,
+             review: bool = False, base_dir=None) -> Generation:
     """Ask the model for a table and loop on validator reports, at most
     ``rounds`` model replies.  Raises ModelError for configuration problems
     and Cancelled when ``should_stop`` turns true between rounds; a table
@@ -746,4 +765,11 @@ def generate(description: str, profile: str = "ieee-single",
                 break
         text = workflow.feedback(result, best, improved, previous)
         previous = errors
+    if review:
+        if isinstance(workflow, CircuitWorkflow):
+            from .review import review_generation
+            review_generation(gen, chat, log=log, on_text=on_text, on_attempt=on_attempt,
+                              should_stop=should_stop, base_dir=base_dir)
+        else:
+            gen.notes.append("出图后自查：当前只支持电路坐标表，已跳过。")
     return gen

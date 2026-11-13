@@ -1,0 +1,515 @@
+{
+  "name": "buck_output_impedance",
+  "elements": [
+    {
+      "id": "Vin",
+      "kind": "V",
+      "pins": {
+        "a": [
+          0.0,
+          0.0
+        ],
+        "b": [
+          0.0,
+          3.0
+        ]
+      },
+      "label": "$V_\\mathrm{in}$",
+      "label_pos": "left"
+    },
+    {
+      "id": "S1",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          1.0,
+          3.0
+        ],
+        "s": [
+          2.2,
+          3.0
+        ]
+      },
+      "label": "$S_1$",
+      "label_pos": "below"
+    },
+    {
+      "id": "S2",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          2.5,
+          2.0
+        ],
+        "s": [
+          2.5,
+          0.0
+        ]
+      },
+      "label": "$S_2$",
+      "label_pos": "left"
+    },
+    {
+      "id": "L1",
+      "kind": "L",
+      "pins": {
+        "a": [
+          2.8,
+          3.0
+        ],
+        "b": [
+          4.0,
+          3.0
+        ]
+      },
+      "label": "$L_1$"
+    },
+    {
+      "id": "Co",
+      "kind": "C",
+      "pins": {
+        "a": [
+          4.3,
+          3.0
+        ],
+        "b": [
+          4.3,
+          0.0
+        ]
+      },
+      "label": "$C_o$",
+      "label_pos": "left"
+    },
+    {
+      "id": "RL",
+      "kind": "R",
+      "pins": {
+        "a": [
+          5.4,
+          3.0
+        ],
+        "b": [
+          5.4,
+          0.0
+        ]
+      },
+      "label": "$R_L$",
+      "label_pos": "left"
+    }
+  ],
+  "wires": [
+    [
+      [
+        0.0,
+        3.0
+      ],
+      [
+        1.0,
+        3.0
+      ]
+    ],
+    [
+      [
+        2.2,
+        3.0
+      ],
+      [
+        2.8,
+        3.0
+      ]
+    ],
+    [
+      [
+        2.5,
+        2.0
+      ],
+      [
+        2.5,
+        3.0
+      ]
+    ],
+    [
+      [
+        4.0,
+        3.0
+      ],
+      [
+        5.4,
+        3.0
+      ]
+    ],
+    [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        5.4,
+        0.0
+      ]
+    ]
+  ],
+  "hops": [],
+  "annotations": [
+    {
+      "at": [
+        6.05,
+        1.92
+      ],
+      "text": "$+$"
+    },
+    {
+      "at": [
+        6.05,
+        1.5
+      ],
+      "text": "$v_o$"
+    },
+    {
+      "at": [
+        6.05,
+        1.08
+      ],
+      "text": "$-$"
+    }
+  ],
+  "netlist": {
+    "Vin.b": "IN",
+    "S1.d": "IN",
+    "S1.s": "SW",
+    "S2.d": "SW",
+    "L1.a": "SW",
+    "L1.b": "OUT",
+    "Co.a": "OUT",
+    "RL.a": "OUT",
+    "Vin.a": "GND",
+    "S2.s": "GND",
+    "Co.b": "GND",
+    "RL.b": "GND"
+  },
+  "simulation": {
+    "version": 1,
+    "ground": "Vin.a",
+    "components": {
+      "Vin": {
+        "dc": "12"
+      },
+      "S1": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "300k",
+        "duty": "0.3",
+        "delay": "0",
+        "rise": "10n",
+        "fall": "10n",
+        "model": "ideal_switch"
+      },
+      "L1": {
+        "value": "10u",
+        "initial": "0"
+      },
+      "Co": {
+        "value": "100u",
+        "initial": "0"
+      },
+      "RL": {
+        "value": "1"
+      },
+      "S2": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "300k",
+        "duty": "0.3",
+        "delay": "0",
+        "rise": "10n",
+        "fall": "10n",
+        "model": "ideal_switch"
+      }
+    },
+    "transient": {
+      "step": "50n",
+      "stop": "3m",
+      "max_step": "20n"
+    },
+    "probes": [
+      {
+        "name": "v_out",
+        "kind": "voltage",
+        "positive": "RL.a",
+        "negative": "Vin.a"
+      },
+      {
+        "name": "i_L",
+        "kind": "current",
+        "element": "L1"
+      },
+      {
+        "name": "pwm",
+        "kind": "drive",
+        "element": "S1"
+      }
+    ]
+  },
+  "closed_loop": {
+    "control": {
+      "kind": "control",
+      "name": "buck_impedance_pi",
+      "title": "Buck 电压模式 PI 控制",
+      "profile": "ieee-double",
+      "blocks": [
+        {
+          "id": "ref",
+          "type": "tag",
+          "style": "ref",
+          "at": [
+            0.75,
+            0
+          ],
+          "size": [
+            1.0,
+            0.5
+          ],
+          "text": "$V_{\\mathrm{ref}}$"
+        },
+        {
+          "id": "e1",
+          "type": "sum",
+          "at": [
+            2.0,
+            0
+          ],
+          "signs": {
+            "w": "+",
+            "s": "-"
+          }
+        },
+        {
+          "id": "gc",
+          "type": "block",
+          "at": [
+            3.7,
+            0
+          ],
+          "size": [
+            1.4,
+            0.8
+          ],
+          "text": "$G_{c}(s)$",
+          "label": "PI",
+          "label_pos": "above"
+        },
+        {
+          "id": "pwm",
+          "type": "block",
+          "at": [
+            5.8,
+            0
+          ],
+          "size": [
+            1.0,
+            0.8
+          ],
+          "text": "$\\frac{1}{V_{M}}$",
+          "label": "PWM",
+          "label_pos": "above"
+        },
+        {
+          "id": "plant",
+          "type": "block",
+          "at": [
+            8.1,
+            0
+          ],
+          "size": [
+            1.6,
+            0.8
+          ],
+          "text": "$G_{vd}(s)$",
+          "label": "Buck power stage",
+          "label_pos": "above"
+        },
+        {
+          "id": "h",
+          "type": "block",
+          "at": [
+            5.8,
+            -1.3
+          ],
+          "size": [
+            1.0,
+            0.6
+          ],
+          "text": "$H$",
+          "label": "Divider",
+          "label_pos": "below"
+        }
+      ],
+      "links": [
+        {
+          "from": "ref.e",
+          "to": "e1.w"
+        },
+        {
+          "from": "e1.e",
+          "to": "gc.w",
+          "label": "$v_{e}$"
+        },
+        {
+          "from": "gc.e",
+          "to": "pwm.w",
+          "label": "$v_{c}$"
+        },
+        {
+          "from": "pwm.e",
+          "to": "plant.w",
+          "label": "$d$"
+        },
+        {
+          "from": "plant.e",
+          "to": [
+            10.6,
+            0
+          ],
+          "open": true
+        },
+        {
+          "from": [
+            9.6,
+            0
+          ],
+          "via": [
+            [
+              9.6,
+              -1.3
+            ]
+          ],
+          "to": "h.e"
+        },
+        {
+          "from": "h.w",
+          "via": [
+            [
+              2.0,
+              -1.3
+            ]
+          ],
+          "to": "e1.s"
+        }
+      ],
+      "texts": [
+        {
+          "at": [
+            10.68,
+            0
+          ],
+          "text": "$v_{o}$",
+          "anchor": "west"
+        }
+      ],
+      "regions": [
+        {
+          "from": [
+            -0.1,
+            -2.15
+          ],
+          "to": [
+            11.3,
+            1.35
+          ],
+          "fill": "green",
+          "label": "Voltage-mode buck loop",
+          "label_pos": "inside"
+        }
+      ],
+      "loop": {
+        "params": {
+          "Vin": 12,
+          "Vo": 3.3,
+          "Vref": 1.65,
+          "L": 1e-05,
+          "C": 0.0001,
+          "ESR": 0,
+          "Rload": 1.0,
+          "VM": 1.5
+        },
+        "tf": {
+          "gc": {
+            "pi": {
+              "kp": 0.05,
+              "ki": 30
+            }
+          },
+          "pwm": {
+            "gain": "1/VM"
+          },
+          "plant": {
+            "model": "buck",
+            "vin": "Vin",
+            "l": "L",
+            "c": "C",
+            "r": "Rload",
+            "rc": "ESR"
+          },
+          "h": {
+            "gain": "Vref/Vo"
+          }
+        },
+        "breaks": [
+          {
+            "at": "pwm",
+            "label": "$T(s)$"
+          }
+        ],
+        "closed": [
+          {
+            "from": "ref",
+            "to": "plant",
+            "label": "$v_{o}/V_{\\mathrm{ref}}$"
+          }
+        ],
+        "freq": [
+          10,
+          1000000.0
+        ]
+      },
+      "code": {
+        "fs": 300000.0,
+        "method": "tustin",
+        "arith": "fixed",
+        "q": 24,
+        "external": [
+          "plant"
+        ],
+        "blocks": {
+          "gc": {
+            "min": 0,
+            "max": "VM"
+          },
+          "pwm": {
+            "min": 0,
+            "max": 0.95
+          }
+        }
+      }
+    },
+    "inputs": {
+      "ref": {
+        "value": 1.65
+      },
+      "plant": {
+        "probe": "v_out"
+      }
+    },
+    "outputs": {
+      "pwm": {
+        "switches": [
+          "S1"
+        ],
+        "complement": [
+          "S2"
+        ],
+        "model": "average"
+      }
+    }
+  }
+}

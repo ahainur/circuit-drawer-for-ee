@@ -57,6 +57,7 @@
   #canvasContext { box-sizing:border-box; max-height:calc(100vh - 16px); overflow-y:auto; }
   #canvasContext .context-submenu { margin-left:12px; border-left:1px solid var(--line); padding-left:8px; }
   .spice-component.context-target { outline:2px solid var(--accent); outline-offset:2px; background:#eef3ff; }
+  #spiceForm button.context-target { outline:2px solid var(--accent); outline-offset:2px; }
   #coords { position: absolute; left: 10px; bottom: 8px; background: rgba(255,255,255,.9);
             border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; font-size: 12px; }
   #modeTip { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
@@ -91,6 +92,7 @@
 <link rel="stylesheet" href="/menu.css">
 <link rel="stylesheet" href="/electrical.css">
 <link rel="stylesheet" href="/editor-ui.css">
+<link rel="stylesheet" href="/hints.css">
 <link rel="stylesheet" href="/theme-eda.css">
 </head>
 <body>
@@ -101,8 +103,10 @@
       <button data-menu="edit" id="menu-edit" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-edit-panel">编辑</button>
       <button data-menu="view" id="menu-view" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-view-panel">视图</button>
       <button data-menu="insert" id="menu-insert" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-insert-panel">插入</button>
+      <button data-menu="simulation" id="menu-simulation" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-simulation-panel">仿真</button>
+      <button data-menu="modes" id="menu-modes" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-modes-panel">模态与波形</button>
       <button data-menu="ai" id="menu-ai" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-ai-panel">AI</button>
-      <button data-menu="analysis" id="menu-analysis" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-analysis-panel">分析</button>
+      <button data-menu="experimental" id="menu-experimental" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-experimental-panel">实验功能</button>
       <button data-menu="help" id="menu-help" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-help-panel">帮助</button>
     </nav>
     <span class="app-label">Circuit Drawer</span>
@@ -110,22 +114,27 @@
   <div class="quick-tools" role="toolbar" aria-label="常用工具栏">
     <div class="tool-group" role="group" aria-label="文件">
       <button id="save" data-icon="save">保存</button>
-      <button id="export" data-icon="export">导出</button>
+      <button id="export" data-icon="export" title="导出论文电路图">导出</button>
     </div>
     <div class="tool-group" role="group" aria-label="编辑">
       <button id="undo" data-icon="undo" title="撤销 (Ctrl+Z)">撤销</button>
       <button id="redo" data-icon="redo" title="重做 (Ctrl+Y / Ctrl+Shift+Z)" disabled>重做</button>
       <button id="del" data-icon="delete" title="删除所选 (Delete)">删除</button>
     </div>
-    <div class="tool-group" role="group" aria-label="绘制">
+    <div class="tool-group" role="group" aria-label="绘图">
       <button id="drawWire" data-icon="wire">导线</button>
+      <button id="quickText" data-command="addAnnotation" data-icon="text" title="在图上加文字或公式">文字</button>
     </div>
-    <div class="tool-group" role="group" aria-label="视图">
+    <div class="tool-group" role="group" aria-label="查看">
       <button id="quickFit" data-command="menuFit" data-icon="fit">适应</button>
       <button id="preview" data-icon="preview">预览</button>
     </div>
-    <div class="tool-group" role="group" aria-label="分析与 AI">
+    <div class="tool-group" role="group" aria-label="仿真">
+      <button id="quickSimulate" data-command="spice" data-icon="run" class="primary" title="填写仿真参数并运行 ngspice">仿真</button>
+      <button id="quickAutoModes" data-command="autoModes" data-icon="modes" title="从仿真结果找出各个开关模态">识别模态</button>
       <button id="waveforms" data-icon="wave">波形与模态</button>
+    </div>
+    <div class="tool-group" role="group" aria-label="AI">
       <button id="quickAi" data-command="tweak" data-icon="ai">AI 修改</button>
     </div>
 <span id="definitionActions" hidden><button id="saveDefinition" class="primary">设置端口并保存…</button> <button id="cancelDefinition">取消编辑定义</button></span>
@@ -137,13 +146,25 @@
     </button>
   </div>
   <div id="menu-file-panel" class="menu-panel" role="menu" aria-labelledby="menu-file" hidden>
+    <button data-command="openExample" role="menuitem" tabindex="-1">打开示例</button>
     <button data-command="save" role="menuitem" tabindex="-1" >保存</button>
     <button id="saveAs" role="menuitem" tabindex="-1">另存为…</button>
+    <hr role="separator">
     <button role="menuitem" tabindex="-1" id="saveTpl" title="以后同一拓扑只需写选项">存为模板…</button>
     <button role="menuitem" tabindex="-1" id="saveModule">存为模块…</button>
     <hr role="separator">
-    <button data-command="export" role="menuitem" tabindex="-1" >导出电路图…</button>
-    <button data-command="modeExport" role="menuitem" tabindex="-1" >导出全部模态…</button>
+    <label title="论文图按单栏或双栏的宽度校验和出图">图纸栏宽 <select id="profile" title="栏宽"></select></label>
+    <hr role="separator">
+    <button id="menuExport" role="menuitem" tabindex="-1" data-submenu="file-export-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="file-export-panel">导出 <span>›</span></button>
+    <div id="file-export-panel" class="menu-subpanel" role="menu" aria-labelledby="menuExport" hidden>
+      <button data-command="export" role="menuitem" tabindex="-1" >电路图…</button>
+      <button data-command="modeExport" role="menuitem" tabindex="-1" >全部模态图…</button>
+      <hr role="separator">
+      <button data-command="exportSpice" role="menuitem" tabindex="-1">ngspice 网表…</button>
+      <button data-command="exportSimulink" role="menuitem" tabindex="-1">Simulink 模型…</button>
+      <button data-command="exportPlecs" role="menuitem" tabindex="-1">PLECS 模型…</button>
+      <button data-command="exportPsim" role="menuitem" tabindex="-1">PSIM 模型…</button>
+    </div>
   </div>
   <div id="menu-edit-panel" class="menu-panel" role="menu" aria-labelledby="menu-edit" hidden>
     <button data-command="undo" role="menuitem" tabindex="-1" >撤销<kbd>Ctrl+Z</kbd></button>
@@ -153,12 +174,13 @@
     <button id="copySelection" role="menuitem" tabindex="-1">复制<kbd>Ctrl+C</kbd></button>
     <button id="pasteSelection" role="menuitem" tabindex="-1">粘贴<kbd>Ctrl+V</kbd></button>
     <button id="duplicateSelection" role="menuitem" tabindex="-1">创建副本<kbd>Ctrl+D</kbd></button>
-    <button id="rotateSelection" role="menuitem" tabindex="-1">旋转 90°<kbd>R</kbd></button>
+    <button data-command="del" role="menuitem" tabindex="-1" >删除所选<kbd>Delete / Backspace</kbd></button>
+    <hr role="separator">
+    <button id="rotateSelection" role="menuitem" tabindex="-1">顺时针旋转 90°<kbd>R</kbd></button>
+    <button id="rotateSelectionCCW" role="menuitem" tabindex="-1">逆时针旋转 90°<kbd>Shift+R</kbd></button>
     <button id="mirrorSelection" role="menuitem" tabindex="-1">镜像 / 反向<kbd>F</kbd></button>
     <button id="growSymbol" role="menuitem" tabindex="-1">增大符号<kbd>+ / =</kbd></button>
     <button id="shrinkSymbol" role="menuitem" tabindex="-1">缩小符号<kbd>- / _</kbd></button>
-    <button data-command="del" role="menuitem" tabindex="-1" >删除所选<kbd>Delete / Backspace</kbd></button>
-    <hr role="separator">
     <button id="menuLayers" role="menuitem" tabindex="-1" data-submenu="layer-menu-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="layer-menu-panel" disabled>同类对象图层 <span>›</span></button>
     <div id="layer-menu-panel" class="menu-subpanel" role="menu" aria-labelledby="menuLayers" hidden>
       <button id="layerRaise" data-layer-action="raise" role="menuitem" tabindex="-1" disabled>上移一层<kbd>Ctrl+]</kbd></button>
@@ -166,6 +188,9 @@
       <button id="layerTop" data-layer-action="top" role="menuitem" tabindex="-1" disabled>置顶<kbd>Ctrl+Shift+]</kbd></button>
       <button id="layerBottom" data-layer-action="bottom" role="menuitem" tabindex="-1" disabled>置底<kbd>Ctrl+Shift+[</kbd></button>
     </div>
+    <hr role="separator">
+    <button id="adopt" role="menuitem" tabindex="-1">按图更新网表</button>
+    <button id="mergeOverlaps" role="menuitem" tabindex="-1">合并重叠导线</button>
     <hr role="separator">
     <button id="menuEditDefinition" role="menuitem" tabindex="-1" disabled>编辑选中模块定义</button>
     <button id="menuDissolve" role="menuitem" tabindex="-1" disabled>解散选中实例为普通元件</button>
@@ -176,6 +201,8 @@
     <button id="menuFit" role="menuitem" tabindex="-1">适应窗口</button>
     <button id="menuZoomIn" role="menuitem" tabindex="-1">放大</button>
     <button id="menuZoomOut" role="menuitem" tabindex="-1">缩小</button>
+    <button id="scaleCircuit" role="menuitem" tabindex="-1">整体等比缩放…</button>
+    <button id="symbolStylePreset" role="menuitem" tabindex="-1">符号风格预设…</button>
     <button id="menuModuleDisplay" role="menuitem" tabindex="-1" data-submenu="module-display-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="module-display-panel" disabled>模块显示 <span>›</span></button>
     <div id="module-display-panel" class="menu-subpanel" role="menu" aria-labelledby="menuModuleDisplay" hidden>
       <label>选中实例 <select id="menuInstanceSelect" aria-label="选中模块实例"></select></label>
@@ -189,67 +216,107 @@
       <button id="menuModuleSize" role="menuitem" tabindex="-1">方框尺寸…</button>
       <button id="menuModuleReset" role="menuitem" tabindex="-1">恢复默认方框尺寸</button>
     </div>
-    <label><input type="checkbox" id="showElectrical"> 显示节点/支路标号</label>
-    <label><input type="checkbox" id="showCoordinates"> 显示画布坐标刻度</label>
-    <label><input type="checkbox" id="showNetlist"> 实时网表面板</label>
-    <button id="modelMapping" role="menuitem" tabindex="-1">全图器件模型…</button>
-    <label>栏宽 <select id="profile" title="栏宽"></select></label>
-    <label class="hint"><input type="checkbox" id="gridPrev" checked> 预览带坐标网</label>
-    <label class="hint" title="区域色块和箭头改成灰度，适合黑白打印；模态图勾选黑白样式时自动如此"><input type="checkbox" id="regionMono"> 色块灰度</label>
-    <label data-availability="moduleView" hidden>模块显示 <select id="moduleView" hidden aria-label="模块显示"><option value="expanded">展开全部实例</option><option value="folded">折叠实例组</option></select></label>
     <hr role="separator">
+    <div class="menu-caption" role="presentation">画布上显示</div>
+    <label><input type="checkbox" id="showElectrical"> 节点/支路标号</label>
+    <label><input type="checkbox" id="showCoordinates"> 坐标刻度</label>
+    <label><input type="checkbox" id="showNetlist"> 实时网表面板</label>
+    <label data-availability="moduleView" hidden>模块显示 <select id="moduleView" hidden aria-label="模块显示"><option value="expanded">展开全部实例</option><option value="folded">折叠实例组</option><option value="ellipsis">省略中间实例</option></select></label>
+    <hr role="separator">
+    <div class="menu-caption" role="presentation">预览设置</div>
+    <label><input type="checkbox" id="gridPrev" checked> 带坐标网</label>
+    <label title="区域色块和箭头改成灰度，适合黑白打印；模态图勾选黑白样式时自动如此"><input type="checkbox" id="regionMono"> 色块灰度</label>
     <button data-command="preview" role="menuitem" tabindex="-1" >真实预览</button>
   </div>
   <div id="menu-insert-panel" class="menu-panel" role="menu" aria-labelledby="menu-insert" hidden>
     <button data-command="drawWire" role="menuitem" tabindex="-1" >画导线</button>
-    <button role="menuitem" tabindex="-1" id="drawRegion" title="在图上拖出一个矩形：模块色块、交叠面板或开关外的虚线框">画区域</button>
-    <button role="menuitem" tabindex="-1" id="drawBlock" title="在图上拖出一个矩形：控制部分的功能方框，如 PWM、驱动、控制器">画方框</button>
-    <button role="menuitem" tabindex="-1" id="drawCallout" title="从起点拖到终点：指向放大图的粗箭头，或方框之间的信号线（可设虚线、隔离符号）">画箭头</button>
-    <button role="menuitem" tabindex="-1" id="addModule">添加模块…</button>
-    <button id="addWaveSymbol" role="menuitem" tabindex="-1">阶跃 / 脉冲标记</button>
     <label>导线交叉 <select id="crossMode" title="新画的导线和已有导线交叉时怎么处理；事后点交叉点可以切换">
     <option value="hop">交叉处：跨线（不相连）</option><option value="node">交叉处：节点（相连）</option></select></label>
     <hr role="separator">
-    <div class="menu-caption" role="presentation">元件库</div>
-    <button id="insert-R" role="menuitem" tabindex="-1" data-component="R" data-availability="drawWire">电阻</button>
-    <button id="insert-L" role="menuitem" tabindex="-1" data-component="L" data-availability="drawWire">电感</button>
-    <button id="insert-C" role="menuitem" tabindex="-1" data-component="C" data-availability="drawWire">电容</button>
-    <button id="insert-D" role="menuitem" tabindex="-1" data-component="D" data-availability="drawWire">二极管</button>
-    <button id="insert-zener" role="menuitem" tabindex="-1" data-component="zener" data-availability="drawWire">稳压管</button>
-    <button id="insert-scr" role="menuitem" tabindex="-1" data-component="scr" data-availability="drawWire">晶闸管</button>
-    <button id="insert-V" role="menuitem" tabindex="-1" data-component="V" data-availability="drawWire">电压源</button>
-    <button id="insert-vac" role="menuitem" tabindex="-1" data-component="vac" data-availability="drawWire">交流电源</button>
-    <button id="insert-vac3" role="menuitem" tabindex="-1" data-component="vac3" data-availability="drawWire">三相电源</button>
-    <button id="insert-battery" role="menuitem" tabindex="-1" data-component="battery" data-availability="drawWire">电池</button>
-    <button id="insert-I" role="menuitem" tabindex="-1" data-component="I" data-availability="drawWire">电流源</button>
-    <button id="insert-port" role="menuitem" tabindex="-1" data-component="port" data-availability="drawWire">端子</button>
-    <button id="insert-nmos" role="menuitem" tabindex="-1" data-component="nmos" data-availability="drawWire">MOSFET</button>
-    <button id="insert-pmos" role="menuitem" tabindex="-1" data-component="pmos" data-availability="drawWire">P 沟 MOSFET</button>
-    <button id="insert-igbt" role="menuitem" tabindex="-1" data-component="igbt" data-availability="drawWire">IGBT</button>
-    <button id="insert-transformer" role="menuitem" tabindex="-1" data-component="transformer" data-availability="drawWire">变压器</button>
-    <button id="insert-coupled" role="menuitem" tabindex="-1" data-component="coupled" data-availability="drawWire">耦合电感</button>
-    <button id="insert-pmsm" role="menuitem" tabindex="-1" data-component="pmsm" data-availability="drawWire">永磁同步电机（PMSM）</button>
+    <button id="menuComponents" role="menuitem" tabindex="-1" data-submenu="insert-components-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="insert-components-panel">元件 <span>›</span></button>
+    <div id="insert-components-panel" class="menu-subpanel" role="menu" aria-labelledby="menuComponents" hidden>
+      <div class="menu-caption" role="presentation">无源</div>
+      <button id="insert-R" role="menuitem" tabindex="-1" data-component="R" data-availability="drawWire">电阻</button>
+      <button id="insert-L" role="menuitem" tabindex="-1" data-component="L" data-availability="drawWire">电感</button>
+      <button id="insert-C" role="menuitem" tabindex="-1" data-component="C" data-availability="drawWire">电容</button>
+      <div class="menu-caption" role="presentation">半导体</div>
+      <button id="insert-D" role="menuitem" tabindex="-1" data-component="D" data-availability="drawWire">二极管</button>
+      <button id="insert-zener" role="menuitem" tabindex="-1" data-component="zener" data-availability="drawWire">稳压管</button>
+      <button id="insert-scr" role="menuitem" tabindex="-1" data-component="scr" data-availability="drawWire">晶闸管</button>
+      <button id="insert-nmos" role="menuitem" tabindex="-1" data-component="nmos" data-availability="drawWire">MOSFET</button>
+      <button id="insert-pmos" role="menuitem" tabindex="-1" data-component="pmos" data-availability="drawWire">P 沟 MOSFET</button>
+      <button id="insert-igbt" role="menuitem" tabindex="-1" data-component="igbt" data-availability="drawWire">IGBT</button>
+      <div class="menu-caption" role="presentation">电源</div>
+      <button id="insert-V" role="menuitem" tabindex="-1" data-component="V" data-availability="drawWire">电压源</button>
+      <button id="insert-vac" role="menuitem" tabindex="-1" data-component="vac" data-availability="drawWire">交流电源</button>
+      <button id="insert-vac3" role="menuitem" tabindex="-1" data-component="vac3" data-availability="drawWire">三相电源</button>
+      <button id="insert-battery" role="menuitem" tabindex="-1" data-component="battery" data-availability="drawWire">电池</button>
+      <button id="insert-I" role="menuitem" tabindex="-1" data-component="I" data-availability="drawWire">电流源</button>
+      <div class="menu-caption" role="presentation">磁性元件与电机</div>
+      <button id="insert-transformer" role="menuitem" tabindex="-1" data-component="transformer" data-availability="drawWire">变压器</button>
+      <button id="insert-coupled" role="menuitem" tabindex="-1" data-component="coupled" data-availability="drawWire">耦合电感</button>
+      <button id="insert-pmsm" role="menuitem" tabindex="-1" data-component="pmsm" data-availability="drawWire">永磁同步电机（PMSM）</button>
+      <div class="menu-caption" role="presentation">连接</div>
+      <button id="insert-port" role="menuitem" tabindex="-1" data-component="port" data-availability="drawWire">端子</button>
+    </div>
+    <button role="menuitem" tabindex="-1" id="addModule">添加模块…</button>
+    <hr role="separator">
+    <button id="menuAnnotations" role="menuitem" tabindex="-1" data-submenu="insert-annotations-panel" aria-haspopup="menu" aria-expanded="false" aria-controls="insert-annotations-panel">标注 <span>›</span></button>
+    <div id="insert-annotations-panel" class="menu-subpanel" role="menu" aria-labelledby="menuAnnotations" hidden>
+      <button role="menuitem" tabindex="-1" id="addAnnotation">加文字</button>
+      <button role="menuitem" tabindex="-1" id="drawRegion" title="在图上拖出一个矩形：模块色块、交叠面板或开关外的虚线框">画区域</button>
+      <button role="menuitem" tabindex="-1" id="drawBlock" title="在图上拖出一个矩形：控制部分的功能方框，如 PWM、驱动、控制器">画方框</button>
+      <button role="menuitem" tabindex="-1" id="drawCallout" title="从起点拖到终点：指向放大图的粗箭头，或方框之间的信号线（可设虚线、隔离符号）">画箭头</button>
+      <button role="menuitem" tabindex="-1" id="drawSignal">画信号箭头</button>
+      <button role="menuitem" tabindex="-1" id="drawGlyph">画功能标志</button>
+      <button id="addWaveSymbol" role="menuitem" tabindex="-1">阶跃 / 脉冲标记</button>
+    </div>
   </div>
-  <div id="menu-ai-panel" class="menu-panel" role="menu" aria-labelledby="menu-ai" hidden>
-    <button role="menuitem" tabindex="-1" id="aiSettings">AI 接口设置…</button>
-    <button role="menuitem" tabindex="-1" id="describe" title="没有模板的新拓扑：由大模型写坐标表，校验器把关">描述新拓扑…</button>
-    <button role="menuitem" tabindex="-1" id="tweak" title="用一句话让大模型改当前这张图，其余部分保持不动">AI 修改当前图…</button>
-  </div>
-  <div id="menu-analysis-panel" class="menu-panel" role="menu" aria-labelledby="menu-analysis" hidden>
-    <button data-command="waveforms" role="menuitem" tabindex="-1" >波形与模态…</button>
+  <div id="menu-simulation-panel" class="menu-panel" role="menu" aria-labelledby="menu-simulation" hidden>
     <button role="menuitem" tabindex="-1" id="spice">SPICE 仿真…</button>
+    <button id="modelMapping" role="menuitem" tabindex="-1">全图器件模型…</button>
+    <hr role="separator">
+    <button id="exportSpice" role="menuitem" tabindex="-1">导出 ngspice 网表…</button>
+    <button id="exportSimulink" role="menuitem" tabindex="-1">导出到 Simulink…</button>
+    <button id="exportPlecs" role="menuitem" tabindex="-1">导出到 PLECS…</button>
+    <button id="exportPsim" role="menuitem" tabindex="-1">导出到 PSIM…</button>
+  </div>
+  <div id="menu-experimental-panel" class="menu-panel" role="menu" aria-labelledby="menu-experimental" hidden>
     <button role="menuitem" tabindex="-1" id="emi">传导 EMI 估算…</button>
-    <button id="adopt" role="menuitem" tabindex="-1">以当前连接更新网表</button>
+    <button role="menuitem" tabindex="-1" id="impedance">输出阻抗分析…</button>
+    <button role="menuitem" tabindex="-1" id="dqImpedance">dq 阻抗矩阵…</button>
+    <button role="menuitem" tabindex="-1" id="impedanceRatio">源负载稳定性…</button>
+    <button role="menuitem" tabindex="-1" id="dqStability">dq 互联稳定性…</button>
+    <hr role="separator">
+    <button role="menuitem" tabindex="-1" id="parameterSearch">参数范围搜索…</button>
+  </div>
+  <div id="menu-modes-panel" class="menu-panel" role="menu" aria-labelledby="menu-modes" hidden>
+    <button data-command="autoModes" role="menuitem" tabindex="-1" >从仿真识别模态…</button>
     <hr role="separator">
     <button data-command="modePrevBtn" role="menuitem" tabindex="-1" >上一个模态<kbd>[</kbd></button>
     <button data-command="modeNextBtn" role="menuitem" tabindex="-1" >下一个模态<kbd>]</kbd></button>
+    <button data-command="modePick" data-sidebar-page="modes" role="menuitem" tabindex="-1" >在图上改模态</button>
+    <button data-command="modeDup" data-sidebar-page="modes" role="menuitem" tabindex="-1" >复制为新模态</button>
     <button data-command="modePreview" role="menuitem" tabindex="-1" >模态真实预览</button>
+    <hr role="separator">
+    <button data-command="waveforms" role="menuitem" tabindex="-1" >波形与模态…</button>
+    <button data-command="modeExport" role="menuitem" tabindex="-1" >导出全部模态图…</button>
+  </div>
+  <div id="menu-ai-panel" class="menu-panel" role="menu" aria-labelledby="menu-ai" hidden>
+    <button role="menuitem" tabindex="-1" id="describe" title="没有模板的新拓扑：由大模型写坐标表，校验器把关">描述新拓扑…</button>
+    <button role="menuitem" tabindex="-1" id="tweak" title="用一句话让大模型改当前这张图，其余部分保持不动">AI 修改当前图…</button>
+    <hr role="separator">
+    <button role="menuitem" tabindex="-1" id="aiSettings">AI 接口设置…</button>
   </div>
   <div id="menu-help-panel" class="menu-panel" role="menu" aria-labelledby="menu-help" hidden>
     <button id="menuUserGuide" role="menuitem" tabindex="-1" data-guide="USER_MANUAL.zh-CN.md">用户指南</button>
     <button id="menuPromptGuide" role="menuitem" tabindex="-1" data-guide="USER_MANUAL.zh-CN.md#ai">提示词说明</button>
-    <button id="menuAboutOpen" role="menuitem" tabindex="-1">关于…</button>
     <button id="menuHelpOpen" role="menuitem" tabindex="-1" >操作与快捷键…</button>
+    <hr role="separator">
+    <button id="menuAboutOpen" role="menuitem" tabindex="-1">关于…</button>
+  </div>
+  <div id="simulationSourceNotice" hidden role="status" style="padding:6px 12px;background:#fff4d6;border-top:1px solid var(--edge)">
+    <span id="simulationSourceText"></span> <button id="simulationSourceRefresh">重新识别…</button>
   </div>
 </header>
 <main>
@@ -267,7 +334,7 @@
     </div>
     <div id="resizeNotice" role="alert" aria-live="assertive" hidden><button id="dismissResize" aria-label="关闭尺寸提示">关闭</button><span id="resizeMessage"></span></div>
     <div id="editorNotice" role="status" aria-live="polite" hidden></div>
-    <div id="modeTip">画导线：单击加拐点，双击或回车结束，Esc 取消</div>
+    <div id="modeTip">画导线时单击加拐点，点击端口旁的三角连接，回车结束，Alt 暂停吸附，Esc 取消</div>
   </div>
   <aside id="inspector" aria-label="电路信息">
     <div class="inspector-tabs" role="tablist" aria-label="电路信息页">
@@ -292,21 +359,29 @@
     </section>
     </section>
     <section id="panel-modes" role="tabpanel" aria-labelledby="tab-modes" tabindex="0" hidden>
-    <h3>模态图</h3>
-    <select id="modeSel" style="width:100%;margin-top:6px"></select>
-    <div id="modeInfo" class="hint" style="margin-top:4px"></div>
-    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
-      <button id="modePrevBtn" title="上一个模态（[ 键）">◀</button><button id="modeNextBtn" title="下一个模态（] 键）">▶</button>
-      <button id="modePreview">模态真实预览</button>
-      <button id="modeExport">导出全部模态</button>
+    <div class="help-row"><h3>模态图</h3><details class="help-tip"><summary aria-label="模态说明" title="模态说明">?</summary><div class="help-body"><ol>
+      <li>一个模态由导通器件和电流回路组成，图上高亮导通路径，箭头表示电流方向。</li>
+      <li>工具只检查回路连接和器件导通方向，不检查偏置和工况是否允许这个模态。</li>
+      <li>在图上改模态：点开关依次切换 关断 → 沟道导通 → 体二极管续流 → 关断；点二极管切换导通 / 关断。工具会给新导通的器件补上最短的闭合回路（沿它能导通的方向），点回路箭头让整个回路反向。拖动改图时暂停。</li>
+      <li>模态名后标“仿真”的来自“从仿真识别模态”，标“手写”的是手写或在图上改的。</li>
+      <li>编辑当前模态（JSON）：on 写导通器件，体二极管导通写 S2:diode；loops 写电流回路，每个回路按电流方向依次写支路，变压器绕组写 T:p / T:s（中心抽头 T:s1、T:s2，附加绕组 T:w3～T:w6），并联写 Co|RL。不写 loops 时按 on 自动找回路，但没有箭头。</li>
+    </ol></div></details></div>
+    <div class="mode-row">
+      <button id="modePrevBtn" title="上一个模态（[ 键）">◀</button>
+      <select id="modeSel" aria-label="当前模态"></select>
+      <button id="modeNextBtn" title="下一个模态（] 键）">▶</button>
     </div>
-    <label class="hint"><input type="checkbox" id="modeMono"> 黑白打印样式（黑色粗线 + 灰色虚线）</label>
-    <div style="margin-top:6px"><button id="modePick" title="打开后点开关或二极管切换状态，点箭头让该回路反向；拖动改图暂停">在图上改模态</button>
-      <button id="modeDup" title="复制当前模态为新模态，再改变化的器件">复制为新模态</button></div>
-    <div class="hint" id="modePickHint" style="display:none">点开关：关断 → 沟道导通 → 体二极管续流 → 关断；点二极管：导通 / 关断。工具会给新导通的器件补上最短的闭合回路（沿它能导通的方向），点箭头可让整个回路反向。电路是否真的工作在这个状态，需要你自己判断。</div>
+    <div id="modeInfo" class="hint" role="status"></div>
     <ul id="modeHealth" style="list-style:none;padding:0;margin:6px 0 0"></ul>
+    <div class="mode-row"><button id="autoModes" title="运行仿真，按器件实测电流找出各个开关模态">从仿真识别模态…</button></div>
+    <div class="mode-row"><button id="modePick" title="打开后点开关或二极管切换状态，点箭头让该回路反向">在图上改模态</button>
+      <button id="modeDup" title="复制当前模态为新模态，再改变化的器件">复制为新模态</button></div>
+    <div class="hint" id="modePickHint" style="display:none">点开关或二极管切换状态，点箭头让回路反向。</div>
+    <div class="mode-row"><button id="modePreview">模态真实预览</button>
+      <button id="modeExport">导出全部模态</button></div>
+    <label class="hint"><input type="checkbox" id="modeMono"> 黑白打印样式（黑色粗线 + 灰色虚线）</label>
     <details style="margin-top:6px"><summary class="hint">编辑当前模态</summary>
-      <div class="hint">on：导通的开关和二极管（体二极管导通写 S2:diode）。loops：每个回路按电流方向依次写支路，变压器绕组写 T:p / T:s（中心抽头 T:s1、T:s2），并联写 Co|RL。不写 loops 时按 on 自动找回路，但没有箭头。</div>
+      <div class="hint">JSON：on 是导通器件，loops 是电流回路，写法见上方“?”。</div>
       <textarea id="modeEdit" rows="9" style="width:100%;font:12px/1.4 ui-monospace,Consolas,monospace;margin-top:4px"></textarea>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button id="modeApply">应用</button><button id="modeAdd">新增空模态</button><button id="modeDel">删除当前模态</button></div>
@@ -325,15 +400,15 @@
 
 <dialog id="menuHelp" class="menu-help" aria-labelledby="menuHelpTitle">
   <strong id="menuHelpTitle">操作与快捷键</strong>
-  <p>左键拖空白处框选顶层元件、导线、自由文字、区域、方框和箭头，Shift 加框选追加；Shift 点选增减对象。拖动已选对象可整体移动，剪切、复制、创建副本、删除也对整组生效，一步撤销。贴合区域需连同全部成员移动；模块内部请进入定义编辑。</p><p><kbd>R</kbd> 旋转，<kbd>F</kbd> 镜像 / 反向，<kbd>+ / -</kbd> 调符号大小。<kbd>Ctrl+X</kbd> 剪切，<kbd>Ctrl+C / Ctrl+V</kbd> 复制粘贴，<kbd>Ctrl+D</kbd> 创建副本，<kbd>Ctrl+Z</kbd> 撤销，<kbd>Ctrl+Y / Ctrl+Shift+Z</kbd> 重做，<kbd>Delete / Backspace</kbd> 删除。</p><p>画导线时单击加拐点，双击或 <kbd>Enter</kbd> 完成，<kbd>Esc</kbd> 取消。滚轮缩放，中键或按住空格加左键拖动平移；<kbd>[ / ]</kbd> 切换模态。</p>
+  <p>左键拖空白处框选顶层元件、导线、自由文字、区域、方框和箭头，Shift 加框选追加；Shift 点选增减对象。拖动已选对象可整体移动，剪切、复制、创建副本、删除也对整组生效，一步撤销。贴合区域需连同全部成员移动；模块内部请进入定义编辑。</p><p><kbd>R</kbd> 顺时针旋转，<kbd>Shift+R</kbd> 逆时针旋转，<kbd>F</kbd> 镜像 / 反向，<kbd>+ / -</kbd> 调符号大小。<kbd>Ctrl+X</kbd> 剪切，<kbd>Ctrl+C / Ctrl+V</kbd> 复制粘贴，<kbd>Ctrl+D</kbd> 创建副本，<kbd>Ctrl+Z</kbd> 撤销，<kbd>Ctrl+Y / Ctrl+Shift+Z</kbd> 重做，<kbd>Delete / Backspace</kbd> 删除。</p><p>画导线时单击加拐点，双击或 <kbd>Enter</kbd> 完成，<kbd>Esc</kbd> 取消。滚轮缩放，中键或按住空格加左键拖动平移；<kbd>[ / ]</kbd> 切换模态。</p>
   <p>选中一个对象或一组对象后，方向键移动一个网格（0.05 布局单位），Shift 加方向键移动 10 格；元件相连的导线跟随调整。单选导线折点时移动折点，选中线段时只沿垂直方向微调。输入框、菜单和弹窗内的方向键仍操作对应控件。</p>
   <p>右键元件、导线、模块或标注打开对应动作菜单；右键已选对象保留整组操作。空白处可按鼠标位置粘贴或插入。上下键选择、Enter 执行、Esc 关闭，左右键进入／返回子菜单；变灰项悬停说明原因。颜色、字号和尺寸仍在属性栏。</p>
   <p>右键元件可添加现有仿真支持的电压／电流／驱动测量，并打开测量通道确认；导线对地电压需先保存参考地。右键引脚可切换故意悬空，四路交叉处可切换相连／跨线。“相关问题”沿用问题栏的定位和允许的意图声明。</p>
   <p>已有导线：双击线段加折点，拖动横竖线段时保留首尾位置。单击小圆点后 Delete 删内部折点；属性页可拆分、合并和删除整条线。重叠处再次单击轮换导线，问题栏也可逐条选择或删除完全重复线。</p>
   <p>区域、方框和箭头：右键或“编辑 → 同类对象图层”可上移一层、下移一层、置顶、置底。<kbd>Ctrl+]</kbd> / <kbd>Ctrl+[</kbd> 上移／下移，加 <kbd>Shift</kbd> 置顶／置底。普通色块不跨到电路上方；前景块箭头仍由其外观选项控制。</p>
   <p>菜单支持方向键、Enter 选择、Esc 收起；点击画布也会收起。Mac 上可用 ⌘ 代替 Ctrl。</p>
-  <p>器件库可以点击或拖入画布；分类标题可收起，搜索会显示匹配项。阶跃 / 脉冲标记在“插入”菜单。</p>
-  <p>网表记录哪些引脚应该相连。只有有意改接线后，才使用“分析 → 以当前连接更新网表”。模态页按开关状态高亮电流回路，箭头表示电流方向。</p>
+  <p>器件库可以点击或拖入画布；分类标题可收起，搜索会显示匹配项。阶跃 / 脉冲标记在“插入 → 标注”。</p>
+  <p>网表记录哪些引脚应该相连。只有有意改接线后，才使用“编辑 → 按图更新网表”。模态页按开关状态高亮电流回路，箭头表示电流方向。</p>
   <button id="menuHelpClose">关闭</button>
 </dialog>
 <dialog id="startupDialog" aria-labelledby="startupTitle" style="max-width:480px">
@@ -388,7 +463,10 @@ const svg = document.getElementById("canvas");
 let layout = null, profile = "ieee-single", report = null, selected = null;
 let history = [], view = null, drag = null, wireDraft = null, badIds = new Set(), badPts = [];
 let redoHistory = [], redoBase = null;
-let boxDraft = null;   // {kind: "regions" | "blocks" | "callouts", a, b} while dragging out a new one
+let boxDraft = null;   // A new decoration, before committing its coordinates.
+let drawingStyles = {};
+try { drawingStyles = JSON.parse(localStorage.getItem('drawingStyles') || '{}') || {}; } catch { /* storage blocked */ }
+if (typeof drawingStyles !== 'object' || Array.isArray(drawingStyles)) drawingStyles = {};
 // Registered before module placement/focus handlers, so panning never places
 // a pending module or starts dragging an object under the pointer.
 window.addEventListener('pointerdown', ev => {
@@ -443,10 +521,31 @@ function updateHistoryControls(current = editorTableSnapshot(layout)) {
 }
 
 // ---------- view (y up, units) ----------
+let projectionSource = null;
+function moduleDrawingSource() {
+  const source = projectionSource || layout;
+  return modulePreview && modulePreview.before === JSON.stringify(source) ? modulePreview.table : source;
+}
+function moduleOffsets(source = moduleDrawingSource(), info = report?.module_info) {
+  const offsets = new Map();
+  for (const inst of source?.modules?.instances || []) {
+    const origin = info?.origins?.[inst.id];
+    if (origin && Array.isArray(inst.at) && inst.at.length === 2 && inst.at.every(Number.isFinite) && !same(origin, inst.at))
+      offsets.set(inst.id, inst.at.map((v, k) => r4(v - origin[k])));
+  }
+  return offsets;
+}
+function currentModulePorts(info, offsets) {
+  return Object.fromEntries(Object.entries(info?.ports || {}).map(([ref, at]) =>
+    [ref, shiftedPoint(at, offsets.get(info.port_owners?.[ref] || ref.slice(0, ref.lastIndexOf('.'))) || [0, 0])]));
+}
 function projected(fn) {
-  const source = layout;
-  if (source?.modules && report?.module_info) layout = currentView(source, report.module_info);
-  try { return fn(); } finally { layout = source; }
+  const source = layout, previous = projectionSource;
+  if (source?.modules && report?.module_info) {
+    projectionSource = moduleDrawingSource();
+    layout = currentView(projectionSource, report.module_info);
+  }
+  try { return fn(); } finally { layout = source; projectionSource = previous; }
 }
 // The server's drawn view is as old as the last check. The table's own parts
 // and wires are drawn where they are now, so a dragged part follows the
@@ -454,7 +553,24 @@ function projected(fn) {
 // the next check routes it.
 function currentView(source, info) {
   const view = info.view, own = new Map(source.elements.map(e => [e.id, e]));
+  const offsets = moduleOffsets(source, info);
+  const ports = currentModulePorts(info, offsets);
+  for (const e of view.elements) {
+    const delta = offsets.get(e.id.split('/')[0]);
+    if (delta && e.id.includes('/')) own.set(e.id, {...e, pins: Object.fromEntries(
+      Object.entries(e.pins).map(([pin, at]) => [pin, shiftedPoint(at, delta)]))});
+  }
   const parts = new Set(info.auto_parts || []);
+  for (const part of source.modules.parts || []) {
+    const drawn = view.elements.find(e => e.id === part.id);
+    if (!drawn) continue;
+    const previous = info.part_offsets?.[part.id] || [0, 0], offset = part.offset || [0, 0];
+    const following=drag?.group && drag.plan?.parts?.includes(part.id)
+      ? offsets.get(drag.plan.instances.find(id=>drag.plan.origins[id])) || [0,0] : [0,0];
+    const delta = offset.map((v, k) => v - previous[k] + following[k]);
+    own.set(part.id, {...drawn, pins: Object.fromEntries(Object.entries(drawn.pins)
+      .map(([pin, at]) => [pin, shiftedPoint(at, delta)]))});
+  }
   // only the geometry: the assembler may have labelled a table part (net names)
   const elements = view.elements.filter(e => e.id.includes("/") || parts.has(e.id) || own.has(e.id))
     .map(e => own.has(e.id) && JSON.stringify(own.get(e.id).pins) !== JSON.stringify(e.pins) ? {...e, pins: own.get(e.id).pins} : e);
@@ -462,30 +578,62 @@ function currentView(source, info) {
   for (const e of source.elements) if (!drawn.has(e.id)) elements.push(e);   // added since the check
   let wires = view.wires;
   const roots = info.root_wires || {};
-  if (info.root_wire_count === source.wires.length) {     // indices still mean the same wires
-    wires = view.wires.map((w, j) => roots[j] !== undefined ? source.wires[roots[j]] : w);
-    const before = new Map(view.elements.map(e => [e.id, e]));
+  const groupMoving=drag?.group && drag.plan?.origins;
+  if (info.root_wire_count === source.wires.length || groupMoving) {
+    const root = {elements: source.elements, wires: source.wires};
+    const pins = Object.fromEntries(Object.entries(info.ports || {}).filter(([ref, at]) => !same(at, ports[ref])));
+    if (Object.keys(pins).length && !groupMoving) pinMover({pins: clone(pins)}, root)(Object.fromEntries(
+      Object.keys(pins).map(ref => [ref, ports[ref]])));
+    wires = view.wires.map((w, j) => roots[j] !== undefined ? root.wires[roots[j]] || [] : w);
+    for (const [id, [first, end]] of Object.entries(info.instance_wires || {})) {
+      const delta = offsets.get(id);
+      if (delta) for (let j = first; j < end; j++) wires[j] = wires[j].map(p => shiftedPoint(p, delta));
+    }
+    const before = new Map(view.elements.flatMap(e => Object.entries(e.pins).map(([pin, at]) => [`${e.id}.${pin}`, at])));
+    const after = new Map(elements.flatMap(e => Object.entries(e.pins).map(([pin, at]) => [`${e.id}.${pin}`, at])));
+    for (const [ref, at] of Object.entries(info.ports || {})) {
+      before.set(ref, at); after.set(ref, ports[ref]);
+    }
     for (const {wire, link} of info.link_wires || []) {
       const moved = link.map(ref => {
-        const [id, pin] = [ref.slice(0, ref.lastIndexOf(".")), ref.slice(ref.lastIndexOf(".") + 1)];
-        const now = own.get(id)?.pins?.[pin], then = before.get(id)?.pins?.[pin];
-        return now && then && (now[0] !== then[0] || now[1] !== then[1]) ? {now, then} : null;
+        const now = after.get(ref), then = before.get(ref);
+        return now && then && !same(now, then) ? {now, then} : null;
       }).filter(Boolean);
       const path = wires[wire];
-      if (moved.length !== 1 || !path?.length) continue;
-      const {now, then} = moved[0], near = q => Math.abs(q[0] - then[0]) < 1e-6 && Math.abs(q[1] - then[1]) < 1e-6;
-      const far = near(path[0]) ? path[path.length - 1] : near(path[path.length - 1]) ? path[0] : null;
-      if (!far) continue;
-      wires = wires === view.wires ? wires.slice() : wires;
-      wires[wire] = now[0] === far[0] || now[1] === far[1] ? [now, far] : [now, [far[0], now[1]], far];
+      if (!path?.length) continue;
+      for (const {now, then} of moved) {
+        if (same(path[0], then)) wires[wire] = moveWirePoint(wires[wire], 0, now, true);
+        else if (same(path.at(-1), then)) wires[wire] = moveWirePoint(wires[wire], wires[wire].length - 1, now, true);
+      }
     }
+    wires.push(...root.wires.slice(groupMoving ? info.root_wire_count : source.wires.length));
   }
   const decorations={};
   for(const [section,mapping] of Object.entries(info.root_decorations||{})){
     if(Object.keys(mapping).length!==(source[section]||[]).length)continue;
     decorations[section]=(view[section]||[]).map((item,i)=>mapping[i]===undefined?item:source[section][mapping[i]]);
   }
-  return {...view,elements,wires,...decorations};
+  const annotations = decorations.annotations || view.annotations || [];
+  decorations.annotations = annotations.map((a, i) => {
+    const title = info.titles?.[i];
+    if (!title) return a;
+    const offset = source.modules.instances.find(inst => inst.id === title.id)?.appearance?.title_offset || [0, 0];
+    return {...a, at: a.at.map((v, k) => v + offset[k] - title.offset[k])};
+  });
+  let hops = view.hops.slice();
+  for (const [id, sections] of Object.entries(info.instance_decorations || {})) {
+    const delta = offsets.get(id), range = sections.hops;
+    if (delta && range) for (let j = range[0]; j < range[1]; j++) hops[j] = shiftedPoint(hops[j], delta);
+  }
+  const owned = new Set();
+  for (const h of info.root_hops || []) {
+    const i = view.hops.findIndex((p, j) => !owned.has(j) && same(p, h));
+    if (i >= 0) owned.add(i);
+  }
+  hops = hops.filter((_, i) => !owned.has(i)).concat(source.hops || []);
+  hops = hops.filter((p, i) => hops.findIndex(q => same(p, q)) === i);
+  return {...view,elements,wires,hops,...decorations,
+    control_view:source.control_view,closed_loop:source.closed_loop};
 }
 function fitView() { const result = projected(fitDrawingView); fittedViewWidth = view.w; return result; }
 function fitDrawingView() {
@@ -498,7 +646,7 @@ function fitDrawingView() {
   layout.wires.forEach(w => w.forEach(p => pts.push(p)));
   (layout.annotations || []).forEach(a => pts.push(a.at));
   (Array.isArray(layout.wave_symbols) ? layout.wave_symbols : []).forEach(w => { if (Array.isArray(w.at)) pts.push(w.at); });
-  ["regions", "callouts", "blocks"].forEach(k => (Array.isArray(layout[k]) ? layout[k] : []).forEach(r => {
+  ["regions", "callouts", "blocks", "glyphs"].forEach(k => (Array.isArray(layout[k]) ? layout[k] : []).forEach(r => {
     if (Array.isArray(r.from)) pts.push(r.from); if (Array.isArray(r.to)) pts.push(r.to); }));
   (report?.regions || []).forEach(r => (r?.rects || []).forEach(b => pts.push(b.slice(0, 2), b.slice(2))));
   if (!pts.length) {
@@ -529,7 +677,7 @@ const TEX_SYMBOLS = {
   perp: "⊥", top: "⊤", pm: "±", mp: "∓", cdot: "·", times: "×", div: "÷", infty: "∞", approx: "≈",
   sim: "∼", propto: "∝", le: "≤", leq: "≤", ge: "≥", geq: "≥", ne: "≠", neq: "≠", to: "→",
   rightarrow: "→", leftarrow: "←", leftrightarrow: "↔", angle: "∠", circ: "∘", partial: "∂",
-  parallel: "∥", ldots: "…", cdots: "⋯", quad: "\u2003", qquad: "\u2003\u2003", left: "", right: "",
+  parallel: "∥", ldots: "…", cdots: "⋯", vdots: "⋮", quad: "\u2003", qquad: "\u2003\u2003", left: "", right: "",
   max: "max", min: "min", sin: "sin", cos: "cos", tan: "tan", ln: "ln", log: "log", exp: "exp",
 };
 function texSymbols(s) {
@@ -593,7 +741,7 @@ function texToSvg(parent, tex, x, y, size) {
   const t = el("text", {x, y: -y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central",
     "font-family": "Times New Roman, Times, serif", "font-style": "italic"}, parent);
   // TeX sets capital Greek and operator symbols upright; letters stay italic
-  const UPRIGHT = /([ΓΔΘΛΞΠΣΥΦΨΩ⊥⊤±∓·×÷∞≈∼∝≤≥≠→←↔∠∘∥…⋯]+)/;
+  const UPRIGHT = /([ΓΔΘΛΞΠΣΥΦΨΩ⊥⊤±∓·×÷∞≈∼∝≤≥≠→←↔∠∘∥…⋯⋮]+)/;
   // A line begun on the base line skips the scripts it spans (one bar over the
   // letter, not a second one at script height); one begun inside a script stays there.
   const lines = {over: null, under: null};
@@ -653,12 +801,15 @@ function bodyEnds(e, box) {
 function drawElement(e, geo, root, glyphOnly = false) {
   const g = glyphOnly ? root : el("g", {"data-id": e.id, class: "element"}, root);
   if (e.opts?.dash && e.opts.dash !== "solid") g.setAttribute("stroke-dasharray", e.opts.dash === "dotted" ? ".02 .06" : ".1 .07");
-  if ((selected && selected.type === "el" && selected.id === e.id) || (typeof moduleSelection !== "undefined" && moduleSelection.has(e.id))) g.classList.add("sel");
+  if ((selected && ["el", "modulePart"].includes(selected.type) && selected.id === e.id) || (typeof moduleSelection !== "undefined" && moduleSelection.has(e.id))) g.classList.add("sel");
   if (badIds.has(e.id)) g.classList.add("bad");
   inkOn(g, !glyphOnly && report && report.inks && report.inks.elements[e.id]);
   const box = geo && geo.bodies && geo.bodies[0];
   const P = e.pins;
-  if (TWO_TERMINAL.includes(e.kind) && box && geo.diag) {
+  if (geo?.resistor_path && box) {
+    el("polyline", {points: geo.resistor_path.map(([x,y])=>`${x},${-y}`).join(" "), class:"glyph resistor-zigzag", fill:"none"}, g);
+    el("rect", {x:box[0]-.06,y:-box[3]-.06,width:box[2]-box[0]+.12,height:box[3]-box[1]+.12,class:"hit"}, g);
+  } else if (TWO_TERMINAL.includes(e.kind) && box && geo.diag) {
     // 45 degrees: leads to the body ends, then the horizontal glyph turned with the part
     const {u, half_len: hl, half_h: hh} = geo.diag;
     const c = [(P.a[0] + P.b[0]) / 2, (P.a[1] + P.b[1]) / 2];
@@ -760,7 +911,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
     line(g, [box[0], cy], [ch - 0.07 * kx, cy]);
     if (e.kind === "pmos") {
       const [rx, ry] = geo.orient.gate_dot;
-      el("ellipse", {cx: ch - 0.07 * kx - rx, cy: -cy, rx, ry, class: "glyph gate-dot", fill: "currentColor"}, g);
+      el("ellipse", {cx: ch - 0.07 * kx - rx, cy: -cy, rx, ry, class: "glyph gate-dot", fill: e.opts?.symbol_style === "ic" ? "white" : "currentColor"}, g);
     }
     if ((e.opts || {}).diode !== false) {
       // class bd: the body diode, coloured on its own in the mode view
@@ -768,6 +919,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
       line(g, [dx, cy + 0.32 * ky], [dx, cy - 0.32 * ky], "glyph bd");
       const hx = 0.07 * kx, hy = 0.07 * ky;
       el("polygon", {points: `${dx - hx},${-(cy - hy)} ${dx + hx},${-(cy - hy)} ${dx},${-(cy + hy)}`, class: "glyph bd", fill: "currentColor"}, g);
+      if (e.opts?.symbol_style === "ic") g.querySelectorAll('.bd').forEach(b=>{b.classList.add('ic-diode');b.style.display='none';});
     }
     el("rect", {x: box[0] - 0.04, y: -(Math.max(top[1], box[3]) + 0.04), width: box[2] - box[0] + 0.08,
                 height: Math.abs(top[1] - bot[1]) + 0.08, class: "hit"}, g);
@@ -788,7 +940,8 @@ function drawElement(e, geo, root, glyphOnly = false) {
       const top = [mid[0] + u[0] * hl, mid[1] + u[1] * hl], bot = [mid[0] - u[0] * hl, mid[1] - u[1] * hl];
       line(g, a, top); line(g, bot, b);
       const hw = (vertical ? box[2] - box[0] : box[3] - box[1]) / 2;
-      if (i === 0) drawCoil(g, top, bot, true, hw); else drawCoil(g, bot, top, true, hw);
+      // coils on the primary axis (p and any extra winding there) face the core one way, the rest the other
+      if ((geo.coil_sides || [])[i] === "p" || (!geo.coil_sides && i === 0)) drawCoil(g, top, bot, true, hw); else drawCoil(g, bot, top, true, hw);
     });
     geo.core_lines.forEach(([a, b]) => line(g, a, b));
     (geo.dots || []).forEach(d => el("circle", {cx: d[0], cy: -d[1], r: 0.045, fill: "currentColor"}, g));
@@ -841,9 +994,41 @@ function drawElement(e, geo, root, glyphOnly = false) {
 
 function drawGrid(root) { drawCanvasGrid(root); }
 
+function drawingJunctions() {
+  if (!moduleOffsets().size) return report?.junctions || [];
+  // Preview incidence at live pins/vertices; the server still checks the committed circuit.
+  const points = new Map(), segments = [];
+  const add = p => {
+    const key = p.map(r4).join(',');
+    if (!points.has(key)) points.set(key, {at:p, degree:0});
+    points.get(key).degree++;
+  };
+  for (const e of layout.elements) for (const p of Object.values(e.pins)) add(p);
+  for (const w of layout.wires) for (let j=1; j<w.length; j++) {
+    if (same(w[j-1], w[j])) continue;
+    add(w[j-1]); add(w[j]); segments.push([w[j-1], w[j]]);
+  }
+  for (const point of points.values()) for (const [a,b] of segments)
+    if (!same(point.at,a) && !same(point.at,b) && inside(point.at,a,b)) point.degree += 2;
+  return [...points.values()].filter(p => p.degree >= 3 && !layout.hops.some(h => same(h,p.at))).map(p => p.at);
+}
+
 // These bands mirror emit(): list order only controls objects within a band.
 function calloutLayer(c) { return (c.style || 'block') !== 'block' ? 'lines' : c.foreground ? 'foreground' : 'background'; }
-function render(keepWireTargets = false) { const out = projected(() => renderDrawing(keepWireTargets === true)); drawResizeHandles(); projected(drawElectrical); projected(() => drawCallouts(svg, 'foreground')); svg.querySelectorAll('.vtx').forEach(h => svg.appendChild(h)); if (typeof drawGuides === "function") drawGuides(); if (typeof drawModuleFocus === "function") drawModuleFocus(); if(typeof drawGroupSelection==='function')drawGroupSelection(); updateEditorChrome(); if (typeof updateLayerControls === 'function') updateLayerControls(); return out; }
+function render(keepWireTargets = false) {
+  const out = projected(() => renderDrawing(keepWireTargets === true));
+  drawResizeHandles(); projected(drawElectrical); projected(() => drawCallouts(svg, 'foreground'));
+  svg.querySelectorAll('.vtx').forEach(h => svg.appendChild(h));
+  if (typeof drawGuides === "function") drawGuides();
+  if (typeof drawModuleFocus === "function") drawModuleFocus();
+  if (typeof drawGroupSelection === 'function') drawGroupSelection();
+  drawModuleMotion();
+  const hint = document.getElementById('wireSnapHint');
+  if (hint) svg.appendChild(hint);
+  updateEditorChrome();
+  if (typeof updateLayerControls === 'function') updateLayerControls();
+  return out;
+}
 document.getElementById('regionMono').addEventListener('change', () => render());
 function renderDrawing(keepWireTargets = false) {
   // Selection redraws other objects, but keeps the wire's actual mouse targets
@@ -859,7 +1044,7 @@ function renderDrawing(keepWireTargets = false) {
     .el-body{stroke-width:.028} .hit{fill:transparent;cursor:move}
     .wire{stroke:#1d1d1f;stroke-width:.028;fill:none} .wire.bad{stroke:var(--bad)}
     .wire.sel{stroke:var(--accent);stroke-width:.045} .wirehit{stroke:transparent;stroke-width:.18;fill:none;cursor:move}
-    .vtx{fill:#fff;stroke:var(--accent);stroke-width:.02;cursor:grab} .element{color:#1d1d1f} .inked .el-body{stroke:currentColor}
+    .vtx{fill:#fff;stroke:var(--accent);stroke-width:.02;cursor:grab} .vtx.connected{stroke:#1f8a4c} .element{color:#1d1d1f} .inked .el-body{stroke:currentColor}
     .element.bad{color:var(--bad)} .element.sel{color:var(--accent)} .inked text{fill:currentColor}`;
   el("rect", {x: view.x0 - 50, y: -(view.y0 + view.h) - 50, width: view.w + 100, height: view.h + 100, fill: "#fff", class: "bg"}, svg);
   drawGrid(svg);
@@ -916,17 +1101,19 @@ function renderDrawing(keepWireTargets = false) {
   });
   // elements
   const eg = el("g", {}, svg);
-  layout.elements.forEach(e => drawElement(e, geo[e.id], eg));
+  layout.elements.forEach(e => drawElement(e, shiftedGeometry(e, geo[e.id]), eg));
   // annotations
   (layout.annotations || []).forEach((a, i) => {
     const sourceIndex=report?.module_info?report.module_info.root_decorations?.annotations?.[i]:i;
     const g = el("g", {"data-ann":i,class: "element" + (selected && selected.type === "ann" && selected.index === sourceIndex ? " sel" : "")}, svg);
+    const moduleTitle = report?.module_info?.titles?.[i];
+    if (moduleTitle) g.dataset.moduleTitle = moduleTitle.id;
     inkOn(g, report && report.inks && report.inks.annotations[i]);
     if (a.arrow) {
       const rot = {right: 0, up: -90, left: 180, down: 90}[a.arrow];
       el("polygon", {points: "-.07,-.05 .07,0 -.07,.05", fill: "currentColor", transform: `translate(${a.at[0]} ${-a.at[1]}) rotate(${rot})`}, g);
     }
-    const b = report && report.annotations && report.annotations[i];
+    const b = !moduleTitle && annotationBox(i, a);
     const t = texToSvg(g, a.text, b ? (b[0] + b[2]) / 2 : a.at[0], b ? (b[1] + b[3]) / 2 : a.at[1], 0.3 * (a.size || 8) / 8);
     t.style.cursor = "move";
     t.addEventListener("pointerdown", ev => startDragAnn(ev, i));
@@ -934,17 +1121,23 @@ function renderDrawing(keepWireTargets = false) {
   drawGlyphs(svg);
   drawWaveSymbols(svg);
   // junction dots
-  ((report && report.junctions) || []).forEach(j => {
+  drawingJunctions().forEach(j => {
     const sel = selected && selected.type === "node" && same(selected.at, j);
     el("circle", {cx: j[0], cy: -j[1], r: sel ? 0.075 : 0.05, fill: sel ? "#2457d6" : "#1d1d1f"}, svg);
     const hit = el("circle", {cx: j[0], cy: -j[1], r: 0.09, fill: "transparent", style: "cursor:pointer"}, svg);
     hit.addEventListener("pointerdown", ev => { if (wireDraft) return; ev.stopPropagation(); select({type: "node", at: j.slice()}); });
   });
   // bad points
-  badPts.forEach(p => el("circle", {cx: p[0], cy: -p[1], r: 0.13, fill: "none", stroke: "#d12f2f", "stroke-width": .03, "pointer-events": "none"}, svg));
+  const livePins = new Map(layout.elements.flatMap(e =>
+    Object.entries(e.pins).map(([name, at]) => [`${e.id}.${name}`, at])));
+  badPts.forEach(mark => {
+    // Error markers follow the pin, wire or part they sit on while validation is pending.
+    const p = liveBadPoint(mark, livePins);
+    if (p) el("circle", {cx: p[0], cy: -p[1], r: 0.13, fill: "none", stroke: "#d12f2f", "stroke-width": .03, "pointer-events": "none"}, svg);
+  });
   // wire draft
   if (wireDraft && wireDraft.pts.length) {
-    const pts = [...wireDraft.pts, wireDraft.hover].filter(Boolean);
+    const pts = [...wireDraft.pts, ...draftWireExtension(wireDraft.hover, !!wireDraft.target)];
     el("polyline", {points: pts.map(p => `${p[0]},${-p[1]}`).join(" "), stroke: "#2457d6", "stroke-width": .03,
       fill: "none", "stroke-dasharray": ".08 .05"}, svg);
   }
@@ -952,6 +1145,7 @@ function renderDrawing(keepWireTargets = false) {
   drawCallouts(svg, 'lines');
   // Selected wire handles stay clickable above labels and junction hit targets.
   svg.querySelectorAll(".vtx").forEach(handle => svg.appendChild(handle));
+  drawWirePinTargets();
 }
 
 // Module drawings are projections of the source table. The table's own parts,
@@ -964,19 +1158,19 @@ function moduleControls() {
   document.getElementById("modules").hidden = !active;
   const viewSelect = document.getElementById("moduleView");
   const linked = active && !!layout.modules.links;
-  // Port-linked tables fold per instance (double-click / right-click); the
-  // stacked whole-figure view stays for older tables until they are converted.
-  viewSelect.hidden = !active || linked; viewSelect.value = layout.module_view || "expanded";
+  const instanceGroups = Object.values(layout.stack_usage || {}).filter(u => u?.purpose === "instances");
+  viewSelect.hidden = !active || (linked && !instanceGroups.length);
+  viewSelect.value = layout.module_view === "folded" && instanceGroups.length &&
+    instanceGroups.every(u => u.style === "ellipsis") ? "ellipsis" : layout.module_view || "expanded";
   document.getElementById("moduleUpgrade").hidden = !active || linked;
-  // switching modes across module ports is not modelled (the assembler refuses modes)
-  // nor inside a module definition being edited: its draft is not the project
+  // A module definition draft is not the complete electrical project.
   const drafting = typeof definitionEdit !== "undefined" && !!definitionEdit;
   for (const id of ["modePick","modeDup","modeApply","modeAdd","modeDel","modePreview","modeExport"])
-    document.getElementById(id).disabled = active || drafting;
+    document.getElementById(id).disabled = drafting;
   if (active && !selected && !(typeof moduleFocusActive === "function" && moduleFocusActive())) {
     const info = report?.module_info, box = document.getElementById("props");
     // older stacked tables fold as a whole group from the View menu
-    const toggle = linked ? "双击展开或折叠" : "整组展开／折叠用“视图 → 模块显示”";
+    const toggle = linked && !instanceGroups.length ? "双击展开或折叠" : "整组展开／折叠用“视图 → 模块显示”";
     box.className = "hint";
     box.textContent = info ? `共 ${info.instances.length} 个实例、${info.element_count} 个实际器件。顶层照常画图；点选实例可改参数和外观，按住拖动整体移动，${toggle}；从引脚画导线到端口即建立连接。内部元件右键“编辑模块定义”修改，所有同类实例一起更新。用“添加模块…”复用项目库。` : "请打开“模块定义”修正源表。";
   }
@@ -986,7 +1180,8 @@ function moduleControls() {
 const RESIZE_GRAB = 0.3;
 function boxRect(id) {
   const r = (report?.module_info?.view?.regions || []).find(r => r.id === id + "/box");
-  return r && [Math.min(r.from[0], r.to[0]), Math.min(r.from[1], r.to[1]), Math.max(r.from[0], r.to[0]), Math.max(r.from[1], r.to[1])];
+  const d = moduleOffsets().get(id) || [0, 0];
+  return r && [Math.min(r.from[0], r.to[0])+d[0], Math.min(r.from[1], r.to[1])+d[1], Math.max(r.from[0], r.to[0])+d[0], Math.max(r.from[1], r.to[1])+d[1]];
 }
 function drawResizeHandles() {
   if (!layout?.modules?.links) return;
@@ -998,6 +1193,8 @@ function drawResizeHandles() {
 }
 let resizing = null, resizeVersion = 0;
 svg.addEventListener("pointerdown", ev => {
+  if (modePick) return; // Let the visible device or current arrow edit the full mode.
+  if (ev.target.closest('[data-wire-pin]')) return;
   if (modulePointerDown(ev)) return;
   if (!layout?.modules?.instances?.length || ev.button !== 0 || wireDraft || boxDraft) return;
   const [x, y] = toUnits(ev);
@@ -1038,7 +1235,7 @@ async function resizeModuleInstance(id, size, before = JSON.stringify(layout), v
   render();
   try {
     const previous = await api("/api/check", {layout: JSON.parse(before), profile});
-    const checked = await checkModuleGeometry(candidate, previous);
+    const checked = await checkModuleGeometry(candidate, JSON.parse(before));
     if (JSON.stringify(layout) !== before || version !== resizeVersion) return; // a newer edit owns the canvas
     const remaining = new Map();
     for (const i of previous.issues.filter(i => i.level === "error")) {
@@ -1068,7 +1265,7 @@ async function resizeModuleInstance(id, size, before = JSON.stringify(layout), v
       }
       return;
     }
-    pushHistory(); layout = candidate; report = checked;
+    pushHistory(); layout = candidate; report = stampReport(checked, candidate);
     if (!report) { checking = false; checkAgain = false; return revalidate(); }
   showIssues(); render(); updateElectricalPanel();
   } catch (err) {
@@ -1090,7 +1287,7 @@ document.addEventListener("keydown", ev => {
   }
 }, true);
 // Double-click or right-click one instance to collapse or expand just it.
-// Only the instance's display switch is stored; link wires are re-derived.
+// Expanding may make room in the source table; the whole edit is one undo step.
 function instanceAt(evt) {
   const child = evt.target?.closest?.("g.element[data-id]")?.dataset.id;
   const parent = child?.split("/")[0];
@@ -1113,33 +1310,36 @@ async function toggleInstance(evt) {
   await setModuleDisplay(id, cycle[(cycle.indexOf(inst.display || "expanded") + 1) % cycle.length]);
 }
 async function setModuleDisplay(id, display) {
-  const before = JSON.stringify(layout), candidate = clone(layout);
-  candidate.modules.instances.find(i => i.id === id).display = display;
+  const before = JSON.stringify(layout), candidate = clone(layout), requestedProfile=profile;
+  candidate.modules.instances.filter(i => (id===null || i.id===id) && (i.display || 'expanded')!==display).forEach(i=>{i.display=display;});
+  if (JSON.stringify(candidate)===before) return;
   try {
-    const result = await checkModuleGeometry(candidate, report);
-    if (JSON.stringify(layout) !== before) return;
-    pushHistory(); layout = candidate; report = result; selected = null;
-    await revalidate(); fitView(); render();
+    const result = await checkModuleGeometry(candidate, JSON.parse(before), true);
+    if (JSON.stringify(layout) !== before || profile!==requestedProfile) return;
+    pushHistory(); layout = candidate; report = stampReport(result, candidate); selected = null;
+    // The expansion response already checked this exact candidate. A second
+    // request is only needed for ledger/live-netlist data or an overlapping edit.
+    if (checking || checkAgain || layout.electrical || !document.getElementById('liveNetlist').hidden) await revalidate();
+    else await refreshReport();
+    fitView(); render();
+    if (report.issues.some(i=>i.code==='drawing-scale-width')) flash('已留出空间；图纸超出当前栏宽，导出前请调整整体缩放或图纸比例。');
   } catch (error) { flash(error.message, true); }
 }
 // Keep ordinary wire endpoints attached when the displayed public pins move.
-async function checkModuleGeometry(candidate, previous) {
+async function checkModuleGeometry(candidate, previous, makeSpace = false) {
   ++pendingTrialChecks; checking = true;
   try {
-    let result = await api("/api/check", {layout: candidate, profile});
-    const pins = {}, next = {};
-    for (const [ref, at] of Object.entries(previous?.module_info?.ports || {})) {
-      const target = result.module_info?.ports[ref];
-      if (target && !same(at, target)) { pins[ref] = at; next[ref] = target; }
-    }
-    if (Object.keys(pins).length) {
-      pinMover({pins}, candidate)(next);
-      result = await api("/api/check", {layout: candidate, profile});
-    }
-    return result;
+    const result = await api("/api/module-geometry", {layout: candidate, before: previous, profile, make_space:makeSpace});
+    if (!Array.isArray(result?.wires) || !Array.isArray(result.report?.issues) || makeSpace && !result.layout?.modules)
+      throw new Error("模块几何更新未完成，请重试。");
+    if (makeSpace && result.layout) {
+      for (const key of Object.keys(candidate)) delete candidate[key];
+      Object.assign(candidate,result.layout);
+    } else candidate.wires = result.wires;
+    return result.report;
   } finally {
     --pendingTrialChecks; checking = validating || pendingTrialChecks > 0;
-    if (!checking && checkAgain) { checkAgain = false; revalidate(); }
+    if (!checking && checkAgain) { checkAgain = false; scheduleCheck(); }
   }
 }
 svg.addEventListener("dblclick", toggleInstance, true);
@@ -1154,11 +1354,31 @@ document.getElementById("moduleUpgrade").onclick = async () => {
   } catch (e) { document.getElementById("props").textContent = "转换失败：" + e.message; }
 };
 document.getElementById("moduleView").onchange = async ev => {
-  pushHistory(); layout.module_view = ev.target.value; selected = null;
+  const mode = ev.target.value, before = JSON.stringify(layout), candidate = JSON.parse(before);
+  candidate.module_view = mode === "expanded" ? "expanded" : "folded";
+  if (mode !== "expanded") for (const usage of Object.values(candidate.stack_usage || {})) {
+    if (usage?.purpose === "instances") usage.style = mode === "ellipsis" ? "ellipsis" : "stack";
+  }
+  const trial = await trialCheck(candidate);
+  if (JSON.stringify(layout) !== before) { moduleControls(); return; }
+  const broken = !trial ? "校验没有完成" : trial.issues?.find(i => i.code === "bad-module")?.message ||
+    (trial.module_info ? "" : "模块拼装失败");
+  if (broken) { flash(`没有改模块显示：${zhModule(broken)}。原图已保留`, true); moduleControls(); return; }
+  pushHistory(); layout = candidate; selected = null;
   await revalidate(); fitView(); render();
 };
+function moduleCapacityHTML() {
+  const entries = Object.entries(report?.module_info?.capacity || {});
+  if (!entries.length) return "";
+  return `<div class="module-capacity"><b>尺寸预算</b><p class="hint">展开图含标签与色块，按允许的最小比例估算横排数量；实际接线仍需校验。栏宽未限制页面高度，竖排没有固定数量上限。</p>
+    <table><thead><tr><th>模块</th><th>1:1 宽 × 高（cm）</th><th>单栏横排</th><th>双栏横排</th></tr></thead><tbody>${entries.map(([name, item]) =>
+      `<tr><td translate="no">${esc(name)}</td>${item.empty ? '<td colspan="3">空子系统</td>' :
+        `<td>${item.width_cm.toFixed(2)} × ${item.height_cm.toFixed(2)}</td><td>${item.columns.single.horizontal}</td><td>${item.columns.double.horizontal}</td>`}</tr>`).join("")}</tbody></table>
+    <p class="hint">若横排为 0，竖排也需折叠或更宽的栏位。可考虑竖排、折叠或切换双栏。</p></div>`;
+}
 document.getElementById("modules").onclick = () => {
   showDialog("模块定义与实例", `<p>编辑原始 JSON：在 definitions 中改共用模板，instances 中改位置、端口绑定和参数差异。展开坐标不会写回源文件。</p>
+    ${moduleCapacityHTML()}
     <textarea id="moduleSource" rows="20" style="width:100%;font-family:monospace"></textarea>
     <button id="moduleApply" class="primary">校验并应用</button><p id="moduleState" role="status"></p>`);
   document.getElementById("moduleSource").value = JSON.stringify(layout, null, 2);
@@ -1174,7 +1394,7 @@ async function applyModuleSource(candidate) {
   const body = document.getElementById("dlgBody");
   const before = JSON.stringify(layout), content = body.firstChild;
   const result = JSON.stringify(candidate.wires) === JSON.stringify(layout.wires)
-    ? await checkModuleGeometry(candidate, report) : await api("/api/check", {layout: candidate, profile});
+    ? await checkModuleGeometry(candidate, JSON.parse(before)) : await api("/api/check", {layout: candidate, profile});
   if (JSON.stringify(layout) !== before) throw new Error("等待模块操作时图纸已改变，已保留当前编辑，请重试。");
   if (!result.ok) throw new Error(result.issues.map(i => i.message).join("\n"));
   pushHistory(); layout = candidate; selected = null;
@@ -1195,6 +1415,8 @@ function drawWaveSymbols(root) {
     if (!w) return;
     const sel = selected && selected.type === "wave_symbols" && selected.index === i;
     const g = el("g", {class:"element" + (sel ? " sel" : ""), "data-wave-symbol":i}, root);
+    const was = reportBasis.get(report)?.symbols[i], at = layout.wave_symbols?.[i]?.at;
+    if (was && at) g.setAttribute("transform", `translate(${at[0] - was[0]} ${was[1] - at[1]})`);
     inkOn(g, document.getElementById("regionMono").checked || (modeIdx >= 0 && modeStyle().mono) ? "#1d1d1f" : w.color);
     if (w.knockout) {           // on_wire: the wire under the mark is hidden, as in the export
       const k = w.knockout;
@@ -1207,7 +1429,7 @@ function drawWaveSymbols(root) {
       if (wireDraft || modePick) return;
       ev.stopPropagation(); select({type:"wave_symbols",index:i}); pushHistory();
       const mark=list("wave_symbols")[i], start=toUnits(ev), at=mark.at.slice();
-      drag={move(p) {mark.at=[r4(at[0]+snap(p[0]-start[0])),r4(at[1]+snap(p[1]-start[1]))];}};
+      drag={deferCheck:true, move(p) {mark.at=[r4(at[0]+snap(p[0]-start[0])),r4(at[1]+snap(p[1]-start[1]))];}};
     });
   });
 }
@@ -1257,19 +1479,57 @@ function labelText(g, text, b, size) {
   return t;
 }
 // Block function marks: a quick sketch; the true preview draws the real symbol.
-function drawGlyphs(root) {
+// Pictorial icons (battery, PV, rack...) come as primitives from the server
+// (report.glyph_icons / report.blocks[i].icon), the same ones the TeX draws.
+function sketchMark(root, kind, x0, y0, x1, y1, shapes, color, basis) {
   const conv = {acdc: ["AC", "DC"], dcdc: ["DC", "DC"], dcac: ["DC", "AC"]};
-  for (const g of layout.glyphs || []) {
+  const ink = color ? {color} : {}; // .glyph uses currentColor; selection can still override its stroke.
+  if (shapes && basis) {
+    // Keep the checked icon square and centred while its source frame is dragged.
+    const k = Math.min(x1-x0, y1-y0) / Math.min(basis[2]-basis[0], basis[3]-basis[1]);
+    const at = p => p && [(x0+x1)/2 + (p[0]-(basis[0]+basis[2])/2)*k,
+                          (y0+y1)/2 + (p[1]-(basis[1]+basis[3])/2)*k];
+    shapes = shapes.map(p => ({...p, points:p.points?.map(at), from:at(p.from), to:at(p.to),
+                               at:at(p.at), r:p.r === undefined ? undefined : p.r*k}));
+  }
+  if (shapes) {
+    for (const p of shapes) {
+      if (p.kind === "line") el("polyline", {points: p.points.map(q => `${q[0]},${-q[1]}`).join(" "), class: "glyph", fill: "none", ...ink}, root);
+      else if (p.kind === "rect") el("rect", {x: Math.min(p.from[0], p.to[0]), y: -Math.max(p.from[1], p.to[1]),
+        width: Math.abs(p.to[0] - p.from[0]), height: Math.abs(p.to[1] - p.from[1]), class: "glyph", style: "fill:#fff", ...ink}, root);
+      else el("circle", {cx: p.at[0], cy: -p.at[1], r: p.r, class: "glyph",
+        style: `fill:${p.kind === "dot" ? "currentColor" : "none"}`, ...ink}, root);
+    }
+  } else if (conv[kind]) {
+    el("line", {x1: x0, y1: -y0, x2: x1, y2: -y1, class: "glyph", ...ink}, root);
+    texToSvg(root, conv[kind][0], x0 + .28 * (x1 - x0), y1 - .28 * (y1 - y0), .32);
+    texToSvg(root, conv[kind][1], x1 - .28 * (x1 - x0), y0 + .28 * (y1 - y0), .32);
+  } else if ({mosfet: 1, igbt: 1, diode: 1}[kind]) {
+    texToSvg(root, {mosfet: "MOSFET", igbt: "IGBT", diode: "▲"}[kind], (x0 + x1) / 2, (y0 + y1) / 2, .26);
+  }
+}
+function drawGlyphs(root) {
+  const shapes = (report && report.glyph_icons) || [];
+  (layout.glyphs || []).forEach((g, i) => {
+    const sourceIndex = report?.module_info ? report.module_info.root_decorations?.glyphs?.[i] : i;
+    const group = el('g', {'data-glyph': i}, root);
     const [x0, x1] = [Math.min(g.from[0], g.to[0]), Math.max(g.from[0], g.to[0])];
     const [y0, y1] = [Math.min(g.from[1], g.to[1]), Math.max(g.from[1], g.to[1])];
-    if (conv[g.kind]) {
-      el("line", {x1: x0, y1: -y0, x2: x1, y2: -y1, class: "glyph"}, root);
-      texToSvg(root, conv[g.kind][0], x0 + .28 * (x1 - x0), y1 - .28 * (y1 - y0), .32);
-      texToSvg(root, conv[g.kind][1], x1 - .28 * (x1 - x0), y0 + .28 * (y1 - y0), .32);
-    } else {
-      texToSvg(root, {mosfet: "MOSFET", igbt: "IGBT", diode: "▲"}[g.kind], (x0 + x1) / 2, (y0 + y1) / 2, .26);
-    }
-  }
+    sketchMark(group, g.kind, x0, y0, x1, y1, shapes[i], null, reportBasis.get(report)?.glyphs[i]);
+    // a pictorial icon is thin strokes with gaps: a clear rectangle keeps the user's own mark
+    // grabbable. A folded module's symbol gets none, so parts drawn over its box stay clickable.
+    if (sourceIndex !== undefined && shapes[i])
+      el('rect', {x:x0,y:-y1,width:x1-x0,height:y1-y0,fill:'transparent',stroke:'none'}, group);
+    const active = selected?.type === 'glyphs' && selected.index === sourceIndex;
+    if (active) el('rect', {x:x0,y:-y1,width:x1-x0,height:y1-y0,fill:'none',
+      stroke:'var(--accent)','stroke-width':.02,'stroke-dasharray':'.08 .05','pointer-events':'none'}, group);
+    group.style.cursor = 'move';
+    if (sourceIndex !== undefined) group.addEventListener('pointerdown', ev => grabRegion(ev, 'glyphs', sourceIndex));
+    if (active) [[x0,y0],[x1,y0],[x1,y1],[x0,y1]].forEach(c => {
+      const handle = el('circle', {cx:c[0],cy:-c[1],r:.08,class:'vtx'}, group);
+      handle.addEventListener('pointerdown', ev => startDragCorner(ev, 'glyphs', sourceIndex, c, [x0+x1-c[0],y0+y1-c[1]]));
+    });
+  });
 }
 function drawRegions(root) {
   const info = (report && report.regions) || [];
@@ -1347,7 +1607,7 @@ function drawCallouts(root, layer) {
       const v = el("circle", {cx: p[0], cy: -p[1], r: 0.08, class: "vtx"}, g);
       v.setAttribute("data-callout-end", key);
       v.addEventListener("pointerdown", ev => startCalloutDrag(ev, i, q => {
-        c[key] = [r4(snap(q[0])), r4(snap(q[1]))]; })); });
+        c[key] = q; }, key === 'from' ? 0 : (c.via || []).length + 1)); });
     if (sel && inf && inf.handle) {
       const p = inf.handle, mid = [(c.from[0] + c.to[0]) / 2, (c.from[1] + c.to[1]) / 2];
       el("line", {x1: mid[0], y1: -mid[1], x2: p[0], y2: -p[1], stroke: "var(--accent)",
@@ -1359,14 +1619,15 @@ function drawCallouts(root, layer) {
     if (sel) (c.via || []).forEach((p, j) => {
       const h = el("circle", {cx: p[0], cy: -p[1], r: .08, class: "vtx", "data-callout-corner": j}, g);
       h.addEventListener("pointerdown", ev => startCalloutDrag(ev, i, q => {
-        c.via[j] = [r4(snap(q[0])), r4(snap(q[1]))]; }));
+        c.via[j] = q; }, j + 1));
     });
   });
   if (layer === 'lines' && boxDraft && boxDraft.b) {
     const {a, b} = boxDraft;
     if (boxDraft.kind !== "callouts") el("rect", {x: Math.min(a[0], b[0]), y: -Math.max(a[1], b[1]), width: Math.abs(b[0] - a[0]),
       height: Math.abs(b[1] - a[1]), fill: "rgba(36,87,214,.08)", stroke: "#2457d6", "stroke-width": .02, "stroke-dasharray": ".08 .05"}, root);
-    else el("line", {x1: a[0], y1: -a[1], x2: b[0], y2: -b[1], stroke: "#2457d6", "stroke-width": .04}, root);
+    else el("polyline", {points:[a,...(boxDraft.via || []),b].map(p=>`${p[0]},${-p[1]}`).join(' '),
+      fill:'none',stroke:"#2457d6","stroke-width":.04}, root);
   }
 }
 // Function blocks: fill, ink and text box come from the server (report.blocks)
@@ -1375,7 +1636,8 @@ function drawBlocks(root) {
   const info = (report && report.blocks) || [];
   list("blocks").forEach((b, i) => {
     if (!Array.isArray(b.from) || !Array.isArray(b.to)) return;
-    const inf = info[i], sel = selected && selected.type === "blocks" && selected.index === i;
+    const sourceIndex = report?.module_info ? report.module_info.root_decorations?.blocks?.[i] : i;
+    const inf = info[i], sel = selected && selected.type === "blocks" && selected.index === sourceIndex;
     const x0 = Math.min(b.from[0], b.to[0]), x1 = Math.max(b.from[0], b.to[0]);
     const y0 = Math.min(b.from[1], b.to[1]), y1 = Math.max(b.from[1], b.to[1]);
     const g = el("g", {"data-block": i}, root);
@@ -1383,15 +1645,29 @@ function drawBlocks(root) {
     const rc = el("rect", {x: x0, y: -y1, width: x1 - x0, height: y1 - y0,
       fill: inf ? (inf.fill || "transparent") : "#fff", stroke: sel ? "var(--accent)" : (inf ? inf.edge : "#000"),
       "stroke-width": sel ? .035 : .022, "stroke-dasharray": dash || "none", style: "cursor:pointer"}, g);
-    rc.addEventListener("pointerdown", ev => grabRegion(ev, "blocks", i));
-    if (inf && inf.text && b.text) {
-      const t = labelText(g, b.text, inf.text, b.size);
+    if (sourceIndex !== undefined) rc.addEventListener("pointerdown", ev => grabRegion(ev, "blocks", sourceIndex));
+    const controller = report?.control_view;
+    const expanded = layout.control_view?.block === b.id && layout.control_view.display === "expanded";
+    const image = expanded && controller?.block === b.id && controller.display === "expanded"
+      && JSON.stringify(controller.reference) === JSON.stringify(layout.closed_loop?.control) && controller.image;
+    if (b.icon && !image) {
+      const mark = el("g", {style: "pointer-events:none", 'data-icon':b.icon}, g);
+      sketchMark(mark, b.icon, x0, y0, x1, y1, inf && inf.icon, inf ? inf.edge : null, inf?.rect);
+    }
+    if (image) {
+      const picture = el("image", {href: image, x:x0, y:-y1, width:x1-x0, height:y1-y0,
+        preserveAspectRatio:"none", "data-controller":b.id, style:"cursor:pointer"}, g);
+      if (sourceIndex !== undefined) picture.addEventListener("pointerdown", ev => grabRegion(ev, "blocks", sourceIndex));
+    } else if (inf && inf.text && b.text) {
+      const dx = (x0+x1-inf.rect[0]-inf.rect[2])/2;
+      const dy = b.icon ? y0-inf.rect[1] : (y0+y1-inf.rect[1]-inf.rect[3])/2;
+      const t = labelText(g, b.text, inf.text.map((v,k) => v+(k%2 ? dy : dx)), b.size);
       if (t) { t.setAttribute("fill", inf.edge); t.style.cursor = "pointer";
-        t.addEventListener("pointerdown", ev => grabRegion(ev, "blocks", i)); }
+        if (sourceIndex !== undefined) t.addEventListener("pointerdown", ev => grabRegion(ev, "blocks", sourceIndex)); }
     }
     if (sel) [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(c => {
       const v = el("circle", {cx: c[0], cy: -c[1], r: 0.08, class: "vtx"}, g);
-      v.addEventListener("pointerdown", ev => startDragCorner(ev, "blocks", i, c, [x0 + x1 - c[0], y0 + y1 - c[1]])); });
+      v.addEventListener("pointerdown", ev => startDragCorner(ev, "blocks", sourceIndex, c, [x0 + x1 - c[0], y0 + y1 - c[1]])); });
   });
 }
 // The first press on a region selects it and pans as before (regions are
@@ -1421,17 +1697,19 @@ let calloutGesture = 0;
 function currentCalloutDrag(d) {
   return d.gesture === calloutGesture && layout === d.layout && list("callouts")[d.callout] === d.source;
 }
-function startCalloutDrag(ev, i, edit) {
+function startCalloutDrag(ev, i, edit, pointIndex) {
   if (ev.button !== 0 || wireDraft || boxDraft) return;
   ev.stopPropagation(); select({type: "callouts", index: i}); pushHistory();
   svg.setPointerCapture(ev.pointerId);
   const d = {callout: i, source: list("callouts")[i], layout, gesture: ++calloutGesture,
     scale: ((report && report.scale_cm_per_unit) || [1, 1]).slice(), pending: null, running: null,
-    move(p) {
-      const extra = edit(p) || {};
+    move(p, event) {
+      const extra = edit(d.guides ? d.guides.snap(p, event) : p) || {};
       d.pending = {callout: clone(d.source), profile, scale: d.scale, ...extra};
       previewCalloutDrag(d);
+      if (d.guides) renderNextFrame();
     }};
+  if (pointIndex !== undefined) d.guides = arrowGuides([d.source.from, ...(d.source.via || []), d.source.to], pointIndex, i);
   drag = d;
 }
 function previewCalloutDrag(d) {
@@ -1460,38 +1738,100 @@ function startDragCorner(ev, kind, i, corner, opposite) {
     r.from = [Math.min(q[0], opposite[0]), Math.min(q[1], opposite[1])];
     r.to = [Math.max(q[0], opposite[0]), Math.max(q[1], opposite[1])]; }};
 }
-function startBoxDraft(kind) {
+function rememberDrawingStyle(kind, item) {
+  if (kind === 'regions') {
+    drawingStyles.regions = {fill:item.fill || 'gray',border:item.border || (item.fill === 'none' ? 'dashed' : 'none')};
+    if (item.border_color !== undefined) drawingStyles.regions.border_color = item.border_color;
+  } else drawingStyles.callouts = {style:item.style || 'block', ...(item.corner === 'round' ? {corner:'round'} : {})};
+  try { localStorage.setItem('drawingStyles', JSON.stringify(drawingStyles)); } catch { /* storage blocked */ }
+}
+function drawingStyle(kind) {
+  const saved = drawingStyles[kind] || {}, opts = report?.region_options || {};
+  if (kind === 'callouts') return {style:opts.callout_styles?.includes(saved.style) ? saved.style : 'block',
+    ...(saved.corner === 'round' ? {corner:'round'} : {})};
+  const style = {}, choices = {fill:opts.fills,border:opts.borders,border_color:opts.border_colors};
+  for (const [key, values] of Object.entries(choices))
+    if (values?.includes(saved[key]) || key !== 'border' && /^#[0-9a-f]{6}$/i.test(saved[key])) style[key] = saved[key];
+  if (style.fill === 'none' && style.border === 'none') style.border = 'dashed';
+  return style;
+}
+function stopBoxDraft() {
+  boxDraft = null;
+  if (drag?.draft) drag = null;
+  ['drawRegion','drawBlock','drawCallout','drawSignal','drawGlyph','addAnnotation'].forEach(id => document.getElementById(id).classList.remove('on'));
+  document.getElementById('modeTip').style.display = 'none'; resetTip();
+}
+function startBoxDraft(kind, style) {
   if (wireDraft) finishWire();
-  const on = !boxDraft || boxDraft.kind !== kind;
-  boxDraft = on ? {kind, a: null, b: null} : null;
+  const on = !boxDraft || boxDraft.kind !== kind || style && boxDraft.style !== style;
+  stopBoxDraft();
+  boxDraft = on ? {kind, a: null, b: null, style:style || drawingStyle('callouts').style, via:[]} : null;
   document.getElementById("drawRegion").classList.toggle("on", !!boxDraft && kind === "regions");
   document.getElementById("drawBlock").classList.toggle("on", !!boxDraft && kind === "blocks");
   document.getElementById("drawCallout").classList.toggle("on", !!boxDraft && kind === "callouts");
+  document.getElementById('drawSignal').classList.toggle('on', !!boxDraft && kind === 'callouts' && boxDraft.style === 'line');
+  document.getElementById('drawGlyph').classList.toggle('on', !!boxDraft && kind === 'glyphs');
+  document.getElementById('addAnnotation').classList.toggle('on', !!boxDraft && kind === 'annotations');
   const tip = document.getElementById("modeTip");
   tip.dataset.wireTip = tip.dataset.wireTip || tip.textContent;
-  tip.textContent = {regions: "画区域：按住拖出矩形，Esc 取消", blocks: "画方框：按住拖出矩形，Esc 取消"}[kind]
+  tip.textContent = {regions: "画区域：按住拖出矩形，Esc 取消", blocks: "画方框：按住拖出矩形，Esc 取消",
+    glyphs:'在方框内拖出功能标志的范围，按 Esc 取消', annotations:'点击文字放置位置，按 Esc 取消'}[kind]
     || "画箭头：从起点按住拖到箭头尖，Esc 取消";
+  if (boxDraft?.kind === 'callouts' && boxDraft.style === 'line') tip.textContent = '拖出直线，或单击拐点后再次点击终点完成。Shift 约束横平竖直，Enter 完成，Esc 取消';
   tip.style.display = boxDraft ? "block" : "none";
   if (!boxDraft) resetTip();
+  render();
 }
 function resetTip() { const tip = document.getElementById("modeTip"); if (tip.dataset.wireTip) tip.textContent = tip.dataset.wireTip; }
 function finishBoxDraft() {
-  const {kind, a, b} = boxDraft; boxDraft = null;
-  ["drawRegion", "drawBlock", "drawCallout"].forEach(id => document.getElementById(id).classList.remove("on"));
-  document.getElementById("modeTip").style.display = "none"; resetTip();
+  const {kind, a, b, style, via} = boxDraft; stopBoxDraft();
+  if (kind === 'annotations') {
+    showDialog('加文字', `<form id="annotationForm"><label for="annotationText">文字</label>
+      <input id="annotationText" required autocomplete="off" placeholder="如 $i_x$、$v_{mv,dc}$、O'、$\\vdots$">
+      <button type="submit">添加文字</button></form>`);
+    document.getElementById('annotationText').focus();
+    document.getElementById('annotationForm').onsubmit = ev => {
+      ev.preventDefault(); const text = document.getElementById('annotationText').value.trim(); if (!text) return;
+      pushHistory(); layout.annotations.push({text,at:a}); selected = {type:'ann',index:layout.annotations.length-1};
+      document.getElementById('dlg').close(); changed();
+    };
+    return;
+  }
   if (!a || !b || Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.2) { render(); return; }
+  if (kind === 'glyphs' && (Math.abs(b[0]-a[0]) < .2 || Math.abs(b[1]-a[1]) < .2)) { render(); return; }
   pushHistory();
   const items = list(kind);
   if (kind === "regions") {
     const used = items.map(r => r.fill), opts = (report && report.region_options) || {};
     const fill = Object.keys(opts.palette || {green: 1}).find(f => !used.includes(f)) || "gray";
-    items.push({from: [Math.min(a[0], b[0]), Math.min(a[1], b[1])], to: [Math.max(a[0], b[0]), Math.max(a[1], b[1])], fill});
+    items.push({from: [Math.min(a[0], b[0]), Math.min(a[1], b[1])], to: [Math.max(a[0], b[0]), Math.max(a[1], b[1])], fill,...drawingStyle(kind)});
+    rememberDrawingStyle(kind, items.at(-1));
   } else if (kind === "blocks") {
     const ids = new Set(items.map(x => x.id)); let n = 1; while (ids.has(`B${n}`)) n++;
     items.push({id: `B${n}`, from: [Math.min(a[0], b[0]), Math.min(a[1], b[1])],
       to: [Math.max(a[0], b[0]), Math.max(a[1], b[1])], text: "方框"});
-  } else items.push({from: a, to: b, style: "block"});
+  } else if (kind === 'glyphs') items.push({from:a,to:b,kind:'acdc'});
+  else {
+    const corners = via.filter((p,i) => i < via.length-1 || !same(p,b));
+    items.push({from:a,to:b,style,...(corners.length ? {via:corners} : {}),
+      ...(style === 'line' && drawingStyle(kind).corner ? {corner:'round'} : {})});
+    rememberDrawingStyle(kind, items.at(-1));
+  }
   selected = {type: kind, index: items.length - 1}; changed();
+}
+function glyphProps(box) {
+  const item = list('glyphs')[selected.index]; if (!item) return;
+  const type = document.createElement('select'); type.id = 'glyphKind';
+  type.setAttribute('aria-label','图标');
+  const names = {acdc:'AC/DC',dcdc:'DC/DC',dcac:'DC/AC',mosfet:'MOSFET',igbt:'IGBT',diode:'二极管',
+    battery:'电池／储能',pv:'光伏板',rack:'服务器机柜',capacitor:'电容',ac:'交流源／电网',square:'方波源'};
+  report.glyph_options.forEach(kind => type.add(new Option(names[kind] || kind,kind)));
+  type.value = item.kind; type.onchange = () => {pushHistory(); item.kind = type.value; changed();};
+  row(box,'图标',type);
+  for (const [key,label] of [['from','起点'],['to','终点']]) {
+    const point = document.createElement('div'); point.className = 'xy';
+    point.append(numInput(item[key][0],v=>item[key][0]=v),numInput(item[key][1],v=>item[key][1]=v)); row(box,label,point);
+  }
 }
 function blockProps(box) {
   const b = list("blocks")[selected.index]; if (!b) return;
@@ -1507,11 +1847,44 @@ function blockProps(box) {
     sel.value = cur; sel.onchange = () => { pushHistory(); set(sel.value); changed(); }; return sel;
   }
   const s = document.createElement("span"); s.textContent = b.id || `方框 ${selected.index + 1}`; row(box, "方框", s);
+  if (layout.control_view?.block === b.id) {
+    const display = document.createElement("select"); display.id = "controlViewDisplay";
+    for (const value of report?.control_view_options?.displays || []) {
+      const option = document.createElement("option"); option.value = value;
+      option.textContent = value === "expanded" ? "展开控制框图" : "折叠为方框"; display.appendChild(option);
+    }
+    display.value = layout.control_view.display || "collapsed";
+    display.onchange = () => { pushHistory(); layout.control_view.display = display.value; changed(); };
+    row(box, "控制器显示", display);
+    const source = document.createElement("span");
+    source.textContent = typeof layout.closed_loop?.control === "string" ? layout.closed_loop.control
+      : layout.closed_loop?.control?.name || "内嵌控制表";
+    row(box, "控制表", source);
+    const unlink = document.createElement("button"); unlink.type = "button"; unlink.id = "controlViewUnlink";
+    unlink.textContent = "取消方框引用";
+    unlink.onclick = () => { pushHistory(); delete layout.control_view; changed(); };
+    row(box, "控制表引用", unlink);
+    const note = document.createElement("div"); note.className = "hint"; note.style.gridColumn = "1 / -1";
+    note.textContent = "与闭环仿真共用控制表；展开前可拖大方框。取消引用只恢复普通方框。"; box.appendChild(note);
+  } else if (layout.closed_loop?.control) {
+    const bind = document.createElement("button"); bind.type = "button"; bind.id = "controlViewBind";
+    bind.textContent = "引用闭环控制表";
+    bind.onclick = () => { pushHistory(); layout.control_view = {block:b.id, display:"collapsed"}; changed(); };
+    row(box, "控制表引用", bind);
+  }
   const t = document.createElement("input"); t.value = b.text || ""; t.placeholder = "如 PWM、$f_r$ calculation"; t.id = "blockText";
   t.onchange = () => { pushHistory(); if (t.value) b.text = t.value; else delete b.text; changed(); }; row(box, "文字", t);
   row(box, "填充", pick(opts.fills, b.fill || "white", v => { if (v === "white") delete b.fill; else b.fill = v; }));
   row(box, "边框", pick(opts.borders, b.border || "solid", v => { if (v === "solid") delete b.border; else b.border = v; }));
   row(box, "颜色", inkControl(b.color || "black", v => { if (!v || v === "black") delete b.color; else b.color = v; }));
+  const ICON_NAMES = {"": "无（只写文字）", dcdc: "DC/DC 变换器", acdc: "AC/DC 变换器", dcac: "DC/AC 变换器",
+    mosfet: "MOSFET", igbt: "IGBT", diode: "二极管", battery: "电池／储能", pv: "光伏板", rack: "服务器机柜",
+    capacitor: "电容", ac: "交流源／电网", square: "方波源"};
+  const icon = document.createElement("select"); icon.id = "blockIcon";
+  ["", ...(opts.icons || [])].forEach(v => icon.add(new Option(ICON_NAMES[v] || v, v)));
+  icon.value = b.icon || ""; icon.title = "方框里画的图标；选了图标后，文字改为写在方框下方";
+  icon.onchange = () => { pushHistory(); if (icon.value) b.icon = icon.value; else delete b.icon; changed(); };
+  row(box, "图标", icon);
   row(box, "字号", fontControl(b.size, v => { if (v === 8) delete b.size; else b.size = v; }));
   [["from", "左下角"], ["to", "右上角"]].forEach(([k, n]) => {
     if (!Array.isArray(b[k])) return;
@@ -1526,6 +1899,7 @@ function regionProps(box) {
   const kind = selected.type, r = list(kind)[selected.index]; if (!r) return;
   const opts = (report && report.region_options) || {fills: [], borders: [], label_pos: [], callout_label_pos: [], palette: {}};
   const NAMES = {green: "绿", blue: "蓝", orange: "橙", red: "红", purple: "紫", yellow: "黄", teal: "青", gray: "灰", none: "无填充",
+    black:'黑',magenta:'品红',
     solid: "实线", dashed: "虚线", dotted: "点线", below: "下", above: "上", left: "左", right: "右", inside: "框内顶部",
     block: "块箭头（可填充）", line: "细箭头 / 弯弧 / 折线", wave: "波浪指示箭头", inline: "在线上（留断口）"};
   function pick(values, cur, set, allowCustom, names = {}) {
@@ -1533,24 +1907,28 @@ function regionProps(box) {
     values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = names[v] || NAMES[v] || v;
       if (opts.palette[v]) o.style.background = opts.palette[v]; sel.appendChild(o); });
     if (allowCustom && cur && !values.includes(cur)) { const o = document.createElement("option"); o.value = o.textContent = cur; sel.appendChild(o); }
-    sel.value = cur; sel.onchange = () => { pushHistory(); set(sel.value); changed(); }; return sel;
+    sel.value = cur; sel.onchange = () => { pushHistory(); set(sel.value); rememberDrawingStyle(kind,r); changed(); }; return sel;
   }
-  function colorRow(name, cur, set, values) {
+  function colorRow(name, cur, set, values, colors = opts.palette) {
     const d = document.createElement("div"); d.className = "xy";
     d.appendChild(pick(values, cur, set, true));
     const c = document.createElement("input"); c.type = "color"; c.title = "自定义颜色（#rrggbb）";
-    c.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : (opts.palette[cur] || "#ececec");
-    c.onchange = () => { pushHistory(); set(c.value); changed(); }; d.appendChild(c); row(box, name, d);
+    c.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : (colors[cur] || "#ececec");
+    c.onchange = () => { pushHistory(); set(c.value); rememberDrawingStyle(kind,r); changed(); }; d.appendChild(c); row(box, name, d);
   }
   const s = document.createElement("span"); s.textContent = kind === "regions" ? `区域 ${selected.index + 1}` : `箭头 ${selected.index + 1}`;
   row(box, kind === "regions" ? "区域" : "箭头", s);
   if (kind === "regions") {
     colorRow("填充", r.fill || "gray", v => { r.fill = v; }, opts.fills);
     row(box, "边框", pick(opts.borders, r.border || (r.fill === "none" ? "dashed" : "none"), v => { r.border = v; }, false, {none: "无边框"}));
+    colorRow('边框颜色',r.border_color || (r.fill === 'none' ? 'gray' : r.fill || 'gray'),v=>{r.border_color=v;},opts.border_colors,opts.border_palette);
+    const white = document.createElement('button'); white.id = 'regionWhite'; white.textContent = '白底黑框';
+    white.onclick = () => {pushHistory(); Object.assign(r,{fill:'#ffffff',border:'solid',border_color:'black'}); rememberDrawingStyle(kind,r); changed();};
+    row(box,'预设',white);
   } else {
     row(box, "样式", pick(opts.callout_styles, r.style || "block", v => {
       r.style = v; delete r.color; if (v !== "line") delete r.bend;
-      if (v !== "line") { delete r.via; delete r.dash; delete r.head; delete r.isolation; }
+      if (v !== "line") { delete r.via; delete r.dash; delete r.head; delete r.isolation; delete r.corner; }
       if (v !== "wave") { delete r.wave_amplitude; delete r.wave_cycles; }
       if (v !== "block") { delete r.border_color; delete r.border_width; delete r.fill_opacity; delete r.foreground; delete r.over_parts; }
       if (v === "block" && r.label_pos === "inline") r.label_pos = "above";
@@ -1602,6 +1980,10 @@ function regionProps(box) {
       row(box, "波数", cycles);
     }
     if (r.style === "line") {
+      const corner = pick(opts.callout_corners, r.corner || 'sharp', v => {
+        if (v === 'sharp') delete r.corner; else r.corner = v;
+      }, false, {sharp:'直角', round:'圆角'});
+      corner.id = 'calloutCorner'; row(box, '拐角', corner);
       row(box, "线型", pick(opts.callout_dashes || ["solid"], r.dash || "solid", v => { if (v === "solid") delete r.dash; else r.dash = v; },
         false, {solid: "实线", dashed: "虚线（反馈、采样信号）", dotted: "点线"}));
       row(box, "箭头", pick(opts.callout_heads || ["end"], r.head || "end", v => { if (v === "end") delete r.head; else r.head = v; },
@@ -1688,7 +2070,7 @@ function regionProps(box) {
     d.appendChild(numInput(r[k][0], v => r[k][0] = v)); d.appendChild(numInput(r[k][1], v => r[k][1] = v)); row(box, n, d);
   });
   const h = document.createElement("div"); h.className = "hint"; h.style.gridColumn = "1 / -1";
-  h.textContent = r.fit ? "色块随成员自动贴合。点击“色块贴合成员”后固定边界，便可手动拖动和调整。" : kind === "regions" ? "再按一次已选中的区域可拖动整体，拖四角改大小。边框不能切过元件，校验会标出来。" : "拖两端圆点改起点和箭头尖。";
+  h.textContent = r.fit ? "色块随成员自动贴合。点击“色块贴合成员”后固定边界，便可手动拖动和调整。" : kind === "regions" ? "再按一次已选中的区域可拖动整体，拖四角改大小。边框不能切过元件，校验会标出来。" : "拖动端点或折点时显示对齐提示。Shift 约束横平竖直，Alt 暂停辅助吸附。";
   box.appendChild(h);
 }
 
@@ -1716,8 +2098,25 @@ function stackUsageProps(box, r) {
     const ids = document.createElement("input"); ids.id = "stackInstances";
     ids.placeholder = "包含前面板，例如 A, B, C";
     ids.value = Array.isArray(current.instances) ? current.instances.join(", ") : "";
-    ids.onchange = () => { pushHistory(); write({purpose: "instances", instances: ids.value.split(/[,，、\s]+/u).filter(Boolean)}); changed(); };
+    ids.onchange = () => { pushHistory(); write({...current, instances: ids.value.split(/[,，、\s]+/u).filter(Boolean)}); changed(); };
     row(box, "电路实例", ids);
+    const style = document.createElement("select"); style.id = "stackStyle";
+    const titles = {stack:"叠面板", ellipsis:"省略中间实例"};
+    for (const value of report?.module_info?.instance_styles || ["stack"])
+      style.add(new Option(titles[value] || value, value));
+    style.value = current.style || "stack";
+    style.onchange = async () => {
+      const before=JSON.stringify(layout), candidate=JSON.parse(before);
+      candidate.stack_usage[r.id].style=style.value; style.disabled=true;
+      try {
+        const trial=await trialCheck(candidate);
+        if(JSON.stringify(layout)!==before)return;
+        const broken=!trial?'校验没有完成':trial.issues?.find(i=>i.code==='bad-module')?.message || (trial.module_info?'':'模块拼装失败');
+        if(broken){flash(`没有改模块显示：${zhModule(broken)}。原图已保留`,true);showProps();return;}
+        pushHistory();layout=candidate;changed();
+      } finally {style.disabled=false;}
+    };
+    row(box, "实例组画法", style);
   }
   const hint = document.createElement("span"); hint.className = "hint";
   hint.textContent = "此设置保存在电路文件中。叠面板和实例名称都不会自动创建器件；缺少真实电路时仍可出图，但不能导出完整仿真。";
@@ -1725,15 +2124,34 @@ function stackUsageProps(box, r) {
 }
 
 // ---------- operating modes (modal figures) ----------
-let modeIdx = -1, modeLit = null, modeSig = "";
+let modeIdx = -1, modeLit = null, modeSig = "", modeLitSource = "";
 const MODE_ON = "#c8102e", MODE_OFF = "#b4b4b4";
 const modeStyle = () => ({mono: document.getElementById("modeMono").checked});
 function drawModeOverlay() {
   if (modeIdx < 0 || !modeLit) return;
+  // The live drag preview has its own geometry; old solved paths must not cover it.
+  if (modeLitSource !== profile + editorTableSnapshot(projectionSource || layout)) return;
   const on = modeStyle().mono ? "#000" : MODE_ON;
+  svg.querySelectorAll("g[data-region]").forEach(g => {
+    const active = modeLit.regions?.[layout.regions?.[+g.dataset.region]?.id];
+    if (active === undefined) return;
+    g.querySelectorAll('rect').forEach(r => {
+      if (r.getAttribute('stroke') !== 'none') {
+        r.style.stroke = active ? on : MODE_OFF;
+        r.style.strokeWidth = active ? '.045' : '.018';
+      }
+    });
+  });
+  svg.querySelectorAll("g[data-glyph]").forEach(g => {
+    const active = modeLit.glyphs?.[g.dataset.glyph];
+    if (active === undefined) return;
+    g.style.color = active ? on : MODE_OFF;
+    g.querySelectorAll('text').forEach(t => { t.style.fill = g.style.color; });
+  });
   svg.querySelectorAll(".wire:not(.sel)").forEach(w => { w.style.stroke = MODE_OFF; });
   svg.querySelectorAll("g.element[data-id]").forEach(g => {
     const id = g.dataset.id;
+    g.querySelectorAll('.ic-diode').forEach(b => { b.style.display = modeLit.diode.includes(id) ? '' : 'none'; });
     if (selected && selected.type === "el" && selected.id === id) return;
     // a switch shows which of its paths conducts: the channel, or only the body diode
     const diodeOnly = modeLit.diode.includes(id) && !modeLit.channel.includes(id);
@@ -1742,7 +2160,9 @@ function drawModeOverlay() {
     g.classList.remove("inked");
     g.style.color = modeLit.parts[id] && !diodeOnly ? on : MODE_OFF;
     g.querySelectorAll(".el-body").forEach(b => { b.style.stroke = g.style.color; });
-    g.querySelectorAll(".bd").forEach(b => { b.style.color = diodeOnly ? on : chanOnly ? MODE_OFF : ""; });
+    g.querySelectorAll(".bd").forEach(b => {
+      b.style.color = diodeOnly ? on : chanOnly ? MODE_OFF : "";
+    });
     g.querySelectorAll(".ld").forEach(b => { b.style.color = diodeOnly ? on : ""; });
     if (modePick) g.style.cursor = "pointer"; });
   const g = el("g", {style: "pointer-events:none"}, svg);
@@ -1771,9 +2191,11 @@ function drawModeOverlay() {
 }
 let modePick = false;
 async function editMode(req) {
+  const index = modeIdx, before = JSON.stringify(tableForSave());
   try {
-    const r = await api("/api/mode-edit", {layout, profile, index: modeIdx, ...req});
-    pushHistory(); layout.modes[modeIdx] = r.mode; changed();
+    const r = await api("/api/mode-edit", {layout:JSON.parse(before), profile, index, ...req});
+    if (index !== modeIdx || before !== JSON.stringify(tableForSave())) return;
+    pushHistory(); layout.modes[index] = r.mode; changed();
   } catch (e) { flash(zhMode(e.message), true); }
 }
 // the mode checker's English messages, in Chinese for the panel
@@ -1809,6 +2231,7 @@ function showModeHealth() {
 }
 function refreshModeList(force) {
   const modes = layout.modes || [];
+  window.updateAutoModeStatus?.();
   showModeHealth();
   const bad = new Set(((report && report.modes) || []).map((m, i) => m.ok ? -1 : i));
   const sig = JSON.stringify([modes.map(m => [m.name, m.caption]),
@@ -1827,7 +2250,9 @@ function refreshModeList(force) {
   if (document.activeElement !== ed)
     ed.value = modeIdx >= 0 ? JSON.stringify(modes[modeIdx], null, 1) : "";
 }
+let modeLoadVersion = 0;
 async function loadMode() {
+  const version = ++modeLoadVersion;
   const info = document.getElementById("modeInfo");
   refreshModeList();
   if (modeIdx < 0) { modeLit = null; info.textContent = ""; render(); return; }
@@ -1836,14 +2261,27 @@ async function loadMode() {
     modeLit = null; info.className = "hint"; info.textContent = "图纸校验未通过，修好问题栏里的错误后再显示模态。"; render(); return;
   }
   try {
-    modeLit = await api("/api/mode", {layout, profile, index: modeIdx, style: modeStyle()});
+    const index = modeIdx, before = JSON.stringify(tableForSave()), requestedProfile = profile;
+    const lit = await api("/api/mode", {layout:JSON.parse(before), profile:requestedProfile, index, style: modeStyle()});
+    if (version !== modeLoadVersion || index !== modeIdx || requestedProfile !== profile || before !== JSON.stringify(tableForSave())) return;
+    modeLit = lit;
+    modeLitSource = profile + editorTableSnapshot(layout);
     info.className = "hint";
     const cond = (layout.modes[modeIdx] || {}).condition;
     const plain = t => t.replace(/\$/g, "").replace(/[{}]/g, "");
     info.innerHTML = (cond ? `<b>工况：${esc(plain(cond))}</b><br>` : "") + esc(plain(modeLit.caption)) +
-      modeLit.notes.map(n => `<br><span style="color:#b26b00">${esc(zhMode(n))}</span>`).join("") +
-      `<br><span class="hint">只检查了回路连接和器件导通方向，没有检查偏置和工况是否允许这个模态。</span>`;
-  } catch (e) { modeLit = null; info.className = "hint bad"; info.textContent = zhMode(e.message); }
+      modeLit.notes.map(n => `<br><span class="mode-warning">${esc(zhMode(n))}</span>`).join("");
+    // where the mode came from; the "?" explains what was and was not checked
+    const tag = document.createElement("span");
+    tag.className = "mode-tag";
+    tag.textContent = layout.modes[modeIdx]?.source?.kind === "simulation"
+      ? (report?.auto_mode_status?.stale_modes.includes(modeIdx)
+        ? (report.auto_mode_status.reason ? "仿真（待核对）" : "仿真（已过期）") : "仿真") : "手写";
+    info.prepend(tag, " ");
+  } catch (e) {
+    if (version !== modeLoadVersion) return;
+    modeLit = null; info.className = "hint bad"; info.textContent = zhMode(e.message);
+  }
   render();
 }
 function stepMode(d) {
@@ -1904,7 +2342,7 @@ const CODE_ZH = {
   "bad-hop": "跨线位置不对", "unused-hop": "多余的跨线", "touches-lead": "导线接在了元件引线中间",
   "open-pin": "引脚没接上", "dangling-wire": "导线一端悬空", "shorted-pins": "元件两脚重合（短路）",
   "netlist-open": "该连的没连上（与网表不符）", "netlist-short": "不该连的连上了（与网表不符）",
-  "netlist-unknown-pin": "网表里有不存在的引脚", "netlist-missing": "新引脚未写进网表",
+  "netlist-unknown-pin": "网表里有不存在的引脚", "netlist-missing": "新增引脚待登记",
   "text-on-symbol": "文字压在元件上", "text-on-line": "文字压在线上", "text-overlap": "文字互相重叠",
   "electrical-label-space": "标号附近没有空位：请移动附近元件/文字，或缩短网络名",
   "arrow-off-wire": "电流箭头不在导线上", "too-cramped": "按当前栏宽放不下", "unknown-kind": "未知元件类型",
@@ -1947,7 +2385,7 @@ const ZH = [
   [/^netlist names (.+?), which is not a pin in the drawing$/, m => `网表里写了 ${m[1]}，但图里没有这个引脚`],
   [/^(.+?) and (.+?) should both be on net (.+?) but the drawing does not join them$/, m => `${m[1]} 和 ${m[2]} 按网表应该相连（${m[3]}），图里没有连上`],
   [/^drawing joins (.+?) \((.+?)\) and (.+?) \((.+?)\)$/, m => `图里把 ${m[1]}（${m[2]}）和 ${m[3]}（${m[4]}）连在了一起，网表里它们不相连`],
-  [/^(.+?) is drawn but not declared in the netlist$/, m => `${m[1]} 是新画的引脚，网表里还没有；确认接法后点“以当前连接更新网表”`],
+  [/^(.+?) is drawn but not declared in the netlist$/, m => `${m[1]} 尚未登记到已确认的网表。确认当前接法后可记录此引脚，供后续检查短路和断路。`],
   [/^current arrow (.+?) at (\(.+?\)) is not on a wire$/, m => `电流箭头 ${m[1]}（${m[2]}）不在导线上`],
   [/^(?:label of (.+?)|text (.+?)) overlaps the symbol of (.+)$/, m => `${m[1] ? m[1] + " 的标签" : "文字 " + m[2]}压在 ${m[3]} 的符号上`],
   [/^(?:label of (.+?)|text (.+?)) is crossed by (.+?) (\(.+?\)) -> (\(.+?\))$/, m => `${m[1] ? m[1] + " 的标签" : "文字 " + m[2]}被 ${m[3]} 的线段 ${m[4]}→${m[5]} 穿过`],
@@ -1974,7 +2412,110 @@ function zh(msg) {
 // Canvas validation and module candidate checks can overlap. Keep the page
 // busy until both are finished, regardless of the response order.
 let checking = false, checkAgain = false, validating = false, pendingTrialChecks = 0;
+// A check result describes the drawing as it was sent. While a part or a text is
+// being dragged the result is not refreshed on every mouse step, so the drawing
+// shifts the server's boxes by how far each part has moved since that check.
+const reportBasis = new WeakMap();
+function stampReport(r, lay = layout) {
+  if (!r || !lay) return r;
+  reportBasis.set(r, {
+    pins: new Map([...(r.module_info?.view?.elements || []), ...(lay.elements || [])]
+      .map(e => [e.id, clone(e.pins)])),
+    ann: (lay.annotations || []).map(a => a.at && a.at.slice()),
+    symbols: (lay.wave_symbols || []).map(w => w.at && w.at.slice()),
+    glyphs: (r.module_info?.view?.glyphs || lay.glyphs || []).map(g =>
+      [Math.min(g.from[0],g.to[0]), Math.min(g.from[1],g.to[1]), Math.max(g.from[0],g.to[0]), Math.max(g.from[1],g.to[1])])
+  });
+  return r;
+}
+function movedBy(e) {   // [dx, dy] when every pin moved together since the check, else null
+  const was = report && reportBasis.get(report)?.pins.get(e.id), keys = Object.keys(e.pins || {});
+  if (!was || !keys.length || Object.keys(was).length !== keys.length || !keys.every(k => was[k])) return null;
+  const d = [e.pins[keys[0]][0] - was[keys[0]][0], e.pins[keys[0]][1] - was[keys[0]][1]];
+  if (!d[0] && !d[1]) return null;
+  return keys.every(k => Math.abs(e.pins[k][0] - was[k][0] - d[0]) < 1e-6 && Math.abs(e.pins[k][1] - was[k][1] - d[1]) < 1e-6) ? d : null;
+}
+function shiftedGeometry(e, geo) {
+  const d = geo && movedBy(e);
+  if (!d) return geo;
+  const pt = q => [q[0] + d[0], q[1] + d[1]];
+  const box = b => [b[0] + d[0], b[1] + d[1], b[2] + d[0], b[3] + d[1]];
+  const g = {...geo, bodies: (geo.bodies || []).map(box), labels: (geo.labels || []).map(box)};
+  if (geo.centre) g.centre = pt(geo.centre);
+  if (geo.gate) g.gate = geo.gate.map(pt);
+  if (geo.dots) g.dots = geo.dots.map(pt);
+  if (geo.coils) g.coils = geo.coils.map(c => c.map(pt));
+  if (geo.core_lines) g.core_lines = geo.core_lines.map(c => c.map(pt));
+  if (geo.source_wave) g.source_wave = geo.source_wave.map(pt);
+  if (geo.resistor_path) g.resistor_path = geo.resistor_path.map(pt);
+  if (geo.current_arrow) g.current_arrow = {
+    shaft: geo.current_arrow.shaft.map(pt), head: geo.current_arrow.head.map(pt)
+  };
+  if (geo.motor_leads) g.motor_leads = geo.motor_leads.map(c => c.map(pt));
+  if (geo.motor_marks) g.motor_marks = geo.motor_marks.map(mark => ({...mark, at: pt(mark.at)}));
+  return g;
+}
+function annotationBox(i, a) {
+  const b = report && report.annotations && report.annotations[i], was = report && reportBasis.get(report)?.ann[i];
+  if (!b || !was || !a.at) return b;
+  const dx = a.at[0] - was[0], dy = a.at[1] - was[1];
+  return [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
+}
+// An error position from the check is tied to what it sits on in the checked
+// drawing: a pin, a wire corner, a point along a wire segment, or a part body.
+// While a newer check is pending, the marker is drawn at that object's live place.
+function anchorBadPoint(at, mentioned = new Set()) {
+  const near = (a, b) => a && b && Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
+  const elements = layout.elements || [], wires = layout.wires || [];
+  const first = (list, keep) => [...list.filter(keep), ...list.filter(x => !keep(x))];
+  for (const e of first(elements, e => mentioned.has(e.id)))
+    for (const [name, q] of Object.entries(e.pins || {})) if (near(q, at)) return {pin: `${e.id}.${name}`};
+  const order = first(wires.map((w, i) => i), i => mentioned.has(`wire[${i}]`));
+  for (const i of order) {   // a wire's end stays its end even when dragging it adds a corner
+    const k = wires[i].findIndex(q => near(q, at));
+    if (k >= 0) return k === wires[i].length - 1 ? {wire: i, k: -1} : {wire: i, k};
+  }
+  for (const i of order) for (let k = 0; k + 1 < wires[i].length; k++) {
+    const [a, b] = [wires[i][k], wires[i][k + 1]], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!len) continue;
+    const t = ((at[0] - a[0]) * (b[0] - a[0]) + (at[1] - a[1]) * (b[1] - a[1])) / len / len;
+    const foot = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+    if (t > 0 && t < 1 && Math.hypot(at[0] - foot[0], at[1] - foot[1]) < 1e-6) return {wire: i, seg: k, t};
+  }
+  const geo = report?.geometry || {};
+  for (const e of first(elements, e => mentioned.has(e.id)))
+    if ((geo[e.id]?.bodies || []).some(b => at[0] >= b[0] && at[0] <= b[2] && at[1] >= b[1] && at[1] <= b[3])) return {part: e.id};
+  return {};
+}
+function liveBadPoint(mark, livePins) {
+  const {at, pin, wire, k, seg, t, part} = mark, w = wire === undefined ? null : layout.wires?.[wire];
+  if (pin) return livePins.get(pin) || at;
+  if (w && k !== undefined) return (k < 0 ? w[w.length - 1] : w[k]) || at;
+  if (w && seg !== undefined) {
+    const [a, b] = [w[seg], w[seg + 1]];
+    return a && b ? [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])] : at;
+  }
+  if (part) {
+    const e = layout.elements.find(x => x.id === part), d = e && movedBy(e);
+    return d ? [at[0] + d[0], at[1] + d[1]] : at;
+  }
+  return at;
+}
+// Only drags with a local geometry preview can wait for a pause before checking.
+let frameQueued = false, dragCheckTimer = 0;
+const DRAG_CHECK_PAUSE_MS = 250;
+function renderNextFrame() {
+  if (frameQueued) return;
+  frameQueued = true;
+  requestAnimationFrame(() => { frameQueued = false; render(); });
+}
+function scheduleCheck() {
+  clearTimeout(dragCheckTimer);
+  if (!drag?.deferCheck) return revalidate();
+  dragCheckTimer = setTimeout(revalidate, DRAG_CHECK_PAUSE_MS);
+}
 async function revalidate() {
+  clearTimeout(dragCheckTimer);
   if (checking) { checkAgain = true; return; }
   checking = validating = true;
   document.getElementById("validationStatus").textContent = "未检查（校验中…）";
@@ -1982,7 +2523,7 @@ async function revalidate() {
   try {
     const result = await api("/api/check", {layout, profile, sync_electrical: !!layout.electrical && !drag, live_spice: !document.getElementById("liveNetlist").hidden});
     if (submitted !== JSON.stringify(layout) || submittedProfile !== profile) { checkAgain = true; }
-    else { report = result;
+    else { report = stampReport(result);
     if (result.electrical) layout.electrical = result.electrical; }
   }
   catch (err) { report = {ok: false, issues: [{code: "error", message: err.message, level: "error"}]}; }
@@ -1991,11 +2532,15 @@ async function revalidate() {
     report.callouts = report.callouts || []; report.callouts[drag.callout] = drag.preview;
   }
   if (!report) { checking = false; checkAgain = false; return revalidate(); }
-  showIssues(); render(); updateElectricalPanel();
+  await refreshReport();
+  if (checkAgain) { checkAgain = false; scheduleCheck(); }
+}
+async function refreshReport() {
+  showIssues(); if (modeIdx >= 0) render();   // with no mode shown, loadMode() below redraws anyway
+  updateElectricalPanel();
   const fitButton = document.getElementById("regionFitMembers");
   if (fitButton) fitButton.disabled = checkAgain || !report?.regions?.[selected?.index]?.fit;
   await loadMode();
-  if (checkAgain) { checkAgain = false; revalidate(); }
 }
 function showIssues() {
   document.getElementById("profileHint").hidden = !report.passes_double;
@@ -2018,6 +2563,7 @@ function showIssues() {
     li.dataset.code = is.code;
     const msg = layout.modules ? zh(is.message) : zh(is.message).replace(/wire\[(\d+)\]/g, (_, i) => wireName(+i));
     li.innerHTML = `<b>${CODE_ZH[is.code] || is.code}</b><br><span class="hint">${msg.replace(/</g, "&lt;")}</span>`;
+    if (is.code === "too-cramped" && report.module_info) li.insertAdjacentHTML("beforeend", moduleCapacityHTML());
     if (layout.modules && is.message.startsWith("模块定义 ")) {
       // These are definition-local IDs/points, not positions in the root table.
       li.onclick = () => document.getElementById("modules").click();
@@ -2027,13 +2573,28 @@ function showIssues() {
     ids.forEach(id => { if (new RegExp(`(^|[^\\w])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w]|$)`).test(is.message)) mine.add(id); });
     (is.message.match(/wire\[\d+\]/g) || []).forEach(w => mine.add(w));
     for (const m of is.message.matchAll(/\((-?[\d.]+), (-?[\d.]+)\)/g)) pts.push([+m[1], +m[2]]);
-    if (is.level === "error") { mine.forEach(x => badIds.add(x)); pts.forEach(p => badPts.push(p)); }
-    if (!layout.modules && is.code === "unmarked-crossing" && pts.length) {
+    if (is.level === "error") {
+      const pin = is.code === "open-pin" ? is.message.match(/^(.+) at \(/)?.[1] : null;
+      mine.forEach(x => badIds.add(x));
+      pts.forEach(at => badPts.push({at, ...(pin ? {pin} : anchorBadPoint(at, mine))}));
+    }
+    const crossing = is.code === 'unmarked-crossing' && pts.length && sourceCrossingAt(pts[0]);
+    if (crossing) {
+      const snapshot = editorTableSnapshot(layout), generation = layoutGeneration, editing = definitionEdit;
+      const current = () => snapshot === editorTableSnapshot(layout) && generation === layoutGeneration && editing === definitionEdit;
+      const entry = crossingEntry(crossing), pin = projected(() => layout.elements.some(e => Object.values(e.pins).some(p => same(p, crossing))));
       const b = document.createElement("button"); b.textContent = "在此加跨线（不相连）";
-      b.onclick = ev => { ev.stopPropagation(); pushHistory(); layout.hops = layout.hops || []; layout.hops.push(pts[0]); changed(); };
+      b.dataset.issueCrossing = 'hop';
+      b.disabled = pin || !!entry?.reason;
+      if (b.disabled) b.title = '此处接有元件引脚，不能改为跨线';
+      b.onclick = ev => { ev.stopPropagation(); if (!current()) return; pushHistory();
+        if (entry) { if (!toHop(crossing)) { history.pop(); return; } } else layout.hops.push(crossing);
+        changed(); };
       const c = document.createElement("button"); c.textContent = "在此相连（节点）";
-      c.onclick = ev => { ev.stopPropagation(); pushHistory(); toNode(pts[0]); changed(); };
-      li.appendChild(document.createElement("br")); li.appendChild(b); li.appendChild(document.createTextNode(" ")); li.appendChild(c);
+      c.dataset.issueCrossing = 'node';
+      c.onclick = ev => { ev.stopPropagation(); if (!current()) return; pushHistory(); toNode(crossing); changed(); };
+      li.appendChild(document.createElement("br")); li.appendChild(b);
+      if (entry) { li.appendChild(document.createTextNode(" ")); li.appendChild(c); }
     }
     if (is.code === "netlist-short" || is.code === "netlist-open" || is.code === "netlist-missing") {
       // usually a deliberate change of the connection: one click to accept it
@@ -2042,14 +2603,18 @@ function showIssues() {
       b.onclick = ev => { ev.stopPropagation(); adoptNetlist(false); };
       li.appendChild(document.createElement("br")); li.appendChild(b);
     }
-    if (!layout.modules && is.code === "unused-hop" && pts.length) {
+    const unused = is.code === 'unused-hop' && pts.length
+      ? layout.hops.filter(h => h.every((v, k) => Math.abs(v-pts[0][k]) <= ISSUE_POINT_TOL)) : [];
+    if (unused.length === 1) {
+      const at = unused[0].slice(), snapshot = editorTableSnapshot(layout);
       const b = document.createElement("button"); b.textContent = "删除这个跨线";
-      b.onclick = ev => { ev.stopPropagation(); pushHistory(); layout.hops = layout.hops.filter(h => !same(h, pts[0])); changed(); };
+      b.dataset.issueCrossing = 'delete';
+      b.onclick = ev => { ev.stopPropagation(); if (snapshot !== editorTableSnapshot(layout)) return;
+        pushHistory(); layout.hops = layout.hops.filter(h => !same(h, at)); changed(); };
       li.appendChild(document.createElement("br")); li.appendChild(b);
     }
     if (!layout.modules) intentButtons(li, is);
-    if (!layout.modules) issueSelectionButtons(li, is);
-    else li.onclick = () => { const id = [...mine].find(x => ids.includes(x)); if (id) select({type: "el", id}); };
+    issueSelectionButtons(li, is);
     ul.appendChild(li);
   });
 }
@@ -2154,14 +2719,35 @@ function toNode(p) {
   });
   layout.wires = out;
 }
-// a junction that should not connect: join the horizontal pieces into one
-// wire and the vertical ones into another, then mark the crossing
+// Include visible automatic links when deciding whether a crossing has four arms.
+function crossingWires() {
+  const info = layout.modules && report?.module_info;
+  if (!info) return layout.wires;
+  const view = currentView(layout, info);
+  // Automatic links participate in the visible crossing, but stay derived.
+  return layout.wires.concat((info.link_wires || []).flatMap(link => view.wires[link.wire] ? [view.wires[link.wire]] : []));
+}
+// Join authored horizontal/vertical pieces, then mark the crossing without
+// copying automatic module links into the source table.
 function toHop(p) {
-  if (layout.elements.some(e => Object.values(e.pins).some(q => same(q, p)))) {
+  if (projected(() => layout.elements.some(e => Object.values(e.pins).some(q => same(q, p))))) {
     flash("这里接着元件引脚，不能改成跨线", true); return false; }
+  const wires = layout.wires.map(w => w.filter((q, k) => !same(q, p) || !k || k === w.length - 1 || !inside(p, w[k - 1], w[k + 1])));
   const ends = [], through = {h: false, v: false};
-  for (let i = 0; i < layout.wires.length; i++) {
-    const w = layout.wires[i];
+  const arms = new Set();
+  for (const w of crossingWires().slice(wires.length)) w.forEach((q, k) => {
+    if (!k) return;
+    const a = w[k - 1];
+    if (!same(p, a) && !same(p, q) && !inside(p, a, q)) return;
+    for (const end of [a, q]) {
+      if (end[1] === p[1] && end[0] !== p[0]) arms.add(end[0] < p[0] ? "L" : "R");
+      if (end[0] === p[0] && end[1] !== p[1]) arms.add(end[1] < p[1] ? "D" : "U");
+    }
+  });
+  through.h = arms.has("L") && arms.has("R");
+  through.v = arms.has("D") && arms.has("U");
+  for (let i = 0; i < wires.length; i++) {
+    const w = wires[i];
     if (w.some((q, k) => k > 0 && k < w.length - 1 && same(q, p))) { flash("有导线在这里拐弯，不能改成跨线", true); return false; }
     w.forEach((q, k) => { if (k && inside(p, w[k - 1], q)) through[Math.abs(q[1] - w[k - 1][1]) < 1e-6 ? "h" : "v"] = true; });
     if (same(w[0], p)) ends.push({i, first: true, n: w[1]});
@@ -2174,29 +2760,59 @@ function toHop(p) {
   const joins = [["L", "R"], ["D", "U"]].filter(([a]) => by[a]).map(([a, b]) => [by[a][0], by[b][0]]);
   if (joins.some(([a, b]) => a.i === b.i)) { flash("这两段是同一条导线，不能改成跨线", true); return false; }
   const merged = joins.map(([a, b]) => {
-    const A = a.first ? layout.wires[a.i].slice().reverse() : layout.wires[a.i];
-    const B = b.first ? layout.wires[b.i] : layout.wires[b.i].slice().reverse();
+    const A = a.first ? wires[a.i].slice().reverse() : wires[a.i];
+    const B = b.first ? wires[b.i] : wires[b.i].slice().reverse();
     return [...A.slice(0, -1), ...B.slice(1)].map(q => q.slice());   // p becomes a straight run
   });
   const drop = new Set(joins.flat().map(e => e.i));
-  layout.wires = layout.wires.filter((_, i) => !drop.has(i)).concat(merged);
+  layout.wires = wires.filter((_, i) => !drop.has(i)).concat(merged);
   layout.hops.push(p.slice());
   return true;
 }
 // orthogonal crossings of wire w with every other wire, interiors only
 function crossingsOf(w, skip) {
-  const pts = [];
-  layout.wires.forEach((o, oi) => { if (oi === skip) return;
-    w.forEach((a, k) => { if (!k) return; const b = w[k - 1];
-      o.forEach((c, m) => { if (!m) return; const d = o[m - 1];
-        const ah = Math.abs(a[1] - b[1]) < 1e-6, ch = Math.abs(c[1] - d[1]) < 1e-6;
-        if (ah === ch) return;
-        const x = ah ? c[0] : a[0], y = ah ? a[1] : c[1];
-        if (inside([x, y], a, b) && inside([x, y], c, d) && !pts.some(q => same(q, [x, y]))) pts.push([r4(x), r4(y)]);
-      });
+  return layout.wires.flatMap((o, i) => i === skip ? [] : wireIntersections(w, o))
+    .filter((p, i, all) => all.findIndex(q => same(p, q)) === i);
+}
+function wireIntersections(w, other, endpoints = false) {
+  const points = [], on = (p, a, b) => inside(p, a, b) || endpoints && (same(p, a) || same(p, b));
+  for (let i = 1; i < w.length; i++) for (let j = 1; j < other.length; j++) {
+    const a = w[i-1], b = w[i], c = other[j-1], d = other[j];
+    const u = [b[0]-a[0], b[1]-a[1]], v = [d[0]-c[0], d[1]-c[1]], det = u[0]*v[1]-u[1]*v[0];
+    if (Math.abs(det) < WIRE_INTERSECTION_EPS) continue;
+    const t = ((c[0]-a[0])*v[1]-(c[1]-a[1])*v[0])/det, p = [a[0]+t*u[0], a[1]+t*u[1]];
+    if (on(p, a, b) && on(p, c, d) && !points.some(q => same(p, q))) points.push(p.map(r4));
+  }
+  return points;
+}
+function crossingObstacles() {
+  const info = layout.modules && report?.module_info;
+  const derived = info ? currentView(layout, info).wires.filter((_, i) => info.root_wires?.[i] === undefined) : [];
+  return layout.wires.concat(derived, Object.values(report?.geometry || {}).flatMap(g => g.leads || []));
+}
+function sourceCrossingAt(at) {
+  const paths = crossingObstacles();
+  return layout.wires.flatMap((w, i) => paths.flatMap((o, j) => i === j ? [] : wireIntersections(w, o)))
+    .find(p => p.every((v, k) => Math.abs(v-at[k]) <= ISSUE_POINT_TOL));
+}
+// A hop belongs to the crossing pair, not to a fixed canvas coordinate.
+function wireHopFollower(index) {
+  const wire = clone(layout.wires[index]), paths = clone(crossingObstacles());
+  const markers = clone(layout.hops).map(at => ({at, others: paths.flatMap((path, i) =>
+    wireIntersections(wire, path).some(p => same(p, at)) ? [{path, moving: i === index}] : [])}));
+  return () => {
+    const assigned = new Map(), choices = [];
+    markers.forEach(({at, others}, i) => {
+      if (!others.length) { assigned.set(i, at); return; }
+      for (const {path, moving} of others) for (const p of wireIntersections(layout.wires[index], moving ? layout.wires[index] : path))
+        choices.push({i, p, distance: Math.hypot(p[0]-at[0], p[1]-at[1])});
     });
-  });
-  return pts;
+    // Two crossings of the same polylines must not both claim the nearest hop.
+    choices.sort((a, b) => a.distance-b.distance);
+    for (const {i, p} of choices)
+      if (!assigned.has(i) && ![...assigned.values()].some(q => same(p, q))) assigned.set(i, p);
+    layout.hops = markers.flatMap((_, i) => assigned.has(i) ? [assigned.get(i)] : []);
+  };
 }
 // "wire[6]" -> which pins it joins, so a problem names parts, not an index
 function wireName(i) {
@@ -2231,17 +2847,59 @@ function numInput(val, on) { const i = document.createElement("input"); i.type =
     if (i.value.trim() === "" || !Number.isFinite(+i.value)) { i.value = r4(val); flash("请输入数字", true); return; }
     pushHistory(); on(+i.value); changed(); };
   return i; }
+function symbolStyleSelect(value) {
+  const input = document.createElement('select'), options = report.symbol_styles;
+  const names = {power:'功率电子', ic:'模拟 IC（Razavi）'};
+  for (const name of options.values) input.add(new Option(names[name] || name, name));
+  input.value = value || options.default;
+  return input;
+}
+function setSymbolStyle(part, value) {
+  part.opts ||= {};
+  if (value === report.symbol_styles.default) delete part.opts.symbol_style;
+  else part.opts.symbol_style = value;
+  if (!Object.keys(part.opts).length) delete part.opts;
+}
+document.getElementById('symbolStylePreset').onclick = () => {
+  const before = JSON.stringify(layout), selectedProfile = profile;
+  showDialog('符号风格预设', `<p>统一当前图纸的电阻与 MOSFET 画法，包括模块内部和自动摆放的外部元件。</p>
+    <p class="hint">IC 风格使用锯齿电阻与简画 MOSFET，PMOS 门极为空心圈。体二极管仍参与仿真，并在导通模态中显示。</p>
+    <p class="hint">仅修改当前图纸；新放入的元件沿用默认风格，可再次应用预设。</p>
+    <label id="symbolStyleLabel">符号风格 </label>
+    <button id="symbolStyleApply">应用到当前图</button><p id="symbolStyleState" role="status"></p>`);
+  const choice = symbolStyleSelect(), button = document.getElementById('symbolStyleApply');
+  choice.id = 'symbolStyleChoice'; document.getElementById('symbolStyleLabel').append(choice);
+  const state = document.getElementById('symbolStyleState');
+  const active = () => dlg.open && button.isConnected;
+  button.onclick = async () => {
+    button.disabled = true; state.textContent = '校验中…';
+    try {
+      const result = await api('/api/symbol-style', {layout:JSON.parse(before), profile:selectedProfile, style:choice.value});
+      if (!active()) return;
+      if (JSON.stringify(layout) !== before || profile !== selectedProfile)
+        throw new Error('等待风格更新时图纸已改变，请重新打开窗口。');
+      if (!result.report.ok) throw new Error(result.report.issues.filter(i=>i.level==='error').map(i=>i.message).join('\n'));
+      if (JSON.stringify(result.layout) !== before) {
+        pushHistory(); layout = result.layout; selected = null; clearGroupSelection(); changed(false);
+      }
+      dlg.close();
+    } catch (error) {
+      if (active()) { state.className = 'bad'; state.textContent = error.message; }
+    } finally { button.disabled = false; }
+  };
+};
 function row(box, name, node) { const l = document.createElement("label"); l.textContent = name; box.appendChild(l); box.appendChild(node); }
 function showProps() {
   queueMicrotask(electricalProps);
   const box = document.getElementById("props"); box.innerHTML = ""; box.className = "prop";
   if (selectionCount() && !selected) { moduleSelectionStatus(); return; }
   if (!selected) { box.className = "hint"; box.textContent = "点选元件、导线或文字。"; return; }
+  if (selected.type === "modulePart") { showAutoPartProps(selected.id, box); return; }
   if (selected.type === "el") {
     const e = layout.elements.find(x => x.id === selected.id); if (!e) return;
     const s = document.createElement("span"); s.textContent = `${e.id}（${e.kind}）`; row(box, "元件", s);
     const ops = document.createElement("div"); ops.style.cssText = "display:flex;flex-wrap:wrap;gap:4px";
-    [["旋转 90°", rotateSelected, "R"], [["nmos", "pmos", "igbt", "scr"].includes(e.kind) ? "镜像（门极换边）" : "反向", mirrorSelected, "F"],
+    [["顺时针旋转 90°", () => rotateSelected(1), "R"], ["逆时针旋转 90°", () => rotateSelected(-1), "Shift+R"], [["nmos", "pmos", "igbt", "scr"].includes(e.kind) ? "镜像（门极换边）" : "反向", mirrorSelected, "F"],
      ["复制", () => { copySelected(); paste(); }, "Ctrl+C / Ctrl+V"]].forEach(([n, f, k]) => {
       if (["transformer", "pmsm"].includes(e.kind) && n === "反向") return;
       const b = document.createElement("button"); b.textContent = n; b.title = k; b.onclick = f; ops.appendChild(b); });
@@ -2287,6 +2945,26 @@ function showProps() {
       row(box, "标签拖动", resetLabel);
     }
     row(box, "颜色", inkControl((e.opts || {}).color, v => { e.opts = e.opts || {}; if (v) e.opts.color = v; else delete e.opts.color; }));
+    if (e.kind === 'port') {
+      const bare = document.createElement('input'); bare.type = 'checkbox'; bare.id = 'portBare'; bare.checked = !!e.opts?.bare;
+      bare.setAttribute('aria-label','不画圆圈（接在方框边上）');
+      bare.onchange = () => {pushHistory(); e.opts ||= {}; if (bare.checked) e.opts.bare = true; else delete e.opts.bare; changed();};
+      row(box,'不画圆圈（接在方框边上）',bare);
+    }
+    if (TWO_TERMINAL.includes(e.kind)) {
+      const current = document.createElement('input'); current.id = 'elementCurrent'; current.value = e.opts?.current || '';
+      current.setAttribute('aria-label','电流箭头标注');
+      current.placeholder = '$i_L$';
+      current.onchange = () => {pushHistory(); e.opts ||= {}; if (current.value.trim()) e.opts.current = current.value.trim(); else delete e.opts.current; changed();};
+      row(box,'电流箭头标注',current);
+      const hint = document.createElement('span'); hint.className = 'hint';
+      hint.textContent = '在真实预览和导出图中查看电流箭头'; row(box,'',hint);
+    }
+    if (report.symbol_styles?.kinds.includes(e.kind)) {
+      const style = symbolStyleSelect(e.opts?.symbol_style); style.id = 'elementSymbolStyle';
+      style.onchange = () => {pushHistory(); setSymbolStyle(e,style.value); changed();};
+      row(box,'符号风格',style);
+    }
     if (["R", "L", "C"].includes(e.kind)) {
       const dash = document.createElement("select"); dash.id = "elementDash";
       for (const value of report.region_options.callout_dashes) dash.add(new Option({solid:"实线",dashed:"虚线",dotted:"点线"}[value], value));
@@ -2305,7 +2983,7 @@ function showProps() {
     if (["V","I"].includes(e.kind)) sourceWaveProps(box,e);
     if (e.kind === "D") {
       const z = document.createElement("input"); z.type = "checkbox"; z.id = "diodeZener"; z.checked = !!e.opts?.zener;
-      z.title = "画成稳压管；击穿电压、测试电流和动态电阻在“分析 → SPICE 仿真…”中填写";
+      z.title = "画成稳压管；击穿电压、测试电流和动态电阻在“仿真 → SPICE 仿真…”中填写";
       z.onchange = () => { pushHistory(); e.opts = e.opts || {}; if (z.checked) e.opts.zener = true; else delete e.opts.zener; changed(); };
       row(box, "画成稳压管", z);
     }
@@ -2327,6 +3005,7 @@ function showProps() {
       sel.value = o.dots === false ? "false" : (o.dots || "same");
       sel.onchange = () => { pushHistory(); e.opts ||= {}; e.opts.dots = sel.value === "false" ? false : sel.value; changed(); };
       row(box, "同名端", sel);
+      transformerWindingProps(box, e);
     }
     Object.keys(e.pins).forEach(k => {
       const d = document.createElement("div"); d.className = "xy";
@@ -2367,6 +3046,8 @@ function showProps() {
     regionProps(box);
   } else if (selected.type === "blocks") {
     blockProps(box);
+  } else if (selected.type === 'glyphs') {
+    glyphProps(box);
   } else if (selected.type === "ann") {
     const a = layout.annotations[selected.index]; if (!a) return;
     const t = document.createElement("input"); t.value = a.text;
@@ -2384,6 +3065,7 @@ function showProps() {
 let wirePick = null;
 const WIRE_PICK_PX = 7, WIRE_DRAG_PX = 3; // screen-space hit/drag tolerances, independent of zoom
 const ISSUE_POINT_TOL = .00051; // validator prints three decimals: half a last digit plus roundoff
+const WIRE_INTERSECTION_EPS = 1e-9; // Below the 1e-8 cross-product precision of coordinates rounded to 1e-4.
 function updateWireSelection() {
   svg.querySelectorAll('g[data-wire] .wire').forEach(node => {
     node.classList.toggle('sel', selected?.type === 'wire' && +node.closest('g[data-wire]').dataset.wire === selected.index);
@@ -2392,8 +3074,10 @@ function updateWireSelection() {
   svg.querySelectorAll('circle[data-point]').forEach(node => {
     const own = selected?.type === 'wire' && +node.dataset.wire === selected.index;
     const active = own && +node.dataset.point === selected.point;
-    node.setAttribute('class', own ? 'vtx' : 'wire-point-hit');
-    node.setAttribute('r', active ? .09 : .07); node.style.fill = active ? 'var(--accent)' : '';
+    const at = [+node.getAttribute('cx'), -node.getAttribute('cy')];
+    const connected = wirePinTargets().some(pin => same(pin.at, at)) && !layout.hops.some(h => same(h, at));
+    node.setAttribute('class', own ? 'vtx' + (connected ? ' connected' : '') : 'wire-point-hit');
+    node.setAttribute('r', active ? .09 : .07); node.style.fill = active ? (connected ? '#1f8a4c' : 'var(--accent)') : '';
   });
 }
 function highlightSelectedWire() {
@@ -2440,7 +3124,8 @@ function deleteWirePoint() {
   if (!w || !Number.isInteger(point) || point <= 0 || point >= w.length - 1) {
     flash("请选择内部折点；端点保留连接，整条导线可用“删除整条导线”删除", true); return;
   }
-  wireEdit(() => { w.splice(point, 1); selected = {type: "wire", index}; });
+  const follow = wireHopFollower(index);
+  wireEdit(() => { w.splice(point, 1); follow(); selected = {type: "wire", index}; });
 }
 function splitWire(at = null) {
   let {index, point} = selected || {};
@@ -2476,6 +3161,38 @@ function deleteDuplicateWire(index) {
   if (!w || !layout.wires.some((other, i) => i !== index && identicalWires(w, other))) return;
   wireEdit(() => { layout.wires.splice(index, 1); selected = null; });
 }
+let wireMergeBusy = false;
+async function mergeOverlappingWires() {
+  if (wireMergeBusy || selectionBusy || drag || instanceDrag || linkDrag || wireDraft || boxDraft || resizing) return;
+  const before=editorTableSnapshot(layout), requestedProfile=profile, file=editorFilePath,
+    generation=layoutGeneration, editing=definitionEdit;
+  const current=()=>editorTableSnapshot(layout)===before && profile===requestedProfile &&
+    editorFilePath===file && layoutGeneration===generation && definitionEdit===editing &&
+    !selectionBusy && !drag && !instanceDrag && !linkDrag && !wireDraft && !boxDraft && !resizing;
+  wireMergeBusy=true; ++pendingTrialChecks; checking=true; syncSelectionControls();
+  try {
+    const result=await api('/api/wire-merge',{layout:clone(layout),profile:requestedProfile});
+    if (!current()) return;
+    if (!Array.isArray(result?.wires) || !result.wires.every(w=>Array.isArray(w) && w.length>=2 &&
+        w.every(p=>Array.isArray(p) && p.length===2 && p.every(Number.isFinite))) || !Array.isArray(result.report?.issues) ||
+        typeof result.report?.ok!=='boolean' || !Array.isArray(result.report?.scale_cm_per_unit) ||
+        result.report.scale_cm_per_unit.length!==2 || !result.report.scale_cm_per_unit.every(Number.isFinite))
+      throw new Error('导线合并未完成，请重试。');
+    if (JSON.stringify(result.wires)===JSON.stringify(layout.wires)) {
+      flash('没有可合并的普通重叠导线；模块内部请进入定义编辑。'); return;
+    }
+    pushHistory(); layout.wires=result.wires; report=stampReport(result.report);
+    selected=null; clearGroupSelection(); focusedLink=null; focusedModuleId=null;
+    showProps(); showIssues(); changed(false);
+    flash('已合并当前图中的重叠普通导线；可撤销。');
+  } catch (error) { if (current()) flash(error.message,true); }
+  finally {
+    wireMergeBusy=false; --pendingTrialChecks; checking=validating || pendingTrialChecks>0;
+    syncSelectionControls();
+    if (!checking && checkAgain) { checkAgain=false; scheduleCheck(); }
+  }
+}
+document.getElementById('mergeOverlaps').onclick=mergeOverlappingWires;
 function wireProps(box) {
   const {index, point} = selected, w = layout.wires[index]; if (!w) return;
   const caption = document.createElement("span"); caption.textContent = `wire[${index}]，${w.length} 个点`;
@@ -2497,11 +3214,22 @@ function wireProps(box) {
   const hint = document.createElement("span"); hint.className = "hint";
   hint.textContent = "双击线段加点；拖动线段保持横竖和首尾位置。删除折点会直接连接相邻点，斜线问题请按校验提示调整。"; row(box, "", hint);
   w.forEach((p, j) => { const d = document.createElement("div"); d.className = "xy";
-    d.appendChild(numInput(p[0], v => p[0] = v)); d.appendChild(numInput(p[1], v => p[1] = v)); row(box, `点 ${j}`, d); });
+    for (const axis of [0, 1]) d.appendChild(numInput(p[axis], v => {
+      const follow = wireHopFollower(index); p[axis] = v; follow();
+    }));
+    row(box, `点 ${j}`, d); });
+  const crossings = crossingWires().flatMap((other, i) => i === index ? [] : wireIntersections(w, other, true));
+  crossings.filter((p, i) => crossings.findIndex(q => same(p, q)) === i).forEach((p, i) => {
+    const entry = crossingEntry(p); if (!entry) return;
+    const control = button(entry.label, `wireCrossing-${i}`, entry.run, !!entry.reason);
+    if (entry.reason) control.title = entry.reason;
+    row(box, `交叉点 (${p[0]}, ${p[1]})`, control);
+  });
   layout.wires.forEach((other, oi) => { if (oi !== index && joinWires(w, other))
     row(box, "首尾相接", button(`合并 wire[${oi}]`, `wireMerge-${oi}`, () => mergeWire(index, oi))); });
   if (layout.wires.some((other, oi) => oi !== index && identicalWires(w, other)))
     row(box, "完全重复", button("删除这条重复线", "wireDeleteDuplicate", () => deleteDuplicateWire(index)));
+  row(box, "当前图导线", button("合并重叠导线", "wireMergeOverlaps", mergeOverlappingWires, wireMergeBusy || selectionBusy));
   row(box, "", button("删除整条导线", "wireDeleteWhole", () => { selected = {type: "wire", index}; delSelected(); }));
 }
 function moveWireSegment(w, segment, delta) {
@@ -2517,6 +3245,15 @@ function moveWireSegment(w, segment, delta) {
   if (!next || (next[0] !== bb[0] && next[1] !== bb[1])) out.push(b.slice());
   out.push(...clone(w.slice(segment + 2)));
   return out.filter((p, i) => i === 0 || !same(p, out[i - 1]));
+}
+function trimMovedWireEnds(w, original, index) {
+  const covered = (a, b) => layout.wires.some((other, i) => i !== index && other.some((p, j) => j &&
+    [a, b].every(q => wireProjection(q, other[j-1], p).distance < 1e-6)));
+  const out = clone(w);
+  // A newly added end stub on an existing bus would duplicate its coverage.
+  if (out.length > 2 && same(out[0], original[0]) && !same(out[1], original[1]) && covered(out[0], out[1])) out.shift();
+  if (out.length > 2 && same(out.at(-1), original.at(-1)) && !same(out.at(-2), original.at(-2)) && covered(out.at(-2), out.at(-1))) out.pop();
+  return out;
 }
 // Pins and other wires' ends that sit inside a segment (a T joint). When the
 // segment moves sideways they keep their connection through a short stub.
@@ -2553,30 +3290,31 @@ function startWirePick(ev, index, point = null) {
   render(true);
   if (vertex !== null) { startDragVertex(ev, hit.index, vertex); return; }
   const orig = clone(layout.wires[hit.index]), start = p, taps = segmentTaps(orig, hit.segment, hit.index);
-  beginWireDrag(ev, hit.index, q => moveWireSegment(orig, hit.segment, [q[0] - start[0], q[1] - start[1]]), true,
+  beginWireDrag(ev, hit.index, q => trimMovedWireEnds(moveWireSegment(orig, hit.segment, [q[0] - start[0], q[1] - start[1]]), orig, hit.index), true,
                 moved => tapStubs(taps, orig, moved, hit.segment));
 }
 function beginWireDrag(ev, index, move, keepEnds = false, stubs = null) {
   svg.setPointerCapture(ev.pointerId);
-  const original = clone(layout.wires[index]), others = clone(layout.wires), start = [ev.clientX, ev.clientY];
-  drag = {wire: index, moved: false, keepEnds, move(p, event) {
+  const original = clone(layout.wires[index]), others = clone(layout.wires), start = [ev.clientX, ev.clientY], followHops = wireHopFollower(index);
+  drag = {wire: index, moved: false, keepEnds, followHops, move(p, event) {
     if (!this.moved && Math.hypot(event.clientX - start[0], event.clientY - start[1]) < WIRE_DRAG_PX) return;
     const candidate = move(p, event);
     if (!this.moved && JSON.stringify(candidate) === JSON.stringify(original)) return;
     if (!this.moved) { pushHistory(); this.moved = true; }
-    if (!stubs) { layout.wires[index] = candidate; return; }
     layout.wires = clone(others); layout.wires[index] = candidate;
-    layout.wires.push(...stubs(candidate).filter(([a, b]) => !same(a, b)));
+    if (stubs) layout.wires.push(...stubs(candidate).filter(([a, b]) => !same(a, b)));
+    followHops();
   }};
 }
 function issueSelectionButtons(li, issue) {
   // Rendering lazily creates empty optional sections; that is not an edit.
-  const version = () => JSON.stringify([layout.wires, layout.elements,
-    ...["callouts", "wave_symbols", "regions", "blocks", "annotations"].map(k => layout[k] || [])]);
+  const version = () => editorTableSnapshot(layout);
   const targets = [], snapshot = version(), seen = new Set();
   const add = (target, key, label) => { if (!seen.has(key)) { seen.add(key); targets.push({target, key, label}); } };
   for (const m of issue.message.matchAll(/(wire|callouts|wave_symbols|regions|blocks|annotations)\[(\d+)\]/g)) {
-    const type = m[1] === "annotations" ? "ann" : m[1], index = +m[2];
+    const type = m[1] === "annotations" ? "ann" : m[1], drawnIndex = +m[2];
+    const index = !layout.modules ? drawnIndex : type === 'wire' ? report.module_info?.root_wires?.[drawnIndex]
+      : report.module_info?.root_decorations?.[m[1]]?.[drawnIndex];
     const list = type === "wire" ? layout.wires : type === "ann" ? layout.annotations : layout[type];
     if (list?.[index]) add({type, index}, `${type}:${index}`, type === "wire" ? `导线 wire[${index}]` : m[0]);
   }
@@ -2603,6 +3341,9 @@ function issueSelectionButtons(li, issue) {
     if (target.type === "wire" && layout.wires.some((w, i) => i !== target.index && identicalWires(w, layout.wires[target.index])))
       button(`删除重复导线 wire[${target.index}]`, `delete-wire:${target.index}`, () => deleteDuplicateWire(target.index));
   });
+  if (issue.code==='collinear-overlap' && (issue.message.match(/wire\[\d+\]/g) || []).length>=2 &&
+      targets.some(({target})=>target.type==='wire'))
+    button('合并重叠导线','merge-overlaps',mergeOverlappingWires);
   li.onclick = () => { if (targets.length && current()) select(targets[0].target); };
 }
 
@@ -2644,6 +3385,63 @@ function moveWirePoint(P, j, q, keepDirection = false) {
 // wire corners sitting on a pin move with it (the wire stretches and stays
 // orthogonal); a pin in the middle of a wire or on another part's pin keeps
 // its connection through a new stub.  Returns apply(newPins).
+// Extra windings w3..w6 of a multi-winding transformer share its one core.
+// A new winding goes on the primary or the secondary axis, one winding length
+// below the lowest coil there (in the transformer's own frame), dot (wka) on top.
+function transformerWindingProps(box, e) {
+  const names = report?.transformer_windings || [];
+  const used = names.filter(w => e.pins[w + "a"] || e.pins[w + "b"]);
+  const free = names.find(w => !used.includes(w));
+  const wrap = document.createElement("div"); wrap.className = "export-row";
+  for (const [side, title] of [["p", "加在原边侧"], ["s", "加在副边侧"]]) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = title;
+    b.id = side === "p" ? "windingAddPrimary" : "windingAddSecondary";
+    b.disabled = !free; b.title = free ? "在同一磁芯上加一个绕组，同名端在 a 端；连线和匝比需另行补上" : "最多 6 个绕组";
+    b.onclick = () => {
+      if (checking || checkAgain || !report?.geometry?.[e.id]) { flash("请等待图纸检查完成后再添加绕组", true); return; }
+      pushHistory(); addWinding(e, free, side); changed();
+    };
+    wrap.appendChild(b);
+  }
+  if (used.length) {
+    const last = used[used.length - 1], b = document.createElement("button");
+    b.type = "button"; b.id = "windingRemove"; b.textContent = `删去 ${last} 绕组`;
+    b.onclick = () => removeWinding(e, last);
+    wrap.appendChild(b);
+  }
+  row(box, "多绕组", wrap);
+}
+function addWinding(e, w, side) {
+  const p1 = e.pins.p1, p2 = e.pins.p2, d = [p1[0] - p2[0], p1[1] - p2[1]];
+  const len = Math.hypot(...d) || 1, u = [d[0] / len, d[1] / len];
+  const col = side === "p" ? p1 : e.pins.s1, along = q => q[0] * u[0] + q[1] * u[1];
+  const across = q => q[0] * u[1] - q[1] * u[0], here = across(col);
+  const low = Math.min(...Object.values(e.pins).filter(q => Math.abs(across(q) - here) < 1e-6).map(along));
+  const gap = Math.ceil(report.geometry[e.id].winding_gap / SNAP) * SNAP;
+  const top = [col[0] + (low - along(col) - gap) * u[0], col[1] + (low - along(col) - gap) * u[1]];
+  e.pins[w + "a"] = [r4(snap(top[0])), r4(snap(top[1]))];
+  e.pins[w + "b"] = [r4(snap(top[0] - len * u[0])), r4(snap(top[1] - len * u[1]))];
+}
+function removeWinding(e, w) {
+  const refs = new Set([`${e.id}.${w}a`, `${e.id}.${w}b`]), branch = `${e.id}:${w}`;
+  const probes = (layout.simulation?.probes || []).filter(p => refs.has(p.positive) || refs.has(p.negative)
+    || p.element === e.id && p.winding === w);
+  const measured = new Set(probes.map(p => p.name));
+  const inMode = (layout.modes || []).some(m => (m.loops || []).flat().some(s => s.split('|').includes(branch))
+    || m.source?.settings?.distinguish?.includes(branch));
+  if (inMode || Object.values(layout.closed_loop?.inputs || {}).some(c => measured.has(c.probe))
+      || refs.has(layout.simulation?.ground)) {
+    flash("绕组仍被模态、闭环反馈或参考地使用，请先修改对应设置", true); return;
+  }
+  pushHistory();
+  for (const ref of refs) { delete e.pins[ref.slice(e.id.length + 1)]; if (layout.netlist) delete layout.netlist[ref]; }
+  if (layout.no_connect) layout.no_connect = layout.no_connect.filter(ref => !refs.has(ref));
+  if (layout.simulation?.components?.[e.id]) delete layout.simulation.components[e.id][`ratio_${w}`];
+  if (layout.simulation?.probes) layout.simulation.probes = layout.simulation.probes.filter(p => !probes.includes(p));
+  if (layout.modules?.links) layout.modules.links = layout.modules.links.filter(pair => !pair.some(ref => refs.has(ref)));
+  changed();
+}
+
 function pinMover(e, table = layout) {
   const pins = clone(e.pins), wires = clone(table.wires);
   const attached = [];
@@ -2698,7 +3496,7 @@ function startDragLabel(ev, id) {
   const start = toUnits(ev), stored = e.opts?.label_offset;
   const offset = Array.isArray(stored) && stored.length === 2 && stored.every(Number.isFinite) ? stored.slice() : [0, 0];
   const screen = [ev.clientX, ev.clientY];
-  drag = {label:id, offset:offset.slice(), moved:false, move(p, event) {
+  drag = {deferCheck:true, label:id, offset:offset.slice(), moved:false, move(p, event) {
     if (!this.moved) {
       if (Math.hypot(event.clientX-screen[0], event.clientY-screen[1]) < WIRE_DRAG_PX) return;
       pushHistory(); this.moved = true;
@@ -2716,7 +3514,7 @@ function startDragElement(ev, id) {
   const e = layout.elements.find(x => x.id === id);
   const pins = clone(e.pins), start = toUnits(ev), apply = pinMover(e), guides = smartGuides(e);
   pushHistory();
-  drag = {guides, move(p, ev) {
+  drag = {deferCheck:true, guides, move(p, ev) {
     // smart guides first (pins, then centres and edges, then equal spacing);
     // otherwise the grid; Alt drags on the grid alone
     const [dx, dy] = guides.snap(p[0] - start[0], p[1] - start[1], !!ev?.altKey);
@@ -2741,21 +3539,23 @@ function startDragPin(ev, id, k) {
   }};
 }
 const TURN = {above: "right", right: "below", below: "left", left: "above"};
+const TURN_BACK = Object.fromEntries(Object.entries(TURN).map(([from,to])=>[to,from]));
 // A part picked with Shift alone is the same selection as a plain click.
 function soleSelection() {
   if (!selected && selectionCount() === 1 && moduleSelection.size === 1) { selected = {type: "el", id: [...moduleSelection][0]}; clearGroupSelection(); }
 }
-function rotateSelected() {
+function rotateSelected(direction = 1) {
+  if (selectionCount()>1) return rotateGroup(direction);
   soleSelection();
   if (!selected || selected.type !== "el") { flash("先选中一个元件", true); return; }
   const e = layout.elements.find(x => x.id === selected.id);
   const ps = Object.values(e.pins), c = [ps.reduce((s, p) => s + p[0], 0) / ps.length, ps.reduce((s, p) => s + p[1], 0) / ps.length];
   if (e.kind === "transformer") for (let i = 0; i < 2; i++) c[i] = snap((Math.min(...ps.map(p => p[i])) + Math.max(...ps.map(p => p[i]))) / 2);
   pushHistory();
-  // a quarter turn clockwise about the centre, snapped back onto the grid
+  // A quarter turn in the chosen direction, snapped back onto the grid.
   pinMover(e)(Object.fromEntries(Object.entries(e.pins).map(([k, p]) =>
-    [k, [r4(snap(c[0] + (p[1] - c[1]))), r4(snap(c[1] - (p[0] - c[0])))]])));
-  if (e.label_pos) e.label_pos = TURN[e.label_pos];
+    [k, [r4(snap(c[0] + direction * (p[1] - c[1]))), r4(snap(c[1] - direction * (p[0] - c[0])))]])));
+  if (e.label_pos) e.label_pos = (direction === 1 ? TURN : TURN_BACK)[e.label_pos];
   changed();
 }
 // font size of one text in pt (8 = the journal size), plus "all texts alike"
@@ -2838,7 +3638,7 @@ function renameCopiedLabel(e, old) {
 }
 function copySelected() {
   if (selectionCount()) return copyGroup();
-  if(['wire','ann'].includes(selected?.type)){groupAdd(selected);selected=null;return copyGroup();}
+  if(['wire','ann','glyphs'].includes(selected?.type)){groupAdd(selected);selected=null;return copyGroup();}
   if (copyDecoration()) return;
   if (!selected || selected.type !== "el") { flash("先选中一个元件", true); return false; }
   const e = layout.elements.find(x => x.id === selected.id);
@@ -2849,7 +3649,7 @@ function addElement(e) {
 }
 function cutSelected() {
   if (selectionCount()) return copyGroup(true);
-  if(['wire','ann'].includes(selected?.type)){groupAdd(selected);selected=null;return copyGroup(true);}
+  if(['wire','ann','glyphs'].includes(selected?.type)){groupAdd(selected);selected=null;return copyGroup(true);}
   if (copyDecoration()) { clipboard.cut = true; delSelected(); return; }
   if (!selected || selected.type !== "el") { flash("先选中一个元件", true); return; }
   copySelected(); clipboard.cut = true;   // the first paste puts it back as it was
@@ -2976,7 +3776,7 @@ function addThreePhase(at) {
   });
   layout.wires.push([[x0, r4(cy + 1.2)], [x0, cy]], [[x0, cy], [x0, r4(cy - 1.2)]]);
   selected = {type: "el", id: ids[0]}; showProps(); changed();
-  flash(`已添加三相电源 ${ids.join("、")}（星形，左侧竖线为中性线）；参数在“分析 → SPICE 仿真”的“三相统一设置”里填`);
+  flash(`已添加三相电源 ${ids.join("、")}（星形，左侧竖线为中性线）；参数在“仿真 → SPICE 仿真”的“三相统一设置”里填`);
 }
 function startDragVertex(ev, i, j) {
   ev.stopPropagation();
@@ -2997,10 +3797,84 @@ function startDragAnn(ev, i) {
   if (!layout.annotations[i]) return;   // a module instance's text: edit its definition
   ev.stopPropagation(); select({type: "ann", index: i}); pushHistory();
   const a = layout.annotations[i], at = a.at.slice(), start = toUnits(ev), guides = textGuides(i);
-  drag = {guides, move(p, ev) {   // smart guides as for a part; Alt: the grid alone
+  drag = {deferCheck:true, guides, move(p, ev) {   // smart guides as for a part; Alt: the grid alone
     const [dx, dy] = guides.snap(p[0] - start[0], p[1] - start[1], !!ev?.altKey);
     a.at = [r4(at[0] + dx), r4(at[1] + dy)];
   }};
+}
+
+const WIRE_SNAP_PX = 22; // screen pixels, so pin targeting works at every zoom level
+function wirePinTargets() {
+  const info = report?.module_info, source = moduleDrawingSource();
+  const drawing = !projectionSource && source?.modules && info ? currentView(source, info) : layout;
+  const parts = new Map(drawing.elements.filter(e => !e.id.includes('/')).map(e => [e.id, e]));
+  for (const id of report?.module_info?.auto_parts || []) {
+    const part = report.module_info.view.elements.find(e => e.id === id);
+    if (part && !parts.has(id)) parts.set(id, part);
+  }
+  const roots = [...parts.values()];
+  const pins = roots.flatMap(e => Object.entries(e.pins).map(([name, at]) => ({ref: `${e.id}.${name}`, at})));
+  const offsets = moduleOffsets(source, info);
+  pins.push(...Object.entries(currentModulePorts(info, offsets)).map(([ref, at]) => ({ref, at})));
+  return pins;
+}
+function nearbyWirePin(point, disabled = false) {
+  if (disabled) return null;
+  const matrix = svg.getScreenCTM(), pixels = Math.hypot(matrix.a, matrix.b);
+  const last = wireDraft?.pts.at(-1);
+  let best = null, distance = WIRE_SNAP_PX;
+  for (const pin of wirePinTargets()) {
+    if (last && same(pin.at, last)) continue;
+    const d = Math.hypot(point[0] - pin.at[0], point[1] - pin.at[1]) * pixels;
+    if (d < distance) { best = pin; distance = d; }
+  }
+  return best;
+}
+function draftWireExtension(point, connect = false) {
+  if (!point) return [];
+  const last = wireDraft.pts.at(-1);
+  if (!last || same(point, last)) return last ? [] : [point];
+  if (point[0] === last[0] || point[1] === last[1]) return [point];
+  const horizontal = Math.abs(point[0] - last[0]) >= Math.abs(point[1] - last[1]);
+  const corner = horizontal ? [point[0], last[1]] : [last[0], point[1]];
+  return connect ? [corner, point] : [corner];
+}
+function beginWire(at = null) {
+  clearGroupSelection(); selected = null; focusedModuleId = null; focusedLink = null;
+  wireDraft = {pts: at ? [at.slice()] : [], hover: null, target: null};
+  document.getElementById('modeTip').style.display = 'block';
+  document.getElementById('drawWire').classList.add('on');
+  showProps(); render();
+}
+function drawWirePinTargets() {
+  if (boxDraft || modePick || document.getElementById('drawWire').disabled) return;
+  const matrix = svg.getScreenCTM(), unit = 1 / Math.hypot(matrix.a, matrix.b);
+  const overlay = el('g', {id: 'wirePins'}, svg);
+  for (const pin of wirePinTargets()) {
+    const attached = !layout.hops.some(h => same(h, pin.at)) && layout.wires.some(w =>
+      w.some((p, i) => same(p, pin.at) || i && inside(pin.at, w[i - 1], p)));
+    if (attached) {
+      el('circle', {cx: pin.at[0], cy: -pin.at[1], r: 3.5 * unit, fill: '#1f8a4c',
+        'data-connected-pin': pin.ref, 'pointer-events': 'none'}, overlay);
+    }
+    const partId = pin.ref.slice(0, pin.ref.lastIndexOf('.'));
+    if (wireDraft || drag || instanceDrag || selectionCount() || selected?.type === 'el' && partId === selected.id ||
+        selected?.type === 'wire' && layout.wires[selected.index]?.some(p => same(p, pin.at))) continue;
+    const hit = el('circle', {cx: pin.at[0], cy: -pin.at[1], r: 6 * unit, fill: 'transparent',
+      'data-wire-pin': pin.ref, style: 'cursor:crosshair'}, overlay);
+    el('title', {}, hit).textContent = cdI18n.translate(`从引脚 ${pin.ref} 开始画线`);
+    hit.addEventListener('pointerdown', ev => {
+      if (ev.button !== 0 || ev.altKey || ev.shiftKey || selectionBusy) return;
+      ev.preventDefault(); ev.stopPropagation(); beginWire(pin.at); svg.focus({preventScroll:true});
+    });
+  }
+  if (wireDraft?.target) {
+    const {at, ref} = wireDraft.target, [x, y] = at, r = 5 * unit;
+    const hint = el('g', {id: 'wireSnapHint', 'data-target': ref, 'pointer-events': 'none'}, overlay);
+    el('circle', {cx:x, cy:-y, r:5 * unit, fill:'none', stroke:'#1f8a4c', 'stroke-width':1.5 * unit}, hint);
+    el('polygon', {points:`${x-2*r},${-y} ${x-4*r},${-y-r} ${x-4*r},${-y+r}`, fill:'#1f8a4c'}, hint);
+    el('title', {}, hint).textContent = cdI18n.translate(`连接到 ${ref}`);
+  }
 }
 
 // The background's left drag is handled by modulePointerDown (marquee).
@@ -3008,12 +3882,16 @@ function startDragAnn(ev, i) {
 svg.addEventListener("pointerdown", ev => {
   if (ev.button !== 0) return;
   if (wireDraft) {
+    const p = toUnits(ev), target = nearbyWirePin(p, ev.altKey);
+    if (target && wireDraft.pts.length) {
+      wireDraft.pts.push(...draftWireExtension(target.at.slice(), true)); finishWire(); return;
+    }
     // render() below replaces the pressed element, so the browser never fires
     // dblclick while drafting: a second press in the same place finishes the wire
     const now = performance.now(), prev = wireDraft.press;
     wireDraft.press = {t: now, x: ev.clientX, y: ev.clientY};
     if (prev && now - prev.t < 450 && Math.hypot(ev.clientX - prev.x, ev.clientY - prev.y) < 6) { finishWire(); return; }
-    const p = toUnits(ev); let q = [r4(snap(p[0])), r4(snap(p[1]))];
+    let q = target ? target.at.slice() : [r4(snap(p[0])), r4(snap(p[1]))];
     const last = wireDraft.pts[wireDraft.pts.length - 1];
     if (last) q = Math.abs(q[0] - last[0]) >= Math.abs(q[1] - last[1]) ? [q[0], last[1]] : [last[0], q[1]];
     if (!last || !same(q, last)) wireDraft.pts.push(q);
@@ -3022,22 +3900,47 @@ svg.addEventListener("pointerdown", ev => {
   if (!ev.regionPicked) select(null);
 });
 // drawing a region or callout starts anywhere, also on top of parts and wires
+function draftArrowPoint(p, event) {
+  const last = boxDraft.via.at(-1) || boxDraft.a;
+  boxDraft.guides ||= arrowGuides([boxDraft.a, ...boxDraft.via, last], boxDraft.via.length + 1);
+  return boxDraft.guides.snap(p, event);
+}
 svg.addEventListener("pointerdown", ev => {
   if (ev.button !== 0 || !boxDraft) return;
   ev.stopPropagation();
+  if (boxDraft.clicks) {
+    const p = toUnits(ev), last = boxDraft.via.at(-1) || boxDraft.a;
+    const reach = GUIDE_PX * view.w / Math.max(svg.getBoundingClientRect().width, 1);
+    if (Math.hypot(p[0]-last[0], p[1]-last[1]) <= reach) {
+      if (boxDraft.via.length) {boxDraft.b = last; finishBoxDraft();}
+      return;
+    }
+    const q = draftArrowPoint(p,ev);
+    boxDraft.b = q;
+    if (same(q,last)) { if (boxDraft.via.length) finishBoxDraft(); }
+    else {boxDraft.via.push(q); boxDraft.guides = null;}
+    render(); return;
+  }
   const p = toUnits(ev); boxDraft.a = [r4(snap(p[0])), r4(snap(p[1]))]; boxDraft.b = null;
-  drag = {pan: true, move(q) { boxDraft.b = [r4(snap(q[0])), r4(snap(q[1]))]; render(); }};
+  if (boxDraft.kind === 'annotations') {finishBoxDraft(); return;}
+  drag = {pan:true,draft:true,moved:false,move(q,event) {
+    boxDraft.b = boxDraft.kind === 'callouts' ? draftArrowPoint(q,event) : [r4(snap(q[0])),r4(snap(q[1]))];
+    this.moved ||= Math.hypot(event.clientX-ev.clientX,event.clientY-ev.clientY) >= WIRE_DRAG_PX; renderNextFrame();
+  }};
 }, true);
 svg.addEventListener("pointermove", ev => {
   const p = toUnits(ev);
   document.getElementById("coords").textContent = `x: ${snap(p[0]).toFixed(2)}, y: ${snap(p[1]).toFixed(2)}`;
-  if (wireDraft) { const last = wireDraft.pts[wireDraft.pts.length - 1]; let q = [snap(p[0]), snap(p[1])];
-    if (last) q = Math.abs(q[0] - last[0]) >= Math.abs(q[1] - last[1]) ? [q[0], last[1]] : [last[0], q[1]];
-    wireDraft.hover = q; render(); return; }
+  if (boxDraft?.clicks) {boxDraft.b = draftArrowPoint(p,ev); renderNextFrame(); return;}
+  if (wireDraft) {
+    wireDraft.target = nearbyWirePin(p, ev.altKey);
+    wireDraft.hover = wireDraft.target?.at.slice() || [r4(snap(p[0])), r4(snap(p[1]))];
+    renderNextFrame(); return;
+  }
   if (!drag) return;
   drag.move(p, ev);
   if (drag.wire !== undefined && !drag.moved) return;
-  if (!drag.pan && drag.callout === undefined) { render(); revalidate(); }
+  if (!drag.pan && drag.callout === undefined) { renderNextFrame(); scheduleCheck(); }
 });
 // Esc during a single drag (part, wire, region, arrow, text) puts the table back as
 // it was at the press that started it; the group drag has its own cancel.
@@ -3052,9 +3955,14 @@ document.addEventListener("keydown", ev => {
 }, true);
 window.addEventListener("pointerup", async () => {
   if (drag?.group) { await finishGroupDrag(drag); return; }
-  if (boxDraft && boxDraft.a) { drag = null; finishBoxDraft(); return; }
+  if (boxDraft && boxDraft.a) {
+    if (boxDraft.kind === 'callouts' && boxDraft.style === 'line' && (boxDraft.clicks || !drag?.moved)) {
+      boxDraft.clicks = true; drag = null; return;
+    }
+    finishBoxDraft(); return;
+  }
   if (drag && drag.callout !== undefined) {
-    const d = drag; drag = null;
+    const d = drag; drag = null; renderNextFrame();
     if (d.running) await d.running;
     if (currentCalloutDrag(d)) { if (d.error) flash(d.error); changed(); }
     return;
@@ -3062,7 +3970,7 @@ window.addEventListener("pointerup", async () => {
   if (drag && !drag.pan) {
     if (drag.guides) drag.guides = null;
     if ((drag.wire !== undefined || drag.label) && !drag.moved) { drag = null; return; }
-    if (drag.wire !== undefined && !drag.keepEnds) { const notes = fixLeadLandings(drag.wire); if (notes.length) flash(notes.join("；")); }
+    if (drag.wire !== undefined && !drag.keepEnds) { const notes = fixLeadLandings(drag.wire); if (notes.length) flash(notes.join("；")); drag.followHops(); }
     changed(!drag.label);
   }
   drag = null;
@@ -3177,6 +4085,11 @@ function nudgeSelection(key, fast) {
     const at = inst.at || viewInfo().origins?.[inst.id];
     if (!at) return false;
     nudgeModuleInstance(inst.id, delta); return true;
+  } else if (selected.type === "modulePart") {
+    const part = layout.modules?.parts?.find(p => p.id === selected.id);
+    if (!part) return false;
+    const offset = moved(part.offset || [0, 0]), move = autoPartMover(part.id);
+    apply = () => move(offset);
   } else if (selected.type === "el") {
     const e = layout.elements.find(e => e.id === selected.id);
     if (!e) return false;
@@ -3188,7 +4101,7 @@ function nudgeSelection(key, fast) {
     if (point === undefined && segment === undefined) { flash("请先点选导线的折点或线段，再用方向键微调"); return true; }
     if (point !== undefined && !w[point] || segment !== undefined && !w[segment + 1]) return false;
     const q = point === undefined ? null : moved(w[point]);
-    const next = q ? moveWirePoint(w, point, q) : segment !== undefined ? moveWireSegment(w, segment, delta) : w.map(moved);
+    const next = q ? moveWirePoint(w, point, q) : segment !== undefined ? trimMovedWireEnds(moveWireSegment(w, segment, delta), w, selected.index) : w.map(moved);
     if (JSON.stringify(next) === JSON.stringify(w)) return true;
     let nextSegment = segment;
     if (segment !== undefined) {
@@ -3197,6 +4110,7 @@ function nudgeSelection(key, fast) {
       nextSegment = next.findIndex((p, i) => same(p, a) && next[i + 1] && same(next[i + 1], b));
     }
     const stubs = segment !== undefined ? tapStubs(segmentTaps(w, segment, selected.index), w, next, segment) : [];
+    const followHops = wireHopFollower(selected.index);
     apply = () => {
       layout.wires[selected.index] = next;
       layout.wires.push(...stubs.filter(([a, b]) => !same(a, b)));
@@ -3205,12 +4119,13 @@ function nudgeSelection(key, fast) {
         selected.point = layout.wires[selected.index].findIndex(p => same(p, q));
         if (selected.point < 0) selected = null;
       } else if (nextSegment !== undefined) selected.segment = nextSegment;
+      followHops();
     };
   } else if (["ann", "wave_symbols"].includes(selected.type)) {
     const item = (selected.type === "ann" ? layout.annotations : list("wave_symbols"))[selected.index];
     if (!item?.at) return false;
     apply = () => { item.at = moved(item.at); };
-  } else if (["regions", "blocks", "callouts"].includes(selected.type)) {
+  } else if (["regions", "blocks", "callouts", "glyphs"].includes(selected.type)) {
     const item = list(selected.type)[selected.index]; if (!item) return false;
     if (item.fit) { flash("此区域随成员自动贴合；请移动成员，或先固定区域边界"); return true; }
     apply = () => { item.from = moved(item.from); item.to = moved(item.to); if (item.via) item.via = item.via.map(moved); };
@@ -3222,13 +4137,15 @@ function nudgeSelection(key, fast) {
 document.getElementById("drawWire").onclick = () => {
   if (wireDraft) { finishWire(); return; }
   if (boxDraft) startBoxDraft(boxDraft.kind);   // toggles it off
-  wireDraft = {pts: [], hover: null}; document.getElementById("modeTip").style.display = "block";
-  document.getElementById("drawWire").classList.add("on");
+  beginWire();
 };
 document.getElementById("del").onclick = delSelected;
 document.getElementById("drawRegion").onclick = () => startBoxDraft("regions");
 document.getElementById("drawCallout").onclick = () => startBoxDraft("callouts");
 document.getElementById("drawBlock").onclick = () => startBoxDraft("blocks");
+document.getElementById('drawSignal').onclick = () => startBoxDraft('callouts','line');
+document.getElementById('drawGlyph').onclick = () => startBoxDraft('glyphs');
+document.getElementById('addAnnotation').onclick = () => startBoxDraft('annotations');
 function delSelected() {
   if (selectionCount()) return groupTransaction(removeGroup);
   if (selected?.type === "wire" && selected.point !== undefined) { deleteWirePoint(); return; }
@@ -3238,17 +4155,21 @@ function delSelected() {
   if (selected.type === "node") { history.pop(); return; }
   if (selected.type === "ann") layout.annotations.splice(selected.index, 1);
   if (selected.type === "wave_symbols") list("wave_symbols").splice(selected.index, 1);
-  if (selected.type === "blocks") list("blocks").splice(selected.index, 1);
+  if (selected.type === "blocks") {
+    if (layout.control_view?.block === list("blocks")[selected.index]?.id) delete layout.control_view;
+    list("blocks").splice(selected.index, 1);
+  }
+  if (selected.type === 'glyphs') list('glyphs').splice(selected.index,1);
   if (selected.type === "regions" || selected.type === "callouts") {
     const removed = list(selected.type).splice(selected.index, 1)[0];
     if (selected.type === "regions" && removed?.id && layout.stack_usage && !list("regions").some(r => r.id === removed.id)) delete layout.stack_usage[removed.id];
   }
-  if (selected.type === "el") forgetElements(new Set([selected.id]));
+  if (["el", "modulePart"].includes(selected.type)) forgetElements(new Set([selected.id]));
   selected = null; showProps(); changed();
 }
 function tableForSave() {
   const table = {...layout};
-  for (const key of ["regions", "callouts", "blocks"])
+  for (const key of ["regions", "callouts", "blocks", "glyphs"])
     if (Array.isArray(table[key]) && !table[key].length && !fileSections?.has(key)) delete table[key];
   return table;
 }
@@ -3300,6 +4221,25 @@ document.getElementById("preview").onclick = () => openCircuitPreview("真实预
 document.getElementById("export").onclick = () => openExport(false);
 
 document.getElementById("spice").onclick = () => openSpiceForElement();
+document.getElementById("parameterSearch").onclick = async () => {
+  await openSpiceForElement();
+  const section = document.getElementById("spiceParameterSearch");
+  if (!section?.closest("dialog")?.open) return;
+  section.open = true;
+  section.scrollIntoView({block: "center"});
+  document.getElementById("psCatalog").focus({preventScroll: true});
+};
+// External exports share the SPICE parameters, so the menu
+// entries open the same window and point at the matching export button.
+for (const [id, action] of [["exportSpice", "export"], ["exportSimulink", "simulink"], ["exportPlecs", "plecs"], ["exportPsim", "psim"]])
+  document.getElementById(id).onclick = () => openSpiceExport(action);
+async function openSpiceExport(action) {
+  await openSpiceForElement();
+  const button = document.querySelector(`#spiceForm button[data-action="${action}"]`);
+  if (!button) return;
+  button.classList.add("context-target");
+  button.scrollIntoView({block: "center"}); button.focus({preventScroll: true});
+}
 async function openSpiceForElement(id = null) {
   try {
     const info = await api("/api/spice-info", {layout, profile});
@@ -3320,9 +4260,10 @@ function motorProbeName(element, quantity, probes) {
   return name;
 }
 function simulationExportOptions(inputId) {
-  return `<details><summary>Simulink / PLECS 导出说明与近似设置</summary>
+  return `<details><summary>外部仿真导出说明与近似设置</summary>
     <p>共用当前接线和仿真参数。Simulink 导出 MATLAB 建模脚本，需要 MATLAB、Simulink 和 Simscape；含 PMSM 时另需 Simscape Electrical（蓝库），普通电路不新增此依赖。PLECS 导出独立版 .plecs 文件。
       本编辑器只导出文件，在对应软件内运行。每份导出都附带接线清单和使用说明。</p>
+    <p>PSIM 导出 Python 建模脚本，需 PSIM 2026 及官方 Python API。运行脚本生成 .psimsch，加 --run 可仿真并保存 CSV。支持开环 RLC、二极管、双向开关及理想变压器；闭环、折叠模块、IGBT、晶闸管和 PMSM 暂不支持。</p>
     <p>二极管由 SPICE 指数模型改为 27 °C 下的分段线性近似；参考电流会影响结果。
       Simscape 另保留 1e-12 S 数值电导。LEVEL=1 开关导出需要勾选下方近似选项。不能用这些简化模型判断损耗或 ZVS。</p>
     <label><input id="${inputId}ApproximateMosfet" type="checkbox"> 按导通电阻近似 LEVEL=1 开关</label>
@@ -3337,9 +4278,13 @@ function simulationExportOptions(inputId) {
     <p class="hint">闭环控制器导出为目标软件的原生控制方块（传递函数、限幅 PI、Park 变换、载波比较 PWM），排在电路下方的控制面板。</p>
     <p>仅在已启用数值稳定电容时，PLECS 为其串联此电阻，避免理想源与电容状态冲突；实际器件电容不会自动加电阻。
       Simscape 数值电容的初值服从电源约束。应比较不同设置及积分步长。</p>
-    <p class="hint">此项只用于本次 Simulink / PLECS 导出，不修改原有 SPICE 模型。</p></details>`;
+    <p class="hint">上述近似选项只用于本次外部仿真导出，不修改原有 SPICE 模型。</p></details>`;
 }
 function openSpice(info) {
+  // A definition draft must never reach whole-project save/export actions.
+  if (definitionEdit) {
+    flash("请先保存模块定义或取消编辑，再操作整个项目。", true); return;
+  }
   // A module project edits its own top-level devices, ground, timing and
   // probes here; instance devices are listed with their effective values.
   const mod = layout.modules ? info.module : null;
@@ -3354,7 +4299,8 @@ function openSpice(info) {
     return;
   }
   // top-level devices: drawn ones, plus a module project's placed parts
-  const devices = mod ? mod.devices.filter(d => !d.instance).map(d => ({id: d.name, kind: d.kind}))
+  const devices = mod ? mod.devices.filter(d => !d.instance).map(d => ({id: d.name, kind: d.kind,
+    pins: Object.fromEntries(d.pins.map(pin => [pin, true]))}))
     : base.elements.filter(e => e.kind !== "port");
   const unsupported = (mod ? mod.devices.map(d => ({id: d.name, kind: d.kind})) : devices).filter(e => !info.fields[e.kind]);
   if (unsupported.length) {
@@ -3367,23 +4313,21 @@ function openSpice(info) {
   const pinNet = p => (mod ? mod.pins[p] : base.netlist[p]) || "未声明";
   const motors = (mod ? mod.devices.map(d=>({id:d.name,kind:d.kind})) : devices).filter(e=>e.kind==="pmsm");
   showDialog("SPICE 参数与导出", `
-    <p>${esc(info.note)}</p><p class="hint">本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件；叠层不增加电气器件。完整性检查不验证工况。</p>
+    <div class="help-row"><span class="hint">本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件</span><details class="help-tip"><summary aria-label="模型说明" title="模型说明">?</summary><div class="help-body"><ol><li>${esc(info.note)}</li><li>本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件；叠层不增加电气器件。完整性检查不验证工况。</li><li>数值支持 500u、50k 等，兆用 Meg，m / M 均为毫。</li>${mod ? "" : "<li>示例按钮会核对拓扑，并替换本窗口参数；保存后才写入电路文件。</li>"}</ol></div></details></div>
     <div class="export-row" ${mod ? "hidden" : ""}><button type="button" id="spiceBuck" title="单相 Buck，或 N 相交错 Buck（各相 PWM 依次错开 1/N 周期）">载入 Buck 示例参数（含多相交错）</button>
-      <button type="button" id="spiceBoost">载入 Boost 示例参数</button></div>
-    <p class="hint">${mod ? "" : "示例按钮会核对拓扑，并替换本窗口参数；保存后才写入电路文件。"}数值支持 500u、50k 等，兆用 Meg，m / M 均为毫。</p>
+      <button type="button" id="spiceBoost" title="核对拓扑后替换本窗口参数，保存后才写入电路文件">载入 Boost 示例参数</button></div>
     <details id="spiceRecommendation"></details>
+    <details id="spiceParameterSearch"></details>
     <form id="spiceForm"><fieldset id="spiceOptions" style="border:0;padding:0;min-width:0">
       <div class="spice-fields"><label>参考地（引脚）<select id="spiceGround" required><option value="">请选择</option>
         ${pins.map(p => `<option value="${esc(p)}">${esc(p)} · ${esc(pinNet(p))}</option>`).join("")}</select></label></div>
       <b>一、元件与驱动参数</b>${threePhaseSection(devices)}<div id="spiceComponents"></div><div id="spiceModules"></div>
-      <b>二、瞬态设置</b><div class="spice-fields" id="spiceTransient"></div>
-      <p class="hint">从 0 秒启动，使用电感/电容初始条件。PWM 为 0/1 控制信号；占空比按 50% 阈值计算。</p>
-      <p class="hint">数值稳定电容默认关闭。设为非零后，会在每个电气网络与仿真地之间加入该电容，可能改变快速瞬态；
-        它不是器件 Coss，不能用其判断 ZVS。应比较不同取值及积分步长，核对关注的指标是否稳定。</p>
+      <div class="help-row"><b>二、瞬态设置</b><details class="help-tip"><summary aria-label="瞬态设置说明" title="瞬态设置说明">?</summary><div class="help-body"><ol><li>从 0 秒启动，使用电感/电容初始条件。PWM 为 0/1 控制信号；占空比按 50% 阈值计算。</li><li>数值稳定电容默认关闭。设为非零后，会在每个电气网络与仿真地之间加入该电容，可能改变快速瞬态；
+        它不是器件 Coss，不能用其判断 ZVS。应比较不同取值及积分步长，核对关注的指标是否稳定。</li></ol></div></details></div><div class="spice-fields" id="spiceTransient"></div>
       <details><summary>三、测量通道（可修改 JSON）</summary>
-        <p class="hint">voltage：positive / negative 引脚；current：D、L、V、vac、IGBT、晶闸管或变压器的 element；drive：MOSFET / IGBT / 晶闸管的 element。
-          变压器电流还要填 winding：primary，普通副边 secondary，中心抽头 upper / lower。
-          二极管、稳压管、电感电流 a→b（稳压管反向击穿时为负），电压源电流 b→a，IGBT 总端口电流 c→e（反向二极管电流为负）；每个 name 使用不同的英文名称。CSV 列名包含单位。</p>
+        <div class="help-row"><span class="hint">每个通道写一项：电压（voltage）、电流（current）或驱动信号（drive）。</span><details class="help-tip"><summary aria-label="测量通道写法" title="测量通道写法">?</summary><div class="help-body"><p>voltage：positive / negative 引脚；current：D、L、V、vac、IGBT、晶闸管或变压器的 element；drive：MOSFET / IGBT / 晶闸管的 element。
+          变压器电流还要填 winding：primary，普通副边 secondary，中心抽头 upper / lower，附加绕组 w3～w6（a→b）。
+          二极管、稳压管、电感电流 a→b（稳压管反向击穿时为负），电压源电流 b→a，IGBT 总端口电流 c→e（反向二极管电流为负）；每个 name 使用不同的英文名称。CSV 列名包含单位。</p></div></details></div>
         ${motors.length ? `<div class="spice-fields"><label>电机<select id="spiceMotorElement">${motors.map(e=>`<option>${esc(e.id)}</option>`).join("")}</select></label>
           <label>测量量<select id="spiceMotorQuantity">${Object.entries(info.motor_quantities).map(([k,v])=>`<option value="${esc(k)}">${esc(v.label)} · ${esc(v.unit)}</option>`).join("")}</select></label>
           <button type="button" id="spiceMotorAdd">添加电机测量</button></div>
@@ -3391,27 +4335,37 @@ function openSpice(info) {
         ${mod ? '<p class="hint">模块内的元件按上面“模块实例”里显示的名称填写，如 M1/L1、M1/S1.d。</p>' : ""}
         <textarea id="spiceProbes" rows="10" style="width:100%;font-family:monospace" required></textarea></details>
       <details id="loopBox"><summary>四、闭环控制（可选）</summary>
-        <p class="hint">用控制框图表（控制框图编辑器保存的 JSON）实时计算占空比，代替开关的固定占空比。控制器按连续时间模型仿真，
-          不含采样、计算延迟和定点舍入；输出限幅时自动抗饱和。导出 Simulink / PLECS 时控制器变成原生控制方块，可在下方选连续或离散控制器。</p>
+        <p class="hint">控制框图计算占空比或频率。数字控制按采样周期更新，并计入延迟、采样量化与定点舍入；PWM 量化仅用于占空比输出。</p>
         <label><input type="checkbox" id="loopOn"> 启用闭环控制</label>
         <div class="export-row"><input id="loopControl" type="text" placeholder="控制表路径，相对于当前电路文件" aria-label="控制表路径">
           <button type="button" id="loopRead">读取控制表</button></div>
         <p id="loopState" class="hint" role="status"></p><div id="loopMap"></div></details>
-      <p><label for="spiceDir"><b>五、输出文件夹</b></label></p>
+      <div class="help-row"><label for="spiceDir"><b>五、输出文件夹</b></label><details class="help-tip"><summary aria-label="输出文件说明" title="输出文件说明">?</summary><div class="help-body"><ol><li>相对路径以当前电路文件所在目录为起点。只导出：.cir；导出并仿真：.cir、CSV、日志；启用晶闸管 dv/dt 检查时另有 .ratings.json。同名文件会覆盖，仿真失败保留旧结果。</li></ol></div></details></div>
       <div class="export-row"><input id="spiceDir" type="text" value="${esc(joinPath(defaultExportDir, 'spice'))}" required>
         <button type="button" id="spiceBrowse">浏览文件夹…</button></div>
       <div id="spiceFolders" hidden></div>
-      <p class="hint">相对路径以当前电路文件所在目录为起点。只导出：.cir；导出并仿真：.cir、CSV、日志；启用晶闸管 dv/dt 检查时另有 .ratings.json。同名文件会覆盖，仿真失败保留旧结果。</p>
       <div class="export-row"><button type="submit" data-action="save">保存参数</button>
         <button type="submit" data-action="export" class="primary">导出 SPICE</button>
         <button type="submit" data-action="run" ${info.available ? "" : "disabled"}>导出并仿真</button></div>
       ${simulationExportOptions("spiceDiodeCurrent")}
       <div class="export-row"><button type="submit" data-action="simulink">导出 Simulink</button>
-        <button type="submit" data-action="plecs">导出 PLECS 独立版</button></div>
+        <button type="submit" data-action="plecs">导出 PLECS 独立版</button>
+        <button type="submit" data-action="psim">导出 PSIM</button></div>
       ${info.available ? "" : '<p class="hint">未检测到 ngspice。可先导出；安装后设置 CIRCUIT_DRAWER_NGSPICE 为可执行文件路径，再重启编辑器。</p>'}
     </fieldset></form><p id="spiceState" role="status" aria-live="polite"></p><div id="spiceResult"></div>`);
   const $ = id => document.getElementById(id);
   const form = $("spiceForm"), state = $("spiceState");
+  // SPICE reads "M" as milli: point it out where it is typed instead of a standing note.
+  form.addEventListener("input", ev => {
+    const field = ev.target.closest("input[data-field], input[data-wave-field]"); if (!field) return;
+    const milli = /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*M\s*$/.test(field.value);
+    let note = field.parentElement.querySelector(".field-error");
+    if (milli && !note) {
+      note = document.createElement("span"); note.className = "field-error"; note.setAttribute("role", "alert");
+      note.textContent = "M 表示毫（10⁻³）；兆请写 Meg"; field.after(note);
+    }
+    if (!milli) note?.remove();
+  });
   if ($("tpApply")) $("tpApply").onclick = () => {
     const msg = applyThreePhase($("spiceComponents"));
     state.className = msg.ok ? "ok" : "bad"; state.textContent = msg.text;
@@ -3420,32 +4374,34 @@ function openSpice(info) {
     $("spiceGround").value = sim.ground || "";
     $("spiceComponents").innerHTML = devices.map(e => `<div class="spice-component" data-id="${esc(e.id)}">
       <b>${esc(e.id)} (${esc(e.kind)})</b><div class="spice-fields">${info.fields[e.kind].map(([key,title]) =>
-        input(key,title,sim.components?.[e.id]?.[key] ?? "")).join("")}${(info.optional_fields[e.kind] || []).map(([key,title,def]) =>
-        input(key,title,sim.components?.[e.id]?.[key] ?? def)).join("")}</div></div>`).join("");
+        input(key,title,sim.components?.[e.id]?.[key] ?? "")).join("")}${(info.optional_fields[e.kind] || []).filter(([key]) => !/^ratio_w\d$/.test(key) || e.pins[key.slice(6) + "a"]).map(([key,title,def]) =>
+        input(key,title,sim.components?.[e.id]?.[key] ?? (key.startsWith('ratio_w') ? '' : def))).join("")}</div></div>`).join("");
     for (const row of $("spiceComponents").children) {
       const e=devices.find(e=>e.id===row.dataset.id);
       if (e.kind==="transformer") {
         const wrap=document.createElement("div"), cfg=sim.components?.[e.id] || {};
-        wrap.innerHTML=`<label>变压器极性 <select class="transformer-polarity" required><option value="">请选择并核对同名端</option>
+        wrap.innerHTML=`<div class="help-row"><label>变压器极性 <select class="transformer-polarity" required><option value="">请选择并核对同名端</option>
           <option value="same">same：p1 与 s1 同名端</option><option value="opposite">opposite：p1 与 s2 同名端</option></select></label>
-          <p class="hint">无损理想变压器。Ns/Np 指 s1 到 s2 的全绕组匝比；中心抽头每半边为一半。
+          <details class="help-tip"><summary aria-label="变压器模型说明" title="变压器模型说明">?</summary><div class="help-body"><p>无损理想变压器。Ns/Np 指 s1 到 s2 的全绕组匝比；中心抽头每半边为一半。
           可选填折算到原边的励磁电感（并在原边）和漏感（串在 p1），0 表示不建模；原边电流通道测的是 p1 端子电流，含励磁电流。
           耦合电感按 L1、L2、耦合系数 k 换算：Ns/Np = √(L2/L1)/k，励磁电感 = k²·L1，漏感 = (1−k²)·L1，与耦合电感完全等效。
-          参考电阻从 sct（无抽头则 s2）接 p2，至少 1G，常用 1T；它只是显式数值参考。</p>`;
+          参考电阻从 sct（无抽头则 s2）接 p2，至少 1G，常用 1T；它只是显式数值参考。</p>
+          ${Object.keys(e.pins).some(k => /^w\d[ab]$/.test(k)) ? `<p class="hint">多绕组：每个附加绕组 w3～w6 按自己的匝比 N/Np 与原边耦合，同名端固定在 a 端，与副边极性选择无关；每个附加绕组的 b 端也经同一参考电阻接 p2。</p>` : ""}</div></details></div>`;
         row.appendChild(wrap); wrap.querySelector("select").value=cfg.polarity || "";
       }
       if (e.kind==="igbt") {
-        const hint=document.createElement("p"); hint.className="hint";
-        hint.textContent="简化 IGBT：通道仅 c→e 导通，正向压降约 Vce0 + Ron×电流；反向由独立 e→c 二极管承担。图上关闭反并联二极管时仿真也不添加。含有限 Roff 漏电，可选线性输出电容；不含尾电流、电压相关电容和反向恢复，不能用于损耗计算。";
-        row.appendChild(hint);
+        // the model limits sit behind a "?" beside the device name
+        const title=row.querySelector("b"), head=document.createElement("div"); head.className="help-row";
+        title.replaceWith(head); head.append(title);
+        head.insertAdjacentHTML("beforeend",`<details class="help-tip"><summary aria-label="IGBT 模型说明" title="IGBT 模型说明">?</summary><div class="help-body"><p>简化 IGBT：通道仅 c→e 导通，正向压降约 Vce0 + Ron×电流；反向由独立 e→c 二极管承担。图上关闭反并联二极管时仿真也不添加。含有限 Roff 漏电，可选线性输出电容；不含尾电流、电压相关电容和反向恢复，不能用于损耗计算。</p></div></details>`);
       }
       if (!["V","vac","I"].includes(e.kind)) continue;
       const cfg=sim.components?.[e.id] || {}, wrap=document.createElement("div");
-      wrap.innerHTML=`<label>瞬态激励 <select class="source-excitation" required>
+      wrap.innerHTML=`<div class="help-row"><label>瞬态激励 <select class="source-excitation" required>
         ${e.kind==="vac"?"":'<option value="dc">直流</option><option value="step">阶跃（可上升或下降）</option><option value="pulse">重复脉冲</option>'}
         <option value="sine">正弦交流</option></select></label>
-        <div class="spice-fields source-wave-fields"></div>
-        <p class="hint">正弦幅值填写峰值，非 RMS；相位单位为度，三相可填 0 / −120 / 120。延迟前保持“偏置 + 峰值 × sin(初相位)”（初相位按度计算），不一定等于偏置。这是瞬态正弦，不是小信号 AC 扫频。阶跃/脉冲使用有限过渡时间；源旁图形在画布中独立选择。</p>`;
+        <details class="help-tip"><summary aria-label="激励说明" title="激励说明">?</summary><div class="help-body"><p>正弦幅值填写峰值，非 RMS；相位单位为度，三相可填 0 / −120 / 120。延迟前保持“偏置 + 峰值 × sin(初相位)”（初相位按度计算），不一定等于偏置。这是瞬态正弦，不是小信号 AC 扫频。阶跃/脉冲使用有限过渡时间；源旁图形在画布中独立选择。</p></div></details></div>
+        <div class="spice-fields source-wave-fields"></div>`;
       row.appendChild(wrap);
       const sel=wrap.querySelector("select"), fields=wrap.querySelector(".source-wave-fields");
       let draft={...cfg.wave};
@@ -3474,10 +4430,10 @@ function openSpice(info) {
   };
   if (mod) moduleSpiceSection($("spiceModules"), mod, info);
   // Closed loop: map the control table's inputs onto probes or fixed values,
-  // and its outputs (duty 0..1) onto PWM switches.
+  // Output units follow the explicit PWM duty / VCO frequency selection.
   const switches = mod ? mod.devices.filter(d => ["nmos","pmos","igbt"].includes(d.kind)).map(d => d.name)
     : devices.filter(e => ["nmos","pmos","igbt"].includes(e.kind)).map(e => e.id);
-  let loopInfo = null, loopInline = null;
+  let loopInfo = null, loopInline = null, digitalForm = null, loopRequest = 0;
   const probeNames = () => { try { return JSON.parse($("spiceProbes").value).map(p => p.name).filter(Boolean); } catch (e) { return []; } };
   function paintLoop(saved) {
     const box = $("loopMap"); box.replaceChildren();
@@ -3503,23 +4459,58 @@ function openSpice(info) {
       const lower = cfg.complement || [], elsewhere = new Set(Object.entries(saved?.outputs || {})
         .filter(([other]) => other !== id).flatMap(([, c]) => [...(c.switches || []), ...(c.complement || [])]));
       row.className = "loop-output"; row.dataset.id = id;
-      row.innerHTML = `<p>输出 ${esc(id)}（占空比 0–1）驱动：${switches.filter(sw => !lower.includes(sw) && !elsewhere.has(sw)).map(sw =>
+      row.innerHTML = `<p><span>输出</span> <span translate="no">${esc(id)}</span> <span>驱动开关</span>：${switches.filter(sw => !lower.includes(sw) && !elsewhere.has(sw)).map(sw =>
         `<label><input type="checkbox" value="${esc(sw)}" ${used.includes(sw) ? "checked" : ""}> ${esc(sw)}</label>`).join(" ") || "电路中没有 MOSFET / IGBT"}${
-        lower.length ? `<br><span class="hint">桥臂下管 ${esc(lower.join("、"))}，死区 ${esc(String(cfg.dead_time ?? 0))} s，${cfg.model === "switching" ? "逐开关" : "平均"}模型（在 JSON 中设置）</span>` : ""}</p>`;
+        lower.length ? `<br><span class="hint loop-frequency-field"><span>互补开关（在 JSON 中设置）</span> <span translate="no">${esc(lower.join("、"))}</span></span>
+        <span class="hint loop-pwm-field"><span>桥臂下管</span> <span translate="no">${esc(lower.join("、"))}</span>，<span>${cfg.model === 'switching' || cfg.modulation === 'vco' ? '逐开关模型（在 JSON 中设置）' : '平均模型（在 JSON 中设置）'}</span></span>` : ""}</p>
+        <div class="spice-fields"><label>调制方式<select class="loop-modulation">${loopInfo.modulations.map(value=>
+          `<option value="${value}">${value === 'vco' ? 'VCO 频率（Hz）' : 'PWM 占空比（0–1）'}</option>`).join('')}</select></label>
+        <label class="loop-frequency-field">最低频率（Hz）<input class="loop-frequency-min" value="${esc(String(cfg.frequency_min ?? ''))}"></label>
+        <label class="loop-frequency-field">最高频率（Hz）<input class="loop-frequency-max" value="${esc(String(cfg.frequency_max ?? ''))}"></label>
+        ${lower.length ? `<label>死区（s）<input class="loop-dead-time" value="${esc(String(cfg.dead_time ?? 0))}"></label>` : ''}</div>
+        <p class="hint loop-frequency-field">VCO 将控制器输出按 Hz 限幅并积分为连续相位，互补组共享频率；名义频率和占空比不参与驱动。各开关 delay 须相同。支持 ngspice 逐开关仿真及 PLECS／Simulink 导出，死区按秒保持。</p>`;
+      const modulation = row.querySelector('.loop-modulation'); modulation.value = cfg.modulation || 'pwm';
+      const showModulation = () => {
+        for (const field of row.querySelectorAll('.loop-frequency-field')) field.hidden = modulation.value !== 'vco';
+        for (const field of row.querySelectorAll('.loop-pwm-field')) field.hidden = modulation.value === 'vco';
+      };
+      modulation.onchange = showModulation; showModulation();
       box.append(row);
+    }
+    if (loopInfo.table) {
+      const control = typeof saved?.control === "object" ? saved.control : loopInfo.table;
+      digitalForm = CircuitDrawerDigital.create(control, loopInfo.inputs);
+      const details = document.createElement("details"), summary = document.createElement("summary");
+      summary.textContent = "数字控制延迟与量化";
+      details.append(summary, digitalForm.element);
+      details.open = !!control.digital;
+      const hint = document.createElement("p"); hint.className = "hint";
+      hint.textContent = "数字设置的修改随本电路内嵌保存。";
+      details.append(hint); box.append(details);
     }
   }
   async function readLoop(saved) {
+    const request = ++loopRequest;
+    loopInfo = null; digitalForm = null;
+    $("loopMap").replaceChildren();
     const status = $("loopState");
     try {
       const control = loopInline || $("loopControl").value.trim();
-      loopInfo = await api("/api/closed-loop-info", {layout:base, profile, control});
-      if (!form.isConnected) return;
+      const result = await api("/api/closed-loop-info", {layout:base, profile, control});
+      if (!form.isConnected || request !== loopRequest) return;
+      loopInfo = result;
       status.className = "hint";
       status.textContent = `控制表 ${loopInfo.name}${loopInfo.title ? "（" + loopInfo.title + "）" : ""}：输入 ${loopInfo.inputs.join("、")}；输出 ${loopInfo.outputs.join("、")}`;
       paintLoop(saved);
-    } catch (e) { loopInfo = null; $("loopMap").replaceChildren(); status.className = "bad"; status.textContent = e.message; }
+    } catch (e) {
+      if (!form.isConnected || request !== loopRequest) return;
+      status.className = "bad"; status.textContent = e.message;
+    }
   }
+  $("loopControl").oninput = () => {
+    ++loopRequest; loopInfo = null; digitalForm = null;
+    $("loopMap").replaceChildren(); $("loopState").textContent = "";
+  };
   $("loopRead").onclick = () => readLoop(base.closed_loop);
   if (base.closed_loop) {
     $("loopBox").open = $("loopOn").checked = true;
@@ -3539,17 +4530,25 @@ function openSpice(info) {
         : {value: row.querySelector(".loop-value").value.trim(), ramp: row.querySelector(".loop-ramp").value.trim() || "0"};
     }
     for (const row of $("loopMap").querySelectorAll(".loop-output")) {
-      const sws = [...row.querySelectorAll("input:checked")].map(i => i.value);
-      // complement / dead_time / model are set in the JSON and kept here
-      const {switches: _, ...rest} = saved.outputs?.[row.dataset.id] || {};
-      if (sws.length) outputs[row.dataset.id] = {...rest, switches: sws};
+      const sws = [...row.querySelectorAll('input[type="checkbox"]:checked')].map(i => i.value);
+      const {switches: _, modulation: oldModulation, frequency_min, frequency_max, ...rest} = saved.outputs?.[row.dataset.id] || {};
+      const dead = row.querySelector('.loop-dead-time')?.value.trim();
+      if (dead !== undefined && dead !== String(rest.dead_time ?? 0)) rest.dead_time = dead;
+      const frequency = (selector, old) => { const value = row.querySelector(selector).value.trim(); return value === String(old) ? old : value; };
+      const modulation = row.querySelector('.loop-modulation').value;
+      // An omitted model meant switching for VCO; keep it when returning to PWM.
+      if (oldModulation === 'vco' && modulation === 'pwm' && !('model' in rest)) rest.model = 'switching';
+      if (sws.length) outputs[row.dataset.id] = {...rest, switches: sws, ...(modulation === 'vco'
+        ? {modulation, ...(rest.model === 'average' ? {model:'switching'} : {}), frequency_min:frequency('.loop-frequency-min', frequency_min), frequency_max:frequency('.loop-frequency-max', frequency_max)}
+        : oldModulation ? {modulation} : {})};
     }
     const drivers = {};
     for (const [id, cfg] of Object.entries(outputs)) for (const sw of cfg.switches) (drivers[sw] ||= []).push(id);
     const twice = Object.entries(drivers).find(([, ids]) => ids.length > 1);
     if (twice) throw new Error(`开关 ${twice[0]} 同时被输出 ${twice[1].join("、")} 驱动，请只保留一个`);
     if (!Object.keys(outputs).length) throw new Error("请至少为一个控制器输出勾选要驱动的开关");
-    return {...(base.closed_loop || {}), control: loopInline || $("loopControl").value.trim(), inputs, outputs};
+    const control = digitalForm?.changed() ? digitalForm.read() : loopInline || $("loopControl").value.trim();
+    return {...(base.closed_loop || {}), control, inputs, outputs};
   }
   async function preset(name) {
     try {
@@ -3561,7 +4560,7 @@ function openSpice(info) {
   }
   $("spiceBuck").onclick = () => preset("buck");
   $("spiceBoost").onclick = () => preset("boost");
-  initSimulationRecommendations(info, base, profile, proposal => {
+  function acceptParameters(proposal) {
     base.simulation = clone(proposal.simulation); fill(base.simulation);
     if (proposal.modules) {
       base.modules = clone(proposal.modules);
@@ -3575,7 +4574,9 @@ function openSpice(info) {
       $("loopControl").disabled = !!loopInline;
       paintLoop(base.closed_loop);
     }
-  }, readSpice);
+  }
+  initSimulationRecommendations(info, base, profile, acceptParameters, readSpice);
+  initParameterSearch(readSpice, acceptParameters, profile);
   let browseVersion=0;
   async function browse(path) {
     const version=++browseVersion;
@@ -3616,7 +4617,8 @@ function openSpice(info) {
       candidate.simulation={...base.simulation,version:base.simulation?.version ?? 1,ground:$("spiceGround").value,components,
         transient:values($("spiceTransient")),probes:JSON.parse($("spiceProbes").value)};
       const loop=loopSection();
-      if (loop) candidate.closed_loop=loop; else delete candidate.closed_loop;
+      if (loop) candidate.closed_loop=loop;
+      else { delete candidate.closed_loop; delete candidate.control_view; }
       return candidate;
   }
   form.onsubmit=async ev=>{
@@ -3624,7 +4626,7 @@ function openSpice(info) {
     try {
       const candidate=readSpice();
       const action=ev.submitter?.dataset.action || "save";
-      const externalTarget=["simulink","plecs"].includes(action) ? action : null;
+      const externalTarget=["simulink","plecs","psim"].includes(action) ? action : null;
       $("spiceOptions").disabled=true; $("spiceBuck").disabled=$("spiceBoost").disabled=true;
       state.className="hint"; state.textContent=action==="run" ? "ngspice 正在仿真，最长等待 120 秒…" : "正在校验并保存…";
       const result=await api(externalTarget ? "/api/simulation-export" : action==="save" ? "/api/spice-save" : "/api/spice-export",
@@ -3638,9 +4640,10 @@ function openSpice(info) {
       const drawingUnsaved=editorTableSnapshot(base)!==savedEditorTable;
       pushHistory(); layout=candidate; base.simulation=clone(candidate.simulation);
       if (candidate.closed_loop) base.closed_loop=clone(candidate.closed_loop); else delete base.closed_loop;
+      if (candidate.control_view) base.control_view=clone(candidate.control_view); else delete base.control_view;
       setEditorFile(editorFilePath, JSON.stringify(candidate));
       changed();
-      state.className=result.rating_checks?.some(r => r.status==="exceeded") ? "bad" : "ok"; state.textContent=(externalTarget ? `${externalTarget==="plecs" ? "PLECS 独立版" : "Simulink"} 已导出，参数已保存；请在对应软件内运行` : action==="save" ? "参数已保存到当前电路 JSON" : result.ran ? "仿真完成，已输出 CSV" : "SPICE 已导出，参数已保存") +
+      state.className=result.rating_checks?.some(r => r.status==="exceeded") ? "bad" : "ok"; state.textContent=(externalTarget ? `${{plecs:"PLECS 独立版",simulink:"Simulink",psim:"PSIM"}[externalTarget]} 已导出，参数已保存；请在对应软件内运行` : action==="save" ? "参数已保存到当前电路 JSON" : result.ran ? "仿真完成，已输出 CSV" : "SPICE 已导出，参数已保存") +
         (drawingUnsaved ? "（图纸上未保存的修改也一并保存到了文件）" : "") +
         (result.rating_checks?.length ? "；请查看下方额定值检查，关闭本窗口后可查看波形" : "");
       $("spiceResult").textContent=(result.files || [result.saved]).join("\n") +
@@ -3839,7 +4842,9 @@ window.addEventListener("keydown", ev => {
   else if ((ev.ctrlKey || ev.metaKey) && ev.key === "c") copySelected();
   else if ((ev.ctrlKey || ev.metaKey) && ev.key === "v") { ev.preventDefault(); paste(); }
   else if ((ev.ctrlKey || ev.metaKey) && ev.key === "d") { ev.preventDefault(); duplicateSelected(); }
-  else if (ev.key === "r" || ev.key === "R") rotateSelected();
+  else if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && (ev.key === "r" || ev.key === "R")) {
+    ev.preventDefault(); rotateSelected(ev.shiftKey ? -1 : 1);
+  }
   else if (ev.key === "+" || ev.key === "=") resizeSelected(0.1);
   else if (ev.key === "-" || ev.key === "_") resizeSelected(-0.1);
   else if (ev.key === "f" || ev.key === "F") mirrorSelected();
@@ -3847,12 +4852,15 @@ window.addEventListener("keydown", ev => {
     ev.preventDefault();
     if (selected?.type === "wire" && selected.point !== undefined) deleteWirePoint(); else delSelected();
   }
-  else if (ev.key === "Enter") finishWire();
-  else if (ev.key === "Escape") { wireDraft = null; boxDraft = null; document.getElementById("modeTip").style.display = "none";
-    ["drawRegion", "drawBlock", "drawCallout"].forEach(id => document.getElementById(id).classList.remove("on")); resetTip();
+  else if (ev.key === "Enter") {if (boxDraft?.clicks) finishBoxDraft(); else finishWire();}
+  else if (ev.key === "Escape") { wireDraft = null; stopBoxDraft();
     document.getElementById("drawWire").classList.remove("on"); render(); }
 });
 function esc(t) { return String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+// The "?" beside a heading: rules and assumptions, shown only when opened. Items are HTML.
+function helpTip(label, items) {
+  return `<details class="help-tip"><summary aria-label="${esc(label)}" title="${esc(label)}">?</summary><div class="help-body"><ol>${items.map(item => `<li>${item}</li>`).join("")}</ol></div></details>`;
+}
 let layoutGeneration = 0;
 function useLayout(lay) {
   pushHistory(); layout = lay; ++layoutGeneration;
@@ -3894,11 +4902,12 @@ document.getElementById("describe").onclick = () => {
     <p id="tplHit" style="display:none"></p>
     <p id="sizeWarn" class="bad" style="display:none">电路较大，单栏多半放不下，建议先切到双栏再生成。
       <button id="sizeToDouble">切到双栏</button></p>
-    <p class="hint">参考图（可选，最多 3 张）：模型会照着它的布局画。<input id="refImg" type="file" accept="image/png,image/jpeg,image/webp" multiple>
-      <span id="refThumbs"></span></p>
+    <div data-reference-images></div>
     <div id="planBox" style="display:none"><b>模型理解的结构</b>（可以直接修改，按这个画）
       <textarea id="planText" rows="10" style="width:100%;box-sizing:border-box"></textarea></div>
     <p id="planNotice" class="hint"></p>
+    <p><label><input id="descReview" type="checkbox"> 出图后自查</label></p>
+    <p class="hint">校验通过后发送当前图给模型看图，最多再修改一次；连接不变才保留修改。会增加出图与模型请求时间，默认关闭。</p>
     <p>最多 <input id="descRounds" type="number" min="1" max="8" value="4" style="width:4em"> 轮
       <button id="planGo">先看结构</button>
       <button id="descGo" class="primary">直接生成</button>
@@ -3908,8 +4917,8 @@ document.getElementById("describe").onclick = () => {
     <div id="jobState"></div>`);
   if (existing) return;
   const form = describeForm, $ = id => form.querySelector('#' + id);
-  let job = null, images = [], matchTimer = null, revision = 0, planRevision = null, planContext = null;
-  const context = () => JSON.stringify([$("descText").value.trim(), images, profile]);
+  let job = null, matchTimer = null, revision = 0, planRevision = null, planContext = null;
+  const context = () => JSON.stringify([$("descText").value.trim(), references.images, profile]);
   const invalidatePlan = () => {
     ++revision; planRevision = null; planContext = null;
     if ($("planBox").style.display !== 'none') $("planNotice").textContent = '描述、参考图或栏宽已改变，旧结构已失效。请重新看结构，或按最新描述直接生成。';
@@ -3959,14 +4968,6 @@ document.getElementById("describe").onclick = () => {
       };
     }, 300);
   };
-  $("refImg").onchange = async ev => {
-    invalidatePlan();
-    const files = [...ev.target.files].slice(0, 3);
-    images = await Promise.all(files.map(f => new Promise((ok, bad) => {
-      const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = bad; rd.readAsDataURL(f); })));
-    images = images.filter(u => u.length < 7e6);
-    $("refThumbs").innerHTML = images.map(u => `<img src="${u}" style="height:48px;margin-left:6px;vertical-align:middle;border:1px solid #ccc">`).join("");
-  };
   $("aiPing").onclick = async () => {
     $("pingState").textContent = '测试中（最多 10 秒）…';
     try {
@@ -3976,10 +4977,11 @@ document.getElementById("describe").onclick = () => {
         : `<p class="bad">连不上 ${esc(r.base_url)}：${esc(r.error)}。国内网络一般需要设 HTTPS_PROXY，或用可访问的网关 / 国内兼容接口。</p>`;
     } catch (e) { $("pingState").textContent = e.message; }
   };
-  const busy = on => { ["planGo", "descGo", "aiPing"].forEach(id => $(id).disabled = on); $("jobCancel").style.display = on ? "" : "none"; };
+  const busy = on => { ["planGo", "descGo", "aiPing"].forEach(id => $(id).disabled = on || references.pending); $("jobCancel").style.display = on ? "" : "none"; };
+  const references = createReferenceImages(form, 'refImg', 'refThumbs', invalidatePlan, () => busy(!!job));
   const start = async planOnly => {
     const text = $("descText").value.trim();
-    if (!text || job) return;
+    if (!text || job || references.pending) return;
     if (planContext !== context()) invalidatePlan();
     const source = context(), sourceRevision = revision;
     const structure = planRevision === revision ? $("planText").value : "";
@@ -3987,8 +4989,8 @@ document.getElementById("describe").onclick = () => {
     $("planNotice").textContent = '';
     $("jobState").textContent = '正在提交任务…';
     try {
-      const started = await api("/api/generate", {description: text, profile, plan: planOnly, structure, images,
-        rounds: +$("descRounds").value || 4});
+      const started = await api("/api/generate", {description: text, profile, plan: planOnly, structure, images: references.images,
+        rounds: +$("descRounds").value || 4, review: !planOnly && $("descReview").checked});
       if (job !== pending) { await api('/api/cancel', {id: started.id}); return; }
       job = started;
     } catch (e) {
@@ -4024,7 +5026,7 @@ document.getElementById("describe").onclick = () => {
       const live = !st.partial ? '<p class="hint">模型在思考，还没有输出正文…</p>'
         : planOnly ? `<p class="hint">模型正在写（写完前不能确认）：</p><pre style="white-space:pre-wrap;max-height:16em;overflow:auto">${esc(st.partial)}</pre>`
         : `<p class="hint">模型正在输出本轮坐标表，已收到 ${st.partial.length} 字…</p>`;
-      $("jobState").innerHTML = `<p><b>${head}</b> <span class="hint">（启动编辑器的终端里也会打印进度）</span></p><ul>${rounds}</ul>${live}${fmtStats(st)}`;
+      $("jobState").innerHTML = `<p><b>${st.activity ? esc(st.activity) : head}</b> <span class="hint">（启动编辑器的终端里也会打印进度）</span></p><ul>${rounds}</ul>${live}${fmtStats(st)}`;
       setTimeout(() => poll(id, planOnly, source, sourceRevision), 1000); return;
     }
     job = null; busy(false);
@@ -4091,6 +5093,9 @@ document.getElementById("tweak").onclick = () => {
     <div id="twWidth" class="hint"></div>
     <textarea id="twText" rows="3" style="width:100%;box-sizing:border-box"
       placeholder="例：把 v_sw 标签放到开关节点上方；输入侧加一个电容 Cin；RL 右移 0.5 格"></textarea>
+    <div data-reference-images></div>
+    <p><label><input id="twReview" type="checkbox"> 出图后自查</label></p>
+    <p class="hint">校验通过后发送当前图给模型看图，最多再修改一次；连接不变才保留修改。会增加出图与模型请求时间，默认关闭。</p>
     <p>最多 <input id="twRounds" type="number" min="1" max="8" value="3" style="width:4em"> 轮
       <button id="twGo" class="primary">修改</button> <button id="twCancel" style="display:none">取消</button></p>
     <div id="twState"></div>`);
@@ -4111,8 +5116,9 @@ document.getElementById("tweak").onclick = () => {
       };
     }).catch(() => {});
   }
-  const busy = on => { $("twGo").disabled = on; $("twCancel").style.display = on ? "" : "none";
+  const busy = on => { $("twGo").disabled = on || references.pending; $("twCancel").style.display = on ? "" : "none";
     if ($("twDouble")) $("twDouble").disabled = on; };
+  const references = createReferenceImages(form, 'twRefImg', 'twRefThumbs', () => {}, () => busy(!!job));
   let baseSnapshot = null, baseFile = null, baseGeneration = null, instruction = '';
   $("twCancel").onclick = async () => {
     const cancelled = job; job = null; busy(false);
@@ -4121,14 +5127,14 @@ document.getElementById("tweak").onclick = () => {
   };
   $("twGo").onclick = async () => {
     const text = $("twText").value.trim();
-    if (!text || job) return;
+    if (!text || job || references.pending) return;
     baseSnapshot = editorTableSnapshot(layout); baseFile = editorFilePath; baseGeneration = layoutGeneration;
     instruction = text;
     const pending = {}; job = pending; busy(true);
     $("twState").textContent = '正在提交任务…';
     try {
-      const started = await api("/api/generate", {description: text, profile, current: JSON.parse(JSON.stringify(layout)),
-        rounds: +$("twRounds").value || 3});
+      const started = await api("/api/generate", {description: text, profile, current: JSON.parse(JSON.stringify(layout)), images: references.images,
+        rounds: +$("twRounds").value || 3, review: $("twReview").checked});
       if (job !== pending) { await api('/api/cancel', {id: started.id}); return; }
       job = started;
     } catch (e) {
@@ -4150,7 +5156,7 @@ document.getElementById("tweak").onclick = () => {
       ${a.fixes?.length ? `<p class="hint">程序自动微调：${esc(a.fixes.join('；'))}</p>` : ''}
       ${a.errors.length ? `<details><summary>问题清单</summary><pre style="white-space:pre-wrap">${esc(a.errors.join("\n"))}</pre></details>` : ""}</li>`).join("");
     if (st.state === "running") {
-      $("twState").innerHTML = `<p><b>第 ${st.round} / ${st.rounds_max} 轮 · 已用 ${fmtTime(st.elapsed_s)}</b></p><ul>${rounds}</ul>${fmtStats(st)}`;
+      $("twState").innerHTML = `<p><b>${st.activity ? esc(st.activity) : `第 ${st.round} / ${st.rounds_max} 轮 · 已用 ${fmtTime(st.elapsed_s)}`}</b></p><ul>${rounds}</ul>${fmtStats(st)}`;
       setTimeout(() => poll(id), 1000); return;
     }
     job = null; busy(false);
@@ -4183,6 +5189,7 @@ document.getElementById("tweak").onclick = () => {
       <p class="hint">校验通过不代表满足所有保留要求。发现不符请修改上方要求后重新请求，或下载候选另行查看。</p>
       ${last.note ? `<p><b>模型的说明</b></p><pre style="white-space:pre-wrap">${esc(last.note)}</pre>` : ''}
       <p><b>实际改动</b>（相对请求前图纸）</p><ul>${(r.changes || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+      ${(r.notes || []).map(n => `<p class="hint">${esc(n)}</p>`).join('')}
       <ul>${rounds}</ul>${fmtStats(st)}
       <button id="twReplace">确认采用并另存…</button>
       <a id="twDownload" download="ai-candidate.json" href="data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(r.layout, null, 2))}">下载 AI 候选 JSON</a>`;
@@ -4266,7 +5273,8 @@ async function initializeEditor() {
   document.getElementById("copySelection").onclick = copySelected;
   document.getElementById("pasteSelection").onclick = paste;
   document.getElementById("duplicateSelection").onclick = duplicateSelected;
-  document.getElementById("rotateSelection").onclick = rotateSelected;
+  document.getElementById("rotateSelection").onclick = () => rotateSelected(1);
+  document.getElementById("rotateSelectionCCW").onclick = () => rotateSelected(-1);
   document.getElementById("mirrorSelection").onclick = mirrorSelected;
   document.getElementById("growSymbol").onclick = () => resizeSelected(0.1);
   document.getElementById("shrinkSymbol").onclick = () => resizeSelected(-0.1);
@@ -4278,8 +5286,14 @@ async function initializeEditor() {
 <script src="/module-editor.js"></script>
 <script src="/selection.js"></script>
 <script src="/simulation-recommendations.js"></script>
+<script src="/parameter-search.js"></script>
 <script src="/emi.js"></script>
+<script src="/impedance.js"></script>
+<script src="/impedance-ratio.js"></script>
 <script src="/ai-settings.js"></script>
+<script src="/digital-control.js"></script>
+<script src="/auto-modes.js"></script>
+<script src="/reference-images.js"></script>
 <script src="/waveforms.js"></script>
 <script src="/layers.js"></script>
 <script src="/context-menu.js"></script>

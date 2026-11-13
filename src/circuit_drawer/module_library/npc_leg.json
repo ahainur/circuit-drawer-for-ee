@@ -1,0 +1,274 @@
+{
+ "title": "NPC leg",
+ "symbol": "text",
+ "layout": {
+  "name": "npc_leg",
+  "elements": [
+   {
+    "id": "Sa1",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.6,
+      8.0
+     ],
+     "e": [
+      4.6,
+      6.8
+     ]
+    },
+    "label": "$S_{a1}$"
+   },
+   {
+    "id": "Sa2",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.6,
+      5.8
+     ],
+     "e": [
+      4.6,
+      4.6
+     ]
+    },
+    "label": "$S_{a2}$"
+   },
+   {
+    "id": "Sa3",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.6,
+      2.6
+     ],
+     "e": [
+      4.6,
+      1.4
+     ]
+    },
+    "label": "$S_{a3}$"
+   },
+   {
+    "id": "Sa4",
+    "kind": "igbt",
+    "pins": {
+     "c": [
+      4.6,
+      1.2
+     ],
+     "e": [
+      4.6,
+      0.0
+     ]
+    },
+    "label": "$S_{a4}$"
+   },
+   {
+    "id": "Da1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      3.2,
+      6.3
+     ],
+     "b": [
+      4.6,
+      6.3
+     ]
+    },
+    "label": "$D_{a1}$"
+   },
+   {
+    "id": "Da2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.6,
+      1.3
+     ],
+     "b": [
+      3.2,
+      1.3
+     ]
+    },
+    "label": "$D_{a2}$",
+    "label_pos": "below"
+   },
+   {
+    "id": "Port_P",
+    "kind": "port",
+    "pins": {
+     "p": [
+      2.2,
+      8.0
+     ]
+    },
+    "label": "$P$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_M",
+    "kind": "port",
+    "pins": {
+     "p": [
+      2.2,
+      2.8
+     ]
+    },
+    "label": "$M$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_N",
+    "kind": "port",
+    "pins": {
+     "p": [
+      2.2,
+      0.0
+     ]
+    },
+    "label": "$N$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_O",
+    "kind": "port",
+    "pins": {
+     "p": [
+      6.6,
+      4.2
+     ]
+    },
+    "label": "$O$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     2.2,
+     8
+    ],
+    [
+     4.6,
+     8
+    ]
+   ],
+   [
+    [
+     2.2,
+     0
+    ],
+    [
+     4.6,
+     0
+    ]
+   ],
+   [
+    [
+     2.2,
+     2.8
+    ],
+    [
+     3.2,
+     2.8
+    ]
+   ],
+   [
+    [
+     4.6,
+     6.8
+    ],
+    [
+     4.6,
+     5.8
+    ]
+   ],
+   [
+    [
+     4.6,
+     4.6
+    ],
+    [
+     4.6,
+     2.6
+    ]
+   ],
+   [
+    [
+     4.6,
+     1.4
+    ],
+    [
+     4.6,
+     1.2
+    ]
+   ],
+   [
+    [
+     3.2,
+     6.3
+    ],
+    [
+     3.2,
+     1.3
+    ]
+   ],
+   [
+    [
+     4.6,
+     4.2
+    ],
+    [
+     6.6,
+     4.2
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {
+   "Sa1.c": "DCP",
+   "Sa4.e": "DCN",
+   "Da1.a": "MID",
+   "Da2.b": "MID",
+   "Sa1.e": "aU",
+   "Sa2.c": "aU",
+   "Da1.b": "aU",
+   "Sa2.e": "aOUT",
+   "Sa3.c": "aOUT",
+   "Sa3.e": "aL",
+   "Sa4.c": "aL",
+   "Da2.a": "aL",
+   "Port_P.p": "DCP",
+   "Port_M.p": "MID",
+   "Port_N.p": "DCN",
+   "Port_O.p": "aOUT"
+  }
+ },
+ "ports": {
+  "P": "Port_P.p",
+  "M": "Port_M.p",
+  "N": "Port_N.p",
+  "O": "Port_O.p"
+ },
+ "port_layout": {
+  "P": {
+   "side": "left",
+   "order": 0
+  },
+  "M": {
+   "side": "left",
+   "order": 1
+  },
+  "N": {
+   "side": "left",
+   "order": 2
+  },
+  "O": {
+   "side": "right",
+   "order": 3
+  }
+ }
+}

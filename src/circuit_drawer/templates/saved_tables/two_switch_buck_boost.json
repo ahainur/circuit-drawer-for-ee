@@ -1,0 +1,317 @@
+{
+ "template": {
+  "name": "two_switch_buck_boost",
+  "title": "Two-switch buck-boost",
+  "aliases": [
+   "two-switch buck-boost",
+   "双开关升降压",
+   "两开关buck-boost"
+  ],
+  "description": "Non-inverting, simultaneous charge/discharge buck-boost operation; ideal positive CCM. Both switches share the gate command.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "two_switch_buck_boost",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      4.0
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      4.0
+     ],
+     "s": [
+      2.2,
+      4.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "below"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.6,
+      1.0
+     ],
+     "b": [
+      2.6,
+      3.0
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      3.0,
+      4.0
+     ],
+     "b": [
+      4.4,
+      4.0
+     ]
+    },
+    "label": "$L_1$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      4.8,
+      3.0
+     ],
+     "s": [
+      4.8,
+      1.0
+     ]
+    },
+    "label": "$S_2$",
+    "label_pos": "left"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.2,
+      4.0
+     ],
+     "b": [
+      6.4,
+      4.0
+     ]
+    },
+    "label": "$D_2$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      6.8,
+      4.0
+     ],
+     "b": [
+      6.8,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.0,
+      4.0
+     ],
+     "b": [
+      8.0,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     4.0
+    ],
+    [
+     1.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.2,
+     4.0
+    ],
+    [
+     3.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     4.0
+    ],
+    [
+     2.6,
+     3.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     1.0
+    ],
+    [
+     2.6,
+     0.0
+    ]
+   ],
+   [
+    [
+     4.4,
+     4.0
+    ],
+    [
+     5.2,
+     4.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     4.0
+    ],
+    [
+     4.8,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     1.0
+    ],
+    [
+     4.8,
+     0.0
+    ]
+   ],
+   [
+    [
+     6.4,
+     4.0
+    ],
+    [
+     6.8,
+     4.0
+    ]
+   ],
+   [
+    [
+     6.8,
+     4.0
+    ],
+    [
+     8.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     8.0,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [
+   {
+    "at": [
+     9.6,
+     2.0
+    ],
+    "text": "$v_o>0$"
+   }
+  ],
+  "netlist": {
+   "Vin.a": "GND",
+   "Vin.b": "IN",
+   "S1.d": "IN",
+   "S1.s": "A",
+   "D1.a": "GND",
+   "D1.b": "A",
+   "L1.a": "A",
+   "L1.b": "B",
+   "S2.d": "B",
+   "S2.s": "GND",
+   "D2.a": "B",
+   "D2.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "GND",
+   "RL.a": "OUT",
+   "RL.b": "GND"
+  },
+  "modes": [
+   {
+    "name": "Charge",
+    "on": [
+     "S1",
+     "S2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "L1",
+      "S2"
+     ],
+     [
+      "RL",
+      "Co"
+     ]
+    ],
+    "caption": "Charge",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   },
+   {
+    "name": "Transfer",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "D1",
+      "L1",
+      "D2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Transfer",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   }
+  ]
+ }
+}

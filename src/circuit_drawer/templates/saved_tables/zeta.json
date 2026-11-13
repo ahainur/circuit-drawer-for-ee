@@ -1,0 +1,320 @@
+{
+ "template": {
+  "name": "zeta",
+  "title": "Zeta converter",
+  "aliases": [
+   "Zeta converter",
+   "Zeta变换器"
+  ],
+  "description": "Two uncoupled inductors and an explicit energy-transfer capacitor; ideal CCM, negligible capacitor ripple. Positive output.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "zeta",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      4.0
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      4.0
+     ],
+     "s": [
+      2.2,
+      4.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "below"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      2.6,
+      3.0
+     ],
+     "b": [
+      2.6,
+      1.0
+     ]
+    },
+    "label": "$L_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Cx",
+    "kind": "C",
+    "pins": {
+     "a": [
+      3.2,
+      4.0
+     ],
+     "b": [
+      4.4,
+      4.0
+     ]
+    },
+    "label": "$C_x$"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.8,
+      1.0
+     ],
+     "b": [
+      4.8,
+      3.0
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L2",
+    "kind": "L",
+    "pins": {
+     "a": [
+      5.2,
+      4.0
+     ],
+     "b": [
+      6.4,
+      4.0
+     ]
+    },
+    "label": "$L_2$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      6.8,
+      4.0
+     ],
+     "b": [
+      6.8,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.0,
+      4.0
+     ],
+     "b": [
+      8.0,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     4.0
+    ],
+    [
+     1.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.2,
+     4.0
+    ],
+    [
+     3.2,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     4.0
+    ],
+    [
+     2.6,
+     3.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     1.0
+    ],
+    [
+     2.6,
+     0.0
+    ]
+   ],
+   [
+    [
+     4.4,
+     4.0
+    ],
+    [
+     5.2,
+     4.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     4.0
+    ],
+    [
+     4.8,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     1.0
+    ],
+    [
+     4.8,
+     0.0
+    ]
+   ],
+   [
+    [
+     6.4,
+     4.0
+    ],
+    [
+     6.8,
+     4.0
+    ]
+   ],
+   [
+    [
+     6.8,
+     4.0
+    ],
+    [
+     8.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     8.0,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [
+   {
+    "at": [
+     9.6,
+     2.0
+    ],
+    "text": "$v_o>0$"
+   }
+  ],
+  "netlist": {
+   "Vin.a": "GND",
+   "Vin.b": "IN",
+   "S1.d": "IN",
+   "S1.s": "A",
+   "L1.a": "A",
+   "L1.b": "GND",
+   "Cx.a": "A",
+   "Cx.b": "B",
+   "D1.a": "GND",
+   "D1.b": "B",
+   "L2.a": "B",
+   "L2.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "GND",
+   "RL.a": "OUT",
+   "RL.b": "GND"
+  },
+  "modes": [
+   {
+    "name": "Switch on",
+    "on": [
+     "S1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "L1"
+     ],
+     [
+      "Vin",
+      "S1",
+      "Cx",
+      "L2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Switch on",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   },
+   {
+    "name": "Switch off",
+    "on": [
+     "D1"
+    ],
+    "loops": [
+     [
+      "L1",
+      "D1",
+      "Cx"
+     ],
+     [
+      "D1",
+      "L2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Switch off",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   }
+  ]
+ }
+}

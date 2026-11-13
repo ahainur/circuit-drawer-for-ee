@@ -410,7 +410,23 @@ def check(raw: Any, prof: Profile) -> Report:
         fns, ferr = parse_functions(raw["functions"], dia)
         wiring(fns, dia.links, ferr)
         errors += ferr
-    return Report(dia, g, errors, warnings)
+    rep = Report(dia, g, errors, warnings)
+    if isinstance(raw, dict) and "digital" in raw and not errors:
+        from .codegen import plan
+        from .digital import parse, prepare
+        from .loop import parse_loop
+        try:
+            spec, _ = parse_loop(raw.get("loop"), dia)
+            pl = plan(rep)
+            cfg = parse(raw["digital"], pl, spec.params)
+            if cfg is None:
+                raise ValueError("digital 须为对象，删除此字段可恢复连续模式")
+            prepare(pl, cfg)
+            if any(tf.delay for tf in spec.tf.values()) or any(p.tf.delay for p in spec.plant):
+                raise ValueError("digital 模式请用 digital.delay_samples 设置整拍延迟，移除 loop 传递函数中的 delay")
+        except ValueError as exc:
+            errors.append(str(exc))
+    return rep
 
 
 def _connections(dia: Diagram, g: Geometry, errors: list[str], warnings: list[str]) -> None:

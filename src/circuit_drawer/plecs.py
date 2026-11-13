@@ -57,11 +57,11 @@ def _check_state_dependencies(circuit):
                 if capacitors:
                     raise SpiceError(
                         f'PLECS：电压源 {sources} 与电容 {capacitors} 构成状态约束；'
-                        '请先保存仿真参数并关闭窗口，进入“视图 → 全图器件模型…”（模型映射），'
+                        '请先保存仿真参数并关闭窗口，进入“仿真 → 全图器件模型…”（模型映射），'
                         '将“电容”设为“带寄生参数”，在“串联电阻 Ω”填写实际 ESR，点击“应用到全图”'
                         '（model_mapping.C：model=parasitic，series_resistance=ESR）；'
                         '此设置作用于全图所有电容，会同时影响 SPICE 仿真结果。'
-                        '然后回到“分析 → SPICE 仿真…”重新导出。不会自动修改器件模型')
+                        '然后回到“仿真 → SPICE 仿真…”重新导出。不会自动修改器件模型')
                 raise SpiceError(f'PLECS：电压源 {sources} 构成理想电压源闭环；请显式加入实际串联阻抗，消除源/状态依赖，不会自动修改器件模型')
             join_voltage_path(p)
     parents.clear()
@@ -771,6 +771,8 @@ def control_terminals(b):
     defines; a block that needs two components (a discrete limited PI, a
     function of several inputs) spreads its ports over both."""
     name, n = b.name, b.inputs
+    if b.kind == 'c':
+        return [(name,i) for i in range(1,n+1)], [(name,n+i) for i in range(1,b.outputs+1)]
     if b.kind in ('input', 'const', 'carrier'):
         return [], [(name, 1)]
     if b.kind in ('sum', 'product', 'mux'):
@@ -783,6 +785,8 @@ def control_terminals(b):
         return [(name, 1), (name, 2)], [(name, 3)]
     if b.kind == 'step':
         return [], [(name, 2)]
+    if b.kind == 'pulse_delay':
+        return [(name, 2)], [(name, 1)]
     if b.kind in ('abc2dq', 'dq2abc'):
         return [(name, 1), (name, 3)], [(name, 2)]
     if b.kind == 'dpi':
@@ -857,6 +861,10 @@ def _control_panel(circuit, panel, origin, block, signal_wire, measurement_tags)
             block('Saturation', name, {'UpperLimit': inf(p['hi'], 1), 'LowerLimit': inf(p['lo'], -1)}, pos)
         elif b.kind == 'delay':
             block('DiscreteTransferFunction', name, {'Numerator': '[1]', 'Denominator': '[1 0]', 'Ts': p['ts'], 'X0': 0}, pos)
+        elif b.kind == 'pulse_delay':
+            reference(name, 'Components/Control/Delays/Pulse Delay', [-15, -15, 15, 15],
+                      [('Output', (19, 0), 'right'), ('Input', (-15, 0), 'left')],
+                      {'T_d': p['seconds'], 'y_init': 0, 'buffer_size': 1024}, pos)
         elif b.kind == 'carrier':
             block('TriangleGenerator', name, {'Min': 0, 'Max': 1, 'f': p['f'],
                                               'DutyCycle': 1 if p['shape'] == 'saw' else 0.5, 'Delay': p['delay']}, pos)
@@ -879,6 +887,22 @@ def _control_panel(circuit, panel, origin, block, signal_wire, measurement_tags)
             function(b, inner, pos)
         elif b.kind == 'fcn':
             function(b, p['expr'], pos)
+        elif b.kind == 'c':
+            from .control.custom_c import statements
+            states = p['c']['states']
+            inputs = {key:f'InputSignal({i},0)' for i,key in enumerate(p['names'])}
+            outputs = {key.split('.',1)[1]:f'OutputSignal({i},0)' for i,key in enumerate(p['outs'])}
+            old = {key:f'DiscState({i})' for i,key in enumerate(states)}
+            next_ = {key:f'cd_next[{i}]' for i,key in enumerate(states)}
+            params = {'NumInputs':'['+' '.join(['1']*b.inputs)+']','NumOutputs':'['+' '.join(['1']*b.outputs)+']',
+                      'NumContStates':0,'NumDiscStates':len(states),'NumZCSignals':0,'DirectFeedthrough':1,
+                      'Ts':p['ts'],'Parameters':'','LangStandard':2,'GnuExtensions':1,'RuntimeCheck':2,
+                      'Declarations':'#include <math.h>\n' + (f'static double cd_next[{len(states)}];' if states else ''),
+                      'StartFcn':'\n'.join(f'{old[key]}={value:.17g};' for key,value in states.items()),
+                      'OutputFcn':statements(p['c'],inputs,outputs,old,next_),
+                      'UpdateFcn':'\n'.join(f'{old[key]}={next_[key]};' for key in states),
+                      'DerivativeFcn':'','TerminateFcn':''}
+            block('CScript',name,params,pos,'up')
         else:
             raise SpiceError(f'PLECS：无法导出的控制方块 {b.kind}')
     for lk in panel.links:

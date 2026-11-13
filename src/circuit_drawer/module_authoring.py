@@ -86,7 +86,7 @@ def selection(source, ids, ports=(), profile="double"):
         raise ModuleError("请选择存在的普通元件；不能把展开的实例子元件再次封装")
     _valid(source, profile, allow_open=True)
     if any(f"{e.id}.{p}" not in source.netlist for e in source.elements for p in e.pins):
-        raise ModuleError("请先用“分析 → 以当前连接更新网表”记录已画出的连接，再设置模块端口")
+        raise ModuleError("请先用“编辑 → 按图更新网表”记录已画出的连接，再设置模块端口")
     # The root has explicit geometry even when other instances already exist.
     graph = WireGraph(source)
     by_net, at_net, outside = defaultdict(list), {}, set()
@@ -269,8 +269,8 @@ def extract(source, ids, name, ports, exposed, profile="double"):
             local.extra[key] = moved
     author = raw.setdefault("module_authoring", {"aliases": {}, "order": [e.id for e in source.elements], "terminals": []})
     author["aliases"].update({f"{instance}/{e.id}": e.id for e in info["chosen"]})
-    if raw.get("modes"):
-        author["modes"] = raw.pop("modes")
+    from .modes import rename_modes
+    rename_modes(raw, {eid: instance + "/" + eid for eid in ids})
     used = {e.id for e in local.elements}
     root_used = {e["id"] for e in raw["elements"]}
     port_map, display, unconnected = {}, {}, []
@@ -440,27 +440,29 @@ def _prune_parameters(definition, raw, name):
             not all(isinstance(v, str) for v in p.values()) for p in editable)):
         raise ModuleError(f"模块 {name}.editable 必须是含 element、field 的参数对象列表")
     users = {i["id"] for i in instances if i["definition"] == name}
+    drawn = {e.id for e in lay.elements}
+    previous = {e["id"] for e in raw["modules"]["definitions"][name]["layout"]["elements"]}
+    deleted = {f"{user}/{eid}" for user in users for eid in previous - drawn}
     meta = raw.get("module_authoring")
     if meta is not None:
-        drawn = {e.id for e in lay.elements}
         removed = {k: v for k, v in meta["aliases"].items()
                    if k.partition("/")[0] in users and k.partition("/")[2] not in drawn}
         meta["aliases"] = {k: v for k, v in meta["aliases"].items() if k not in removed}
-        deleted = set(removed) | set(removed.values())
-        def touches(ref):
-            return any(r.strip().partition(":")[0] in deleted for r in ref.split("|"))
-        for mode in meta.get("modes", []):
-            if mode.get("on") is not None:
-                mode["on"] = [ref for ref in mode["on"] if not touches(ref)]
-            loops = mode.get("loops") or []
-            flat = bool(loops) and isinstance(loops[0], str)
-            kept = [loop for loop in ([loops] if flat else loops) if not any(touches(ref) for ref in loop)]
-            if len(kept) != (1 if flat else len(loops)):
-                # Removing just one branch could invent a different current path.
-                mode["loops"] = kept[0] if flat and kept else kept
-                mode.pop("arrows", None)
+        deleted |= set(removed) | set(removed.values())
         if deleted:
             meta["order"] = [eid for eid in meta["order"] if eid not in deleted]
+    def touches(ref):
+        return any(r.strip().partition(":")[0] in deleted for r in ref.split("|"))
+    for mode in raw.get("modes", []) + (meta or {}).get("modes", []):
+        if mode.get("on") is not None:
+            mode["on"] = [ref for ref in mode["on"] if not touches(ref)]
+        loops = mode.get("loops") or []
+        flat = bool(loops) and isinstance(loops[0], str)
+        kept = [loop for loop in ([loops] if flat else loops) if not any(touches(ref) for ref in loop)]
+        if len(kept) != (1 if flat else len(loops)):
+            # Removing just one branch could invent a different current path.
+            mode["loops"] = kept[0] if flat and kept else kept
+            mode.pop("arrows", None)
     from .spice import FIELDS, OPTIONAL_FIELDS
     parts = {e.id: e.kind for e in lay.elements if e.kind != "port"}
     fields = {(eid, key) for eid, kind in parts.items()
@@ -521,7 +523,7 @@ def update_definition(source, name, definition, profile="double", *, new_name=No
         definition["title"] = new_name
         definition["layout"]["name"] = new_name
     raw["modules"]["definitions"][new_name] = definition
-    _move_port_wires(raw, assemble(source).ports, assemble(Layout.from_dict(raw)).ports)
+    _move_port_wires(raw, assemble(source).contact_pins, assemble(Layout.from_dict(raw)).contact_pins)
     result = Layout.from_dict(raw)
     if "electrical" in result.extra:
         result.extra["electrical"] = synchronize(result, profile)
@@ -590,11 +592,101 @@ def connect_touching_ports(source, profile="double", instance_id=None):
     return result
 
 
+def _separate_port_bends(raw, previous, old_ports, new_ports):
+    """Keep the moving end's bends clear of adjacent authored wires."""
+    from .modules import _cost, _cross, _crossings, _on
+    moved = {_k(old): _k(new_ports[ref]) for ref, old in old_ports.items()
+             if ref in new_ports and _k(old) != _k(new_ports[ref])}
+    pins = [_k(p) for e in raw["elements"] for p in e["pins"].values()]
+    pins += [_k(p) for p in {**old_ports, **new_ports}.values()]
+    hops = {_k(p) for p in raw.get("hops", [])}
+    part_leads = [tuple(_k(point) for ref, point in new_ports.items() if ref.rpartition(".")[0] == part["id"])
+                  for part in [*raw.get("elements", []), *raw.get("modules", {}).get("parts", [])]]
+    part_leads = [lead for lead in part_leads if len(lead) == 2]
+    for index, original in enumerate(previous):
+        if raw["wires"][index] == original:
+            continue
+        for reverse in (False, True):
+            start = _k(original[-1 if reverse else 0])
+            path = raw["wires"][index][::-1] if reverse else raw["wires"][index]
+            path = [list(p) for j, p in enumerate(path) if j == 0 or _k(p) != _k(path[j - 1])]
+            if start not in moved or len(path) < 3 or _k(path[0]) != moved[start]:
+                continue
+            prefix, rest = path[:4], path[4:]
+            a, b = tuple(prefix[0]), tuple(prefix[-1])
+            axis = 0 if abs(prefix[0][1] - prefix[1][1]) < 1e-6 else 1
+            obstacles = [(tuple(a), tuple(b)) for i, wire in enumerate(raw["wires"]) if i != index
+                         for a, b in zip(wire, wire[1:])]
+            obstacles += [(tuple(a), tuple(b)) for a, b in zip(path[3:], path[4:])]
+            same = [segment for segment in obstacles if _on(a, *segment) or _on(b, *segment)]
+
+            def clear(candidate):
+                if any(_cross(p, q, *lead) for p, q in zip(candidate, candidate[1:]) for lead in part_leads):
+                    return False
+                if _cost(candidate, (a, None, False), (b, None, False), obstacles, pins, [], same) is None:
+                    return False
+                if any(_on(point, *segment) for point in candidate[1:-1] for segment in obstacles):
+                    return False
+                crossings = _crossings(candidate, obstacles, (), False)[1]
+                return all(_k(point) in hops for point in crossings)
+
+            if clear([tuple(p) for p in prefix]):
+                continue
+            # Existing junctions and bridges stay fixed. Only the free lead bends move.
+            old_path = original[::-1] if reverse else original
+            anchors = [_k(p) for e in raw["elements"] for p in e["pins"].values()]
+            anchors += [_k(p) for p in old_ports.values()] + list(hops)
+            anchors += [_k(p) for i, wire in enumerate(previous) if i != index for p in wire]
+            ends = {_k(old_path[0]), _k(old_path[-1])}
+            attachments = [p for p in anchors if _k(p) not in ends]
+            if any(_on(p, a, b) for p in attachments for a, b in zip(old_path, old_path[1:])):
+                continue
+            low, high = sorted((a[axis], b[axis]))
+            points = pins + [p for segment in obstacles for p in segment]
+            coordinates = sorted({low, high} | {p[axis] for p in points if low < p[axis] < high})
+            bends = [(lo + hi) / 2 for lo, hi in zip(coordinates, coordinates[1:])]
+            for bend in sorted(bends, key=lambda value: abs(value - prefix[1][axis])):
+                first, second = list(a), list(b)
+                first[axis] = second[axis] = round(bend, 4)
+                candidate = [a, tuple(first), tuple(second), b]
+                if clear(candidate):
+                    path = [list(p) for p in candidate] + rest
+                    raw["wires"][index] = path[::-1] if reverse else path
+                    break
+
+
 def _move_port_wires(raw, old_ports, new_ports):
     """Keep authored wire contacts when a definition or its display changes."""
-    from .modules import _on
-    wires = deepcopy(raw["wires"])
+    from .modules import _on, _split_joins
+    # A free tail beyond a port travels with that port. Keeping its old corner
+    # fixed can stretch the external wire through the newly expanded circuit.
+    tails = []
     fixed = [tuple(p) for e in raw["elements"] for p in e["pins"].values()]
+    for ref, old in old_ports.items():
+        if ref not in new_ports or _k(old) == _k(new_ports[ref]):
+            continue
+        for i, wire in enumerate(raw["wires"]):
+            path = [list(p) for p in _split_joins(wire, {_k(old)})]
+            if not any(_k(p) == _k(old) for p in path[1:-1]):
+                continue
+            at = next(j for j, p in enumerate(path) if _k(p) == _k(old))
+            sides = [path[:at + 1][::-1], path[at:]]
+            other_wires = [w for j, w in enumerate(raw["wires"]) if j != i]
+            anchors = fixed + [tuple(p) for key, p in old_ports.items() if key != ref]
+            anchors += [tuple(p) for w in other_wires for p in w]
+            anchors = [p for p in anchors if _k(p) != _k(old)]
+            free = []
+            for side in sides:
+                attached = any(_on(p, a, b) for p in anchors for a, b in zip(side, side[1:]))
+                attached |= any(_on(p, a, b) for p in side[1:] for w in other_wires for a, b in zip(w, w[1:]))
+                free.append(not attached)
+            # A through bus, including one with two free ends, keeps its place.
+            if free.count(True) != 1:
+                continue
+            side = free.index(True)
+            tails.append((ref, sides[side]))
+            raw["wires"][i] = path[at:] if side == 0 else path[:at + 1]
+    wires = deepcopy(raw["wires"])
     stops = fixed + [tuple(p) for p in old_ports.values()] + [tuple(p) for w in wires for p in (w[0], w[-1])]
     for ref, old in old_ports.items():
         if ref not in new_ports or _k(old) == _k(new_ports[ref]):
@@ -631,10 +723,15 @@ def _move_port_wires(raw, old_ports, new_ports):
                     continue
                 horizontal = abs(old[1] - path[k][1]) < 1e-6
                 if 0 < k < len(path) - 1:
-                    path[k][1 if horizontal else 0] = new[1 if horizontal else 0]
+                    if not horizontal and target in (0, len(path) - 1):
+                        # Keep an external vertical approach outside the module.
+                        path.insert(min(k, target) + 1, [path[k][0], new[1]])
+                    else:
+                        path[k][1 if horizontal else 0] = new[1 if horizontal else 0]
                 else:
                     elbow = [new[0], path[k][1]] if horizontal else [path[k][0], new[1]]
                     path.insert(min(k, target) + 1, elbow)
+    _separate_port_bends(raw, wires, old_ports, new_ports)
     cleaned = []
     for index, path in enumerate(raw["wires"]):
         if index < len(wires) and path == wires[index]:
@@ -654,10 +751,13 @@ def _move_port_wires(raw, old_ports, new_ports):
         if len(kept) > 1:
             cleaned.append(kept)
     raw["wires"] = cleaned
+    for ref, tail in tails:
+        delta = [new_ports[ref][k] - old_ports[ref][k] for k in range(2)]
+        raw["wires"].append([[round(p[k] + delta[k], 4) for k in range(2)] for p in tail])
 
 
 def set_connections(source, iid, connections, profile="double"):
-    """One connection per port, as the port dialog shows it: the first link
+    """One named connection per port for API clients: the first link
     of each port. A port left empty loses all its links; an unchanged choice
     keeps every link it has (a port may also feed further instances)."""
     from .modules import _definitions
@@ -709,9 +809,6 @@ def create_empty(source, at, profile="double"):
     definitions = spec.setdefault("definitions", {})
     name = _unique("Subsystem", set(definitions))
     definitions[name] = {"layout": Layout(name).to_dict(), "ports": {}, "editable": [], "title": name}
-    if raw.get("modes"):
-        meta = raw.setdefault("module_authoring", {"aliases": {}, "order": [e.id for e in source.elements], "terminals": []})
-        meta["modes"] = raw.pop("modes")
     return add_instance(Layout.from_dict(raw), name, at, {}, profile)
 
 
@@ -734,6 +831,20 @@ def add_instance(source, name, at, connections, profile="double"):
         result.extra["electrical"] = synchronize(result, profile)
     _assembles(result, profile)
     return result
+
+
+def prepare_part_move(source, part_id, profile="double"):
+    """Get current displayed geometry without replacing port-relative placement."""
+    from .validate import check_with_assembly
+    prof = get_profile(profile)
+    report, assembly = check_with_assembly(source, prof)
+    assembly = assembly or assemble(source, report.scale, prof)
+    spec = source.extra["modules"]
+    part = next((p for p in spec.get("parts", []) if p.get("id") == part_id), None)
+    if part is None:
+        raise ModuleError("自动摆放的元件不存在")
+    return {"element": assembly.view.element(part_id).to_dict(),
+            "offset": deepcopy(part.get("offset", [0, 0]))}
 
 
 def dissolve(source, instance_id, profile="double"):
@@ -792,7 +903,9 @@ def dissolve(source, instance_id, profile="double"):
         raise ModuleError("空子系统还没有可解散的元件；可进入定义搭电路，或删除实例")
     prefix = instance_id + "/"
     targets = {f"{instance_id}.{p}": full[prefix + ref[:-2]].pins["p"] for p, ref in definition["ports"].items()}
-    _move_port_wires(raw, assembly.ports, targets)
+    targets.update({f"{part['id']}.{pin}": point for part in parts if part not in kept
+                    for pin, point in full[part["id"]].pins.items()})
+    _move_port_wires(raw, assembly.contact_pins, targets)
     first = local.elements[0]
     pin = next(iter(first.pins))
     at = [full[prefix + first.id].pins[pin][j] - first.pins[pin][j] for j in range(2)]
@@ -801,6 +914,8 @@ def dissolve(source, instance_id, profile="double"):
     meta = raw.setdefault("module_authoring", {"aliases": {}, "order": [e.id for e in assembly.full.elements], "terminals": []})
     used = {e["id"] for e in raw["elements"]} | {p["id"] for p in kept}
     rename = {e["id"]: _unique(meta["aliases"].get(e["id"], e["id"].replace("/", "_")), used) for e in part["elements"]}
+    from .modes import rename_modes
+    rename_modes(raw, rename)
     def ref(r):
         eid, _, pin = r.rpartition(".")
         return rename.get(eid, eid) + "." + pin
@@ -878,7 +993,7 @@ def dissolve(source, instance_id, profile="double"):
         raw["elements"].sort(key=lambda e: order.get(e["id"], len(order)))
         spec["links"] = []
         spec.pop("root_ports", None)
-        if meta.get("modes"):
+        if meta.get("modes") and not raw.get("modes"):
             raw["modes"] = meta["modes"]
         meta["terminals"] = []
     # Deliberately unused module ports remain deliberately open after flattening.
@@ -906,8 +1021,8 @@ def dissolve(source, instance_id, profile="double"):
     # Compare actual connectivity even when unrelated unfinished parts prevent SPICE export.
     after = assemble(result)
     groups = []
-    for graph, links, rename_pin in ((assembly.full, assembly.links, ref), (after.full, after.links, lambda p: p)):
-        nets = check(graph, get_profile(profile), connections=links).nets
+    for built, rename_pin in ((assembly, ref), (after, lambda p: p)):
+        graph, nets = built.sheets, built.connectivity(get_profile(profile)).nets
         grouped = defaultdict(set)
         for element in graph.elements:
             if element.kind != "port":
@@ -920,7 +1035,13 @@ def dissolve(source, instance_id, profile="double"):
     if groups[0] != groups[1]:
         raise ModuleError("解散改变了电气连接，已取消")
     if source.extra.get("simulation") and before.ok:
-        from .spice import circuit_deck as make_deck
-        if make_deck(source, profile).text != make_deck(result, profile).text:
+        from .spice import SpiceError, circuit_deck as make_deck
+        try:
+            original_deck = make_deck(source, profile).text
+        except SpiceError:
+            # New drawing parts may still await simulation parameters.
+            # Their complete connectivity was compared immediately above.
+            original_deck = None
+        if original_deck is not None and original_deck != make_deck(result, profile).text:
             raise ModuleError("解散改变了网表，已取消")
     return result

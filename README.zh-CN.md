@@ -2,19 +2,19 @@
 
 简体中文 | [English](README.md)
 
-Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直接放进论文的电力电子 CircuiTikZ 电路图，并把同一张表导出为 ngspice、Simulink 和 PLECS 仿真模型。
+Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直接放进论文的电力电子 CircuiTikZ 电路图，并把同一张表导出为 ngspice、Simulink、PLECS 及 PSIM 开环仿真模型。
 
 <p align="center">
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.6.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.6.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 Windows 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.6.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v1.6.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.6.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 Windows 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.7.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
 四个按钮均下载同一份 **通用 Python 安装包（`.whl`，需要 Python 3.10+）**，安装步骤见下方[安装说明](#三安装)。macOS 和 Linux 当前为预览支持。
 
-[新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.6.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-trial-1.6.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-manuals-1.6.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-public-source-1.6.0.zip)
+[新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.7.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-trial-1.7.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-manuals-1.7.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-public-source-1.7.0.zip)
 
 ![全桥 LLC 变换器，IEEE 单栏](docs/images/manual/example-llc-fullbridge.png)
 
@@ -22,11 +22,13 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 
 1、**一张表，多种输出。** 一份 JSON 同时保存元件、导线、网表、工作模态、标注、仿真参数和波形设置。由它可以得到 PDF、SVG、PNG、TeX 电路图，ngspice 网表和 CSV 仿真结果，Simulink + Simscape 的 MATLAB 建模脚本，以及 PLECS Standalone 原生模型。
 
+1a、**PSIM 开环导出。** 在仿真菜单选择“导出到 PSIM…”，生成 Python 建模脚本；通过 PSIM 2026 官方 API 生成原生模型和求解 CSV。[支持范围与操作](docs/PSIM_EXPORT.md)。
+
 2、**默认就是论文版式。** 图宽适配 IEEE 单栏（8.79 cm）或双栏（17.99 cm），文字为 8 pt Times。符号尺寸固定，适配栏宽时只伸缩元件之间的间距，所以 PDF 按 100% 插入论文，图中字号与图注一致。
 
-3、**不做自动布局，严格校验。** 每个引脚、每个导线拐点都来自模板或你自己。校验器拒绝斜线、符号和文字重叠、没有标跨线的交叉、悬空导线，以及图与网表不一致，并指出位置和原因。
+3、**明确坐标，严格校验。** 每个引脚、每个导线拐点都来自模板或你自己；主动展开模块时可自适应留出空间。校验器拒绝斜线、符号和文字重叠、没有标跨线的交叉、悬空导线，以及图与网表不一致，并指出位置和原因。
 
-4、**网页编辑器。** 从分类器件库拖入元件，画导线，框选，整组编辑，右键菜单，撤销重做，方向键微调，问题随改随报。
+4、**网页编辑器。** 元件、导线和模块可混合多选移动，普通元件与导线可整组双向旋转；支持叠线合并、跨线跟随和整体缩放。框选、右键、撤销重做及方向键微调沿用原有检查。
 
 5、**模块化。** 一个变换器单元定义一次，可从库中拖入画布、放置多份，用普通导线连接端口，也可折叠成带 IEC 符号的方框。折叠只改画面，仿真始终使用完整电路。
 
@@ -59,7 +61,7 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 Windows：
 
 ```powershell
-python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
 macOS 或 Linux：在虚拟环境中安装。
@@ -67,7 +69,7 @@ macOS 或 Linux：在虚拟环境中安装。
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
 运行后文命令时保持此环境已激活。Debian／Ubuntu 若提示缺少 `venv` 模块，先安装 `python3-venv`。
@@ -133,10 +135,10 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 | 电源旁的阶跃 / 脉冲小图 | 网页编辑器元件属性 |
 | 可复用模块、折叠、模块库 | 网页编辑器器件库的 **模块（子系统）** 分组 |
 | 工作模态图 | **模态** 页，或 `circuit-drawer modes` |
-| 波形与模态对应 | **分析 → 波形与模态…**，或 `circuit-drawer waveforms` |
-| ngspice 仿真 | **分析 → SPICE 仿真…**，或 `circuit-drawer spice` |
-| 传导 EMI 工程估算及滤波前后对比 | **分析 → 传导 EMI 估算…**，从 `buck_emi` 模板开始 |
-| Simulink 和 PLECS 模型、闭环控制器、折叠模块导出为子系统 | **分析 → SPICE 仿真…**，或 `circuit-drawer simulink` / `circuit-drawer plecs` |
+| 波形与模态对应 | **模态与波形 → 波形与模态…**，或 `circuit-drawer waveforms` |
+| ngspice 仿真 | **仿真 → SPICE 仿真…**，或 `circuit-drawer spice` |
+| 传导 EMI 工程估算及滤波前后对比 | **实验功能 → 传导 EMI 估算…**，从 `buck_emi` 模板开始 |
+| Simulink 和 PLECS 模型、闭环控制器、折叠模块导出为子系统 | **仿真 → 导出到 Simulink… / 导出到 PLECS…**，或 `circuit-drawer simulink` / `circuit-drawer plecs` |
 | 控制框图、环路分析、C 代码 | `circuit-drawer-control` |
 | 用文字生成新拓扑，或一句话修改当前图 | **AI** 菜单，或 `circuit-drawer new` / `circuit-drawer tweak` |
 | 把校验通过的表存成自己的模板 | `circuit-drawer save-template` |

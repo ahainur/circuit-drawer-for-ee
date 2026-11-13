@@ -1,0 +1,288 @@
+{
+ "name": "inverting_buck_boost",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.0
+    ]
+   },
+   "label": "$V_{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     4.0
+    ],
+    "s": [
+     2.2,
+     4.0
+    ]
+   },
+   "label": "$S_1$",
+   "label_pos": "below"
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.6,
+     3.0
+    ],
+    "b": [
+     2.6,
+     1.0
+    ]
+   },
+   "label": "$L_1$",
+   "label_pos": "left"
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     5.0,
+     4.0
+    ],
+    "b": [
+     3.7,
+     4.0
+    ]
+   },
+   "label": "$D_1$"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     5.5,
+     4.0
+    ],
+    "b": [
+     5.5,
+     0.0
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     6.7,
+     4.0
+    ],
+    "b": [
+     6.7,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    4.0
+   ],
+   [
+    1.0,
+    4.0
+   ]
+  ],
+  [
+   [
+    2.2,
+    4.0
+   ],
+   [
+    3.7,
+    4.0
+   ]
+  ],
+  [
+   [
+    2.6,
+    4.0
+   ],
+   [
+    2.6,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.6,
+    1.0
+   ],
+   [
+    2.6,
+    0.0
+   ]
+  ],
+  [
+   [
+    5.0,
+    4.0
+   ],
+   [
+    5.5,
+    4.0
+   ]
+  ],
+  [
+   [
+    5.5,
+    4.0
+   ],
+   [
+    6.7,
+    4.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    6.7,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    8.3,
+    2.0
+   ],
+   "text": "$v_o<0$"
+  }
+ ],
+ "netlist": {
+  "Vin.a": "GND",
+  "Vin.b": "IN",
+  "S1.d": "IN",
+  "S1.s": "SW",
+  "L1.a": "SW",
+  "L1.b": "GND",
+  "D1.a": "OUT",
+  "D1.b": "SW",
+  "Co.a": "OUT",
+  "Co.b": "GND",
+  "RL.a": "OUT",
+  "RL.b": "GND"
+ },
+ "modes": [
+  {
+   "name": "Charge",
+   "on": [
+    "S1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L1"
+    ],
+    [
+     "Co",
+     "RL"
+    ]
+   ],
+   "caption": "Charge",
+   "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+  },
+  {
+   "name": "Transfer",
+   "on": [
+    "D1"
+   ],
+   "loops": [
+    [
+     "L1",
+     "Co|RL",
+     "D1"
+    ]
+   ],
+   "caption": "Transfer",
+   "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+  }
+ ],
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/inverting_buck_boost.csv",
+  "sha256": "587665cfe15815347092706966e5884dcf54f58f627b4ea52236cc66b384cce9",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "us",
+  "relative_time": true,
+  "slice_style": "shade",
+  "arrange": "grid",
+  "window": [
+   0,
+   2e-05
+  ],
+  "boundaries": [
+   0.0,
+   8.000000000000001e-06,
+   2e-05
+  ],
+  "intervals": [
+   "Charge",
+   "Transfer"
+  ],
+  "channels": [
+   {
+    "column": "g1_1",
+    "label": "g1",
+    "unit": "1",
+    "color": "#c8102e"
+   },
+   {
+    "column": "v_L1_V",
+    "label": "v_L1",
+    "unit": "V",
+    "color": "#2457d6"
+   },
+   {
+    "column": "i_L1_A",
+    "label": "i_L1",
+    "unit": "A",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "feadf68a5cd172dcb59e801db44201dea78dd8907677ad479db55219fb16c19a",
+  "notes": [
+   {
+    "kind": "text",
+    "channel": "g1_1",
+    "at": [
+     1.4e-05,
+     0.65
+    ],
+    "text": "Ideal analytical reference"
+   }
+  ]
+ }
+}

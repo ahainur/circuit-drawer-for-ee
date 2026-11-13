@@ -1,0 +1,701 @@
+{
+ "template": {
+  "name": "three_phase_diode_bridge",
+  "title": "Three-phase diode bridge",
+  "aliases": [
+   "three phase diode bridge",
+   "三相二极管整流桥"
+  ],
+  "description": "Six conduction sectors with a series L-R DC load. Ideal analytical waveforms omit commutation overlap and switching transients.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.plexim.com/academy/power-electronics/diode-rect-ind-load-3ph"
+  ]
+ },
+ "layout": {
+  "name": "three_phase_diode_bridge",
+  "elements": [
+   {
+    "id": "Va",
+    "kind": "vac",
+    "pins": {
+     "a": [
+      0.0,
+      4.0
+     ],
+     "b": [
+      1.2,
+      4.0
+     ]
+    },
+    "label": "$v_a$",
+    "label_pos": "above"
+   },
+   {
+    "id": "Vb",
+    "kind": "vac",
+    "pins": {
+     "a": [
+      0.0,
+      2.4
+     ],
+     "b": [
+      1.2,
+      2.4
+     ]
+    },
+    "label": "$v_b$",
+    "label_pos": "above"
+   },
+   {
+    "id": "Vc",
+    "kind": "vac",
+    "pins": {
+     "a": [
+      0.0,
+      0.8
+     ],
+     "b": [
+      1.2,
+      0.8
+     ]
+    },
+    "label": "$v_c$",
+    "label_pos": "above"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      3.0,
+      4.4
+     ],
+     "b": [
+      3.0,
+      5.6
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D3",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.5,
+      2.8
+     ],
+     "b": [
+      4.5,
+      4.0
+     ]
+    },
+    "label": "$D_3$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D5",
+    "kind": "D",
+    "pins": {
+     "a": [
+      6.0,
+      1.2
+     ],
+     "b": [
+      6.0,
+      2.4
+     ]
+    },
+    "label": "$D_5$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D4",
+    "kind": "D",
+    "pins": {
+     "a": [
+      3.0,
+      2.6
+     ],
+     "b": [
+      3.0,
+      3.8
+     ]
+    },
+    "label": "$D_4$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D6",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.5,
+      1.0
+     ],
+     "b": [
+      4.5,
+      2.2
+     ]
+    },
+    "label": "$D_6$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      6.0,
+      -0.6
+     ],
+     "b": [
+      6.0,
+      0.6
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Ld",
+    "kind": "L",
+    "pins": {
+     "a": [
+      7.5,
+      5.2
+     ],
+     "b": [
+      7.5,
+      4.0
+     ]
+    },
+    "label": "$L_d$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Rd",
+    "kind": "R",
+    "pins": {
+     "a": [
+      7.5,
+      2.4
+     ],
+     "b": [
+      7.5,
+      1.2
+     ]
+    },
+    "label": "$R_d$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     4.0
+    ],
+    [
+     0.0,
+     2.4
+    ]
+   ],
+   [
+    [
+     0.0,
+     2.4
+    ],
+    [
+     0.0,
+     0.8
+    ]
+   ],
+   [
+    [
+     1.2,
+     4.0
+    ],
+    [
+     3.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     1.2,
+     2.4
+    ],
+    [
+     4.5,
+     2.4
+    ]
+   ],
+   [
+    [
+     1.2,
+     0.8
+    ],
+    [
+     6.0,
+     0.8
+    ]
+   ],
+   [
+    [
+     3.0,
+     4.0
+    ],
+    [
+     3.0,
+     4.4
+    ]
+   ],
+   [
+    [
+     3.0,
+     4.0
+    ],
+    [
+     3.0,
+     3.8
+    ]
+   ],
+   [
+    [
+     3.0,
+     2.6
+    ],
+    [
+     3.0,
+     -0.8
+    ]
+   ],
+   [
+    [
+     4.5,
+     2.4
+    ],
+    [
+     4.5,
+     2.8
+    ]
+   ],
+   [
+    [
+     4.5,
+     4.0
+    ],
+    [
+     4.5,
+     5.6
+    ]
+   ],
+   [
+    [
+     4.5,
+     2.4
+    ],
+    [
+     4.5,
+     2.2
+    ]
+   ],
+   [
+    [
+     4.5,
+     1.0
+    ],
+    [
+     4.5,
+     -0.8
+    ]
+   ],
+   [
+    [
+     6.0,
+     0.8
+    ],
+    [
+     6.0,
+     1.2
+    ]
+   ],
+   [
+    [
+     6.0,
+     2.4
+    ],
+    [
+     6.0,
+     5.6
+    ]
+   ],
+   [
+    [
+     6.0,
+     0.8
+    ],
+    [
+     6.0,
+     0.6
+    ]
+   ],
+   [
+    [
+     6.0,
+     -0.6
+    ],
+    [
+     6.0,
+     -0.8
+    ]
+   ],
+   [
+    [
+     3.0,
+     5.6
+    ],
+    [
+     4.5,
+     5.6
+    ]
+   ],
+   [
+    [
+     4.5,
+     5.6
+    ],
+    [
+     6.0,
+     5.6
+    ]
+   ],
+   [
+    [
+     6.0,
+     5.6
+    ],
+    [
+     7.5,
+     5.6
+    ],
+    [
+     7.5,
+     5.2
+    ]
+   ],
+   [
+    [
+     7.5,
+     4.0
+    ],
+    [
+     7.5,
+     2.4
+    ]
+   ],
+   [
+    [
+     7.5,
+     1.2
+    ],
+    [
+     7.5,
+     -0.8
+    ],
+    [
+     6.0,
+     -0.8
+    ]
+   ],
+   [
+    [
+     6.0,
+     -0.8
+    ],
+    [
+     4.5,
+     -0.8
+    ]
+   ],
+   [
+    [
+     4.5,
+     -0.8
+    ],
+    [
+     3.0,
+     -0.8
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    3.0,
+    2.4
+   ],
+   [
+    3.0,
+    0.8
+   ],
+   [
+    4.5,
+    0.8
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "Va.a": "N",
+   "Vb.a": "N",
+   "Vc.a": "N",
+   "Va.b": "A",
+   "D1.a": "A",
+   "D4.b": "A",
+   "Vb.b": "B",
+   "D3.a": "B",
+   "D6.b": "B",
+   "Vc.b": "C",
+   "D5.a": "C",
+   "D2.b": "C",
+   "D1.b": "P",
+   "D3.b": "P",
+   "D5.b": "P",
+   "Ld.a": "P",
+   "Ld.b": "M",
+   "Rd.a": "M",
+   "D4.a": "NEG",
+   "D6.a": "NEG",
+   "D2.a": "NEG",
+   "Rd.b": "NEG"
+  },
+  "modes": [
+   {
+    "name": "Sector 1",
+    "on": [
+     "D1",
+     "D6"
+    ],
+    "loops": [
+     [
+      "Va",
+      "D1",
+      "Ld",
+      "Rd",
+      "D6",
+      "Vb"
+     ]
+    ],
+    "caption": "Sector 1",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   },
+   {
+    "name": "Sector 2",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Va",
+      "D1",
+      "Ld",
+      "Rd",
+      "D2",
+      "Vc"
+     ]
+    ],
+    "caption": "Sector 2",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   },
+   {
+    "name": "Sector 3",
+    "on": [
+     "D3",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vb",
+      "D3",
+      "Ld",
+      "Rd",
+      "D2",
+      "Vc"
+     ]
+    ],
+    "caption": "Sector 3",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   },
+   {
+    "name": "Sector 4",
+    "on": [
+     "D3",
+     "D4"
+    ],
+    "loops": [
+     [
+      "Vb",
+      "D3",
+      "Ld",
+      "Rd",
+      "D4",
+      "Va"
+     ]
+    ],
+    "caption": "Sector 4",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   },
+   {
+    "name": "Sector 5",
+    "on": [
+     "D5",
+     "D4"
+    ],
+    "loops": [
+     [
+      "Vc",
+      "D5",
+      "Ld",
+      "Rd",
+      "D4",
+      "Va"
+     ]
+    ],
+    "caption": "Sector 5",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   },
+   {
+    "name": "Sector 6",
+    "on": [
+     "D5",
+     "D6"
+    ],
+    "loops": [
+     [
+      "Vc",
+      "D5",
+      "Ld",
+      "Rd",
+      "D6",
+      "Vb"
+     ]
+    ],
+    "caption": "Sector 6",
+    "condition": "Ideal commutation, zero source inductance, continuous DC current"
+   }
+  ],
+  "simulation": {
+   "version": 1,
+   "ground": "Va.a",
+   "components": {
+    "Va": {
+     "dc": "0",
+     "wave": {
+      "kind": "sine",
+      "offset": "0",
+      "amplitude": "100",
+      "frequency": "50",
+      "delay": "0",
+      "phase": "0"
+     }
+    },
+    "Vb": {
+     "dc": "0",
+     "wave": {
+      "kind": "sine",
+      "offset": "0",
+      "amplitude": "100",
+      "frequency": "50",
+      "delay": "0",
+      "phase": "-120"
+     }
+    },
+    "Vc": {
+     "dc": "0",
+     "wave": {
+      "kind": "sine",
+      "offset": "0",
+      "amplitude": "100",
+      "frequency": "50",
+      "delay": "0",
+      "phase": "120"
+     }
+    },
+    "Ld": {
+     "value": "100m",
+     "initial": "0"
+    },
+    "Rd": {
+     "value": "10"
+    },
+    "D1": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    },
+    "D2": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    },
+    "D3": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    },
+    "D4": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    },
+    "D5": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    },
+    "D6": {
+     "model": "generic_diode",
+     "is": "1n",
+     "n": "1",
+     "rs": "0.01"
+    }
+   },
+   "transient": {
+    "step": "10u",
+    "max_step": "10u",
+    "stop": "100m"
+   },
+   "probes": [
+    {
+     "name": "v_d",
+     "kind": "voltage",
+     "positive": "D1.b",
+     "negative": "D4.a"
+    },
+    {
+     "name": "i_d",
+     "kind": "current",
+     "element": "Ld"
+    },
+    {
+     "name": "i_a",
+     "kind": "current",
+     "element": "Va"
+    },
+    {
+     "name": "i_D1",
+     "kind": "current",
+     "element": "D1"
+    }
+   ]
+  }
+ }
+}

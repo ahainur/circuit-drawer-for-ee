@@ -1,0 +1,244 @@
+{
+ "title": "Diode bridge",
+ "symbol": "acdc",
+ "layout": {
+  "name": "fb_diode_rectifier",
+  "elements": [
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.0,
+      3.0
+     ],
+     "b": [
+      2.0,
+      4.5
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.0,
+      0.0
+     ],
+     "b": [
+      2.0,
+      1.5
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D3",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.0,
+      3.0
+     ],
+     "b": [
+      4.0,
+      4.5
+     ]
+    },
+    "label": "$D_3$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D4",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.0,
+      0.0
+     ],
+     "b": [
+      4.0,
+      1.5
+     ]
+    },
+    "label": "$D_4$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_A",
+    "kind": "port",
+    "pins": {
+     "p": [
+      0.0,
+      3.5
+     ]
+    },
+    "label": "$A$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_B",
+    "kind": "port",
+    "pins": {
+     "p": [
+      0.0,
+      1.5
+     ]
+    },
+    "label": "$B$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_OP",
+    "kind": "port",
+    "pins": {
+     "p": [
+      6.0,
+      4.5
+     ]
+    },
+    "label": "$OP$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_ON",
+    "kind": "port",
+    "pins": {
+     "p": [
+      6.0,
+      0.0
+     ]
+    },
+    "label": "$ON$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     2.0,
+     1.5
+    ],
+    [
+     2.0,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.0,
+     1.5
+    ],
+    [
+     4.0,
+     3.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     3.5
+    ],
+    [
+     1.0,
+     3.5
+    ],
+    [
+     1.0,
+     2.7
+    ],
+    [
+     2.0,
+     2.7
+    ]
+   ],
+   [
+    [
+     0.0,
+     1.5
+    ],
+    [
+     1.0,
+     1.5
+    ],
+    [
+     1.0,
+     2.0
+    ],
+    [
+     4.0,
+     2.0
+    ]
+   ],
+   [
+    [
+     2.0,
+     4.5
+    ],
+    [
+     6.0,
+     4.5
+    ]
+   ],
+   [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     6.0,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.0,
+    2.0
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "D1.a": "A",
+   "D1.b": "DCP",
+   "D2.a": "DCN",
+   "D2.b": "A",
+   "D3.a": "B",
+   "D3.b": "DCP",
+   "D4.a": "DCN",
+   "D4.b": "B",
+   "Port_A.p": "A",
+   "Port_B.p": "B",
+   "Port_OP.p": "DCP",
+   "Port_ON.p": "DCN"
+  }
+ },
+ "ports": {
+  "A": "Port_A.p",
+  "B": "Port_B.p",
+  "OP": "Port_OP.p",
+  "ON": "Port_ON.p"
+ },
+ "port_layout": {
+  "A": {
+   "side": "left",
+   "order": 0
+  },
+  "B": {
+   "side": "left",
+   "order": 1
+  },
+  "OP": {
+   "side": "right",
+   "order": 2
+  },
+  "ON": {
+   "side": "right",
+   "order": 3
+  }
+ }
+}

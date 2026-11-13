@@ -20,12 +20,12 @@ from .validate import Report, extent
 from .glyphs import glyphs, tikz as glyph_tikz
 from .blocks import Block, fill_rgb as block_fill, safe_blocks
 from .source_waves import symbols as wave_symbols
-from .geometry import symbol_kind, wave_symbol
+from .geometry import body_diode_visible, symbol_kind, wave_symbol
 
 HOP_R = 0.12        # cm
 
 CTIKZ_KIND = {"R": "R", "L": "L", "C": "C", "D": "D", "scr": "Ty", "V": "V", "vac": "sV", "I": "american current source",
-              "battery": "battery1", "zener": "zD"}
+              "battery": "battery1", "zener": "zD", "R_ic": "american resistor"}
 
 
 def _n(v: float) -> str:
@@ -67,7 +67,7 @@ def _texts(layout: Layout) -> list[str]:
 
 
 def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
-         paint=None, mono: bool = False, node_labels: bool = False) -> str:
+         paint=None, mono: bool = False, node_labels: bool = False, *, base_dir=None) -> str:
     """``grid`` overlays the layout-unit coordinate grid, for editing only.
     ``paint`` (a modes.Paint) restyles one operating mode: lit parts heavy and
     coloured, the rest grey, plus current arrows.  Coordinates do not change.
@@ -82,9 +82,14 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
         layout = assembly.view
     s = report.scale
     mono = mono or bool(paint is not None and paint.style.mono)
-    cjk = any(has_wide(t) for t in _texts(layout))
+    from .control_view import prepare as prepare_control_view, texts as control_texts
+    control_view = prepare_control_view(layout, prof, s, base_dir)
+    cjk = any(has_wide(t) for t in _texts(layout) + control_texts(control_view))
     regions, callouts = safe_regions(layout, s, prof)
     out: list[str] = [preamble(prof, cjk)]
+    if control_view and control_view.display == "expanded":
+        out[0] = out[0].replace(r"\usepackage{circuitikz}",
+                                "\\usepackage{circuitikz}\n\\usetikzlibrary{arrows.meta}")
     out.append(f"% {layout.name}: coordinates are layout units, 1 unit = "
                f"{_n(s.x)} cm across and {_n(s.y)} cm up ({prof.name})\n")
     out.append(rf"\begin{{circuitikz}}[x={_n(s.x)}cm, y={_n(s.y)}cm, "
@@ -94,12 +99,15 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
         out.append(_grid(layout, prof, s))
     if regions or any(c.style == "block" and not c.foreground for c in callouts):
         out.append("% ---- regions (background) ----\n")
-        out += [_region(r, s, prof, mono) for r in regions]
+        out += [_region(r, s, prof, mono, paint.region(r.id) if paint else "") for r in regions]
         out += [_callout(c, s, prof, mono) for c in callouts if c.style == "block" and not c.foreground]
     blocks = safe_blocks(layout)
     if blocks:
         out.append("% ---- function blocks (not electrical) ----\n")
-        out += [_block(b, s, prof, mono) for b in blocks]
+        for b in blocks:
+            content = (control_view.tikz(s, mono) if control_view and control_view.block.id == b.id
+                       and control_view.display == "expanded" else None)
+            out.append(_block(b, s, prof, mono, content))
     out.append("% ---- wires ----\n")
     arcs: list[str] = []
     carriers = _hop_carriers(layout)
@@ -124,15 +132,17 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
             out.append(_split_switch(el, s, prof, paint))
         else:
             out.append("\\begin{scope}[" + paint.element(el.id) + "]\n"
-                       + _element(el, s, prof, ink=paint.ink) + "\\end{scope}\n")
+                       + _element(el, s, prof, ink=paint.ink,
+                                  conducting_diode=el.kind in SWITCHES and paint.switch(el.id) == "both")
+                       + "\\end{scope}\n")
     if layout.annotations:
         out.append("% ---- annotations ----\n")
         for a in layout.annotations:
             out.append(_annotation(a, prof, mono))
     if glyphs(layout):
         out.append("% ---- block function marks (not electrical) ----\n")
-        for g in glyphs(layout):
-            out.append(glyph_tikz(g))
+        for i, g in enumerate(glyphs(layout)):
+            out.append(glyph_tikz(g, paint.glyph(i) if paint else "black"))
     for w in wave_symbols(layout):
         if w is not None:
             points, box = wave_symbol(scaled(w["at"], s), w["wave"], w["scale"])
@@ -197,7 +207,7 @@ def _label_node(box, text: str, size, s: Scale, prof: Profile) -> str:
     return rf"\node[inner sep=0pt] at {_p(at)} {{{sized(text, pt)}}};" "\n"
 
 
-def _region(r: Region, s: Scale, prof: Profile, mono: bool) -> str:
+def _region(r: Region, s: Scale, prof: Profile, mono: bool, mode_style: str = "") -> str:
     """Panels behind first (farthest back first), then the front one."""
     lines = []
     width = f"line width={_n(prof.line_pt * 0.8)}pt"
@@ -214,6 +224,8 @@ def _region(r: Region, s: Scale, prof: Profile, mono: bool) -> str:
     if r.border != "none":
         edge = r.border_color or (r.fill if r.fill != "none" else "gray")
         opts.append(f"draw={tikz_rgb(edge, mono, edge=True)}, {width}{BORDER_STYLE[r.border]}")
+        if mode_style:
+            opts.append(mode_style)
     cmd = "\\filldraw" if r.fill != "none" and r.border != "none" else (
         "\\fill" if r.fill != "none" else "\\draw")
     lines.append(rf"{cmd}[{', '.join(opts)}] {_p((x0, y0))} rectangle {_p((x1, y1))};")
@@ -224,7 +236,7 @@ def _region(r: Region, s: Scale, prof: Profile, mono: bool) -> str:
     return out
 
 
-def _block(b: Block, s: Scale, prof: Profile, mono: bool) -> str:
+def _block(b: Block, s: Scale, prof: Profile, mono: bool, content: str | None = None) -> str:
     """A function block: box in the circuit's line width, centred text."""
     ink = "{rgb,255:red,%d;green,%d;blue,%d}" % ink_rgb(b.color, mono)
     fill = block_fill(b, mono)
@@ -233,6 +245,10 @@ def _block(b: Block, s: Scale, prof: Profile, mono: bool) -> str:
         opts.insert(0, "fill={rgb,255:red,%d;green,%d;blue,%d}" % fill)
     out = (rf"\{'filldraw' if fill is not None else 'draw'}[{', '.join(opts)}] "
            rf"{_p((b.x0, b.y0))} rectangle {_p((b.x1, b.y1))};" "\n")
+    if content is not None:
+        return out + content
+    if b.icon:
+        out += glyph_tikz({"kind": b.icon, "from": [b.x0, b.y0], "to": [b.x1, b.y1]}, f"color={ink}")
     box = block_text_box(b, s, prof)
     if box is not None:
         text = b.text if mono or b.color == "black" else \
@@ -358,11 +374,11 @@ def _wire(w: list[Point], hops: list[Point], s: Scale, arcs: list[str],
 
 
 def _element(el: Element, s: Scale, prof: Profile, parts: dict | None = None,
-             ink: str | None = None) -> str:
+             ink: str | None = None, conducting_diode: bool = False) -> str:
     """``parts`` styles the windings and core of a transformer separately and
     ``ink`` keeps labels in that colour when the symbol itself is restyled."""
     z, width = axis_sizes(el)
-    body = _element_body(el, s, prof, parts, ink)
+    body = _element_body(el, s, prof, parts, ink, conducting_diode)
     if el.opts.get("dash", "solid") != "solid":
         body = "\\begin{scope}[" + el.opts["dash"] + "]\n" + body + "\\end{scope}\n"
     if abs(z - 1) < 1e-9 or el.kind in ("transformer", "pmsm"):
@@ -407,7 +423,8 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
         width = -width                  # the gate lead on the other side of the path
     stretched = abs(length - width) > 1e-9
     # a thyristor's label sits where the validator put it, clear of the gate lead
-    own_label = el.label and fp.labels and (stretched or "diag" in fp.extra or el.kind == "scr" or "label_offset" in fp.extra)
+    zigzag = "resistor_path" in fp.extra
+    own_label = el.label and fp.labels and (zigzag or stretched or "diag" in fp.extra or el.kind == "scr" or "label_offset" in fp.extra)
     a, b = el.pins["a"], el.pins["b"]
     side = fp.label_side
     if el.kind == "V":
@@ -417,7 +434,9 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
         side = "_" if side == "^" else "^"
     current = (f"i>{el.opts.get('current_side', '^')}={el.opts['current']}"
                if el.opts.get("current") else None)
-    if stretched:
+    if zigzag:
+        line = _wave_path(fp.extra["resistor_path"], s)
+    elif stretched:
         # the local frame would stretch text too: the arrow rides an open path
         line = _bipole_path(CTIKZ_KIND[symbol_kind(el)], a, b, s, prof, length, width,
                             invert=bool(el.opts.get("invert")))
@@ -434,7 +453,7 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
         box = fp.labels[0]
         at = unscaled(((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2), s)
         line += rf"\node at {_p(at)} {{{el.label}}};" "\n"
-    if stretched and current:
+    if (stretched or zigzag) and current:
         line += rf"\draw {_p(a)} to[open, {current}] {_p(b)};" "\n"
     if "source_wave" in fp.extra:
         line += _wave_path(fp.extra["source_wave"]["points"], s)
@@ -474,7 +493,7 @@ def _wave_path(points, s: Scale, color: str | None = None) -> str:
 
 
 def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = None,
-                  ink: str | None = None) -> str:
+                  ink: str | None = None, conducting_diode: bool = False) -> str:
     fp = footprint(el, s, prof)
     if ink:
         def inked(t):
@@ -511,7 +530,9 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
         top, bot = ("s", "d") if el.kind == "pmos" else PIN_NAMES[el.kind]
         anchors = (top.upper(), bot.upper())
         shape = "nigbt" if el.kind == "igbt" else el.kind
-        diode = ",bodydiode" if el.opts.get("diode", True) else ""
+        diode = ",bodydiode" if body_diode_visible(el, conducting_diode) else ""
+        if el.opts.get("symbol_style") == "ic":
+            shape += ",noarrowmos" + (",emptycircle" if el.kind == "pmos" else "")
         c = unscaled(fp.centre, s)
         u, side = fp.extra["u"], fp.extra["side"]
         length, width = axis_sizes(el)
@@ -553,6 +574,10 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
         halves = ["s1", "s2"] if len(sec) == 3 else ["s1"]
         for (a, b), h in zip(zip(sec, sec[1:]), halves):
             lines.append(_bipole_path("L", b, a, s, prof, length, width, st(h)))
+        # extra windings face the core like the winding whose axis they share
+        for name, top, bot, side in ex["extra_coils"]:
+            a, b = (u(top), u(bot)) if side == "p" else (u(bot), u(top))
+            lines.append(_bipole_path("L", a, b, s, prof, length, width, st(name)))
         for a, b in ex["core_lines"]:
             lines.append(rf"\draw{st('core')} {_p(u(a))} -- {_p(u(b))};")
         for dot in ex.get("dots", []):
@@ -590,7 +615,7 @@ def _split_switch(el: Element, s: Scale, prof: Profile, paint) -> str:
     hole = (rf"\clip {pt(-big, -big)} -- {pt(big, -big)} -- {pt(big, big)} -- "
             rf"{pt(-big, big)} -- cycle {pt(a0, b0)} -- {pt(a0, b1)} -- {pt(a1, b1)} -- "
             rf"{pt(a1, b0)} -- cycle;" "\n")
-    body = _element(el, s, prof, ink=paint.ink)
+    body = _element(el, s, prof, ink=paint.ink, conducting_diode=paint.switch(el.id) == "diode")
     return ("\\begin{scope}[" + paint.off + "]\n" + body + "\\end{scope}\n"
             # the grey copy already fixes the bounding box; the big clip must not
             + "\\begin{pgfinterruptboundingbox}\\begin{scope}\n" + hole

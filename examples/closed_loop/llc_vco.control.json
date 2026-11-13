@@ -1,0 +1,209 @@
+{
+  "kind": "control",
+  "name": "llc_vco",
+  "title": "全桥 LLC：电压 PI 反馈，输出频率 Hz",
+  "profile": "ieee-double",
+  "blocks": [
+    {
+      "id": "ref",
+      "type": "tag",
+      "style": "ref",
+      "at": [
+        0.75,
+        0
+      ],
+      "size": [
+        1.0,
+        0.5
+      ],
+      "text": "$V_{\\mathrm{ref}}$"
+    },
+    {
+      "id": "e1",
+      "type": "sum",
+      "at": [
+        2.0,
+        0
+      ],
+      "signs": {
+        "w": "+",
+        "s": "-"
+      }
+    },
+    {
+      "id": "gc",
+      "type": "block",
+      "at": [
+        3.7,
+        0
+      ],
+      "size": [
+        2.0,
+        0.8
+      ],
+      "text": "$-(K_p+K_i/s)$",
+      "label": "PI (Hz/V)",
+      "label_pos": "above"
+    },
+    {
+      "id": "pwm",
+      "type": "sum",
+      "at": [
+        5.8,
+        0
+      ],
+      "signs": {
+        "w": "+",
+        "n": "+"
+      }
+    },
+    {
+      "id": "plant",
+      "type": "block",
+      "at": [
+        8.1,
+        0
+      ],
+      "size": [
+        1.6,
+        0.8
+      ],
+      "text": "LLC",
+      "label": "External power stage",
+      "label_pos": "above"
+    },
+    {
+      "id": "h",
+      "type": "block",
+      "at": [
+        5.8,
+        -1.3
+      ],
+      "size": [
+        1.0,
+        0.6
+      ],
+      "text": "$1$",
+      "label": "Voltage feedback",
+      "label_pos": "below"
+    },
+    {
+      "id": "bias",
+      "type": "tag",
+      "style": "ref",
+      "at": [
+        5.8,
+        1.7
+      ],
+      "size": [
+        1.2,
+        0.5
+      ],
+      "text": "$f_{max}$"
+    }
+  ],
+  "links": [
+    {
+      "from": "ref.e",
+      "to": "e1.w"
+    },
+    {
+      "from": "e1.e",
+      "to": "gc.w",
+      "label": "$v_{e}$"
+    },
+    {
+      "from": "gc.e",
+      "to": "pwm.w",
+      "label": "$v_{c}$"
+    },
+    {
+      "from": "pwm.e",
+      "to": "plant.w",
+      "label": "$f_s$"
+    },
+    {
+      "from": "plant.e",
+      "to": [
+        10.6,
+        0
+      ],
+      "open": true
+    },
+    {
+      "from": [
+        9.6,
+        0
+      ],
+      "via": [
+        [
+          9.6,
+          -1.3
+        ]
+      ],
+      "to": "h.e"
+    },
+    {
+      "from": "h.w",
+      "via": [
+        [
+          2.0,
+          -1.3
+        ]
+      ],
+      "to": "e1.s"
+    },
+    {
+      "from": "bias.s",
+      "to": "pwm.n"
+    }
+  ],
+  "texts": [
+    {
+      "at": [
+        10.68,
+        0
+      ],
+      "text": "$v_{o}$",
+      "anchor": "west"
+    }
+  ],
+  "regions": [],
+  "loop": {
+    "params": {
+      "Kp": 20000,
+      "Ki": 50000000.0,
+      "Fmax": 240000.0,
+      "Fmin": 110000.0
+    },
+    "tf": {
+      "gc": {
+        "pi": {
+          "kp": "-Kp",
+          "ki": "-Ki"
+        }
+      },
+      "h": {
+        "gain": 1
+      }
+    }
+  },
+  "code": {
+    "fs": 300000.0,
+    "method": "tustin",
+    "arith": "float",
+    "external": [
+      "plant"
+    ],
+    "blocks": {
+      "gc": {
+        "min": "Fmin-Fmax",
+        "max": 0
+      },
+      "pwm": {
+        "min": "Fmin",
+        "max": "Fmax"
+      }
+    }
+  }
+}

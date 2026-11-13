@@ -425,7 +425,7 @@ def _place_transformer(out: Plan, eid, pins, parts, pin_nodes, terminal, sensors
         return set()
     px = {pin: out.pins[f"{eid}.{pin}"] for pin in pins}
     prim = [px["p1"], px["p2"]]
-    sec = [px[k] for k in ("s1", "s2", "sct") if k in px]
+    sec = [px[k] for k in ("s1", "s2", "sct") if k in px]   # extra windings w3..w6 stay in px only
     cx = (sum(x for x, _ in prim) / 2 + sum(x for x, _ in sec) / len(sec)) / 2
     cy = (sum(y for _, y in prim + sec)) / len(prim + sec)
     side = (sum(x for x, _ in prim) / 2 - sum(x for x, _ in sec) / len(sec),

@@ -1,0 +1,358 @@
+{
+ "name": "four_switch_buck_boost",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.0
+    ]
+   },
+   "label": "$V_{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     4.0
+    ],
+    "s": [
+     2.2,
+     4.0
+    ]
+   },
+   "label": "$S_1$",
+   "label_pos": "below"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.6,
+     3.0
+    ],
+    "s": [
+     2.6,
+     1.0
+    ]
+   },
+   "label": "$S_2$",
+   "label_pos": "left"
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     3.0,
+     4.0
+    ],
+    "b": [
+     4.4,
+     4.0
+    ]
+   },
+   "label": "$L_1$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     4.8,
+     3.0
+    ],
+    "s": [
+     4.8,
+     1.0
+    ]
+   },
+   "label": "$S_4$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     6.4,
+     4.0
+    ],
+    "s": [
+     5.2,
+     4.0
+    ]
+   },
+   "label": "$S_3$",
+   "label_pos": "below"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     6.8,
+     4.0
+    ],
+    "b": [
+     6.8,
+     0.0
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     8.0,
+     4.0
+    ],
+    "b": [
+     8.0,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    4.0
+   ],
+   [
+    1.0,
+    4.0
+   ]
+  ],
+  [
+   [
+    2.2,
+    4.0
+   ],
+   [
+    3.0,
+    4.0
+   ]
+  ],
+  [
+   [
+    2.6,
+    4.0
+   ],
+   [
+    2.6,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.6,
+    1.0
+   ],
+   [
+    2.6,
+    0.0
+   ]
+  ],
+  [
+   [
+    4.4,
+    4.0
+   ],
+   [
+    5.2,
+    4.0
+   ]
+  ],
+  [
+   [
+    4.8,
+    4.0
+   ],
+   [
+    4.8,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.8,
+    1.0
+   ],
+   [
+    4.8,
+    0.0
+   ]
+  ],
+  [
+   [
+    6.4,
+    4.0
+   ],
+   [
+    6.8,
+    4.0
+   ]
+  ],
+  [
+   [
+    6.8,
+    4.0
+   ],
+   [
+    8.0,
+    4.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    8.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    9.6,
+    2.0
+   ],
+   "text": "$v_o>0$"
+  }
+ ],
+ "netlist": {
+  "Vin.a": "GND",
+  "Vin.b": "IN",
+  "S1.d": "IN",
+  "S1.s": "A",
+  "S2.d": "A",
+  "S2.s": "GND",
+  "L1.a": "A",
+  "L1.b": "B",
+  "S4.d": "B",
+  "S4.s": "GND",
+  "S3.d": "OUT",
+  "S3.s": "B",
+  "Co.a": "OUT",
+  "Co.b": "GND",
+  "RL.a": "OUT",
+  "RL.b": "GND"
+ },
+ "modes": [
+  {
+   "name": "Charge",
+   "on": [
+    "S1",
+    "S4"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L1",
+     "S4"
+    ],
+    [
+     "RL",
+     "Co"
+    ]
+   ],
+   "caption": "Charge",
+   "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+  },
+  {
+   "name": "Transfer",
+   "on": [
+    "S2",
+    "S3"
+   ],
+   "loops": [
+    [
+     "S2",
+     "L1",
+     "S3",
+     "Co|RL"
+    ]
+   ],
+   "caption": "Transfer",
+   "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+  }
+ ],
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/four_switch_buck_boost.csv",
+  "sha256": "587665cfe15815347092706966e5884dcf54f58f627b4ea52236cc66b384cce9",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "us",
+  "relative_time": true,
+  "slice_style": "shade",
+  "arrange": "grid",
+  "window": [
+   0,
+   2e-05
+  ],
+  "boundaries": [
+   0.0,
+   8.000000000000001e-06,
+   2e-05
+  ],
+  "intervals": [
+   "Charge",
+   "Transfer"
+  ],
+  "channels": [
+   {
+    "column": "g1_1",
+    "label": "g1",
+    "unit": "1",
+    "color": "#c8102e"
+   },
+   {
+    "column": "v_L1_V",
+    "label": "v_L1",
+    "unit": "V",
+    "color": "#2457d6"
+   },
+   {
+    "column": "i_L1_A",
+    "label": "i_L1",
+    "unit": "A",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "d19604f8582b08528df0606e8bf56d4a342aec4fbe87aeb9ac46f2f0ce95ee91",
+  "notes": [
+   {
+    "kind": "text",
+    "channel": "g1_1",
+    "at": [
+     1.4e-05,
+     0.65
+    ],
+    "text": "Ideal analytical reference"
+   }
+  ]
+ }
+}

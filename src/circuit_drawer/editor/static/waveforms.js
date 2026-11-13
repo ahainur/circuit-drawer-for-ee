@@ -10,10 +10,10 @@
   const CM=40; // SVG user units per paper cm; the viewport scales uniformly.
   panel.innerHTML = `<div class="wave-toolbar"><strong>波形与模态</strong>
     <button id="waveImport">导入 CSV…</button>
-    <span class="wave-tools" title="在波形上加文字、箭头和关键点圆圈；导出时一起出图">标注
-    <button id="waveNote_text">文字</button><button id="waveNote_arrow">箭头</button><button id="waveNote_dot">关键点</button>
-    <button id="waveNoteDelete" disabled>删除所选</button></span><button id="waveSave">保存对应关系</button>
-    <button id="waveUndo">撤销</button><button id="waveTruePreview">真实出图预览</button>
+    <span class="wave-tools" title="在波形上加文字、箭头、关键点圆圈和区间尺寸线；导出时一起出图">标注
+    <button id="waveNote_text">文字</button><button id="waveNote_arrow">箭头</button><button id="waveNote_dot">关键点</button><button id="waveNote_dimension">区间尺寸线</button>
+    <button id="waveNoteDelete" disabled>删除所选</button></span><button id="waveAI" disabled>AI 标注…</button><button id="waveSave">保存对应关系</button>
+    <button id="waveUndo">撤销</button><button id="waveTruePreview">真实出图预览</button><button id="waveXY" disabled>XY / 状态平面…</button>
     <button id="waveExport" class="primary">导出波形与模态…</button><button id="waveClose">收起</button></div>
     <div class="wave-paper-toolbar"><label>纸面尺寸 <select id="wavePaperTarget"><option value="overview">总览中的波形</option><option value="standalone">独立波形图</option></select></label>
     <label>查看比例 <select id="waveViewZoom"><option value="fit">适合画布</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
@@ -67,6 +67,88 @@
     if(info) {try {const r=await request("/api/waveform-view",layout.waveform);if(id===revision) installed(r,false);} catch(e) {if(id===revision) note(e.message,true);}}
   };
   $("waveViewZoom").onchange=()=>{viewZoom=$("waveViewZoom").value;draw();};
+  $("waveAI").onclick=()=> {
+    if(!info) return;
+    showDialog("波形 AI 标注", `<div id="waveAIForm">
+      <label class="wave-note-text">标注需求<textarea id="waveAIDescription" rows="3" placeholder="例如，在 i_L 峰值标 $I_{L,max}$，在上升段画箭头标 $V_{in}/L$。"></textarea></label>
+      <p class="hint">使用当前 AI 设置。发送所选通道各区间的候选点摘要，生成后可预览并采用。</p>
+      <div class="wave-row"><button id="waveAIGenerate" class="primary">生成标注</button><button id="waveAICancel" disabled>取消生成</button><button id="waveAIApply" disabled>采用标注</button></div>
+      <p id="waveAIState" role="status" aria-live="polite"></p>
+      <div id="waveAIResult" hidden><svg id="waveAIChart" role="img" aria-label="AI 标注预览"></svg></div></div>`);
+    const host=$("waveAIForm"), dialog=$("dlg"), state=$("waveAIState"), description=$("waveAIDescription");
+    let jobId=null, serial=0, snapshot=null, proposal=null;
+    const current=()=>JSON.stringify({waveform:layout?.waveform,modes:layout?.modes?.map(m=>m.name),profile,target:previewTarget});
+    const present=ticket=>ticket===serial && host.isConnected && dialog.open;
+    const cancelRequest=id=>api("/api/cancel",{id}).catch(()=>{});
+    function busy(value) {
+      description.disabled=$("waveAIGenerate").disabled=value;
+      $("waveAICancel").disabled=!value;
+    }
+    function discard() {
+      proposal=null;$("waveAIApply").disabled=true;$("waveAIResult").hidden=true;
+    }
+    function showError(error) {
+      discard();state.className="bad";state.replaceChildren();
+      for(const message of new Set(error.message.split("\n"))) {
+        const line=document.createElement("span");
+        line.textContent=message.replace(/^bad-json: /,"");state.append(line);
+      }
+    }
+    function cancel() {
+      serial++;
+      if(jobId) cancelRequest(jobId);
+      jobId=null;
+    }
+    dialog.addEventListener("close",cancel,{once:true});
+    $("waveAICancel").onclick=()=> {cancel();discard();busy(false);state.textContent="已取消。";};
+    description.oninput=()=> {discard();state.textContent="";};
+    $("waveAIGenerate").onclick=async()=> {
+      const text=description.value.trim();
+      if(!text) {state.className="bad";state.textContent="请填写波形标注需求。";return;}
+      const ticket=++serial;
+      jobId=null;snapshot=current();discard();busy(true);
+      state.className="hint";state.textContent="正在生成波形标注…";
+      try {
+        let job=await request("/api/waveform-ai",layout.waveform,{description:text});
+        if(!present(ticket)) {await cancelRequest(job.id);return;}
+        jobId=job.id;
+        while(job.state==="running") {
+          await new Promise(resolve=>setTimeout(resolve,350));
+          if(!present(ticket)) return;
+          job=await api("/api/job/"+jobId);
+        }
+        if(!present(ticket)) return;
+        if(job.state==="cancelled") {state.textContent="已取消。";return;}
+        if(job.state==="error") throw new Error(job.error);
+        if(!job.result?.ok) throw new Error("未能生成有效标注，请调整描述后重试。\n"+(job.result?.rounds || []).flatMap(r=>r.errors || []).join("\n"));
+        if(current()!==snapshot) throw new Error("波形设置或标注已改变，请重新生成 AI 标注。");
+        if(!job.result.proposal.notes.length) {state.textContent="没有找到符合要求的标注，请调整描述。";return;}
+        const result=await request("/api/waveform-ai-preview",layout.waveform,{id:jobId});
+        if(!present(ticket)) return;
+        if(current()!==snapshot) throw new Error("波形设置或标注已改变，请重新生成 AI 标注。");
+        proposal=result;$("waveAIResult").hidden=false;
+        draw(result.config,$("waveAIChart"));
+        $("waveAIApply").disabled=false;
+        state.textContent="请核对预览，点击“采用标注”后追加，可撤销。";
+      } catch(e) {
+        if(present(ticket)) showError(e);
+      } finally {if(present(ticket)) busy(false);}
+    };
+    $("waveAIApply").onclick=async()=> {
+      if(!proposal || $("waveAIApply").disabled) return;
+      const ticket=serial;
+      $("waveAIApply").disabled=true;busy(true);
+      try {
+        if(current()!==snapshot) throw new Error("波形设置或标注已改变，请重新生成 AI 标注。");
+        const result=await request("/api/waveform-ai-preview",layout.waveform,{id:jobId});
+        if(!present(ticket)) return;
+        if(current()!==snapshot) throw new Error("波形设置或标注已改变，请重新生成 AI 标注。");
+        proposal=null;++revision;setTool(null);installed(result);dialog.close();
+      } catch(e) {
+        if(present(ticket)) showError(e);
+      } finally {if(present(ticket)) busy(false);}
+    };
+  };
   $("waveTruePreview").onclick=async()=> {
     const button=$("waveTruePreview");button.disabled=true;note("正在按导出设置编译波形…");
     const snapshot=JSON.stringify(layout.waveform), target=previewTarget, savedProfile=profile;
@@ -120,7 +202,7 @@
 
   function controls() {
     const cfg=layout.waveform;
-    $("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=!info;
+    $("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=$("waveAI").disabled=$("waveXY").disabled=!info;
     if(!info) {$("waveSettings").textContent="导入 CSV 后，可选通道、时间范围和对应模态。";return;}
     const factor=units[cfg.display_unit];
     const number=t=>Number((t/factor).toPrecision(12));
@@ -151,8 +233,10 @@
         return `<div class="wave-channel" data-column="${esc(column)}"><input type="checkbox" ${cfg.channels.some(c=>c.column===column)?'checked':''} aria-label="显示 ${esc(column)}">
         <input type="text" data-field="label" value="${esc(c.label)}" aria-label="${esc(column)} 标签">
         <input type="text" data-field="unit" value="${esc(c.unit)}" aria-label="${esc(column)} 单位">
-        <input type="color" value="${esc(c.color)}" aria-label="${esc(column)} 颜色"><small>${esc(column)}</small></div>`;
-      }).join('')}</div><button id="waveApplyChannels">应用通道设置</button></details>`;
+        <input type="color" value="${esc(c.color)}" aria-label="${esc(column)} 颜色"><small>${esc(column)}</small>
+        <label style="grid-column:2/-1">纵轴分组 <select data-field="axis_group" aria-label="${esc(column)} 纵轴分组"><option value="">独立纵轴</option>
+        ${[...new Set([...Array.from({length:6},(_,k)=>'axis'+(k+1)),...cfg.channels.map(c=>c.axis_group).filter(Boolean)])].map(group=>`<option value="${esc(group)}" ${group===c.axis_group?'selected':''}>${esc(/^axis[1-6]$/.test(group)?'同轴组 '+group.slice(4):group)}</option>`).join('')}</select></label></div>`;
+      }).join('')}</div><p class="hint">单位相同的通道选择相同组号，即可共用纵轴叠加显示。</p><button id="waveApplyChannels">应用通道设置</button></details>`;
     $("waveUnit").onchange=()=>change({...clone(cfg),display_unit:$("waveUnit").value});
     $("waveRelative").onchange=()=>change({...clone(cfg),relative_time:$("waveRelative").checked});
     $("waveRange").onclick=()=>range(Number($("waveStart").value)*factor,Number($("waveEnd").value)*factor);
@@ -193,7 +277,8 @@
     $("waveApplyChannels").onclick=()=> {
       const channels=[...$("waveChannels").children].filter(row=>row.querySelector('[type=checkbox]').checked).map(row=>({
         column:row.dataset.column,label:row.querySelector('[data-field=label]').value,
-        unit:row.querySelector('[data-field=unit]').value,color:row.querySelector('[type=color]').value}));
+        unit:row.querySelector('[data-field=unit]').value,color:row.querySelector('[type=color]').value,
+        ...(row.querySelector('[data-field=axis_group]').value?{axis_group:row.querySelector('[data-field=axis_group]').value}:{})}));
       // Notes on a hidden channel stay in the table and come back with it.
       change({...clone(cfg),channels});
     };
@@ -201,13 +286,13 @@
   function properties() {
     const host=$("waveProperties"), cfg=layout?.waveform, n=cfg?.notes?.[selNote], p=info?.paper;
     if(!p || (!n && !selLabel)) {host.innerHTML='<strong>标注属性</strong><p class="hint">点击文字、箭头、圆圈或 t / Mode 标签进行微调。</p>';return;}
-    const offset=n?(n.offset || (n.kind==='dot'?p.dot_label_offset:[0,0])):(cfg.label_offsets?.[selLabel] || [0,0]);
+    const offset=n?(n.offset || noteOffset(n)):(cfg.label_offsets?.[selLabel] || [0,0]);
     const field=(id,title,value,lo,hi)=>`<label>${title}<input id="${id}" type="number" step="any" min="${lo}" max="${hi}" value="${value}"></label>`;
-    host.innerHTML=`<strong>${n?{text:'文字',arrow:'箭头',dot:'关键点'}[n.kind]:esc(selLabel)}属性</strong>
+    host.innerHTML=`<strong>${n?{text:'文字',arrow:'箭头',dot:'关键点',dimension:'区间尺寸线'}[n.kind]:esc(selLabel)}属性</strong>
       ${n?`<label class="wave-note-text">文字（英文或 $数学$）<textarea id="wavePropText" rows="2" maxlength="120">${esc(n.text || '')}</textarea></label>
       <div class="wave-prop-grid"><label>颜色<input id="wavePropColor" type="color" value="${ink_css(n.color)}"></label>
       ${field('wavePropFont','字号 / pt',n.font_pt || p.font_pt,...p.note_limits.font_pt)}
-      ${n.kind!=='text'?field('wavePropLine','线宽 / pt',n.line_pt || p.line_pt*(n.kind==='arrow'?p.arrow_weight:1),...p.note_limits.line_pt):''}
+      ${n.kind!=='text'?field('wavePropLine','线宽 / pt',n.line_pt || p.line_pt*(['arrow','dimension'].includes(n.kind)?p.arrow_weight:1),...p.note_limits.line_pt):''}
       ${n.kind==='dot'?field('wavePropRadius','圆圈半径 / cm',n.radius_cm || p.radius_cm,...p.note_limits.radius_cm):''}</div>`:''}
       <div class="wave-prop-grid">${field('wavePropDx','文字右移 / cm',offset[0],-p.max_offset_cm,p.max_offset_cm)}
       ${field('wavePropDy','文字上移 / cm',offset[1],-p.max_offset_cm,p.max_offset_cm)}</div>
@@ -239,7 +324,7 @@
     if(selLabel) candidate.label_offsets={...(candidate.label_offsets || {}),[selLabel]:add(candidate.label_offsets?.[selLabel] || [0,0])};
     else {
       const n=candidate.notes[selNote]; if(!n) return;
-      if(selectedPart==='label') n.offset=add(n.offset || (n.kind==='dot'?info.paper.dot_label_offset:[0,0]));
+      if(selectedPart==='label') n.offset=add(n.offset || noteOffset(n));
       else {
         const row=box.rows[n.channel];if(!row) return;
         const dt=dx/info.paper.width_cm*(box.end-box.start), dv=dy/info.paper.row_cm*(row.hi-row.lo);
@@ -300,13 +385,13 @@
     const t=el("text",{x,y,"text-anchor":h,"dominant-baseline":v,"font-size":info.paper.font_pt*info.paper.pt_cm*CM,...attrs},parent);
     t.textContent=plain(text); return t;
   }
-  function draw(candidate=layout?.waveform) {
-    const svg=$("waveChart"); svg.replaceChildren();
+  function draw(candidate=layout?.waveform, svg=$("waveChart")) {
+    svg.replaceChildren();
     $("waveNoteDelete").disabled=selNote===null;
     if(!info || !candidate) {svg.setAttribute("viewBox","0 0 800 200");el("text",{x:30,y:80,fill:"#6b6b70"},svg).textContent="导入 CSV，查看波形并标注模态区间";return;}
     const p=info.paper, width=p.total_width_cm*CM, height=p.total_height_cm*CM;
     const left=p.left_cm*CM, right=left+p.width_cm*CM, top=p.top_cm*CM;
-    const rowHeight=p.row_cm*CM, gap=p.gap_cm*CM, font=p.font_pt*p.pt_cm*CM;
+    const rowHeight=p.row_cm*CM, font=p.font_pt*p.pt_cm*CM;
     svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
     $("wavePaperSize").textContent=`${p.profile==='ieee-single'?'单栏':'双栏'} · ${p.total_width_cm.toFixed(2)} × ${p.total_height_cm.toFixed(2)} cm`;
     const [start,end]=candidate.window, factor=units[candidate.display_unit];
@@ -321,10 +406,16 @@
         if(out.length>=2 || k===0) return out; k--; }
     };
     const origin=candidate.relative_time?start:0, times=ticks((start-origin)/factor,(end-origin)/factor,5);
-    info.channels.forEach((channel,i)=> {
-      const y0=top+i*(rowHeight+gap), [lo,hi]=channel.axis.range;
+    p.rows.forEach((row,i)=> {
+      const channels=row.columns.map(column=>info.channels.find(c=>c.column===column)), channel=channels[0];
+      const y0=top+row.offset_cm*CM, [lo,hi]=channel.axis.range;
       const y=v=>y0+rowHeight-(v-lo)/(hi-lo)*rowHeight;
-      rows[channel.column]={y0,lo,hi,y};
+      const axisRow={y0,lo,hi,y};channels.forEach(c=>rows[c.column]=axisRow);
+      row.legend.forEach(key=> {
+        const lx=left+key.at[0]*CM, ly=y0+rowHeight-key.at[1]*CM;
+        el('line',{x1:lx,y1:ly,x2:lx+p.legend_line_cm*CM,y2:ly,stroke:key.color,'stroke-width':p.line_pt*p.pt_cm*CM},svg);
+        textAt(svg,lx+(p.legend_line_cm+p.legend_gap_cm)*CM,ly,'west',key.text,{'data-legend':true,'pointer-events':'none'});
+      });
       if((candidate.slice_style || 'shade')==='shade') candidate.intervals.forEach((name,j)=> {
         if(j%2===0) el("rect",{x:x(candidate.boundaries[j]),y:y0,width:x(candidate.boundaries[j+1])-x(candidate.boundaries[j]),height:rowHeight,
           fill:"#ededed","pointer-events":"none"},svg);
@@ -333,22 +424,25 @@
         el("line",{x1:left,y1:y(value),x2:right,y2:y(value),stroke:"#e4e4e4","stroke-width":.25*p.pt_cm*CM,"pointer-events":"none"},svg);
         textAt(svg,left-.1*CM,y(value),'east',channel.axis.labels[k],{"pointer-events":"none"});
       });
-      const unit=["","1"].includes(channel.unit)?"":` [${channel.unit}]`, labelX=left-1.05*CM, labelY=y0+rowHeight/2;
-      el("text",{x:labelX,y:labelY,transform:`rotate(-90 ${labelX} ${labelY})`,"text-anchor":"middle","dominant-baseline":"central","font-size":font},svg).textContent=channel.label+unit;
-      const clip=el("clipPath",{id:`waveClip${i}`},el("defs",{},svg));
+      const labelX=left-1.05*CM, labelY=y0+rowHeight/2;
+      el("text",{x:labelX,y:labelY,transform:`rotate(-90 ${labelX} ${labelY})`,"text-anchor":"middle","dominant-baseline":"central","font-size":font,'data-axis':i},svg).textContent=plain(row.title);
+      const clipId=`${svg.id}Clip${i}`;
+      const clip=el("clipPath",{id:clipId},el("defs",{},svg));
       el("rect",{x:left,y:y0,width:right-left,height:rowHeight},clip);
-      const d=channel.points.map(([t,v],j)=>`${j?'L':'M'}${x(t).toFixed(5)},${y(v).toFixed(5)}`).join(' ');
-      el("path",{d,fill:"none",stroke:channel.color,"stroke-width":p.line_pt*p.pt_cm*CM,"stroke-linejoin":"round","clip-path":`url(#waveClip${i})`,"pointer-events":"none"},svg);
+      channels.forEach(c=> {
+        const d=c.points.map(([t,v],j)=>`${j?'L':'M'}${x(t).toFixed(5)},${y(v).toFixed(5)}`).join(' ');
+        el("path",{d,fill:"none",stroke:c.color,"stroke-width":p.line_pt*p.pt_cm*CM,"stroke-linejoin":"round","clip-path":`url(#${clipId})`,"pointer-events":"none",'data-channel':c.column},svg);
+      });
       el("path",{d:`M${left},${y0} V${y0+rowHeight} H${right}`,fill:"none",stroke:"#111","stroke-width":.35*p.pt_cm*CM,"pointer-events":"none"},svg);
       times.forEach(t=> {
         const tx=x(t*factor+origin);
         el("line",{x1:tx,y1:y0+rowHeight,x2:tx,y2:y0+rowHeight-.06*CM,stroke:"#111","stroke-width":.35*p.pt_cm*CM,"pointer-events":"none"},svg);
-        if(i===info.channels.length-1) textAt(svg,tx,y0+rowHeight+.04*CM,'north',String(t),{"pointer-events":"none"});
+        if(i===p.rows.length-1) textAt(svg,tx,y0+rowHeight+.04*CM,'north',String(t),{"pointer-events":"none"});
       });
     });
     candidate.boundaries.forEach((t,i)=> {
       const group=el("g",{"data-marker":i,class:"wave-marker"},svg);
-      Object.values(rows).forEach(row=>el("line",{x1:x(t),y1:row.y0,x2:x(t),y2:row.y0+rowHeight,stroke:"gray","stroke-width":.3*p.pt_cm*CM,"stroke-dasharray":`${3*p.pt_cm*CM} ${3*p.pt_cm*CM}`},group));
+      [...new Set(Object.values(rows))].forEach(row=>el("line",{x1:x(t),y1:row.y0,x2:x(t),y2:row.y0+rowHeight,stroke:"gray","stroke-width":.3*p.pt_cm*CM,"stroke-dasharray":`${3*p.pt_cm*CM} ${3*p.pt_cm*CM}`},group));
       el("line",{x1:x(t),y1:top,x2:x(t),y2:box.bottom,stroke:"transparent","stroke-width":.18*CM},group);
       el("title",{},group).textContent=`t${i} = ${Number((t/factor).toPrecision(12))} ${candidate.display_unit}，拖动调整`;
     });
@@ -360,7 +454,7 @@
       el("title",{},t).textContent="拖动或方向键移开标签（分界线不动）";
     }
     drawNotes(svg,candidate,x);
-    if(gesture?.draft) el("line",{x1:gesture.px[0],y1:gesture.px[1],x2:gesture.now[0],y2:gesture.now[1],stroke:"#2457d6","stroke-dasharray":"3 3","pointer-events":"none"},svg);
+    if(gesture?.draft) el("line",{x1:gesture.px[0],y1:gesture.px[1],x2:gesture.now[0],y2:gesture.draft==='dimension'?gesture.px[1]:gesture.now[1],stroke:"#2457d6","stroke-dasharray":"3 3","pointer-events":"none"},svg);
     textAt(svg,(left+right)/2,box.bottom+.42*CM,'north',`Time ${candidate.relative_time?'t − t₀ ':''}[${candidate.display_unit==='us'?'μs':candidate.display_unit}]`);
     // Like TeX's minimum bounding box, include notes dragged into a margin.
     // Only annotations expand it; off-window trace samples are clipped.
@@ -379,25 +473,40 @@
       svg.style.width=gesture.viewport.width;svg.style.aspectRatio=gesture.viewport.ratio;
     }
   }
+  function noteOffset(note) {
+    return note.kind==='dot'?info.paper.dot_label_offset:note.kind==='dimension'?info.paper.dimension_label_offset:[0,0];
+  }
   function drawNotes(svg,candidate,x) {
     const [start,end]=candidate.window;
     (candidate.notes || []).forEach((note,i)=> {
       const row=box.rows[note.channel], pts=[note.at,note.from,note.to].filter(Boolean);
       if(!row || pts.some(p=>p[0]<start || p[0]>end)) return;
-      const sel=i===selNote, ink=ink_css(note.color), g=el("g",{"data-note":i,class:"wave-note"},svg);
+      const sel=svg.id==="waveChart" && i===selNote, ink=ink_css(note.color), g=el("g",{"data-note":i,class:"wave-note"},svg);
       const p=info.paper, font=(note.font_pt || p.font_pt)*p.pt_cm*CM;
-      const line=(note.line_pt || p.line_pt*(note.kind==='arrow'?p.arrow_weight:1))*p.pt_cm*CM;
+      const line=(note.line_pt || p.line_pt*(['arrow','dimension'].includes(note.kind)?p.arrow_weight:1))*p.pt_cm*CM;
       const px=p=>[x(p[0]),row.y(p[1])];
-      let at, anchor="center", [dx,dy]=toPx(note.offset || [0,0]);
-      if(note.kind==="arrow") {
-        const a=px(note.from), b=px(note.to), L=Math.hypot(b[0]-a[0],b[1]-a[1]) || 1;
-        const head=p.arrow_head_cm*CM, half=head*.45;
-        const u=[(b[0]-a[0])/L,(b[1]-a[1])/L], base=[b[0]-u[0]*head,b[1]-u[1]*head];
-        el("line",{x1:a[0],y1:a[1],x2:base[0],y2:base[1],stroke:ink,"stroke-width":line,"stroke-linecap":"round"},g);
-        el("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:"transparent","stroke-width":12},g);
-        el("polygon",{points:[b,[base[0]-u[1]*half,base[1]+u[0]*half],[base[0]+u[1]*half,base[1]-u[0]*half]].map(p=>p.join(",")).join(" "),fill:ink},g);
+      let at, anchor="center", [dx,dy]=toPx(note.offset || noteOffset(note));
+      if(note.kind==="arrow" || note.kind==="dimension") {
+        const a=px(note.from), b=px(note.to), middle=[(a[0]+b[0])/2,a[1]];
+        let segments=note.kind==='dimension'?[[middle,a],[middle,b]]:[[a,b]];
+        if(note.kind==='dimension' && Math.abs(a[0]-b[0])<p.dimension_tail_cm*CM) {
+          const [low,high]=[a,b].sort((a,b)=>a[0]-b[0]), tail=p.dimension_tail_cm*CM;
+          segments=[[[low[0]-tail,low[1]],low],[[high[0]+tail,high[1]],high]];
+          el('line',{x1:low[0],y1:low[1],x2:high[0],y2:high[1],stroke:ink,'stroke-width':line},g);
+        }
+        for(const [tail,tip] of segments) {
+          const L=Math.hypot(tip[0]-tail[0],tip[1]-tail[1]) || 1, head=p.arrow_head_cm*CM, half=head*.45;
+          const u=[(tip[0]-tail[0])/L,(tip[1]-tail[1])/L], base=[tip[0]-u[0]*head,tip[1]-u[1]*head];
+          el("line",{x1:tail[0],y1:tail[1],x2:base[0],y2:base[1],stroke:ink,"stroke-width":line,"stroke-linecap":"round"},g);
+          el("line",{x1:tail[0],y1:tail[1],x2:tip[0],y2:tip[1],stroke:"transparent","stroke-width":12},g);
+          el("polygon",{points:[tip,[base[0]-u[1]*half,base[1]+u[0]*half],[base[0]+u[1]*half,base[1]-u[0]*half]].map(p=>p.join(",")).join(" "),fill:ink},g);
+        }
         // Decide in printed cm like the exporter; screen px are scaled differently per axis.
         const {sx,sy}=scales(); at=a; anchor=tailAnchor((b[0]-a[0])/sx,(a[1]-b[1])/sy);
+        if(note.kind==='dimension') {
+          at=middle;anchor='south';
+          for(const q of [a,b]) el('line',{x1:q[0],x2:q[0],y1:q[1]-p.dimension_cap_cm*CM,y2:q[1]+p.dimension_cap_cm*CM,stroke:ink,'stroke-width':line},g);
+        }
         if(sel) [["from",a],["to",b]].forEach(([end,p])=>el("circle",{cx:p[0],cy:p[1],r:5,class:"wave-handle","data-note-end":end},g));
       } else {
         at=px(note.at);
@@ -434,9 +543,9 @@
   function setTool(kind) {
     selNote=null;selLabel=null;properties();
     tool=tool===kind?null:kind;
-    ["text","arrow","dot"].forEach(k=>$(`waveNote_${k}`).classList.toggle("on",tool===k));
+    ["text","arrow","dot","dimension"].forEach(k=>$(`waveNote_${k}`).classList.toggle("on",tool===k));
     $("waveChart").style.cursor=tool?"crosshair":"";
-    if(tool) note({text:"点击放文字",arrow:"从箭尾拖到箭头尖",dot:"点击关键点放小圆圈"}[tool]+"；再点一次按钮退出。");
+    if(tool) note({text:"点击放文字",arrow:"从箭尾拖到箭头尖",dot:"点击关键点放小圆圈",dimension:"按住区间起点，拖到终点；尺寸线保持水平"}[tool]+"；再点一次按钮退出。");
   }
   function addNote(item) {
     const candidate=clone(layout.waveform);
@@ -458,6 +567,7 @@
   $("waveNote_text").onclick=()=>setTool("text");
   $("waveNote_arrow").onclick=()=>setTool("arrow");
   $("waveNote_dot").onclick=()=>setTool("dot");
+  $("waveNote_dimension").onclick=()=>setTool("dimension");
   $("waveNoteDelete").onclick=()=>{if(selNote!==null) removeNote(selNote);};
   $("waveChart").ondblclick=ev=> {
     const g=ev.target.closest("[data-note]");
@@ -500,7 +610,7 @@
     if(!gesture) return;
     const g=gesture, p=svgPoint(ev); g.now=p;
     const dx=p[0]-g.px[0], dy=p[1]-g.px[1];
-    if(g.draft) { if(g.draft==="arrow") draw(); return; }
+    if(g.draft) { if(g.draft==="arrow" || g.draft==="dimension") draw(); return; }
     if(g.label) {
       const candidate=clone(g.cfg), [ox,oy]=toPx(candidate.label_offsets?.[g.label] || [0,0]);
       candidate.label_offsets={...(candidate.label_offsets || {}),[g.label]:toCm(ox+dx,oy+dy)};
@@ -509,12 +619,20 @@
     if(g.note!==undefined) {
       const candidate=clone(g.cfg), n=candidate.notes[g.note], row=box.rows[n.channel];
       if(g.part==="label") {
-        const fallback=n.kind==="dot"?info.paper.dot_label_offset:[0,0], [ox,oy]=toPx(n.offset || fallback);
+        const [ox,oy]=toPx(n.offset || noteOffset(n));
         n.offset=toCm(ox+dx,oy+dy);
       } else {
+        let moveDx=dx;
+        if(n.kind==='dimension' && g.part==='body') {
+          const sx=(box.right-box.left)/(box.end-box.start), times=[n.from[0],n.to[0]];
+          moveDx=Math.max((box.start-Math.min(...times))*sx,Math.min((box.end-Math.max(...times))*sx,dx));
+        }
         const move=q=>{const at=[box.left+(q[0]-box.start)/(box.end-box.start)*(box.right-box.left),row.y(q[1])];
-          return dataAt([at[0]+dx,at[1]+dy],n.channel).point;};
-        if(g.part==="from" || g.part==="to") n[g.part]=move(g.cfg.notes[g.note][g.part]);
+          return dataAt([at[0]+moveDx,at[1]+dy],n.channel).point;};
+        if(g.part==="from" || g.part==="to") {
+          n[g.part]=move(g.cfg.notes[g.note][g.part]);
+          if(n.kind==='dimension') n[g.part==='from'?'to':'from'][1]=n[g.part][1];
+        }
         else for(const key of ["at","from","to"]) if(n[key]) n[key]=move(g.cfg.notes[g.note][key]);
       }
       g.candidate=candidate; draw(candidate); return;
@@ -539,7 +657,13 @@
     const moved=Math.hypot(g.now[0]-g.px[0],g.now[1]-g.px[1])>1e-6;
     if(g.draft) {
       const a=dataAt(g.px);
-      if(g.draft==="arrow") {
+      if(g.draft==="dimension") {
+        const b=dataAt(g.now,a.channel).point;
+        if(a.point[0]===b[0]) {note("区间尺寸线需要不同的起止时间。",true);draw();return;}
+        const text=cdI18n.prompt("区间文字（英文或 $数学$，如 $D T_s$）","$\\Delta t$");
+        if(text===null) {draw();return;}
+        addNote({kind:'dimension',channel:a.channel,from:a.point,to:[b[0],a.point[1]],...(text.trim()?{text:text.trim()}:{})});
+      } else if(g.draft==="arrow") {
         if(!moved) {note("箭头需要拖出一段：按住箭尾，拖到要指的点再松开。",true);draw();return;}
         const text=cdI18n.prompt("箭尾文字（可留空；英文或 $数学$）","");
         addNote({kind:"arrow",channel:a.channel,from:a.point,to:dataAt(g.now,a.channel).point,...(text?.trim()?{text:text.trim()}:{})});
@@ -568,9 +692,101 @@
     try {const r=await request("/api/waveform-save",layout.waveform);note(`已保存到 ${r.saved}`);}
     catch(e) {note(e.message,true);}
   };
+  function drawXY(view,host) {
+    const p=view.paper, w=p.width_cm, h=p.height_cm, at=([x,y])=>[(p.left_cm+x)*CM,(p.top_cm+h-y)*CM];
+    host.replaceChildren();
+    const svg=el('svg',{id:'waveXYChart',viewBox:`0 0 ${(w+p.left_cm+p.right_cm)*CM} ${(h+p.top_cm+p.bottom_cm)*CM}`,
+      role:'img','aria-label':'XY trajectory',style:'display:block;width:100%;height:42vh;background:white;font-family:Times New Roman,serif'},host);
+    const line=(a,b,color,width=p.line_pt)=>{const [x1,y1]=at(a),[x2,y2]=at(b);return el('line',{x1,y1,x2,y2,stroke:color,'stroke-width':width*p.pt_cm*CM},svg);};
+    const label=(q,anchor,text,attrs={})=>textAt(svg,...at(q),anchor,text,{'font-size':p.font_pt*p.pt_cm*CM,...attrs});
+    view.axes.forEach((axis,i)=> {
+      const [lo,hi]=axis.range, span=i?h:w;
+      axis.ticks.forEach((v,j)=> {
+        const pos=(v-lo)/(hi-lo)*span;
+        line(i?[0,pos]:[pos,0],i?[w,pos]:[pos,h],'#e4e4e4',.25);
+        label(i?[-.1,pos]:[pos,-.04],i?'east':'north',axis.labels[j]);
+      });
+      if(i) {const [x,y]=at([-1.05,h/2]);el('text',{x,y,transform:`rotate(-90 ${x} ${y})`,'text-anchor':'middle','dominant-baseline':'central','font-size':p.font_pt*p.pt_cm*CM},svg).textContent=plain(view.titles[i]);}
+      else label([w/2,-.48],'north',view.titles[i]);
+    });
+    line([0,h],[0,0],'#111',.35);line([0,0],[w,0],'#111',.35);
+    view.legend.forEach(key=> {
+      const [x,y]=key.at;
+      line([x,y],[x+p.legend_line_cm,y],key.color);
+      label([x+p.legend_line_cm+p.legend_gap_cm,y],'west',key.text);
+    });
+    view.segments.forEach(s=> {
+      el('polyline',{points:s.points.map(p=>at(p).join(',')).join(' '),fill:'none',stroke:s.color,
+        'stroke-width':p.line_pt*p.pt_cm*CM,'stroke-linejoin':'round','data-xy-interval':s.interval},svg);
+      if(s.arrow) {
+        const [a,b]=s.arrow.map(at),length=Math.hypot(b[0]-a[0],b[1]-a[1]),head=p.arrow_head_cm*CM;
+        const u=[(b[0]-a[0])/length,(b[1]-a[1])/length],base=[b[0]-u[0]*head,b[1]-u[1]*head],half=head*.45;
+        el('line',{x1:a[0],y1:a[1],x2:base[0],y2:base[1],stroke:s.color,'stroke-width':p.line_pt*p.pt_cm*CM},svg);
+        el('polygon',{points:[b,[base[0]-u[1]*half,base[1]+u[0]*half],[base[0]+u[1]*half,base[1]-u[0]*half]].map(p=>p.join(',')).join(' '),fill:s.color,'data-xy-arrow':s.interval},svg);
+      }
+    });
+    const [start,end]=view.ends.map(at);
+    el('circle',{cx:end[0],cy:end[1],r:p.end_radius_cm*CM,fill:'white',stroke:'black','stroke-width':p.line_pt*p.pt_cm*CM,'data-xy-end':'end'},svg);
+    el('circle',{cx:start[0],cy:start[1],r:p.start_radius_cm*CM,fill:'black','data-xy-end':'start'},svg);
+    label([w/2,-.86],'north','Start: filled; End: open');
+  }
+  $("waveXY").onclick=()=> {
+    if(!info) return;
+    const original=JSON.stringify(layout), originalProfile=profile, originalTarget=previewTarget;
+    const base=clone(layout.waveform), columns=info.columns.filter(c=>c!==base.time_column);
+    const xy=base.xy || {x:columns[0],y:columns[1] || columns[0]}, options=value=>columns.map(c=>`<option value="${esc(c)}" ${c===value?'selected':''}>${esc(c)}</option>`).join('');
+    showDialog('XY / 状态平面',`<p>按同一时刻配对两个通道；箭头表示时间前进方向。时间范围和模态分界沿用波形面板。</p>
+      <div class="wave-row"><label>横轴通道 <select id="waveXYX">${options(xy.x)}</select></label><label>纵轴通道 <select id="waveXYY">${options(xy.y)}</select></label></div>
+      <div class="wave-row"><label><input id="waveXYArrows" type="checkbox" ${xy.arrows!==false?'checked':''}> 显示轨迹方向</label>
+      <label><input id="waveXYModes" type="checkbox" ${xy.color_by_mode!==false?'checked':''}> 按已绑定模态着色</label></div>
+      <p class="hint">起点为实心圆，终点为空心圆；未绑定区间显示灰色。此图展示数据轨迹，不自动判断稳定性。</p>
+      <div id="waveXYPreview" style="max-height:48vh;overflow:auto;background:#eee;padding:10px"></div>
+      <p id="waveXYState" role="status"></p><div class="wave-row"><button id="waveXYApply" class="primary">应用到当前图</button>
+      <button id="waveXYTrue">真实出图预览</button><button id="waveXYExport">应用并导出…</button>
+      <button id="waveXYRemove" ${base.xy?'':'disabled'}>移除 XY 图</button></div>`);
+    const dialog=$('dlg'),host=$('waveXYPreview'),state=$('waveXYState');let serial=0;
+    const current=()=>JSON.stringify(layout)===original && profile===originalProfile && previewTarget===originalTarget;
+    const present=ticket=>dialog.open && host.isConnected && ticket===serial;
+    const candidate=()=>({...clone(base),xy:{x:$('waveXYX').value,y:$('waveXYY').value,arrows:$('waveXYArrows').checked,color_by_mode:$('waveXYModes').checked}});
+    const fail=e=>{state.className='bad';state.textContent=e.message;};
+    async function preview(cfg=candidate(),real=false) {
+      const ticket=++serial;$('waveXYApply').disabled=true;$('waveXYExport').disabled=true;
+      try {
+        if(!current()) throw new Error('图纸或波形设置已改变，请关闭后重新打开 XY 图。');
+        const r=await request(real?'/api/waveform-preview':'/api/waveform-view',cfg,real?{plot:'xy'}:{});
+        if(!present(ticket)) return null;
+        if(!current()) throw new Error('图纸或波形设置已改变，请关闭后重新打开 XY 图。');
+        if(real) host.innerHTML=`<img style="display:block;width:100%;height:42vh;object-fit:contain" alt="XY trajectory" src="data:image/svg+xml;base64,${r.svg}">`;
+        else drawXY(r.xy,host);
+        state.className='hint';state.textContent='核对后应用；保存对应关系后写入文件。';
+        $('waveXYApply').disabled=false;$('waveXYExport').disabled=false;
+        return r;
+      } catch(e) {if(present(ticket)) fail(e);return null;}
+    }
+    for(const id of ['waveXYX','waveXYY','waveXYArrows','waveXYModes']) $(id).onchange=()=>preview();
+    const apply=async(exportIt=false)=> {
+      const r=await preview();if(!r) return;
+      ++revision;installed(r);dialog.close();if(exportIt) $('waveExport').click();
+    };
+    $('waveXYApply').onclick=()=>apply();$('waveXYExport').onclick=()=>apply(true);
+    $('waveXYTrue').onclick=()=>preview(candidate(),true);
+    $('waveXYRemove').onclick=async()=> {
+      const cfg=clone(base);delete cfg.xy;
+      const ticket=++serial;
+      try {
+        if(!current()) throw new Error('图纸或波形设置已改变，请关闭后重新打开 XY 图。');
+        const r=await request('/api/waveform-view',cfg);
+        if(!present(ticket)) return;
+        if(!current()) throw new Error('图纸或波形设置已改变，请关闭后重新打开 XY 图。');
+        ++revision;installed(r);dialog.close();
+      } catch(e) {if(present(ticket)) fail(e);}
+    };
+    preview();
+  };
   $("waveExport").onclick=()=> {
     showDialog("导出波形与模态",`<p>独立波形图、用到的模态图各一份；勾选模态时另有带 t₀、t₁… 对应关系的总览。</p>
       <div class="export-row"><label><input id="waveIncludeModes" type="checkbox" checked> 包含对应模态与总览</label></div>
+      ${layout.waveform.xy?'<div class="export-row"><label><input id="waveXYOnly" type="checkbox"> 仅导出 XY 图</label></div><p class="hint">已应用的 XY 图会另存一份；勾选后只输出 XY 图。</p>':''}
       <div class="export-row"><label><input id="waveShade" type="checkbox" ${(layout.waveform.slice_style || 'shade')==='shade'?'checked':''}> 波形按模态切片：区间交替灰底，上方标 Mode k</label></div>
       <div class="export-row"><label>总览排版 <select id="waveArrange">${[["stack","竖排：波形下依次放各区间模态"],["side","并排：左波形、右模态（需双栏）"],["grid","上波形、下模态两列（双栏）"]].map(([v,t])=>`<option value="${v}" ${(layout.waveform.arrange || 'stack')===v?'selected':''}>${t}</option>`).join('')}</select></label></div>
       <p class="hint">并排与两列排版时每个模态只画一次，图注列出它对应的全部区间；模态图按单栏宽度绘制，字号与波形一致。当前图幅：${/double|双栏/.test(profile)?'双栏':'单栏'}。</p>
@@ -596,7 +812,7 @@
       try {
         const cfg={...clone(layout.waveform),slice_style:$("waveShade").checked?"shade":"lines",arrange:$("waveArrange").value};
         const r=await request("/api/waveform-export",cfg,{out_dir:$("waveOutDir").value,
-          formats:[...document.querySelectorAll('[name=waveFormat]:checked')].map(c=>c.value),include_modes:$("waveIncludeModes").checked});
+          formats:[...document.querySelectorAll('[name=waveFormat]:checked')].map(c=>c.value),include_modes:$("waveIncludeModes").checked,xy_only:$('waveXYOnly')?.checked || false});
         installed(await request('/api/waveform-view',cfg),false);
         state.className="ok";state.textContent="导出完成。排版设置已记在当前图里，保存文件即可保留。";
         $("waveExportResult").replaceChildren();

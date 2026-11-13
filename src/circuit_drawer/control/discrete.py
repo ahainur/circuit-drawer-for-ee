@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from .lti import ROOT_ABS, Zpk, from_roots, pmul, real_poly, roots, same_root
 
 METHODS = ("tustin", "zoh", "backward", "forward")
+Z_ROOT_TOL = 1e-12  # Slow dynamics map near z=1 and must retain distinct roots.
 SECTION_HEADROOM = 29     # bits: |coefficient| < 2^29 / 2^q keeps five int64 products clear
 
 
@@ -128,11 +129,8 @@ def _zoh(h: Zpk, ts: float) -> Discrete:
         for q in rest:
             r /= p - q
         terms.append((r, cmath.exp(p * ts)))
-    # common denominator prod(1 - e^{p T} z^-1), in powers of z^-1
-    den = [1 + 0j]
-    for _, e in terms:
-        den = pmul(den, [1, -e])
-    b = [0j] * len(den)
+    # Numerator of the partial-fraction sum in powers of z^-1.
+    b = [0j] * len(terms)
     for i, (r, _) in enumerate(terms):
         part = [r]
         for j, (_, e) in enumerate(terms):
@@ -140,15 +138,15 @@ def _zoh(h: Zpk, ts: float) -> Discrete:
                 part = pmul(part, [1, -e])
         for n, c in enumerate(part):
             b[n] += c
-    # (1 - z^-1) cancels the factor of the pole at s = 0 (e^0 = 1)
-    b = pmul(b, [1, -1])
-    # back to z: b and den are polynomials in z^-1 of degrees nb, nd
+    # Cancel the known s=0 integration factor algebraically. Finding both
+    # almost-coincident roots near z=1 would erase slow physical dynamics.
+    # Convert the numerator to z and retain its leading sample delays.
     bz = _trim_tail(b)
     lead = next((i for i, c in enumerate(bz) if abs(c) > 1e-15 * max(abs(x) for x in bz)), 0)
     bz = bz[lead:]
     k = bz[0].real if bz else 0.0
     zs = roots(bz) if len(bz) > 1 else []
-    ps = roots(den)
+    ps = [e for _, e in terms[:-1]]
     d = Discrete(k, zs, ps, ts, "zoh", delay=lead)
     return _cancel(d)
 
@@ -161,7 +159,7 @@ def _trim_tail(p: list[complex]) -> list[complex]:
 
 
 def _cancel(d: Discrete) -> Discrete:
-    z = Zpk(1.0, list(d.zeros), list(d.poles)).cancel()
+    z = Zpk(1.0, list(d.zeros), list(d.poles), Z_ROOT_TOL).cancel()
     return Discrete(d.k, z.zeros, z.poles, d.ts, d.method, d.prewarp, d.delay)
 
 

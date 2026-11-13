@@ -1,0 +1,217 @@
+{
+ "name": "mmc_arm_ellipsis",
+ "elements": [],
+ "wires": [],
+ "hops": [],
+ "annotations": [],
+ "netlist": {},
+ "modules": {
+  "version": 1,
+  "instances": [
+   {
+    "id": "SM1",
+    "definition": "hb_submodule",
+    "display": "collapsed",
+    "appearance": {
+     "title": "$SM_1$"
+    },
+    "overrides": {
+     "S1": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n"
+     },
+     "S2": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "10u",
+      "rise": "10n",
+      "fall": "10n"
+     }
+    }
+   },
+   {
+    "id": "SM2",
+    "definition": "hb_submodule",
+    "display": "collapsed",
+    "appearance": {
+     "title": "$SM_2$"
+    },
+    "overrides": {
+     "S1": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n"
+     },
+     "S2": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "10u",
+      "rise": "10n",
+      "fall": "10n"
+     }
+    }
+   },
+   {
+    "id": "SM3",
+    "definition": "hb_submodule",
+    "display": "collapsed",
+    "appearance": {
+     "title": "$SM_3$"
+    },
+    "overrides": {
+     "S1": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n"
+     },
+     "S2": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "10u",
+      "rise": "10n",
+      "fall": "10n"
+     }
+    }
+   },
+   {
+    "id": "SM4",
+    "definition": "hb_submodule",
+    "display": "collapsed",
+    "appearance": {
+     "title": "$SM_4$"
+    },
+    "overrides": {
+     "S1": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "0",
+      "rise": "10n",
+      "fall": "10n"
+     },
+     "S2": {
+      "model": "ideal_switch",
+      "ron": "0.01",
+      "roff": "1G",
+      "frequency": "50k",
+      "duty": "0.45",
+      "delay": "10u",
+      "rise": "10n",
+      "fall": "10n"
+     }
+    }
+   }
+  ],
+  "parts": [
+   {
+    "id": "RL",
+    "kind": "R",
+    "label": "$R_L$"
+   }
+  ],
+  "links": [
+   [
+    "RL.a",
+    "SM1.O"
+   ],
+   [
+    "SM1.N",
+    "SM2.O"
+   ],
+   [
+    "SM2.N",
+    "SM3.O"
+   ],
+   [
+    "SM3.N",
+    "SM4.O"
+   ],
+   [
+    "SM4.N",
+    "RL.b"
+   ]
+  ]
+ },
+ "regions": [
+  {
+   "id": "arm",
+   "from": [
+    1.1,
+    4.4
+   ],
+   "to": [
+    4.1,
+    5.0
+   ],
+   "fill": "blue",
+   "border": "none",
+   "label": "$N=4$",
+   "label_pos": "inside",
+   "stack": {
+    "count": 3
+   }
+  }
+ ],
+ "stack_usage": {
+  "arm": {
+   "purpose": "instances",
+   "instances": [
+    "SM1",
+    "SM2",
+    "SM3",
+    "SM4"
+   ],
+   "style": "ellipsis"
+  }
+ },
+ "module_view": "folded",
+ "simulation": {
+  "version": 1,
+  "ground": "RL.b",
+  "components": {
+   "RL": {
+    "value": "100"
+   }
+  },
+  "transient": {
+   "step": "100n",
+   "max_step": "100n",
+   "stop": "1m"
+  },
+  "probes": [
+   {
+    "name": "v_arm",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "RL.b"
+   }
+  ]
+ }
+}

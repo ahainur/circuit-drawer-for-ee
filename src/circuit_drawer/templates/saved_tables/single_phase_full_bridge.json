@@ -1,0 +1,231 @@
+{
+ "template": {
+  "name": "single_phase_full_bridge",
+  "title": "Single-phase full-bridge inverter",
+  "aliases": [
+   "single phase full bridge inverter",
+   "单相全桥逆变器"
+  ],
+  "description": "Resistive-load square-wave example. Inductive-load commutation and sinusoidal PWM require different modes.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.monolithicpower.com/en/learning/mpscholar/power-electronics/dc-ac-converters/single-phase-inverters"
+  ]
+ },
+ "layout": {
+  "name": "single_phase_full_bridge",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      3.9
+     ]
+    },
+    "label": "$V_{dc}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.9
+     ],
+     "s": [
+      1.0,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      1.0
+     ],
+     "s": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "S3",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      3.9
+     ],
+     "s": [
+      2.35,
+      2.9
+     ]
+    },
+    "label": "$S_{3}$"
+   },
+   {
+    "id": "S4",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      1.0
+     ],
+     "s": [
+      2.35,
+      0.0
+     ]
+    },
+    "label": "$S_{4}$"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      4.0,
+      2.5
+     ],
+     "b": [
+      4.0,
+      1.2
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     2.35,
+     3.9
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     2.35,
+     0.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.9
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   [
+    [
+     2.35,
+     2.9
+    ],
+    [
+     2.35,
+     1.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     4.0,
+     2.5
+    ]
+   ],
+   [
+    [
+     2.35,
+     1.2
+    ],
+    [
+     4.0,
+     1.2
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.35,
+    2.5
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "Vin.b": "DCP",
+   "S1.d": "DCP",
+   "S3.d": "DCP",
+   "Vin.a": "DCN",
+   "S2.s": "DCN",
+   "S4.s": "DCN",
+   "S1.s": "NA",
+   "S2.d": "NA",
+   "S3.s": "NB",
+   "S4.d": "NB",
+   "RL.a": "NA",
+   "RL.b": "NB"
+  },
+  "modes": [
+   {
+    "name": "Positive",
+    "on": [
+     "S1",
+     "S4"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "RL",
+      "S4"
+     ]
+    ],
+    "caption": "Positive",
+    "condition": "Ideal square-wave modulation, resistive load, no switching dead time"
+   },
+   {
+    "name": "Negative",
+    "on": [
+     "S2",
+     "S3"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S3",
+      "RL",
+      "S2"
+     ]
+    ],
+    "caption": "Negative",
+    "condition": "Ideal square-wave modulation, resistive load, no switching dead time"
+   }
+  ]
+ }
+}

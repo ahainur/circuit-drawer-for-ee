@@ -1,0 +1,133 @@
+{
+  "kind": "control",
+  "name": "buck_c_mpc",
+  "title": "Buck sampled predictive controller (explicit demonstration model)",
+  "profile": "ieee-double",
+  "blocks": [
+    {
+      "id": "vin",
+      "type": "tag",
+      "style": "meas",
+      "at": [
+        0.75,
+        1.5
+      ],
+      "size": [
+        1,
+        0.5
+      ],
+      "text": "$V_{in}$"
+    },
+    {
+      "id": "vo",
+      "type": "tag",
+      "style": "meas",
+      "at": [
+        0.75,
+        0.5
+      ],
+      "size": [
+        1,
+        0.5
+      ],
+      "text": "$v_o$"
+    },
+    {
+      "id": "il",
+      "type": "tag",
+      "style": "meas",
+      "at": [
+        0.75,
+        -0.5
+      ],
+      "size": [
+        1,
+        0.5
+      ],
+      "text": "$i_L$"
+    },
+    {
+      "id": "ref",
+      "type": "tag",
+      "style": "ref",
+      "at": [
+        0.75,
+        -1.5
+      ],
+      "size": [
+        1,
+        0.5
+      ],
+      "text": "$V_{ref}$"
+    },
+    {
+      "id": "mpc",
+      "type": "block",
+      "at": [
+        4,
+        0
+      ],
+      "size": [
+        2.5,
+        4
+      ],
+      "text": "Predictive\\\\control",
+      "label": "C, 100 kHz",
+      "label_pos": "above"
+    }
+  ],
+  "links": [
+    {
+      "from": "vin.e",
+      "to": "mpc.w+1.5"
+    },
+    {
+      "from": "vo.e",
+      "to": "mpc.w+0.5"
+    },
+    {
+      "from": "il.e",
+      "to": "mpc.w-0.5"
+    },
+    {
+      "from": "ref.e",
+      "to": "mpc.w-1.5"
+    },
+    {
+      "from": "mpc.e",
+      "to": [
+        7,
+        0
+      ],
+      "open": true,
+      "label": "$d$"
+    }
+  ],
+  "functions": {
+    "mpc": {
+      "fn": "c",
+      "in": {
+        "supply": "w+1.5",
+        "voltage": "w+0.5",
+        "current": "w-0.5",
+        "reference": "w-1.5"
+      },
+      "out": {
+        "duty": "e"
+      },
+      "c": {
+        "states": {
+          "previous": 0
+        },
+        "body": "/* Explicit demonstration model: Ts=10 us, L=100 uH, C=100 uF, R=5 ohm.\n   The horizon holds each candidate duty constant for eight predicted samples.\n   Re-identify these constants if the power stage changes. */\nconst double Ts=1e-5, L=100e-6, C=100e-6, R=5.0, Vf=0.55, Ron=0.01;\ndouble best=1e100;\nduty=0.02;\nfor (int candidate=2; candidate<=95; ++candidate) {\n    double d=0.01*candidate, ip=current, vp=voltage;\n    double cost=0.001*(d-previous)*(d-previous);\n    for (int k=0; k<8; ++k) {\n        double next_i=ip+Ts*(d*(supply-Ron*ip)-(1.0-d)*Vf-vp)/L;\n        double next_v=vp+Ts*(ip-vp/R)/C;\n        ip=next_i; vp=next_v;\n        double ev=vp-reference, ei=ip-reference/R;\n        cost += ev*ev + 0.02*ei*ei;\n        if (ip<0 || ip>6) cost += 100.0;\n    }\n    if (cost<best) { best=cost; duty=d; }\n}\nnext_previous=duty;\n"
+      }
+    }
+  },
+  "code": {
+    "fs": 100000,
+    "arith": "double",
+    "outputs": [
+      "mpc.duty"
+    ]
+  }
+}

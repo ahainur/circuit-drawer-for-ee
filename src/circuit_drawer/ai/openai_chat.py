@@ -20,6 +20,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from copy import copy
 
 from .. import __version__
 from .meter import Meter
@@ -87,6 +88,14 @@ class OpenAIChat:
             self.optional["reasoning_effort"] = effort
         self.on_text = None
         self.stats: list[dict] = []
+
+    def fork(self, system: str):
+        """Fresh conversation without re-reading possibly changed API settings."""
+        chat = copy(self)
+        chat.messages = [{"role": "system", "content": system}]
+        chat.optional = dict(self.optional)
+        chat.stats, chat.on_text = [], None
+        return chat
 
     def send(self, text: str, images: list[tuple[str, str]] | None = None) -> str:
         from .loop import ModelError, OutputTruncated

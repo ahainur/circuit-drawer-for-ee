@@ -1,0 +1,1762 @@
+{
+ "name": "gfm_vsm",
+ "elements": [
+  {
+   "id": "u1_Vdc",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     4.4
+    ]
+   },
+   "label": "$V_{dc1}$"
+  },
+  {
+   "id": "u1_S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     4.4
+    ],
+    "s": [
+     2.0,
+     3.4
+    ]
+   },
+   "label": "$S_{1,1}$"
+  },
+  {
+   "id": "u1_S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.0,
+     1.0
+    ],
+    "s": [
+     2.0,
+     0.0
+    ]
+   },
+   "label": "$S_{1,2}$"
+  },
+  {
+   "id": "u1_S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     4.4
+    ],
+    "s": [
+     3.6,
+     3.4
+    ]
+   },
+   "label": "$S_{1,3}$"
+  },
+  {
+   "id": "u1_S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     3.6,
+     1.0
+    ],
+    "s": [
+     3.6,
+     0.0
+    ]
+   },
+   "label": "$S_{1,4}$"
+  },
+  {
+   "id": "u1_S5",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     4.4
+    ],
+    "s": [
+     5.2,
+     3.4
+    ]
+   },
+   "label": "$S_{1,5}$"
+  },
+  {
+   "id": "u1_S6",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     5.2,
+     1.0
+    ],
+    "s": [
+     5.2,
+     0.0
+    ]
+   },
+   "label": "$S_{1,6}$"
+  },
+  {
+   "id": "u1_La",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     3.1
+    ],
+    "b": [
+     7.6,
+     3.1
+    ]
+   },
+   "label": "$L_{1,a}$"
+  },
+  {
+   "id": "u1_Lb",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     2.15
+    ],
+    "b": [
+     7.6,
+     2.15
+    ]
+   },
+   "label": "$L_{1,b}$"
+  },
+  {
+   "id": "u1_Lc",
+   "kind": "L",
+   "pins": {
+    "a": [
+     6.4,
+     1.2
+    ],
+    "b": [
+     7.6,
+     1.2
+    ]
+   },
+   "label": "$L_{1,c}$"
+  },
+  {
+   "id": "u1_Rn",
+   "kind": "R",
+   "pins": {
+    "a": [
+     0,
+     -1.0
+    ],
+    "b": [
+     -1.2,
+     -1.0
+    ]
+   },
+   "label": "$R_{ref}$"
+  },
+  {
+   "id": "Ra",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     3.1
+    ],
+    "b": [
+     14.4,
+     3.1
+    ]
+   },
+   "label": "$R_a$"
+  },
+  {
+   "id": "Rstepa",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     2.1
+    ],
+    "b": [
+     14.4,
+     2.1
+    ]
+   },
+   "label": "$R_{sa}$"
+  },
+  {
+   "id": "Sstepa",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     15.4,
+     2.1
+    ],
+    "s": [
+     16.4,
+     2.1
+    ]
+   },
+   "label": "$S_{sa}$",
+   "opts": {
+    "diode": false
+   }
+  },
+  {
+   "id": "Rb",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     0.4
+    ],
+    "b": [
+     14.4,
+     0.4
+    ]
+   },
+   "label": "$R_b$"
+  },
+  {
+   "id": "Rstepb",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     -0.6
+    ],
+    "b": [
+     14.4,
+     -0.6
+    ]
+   },
+   "label": "$R_{sb}$"
+  },
+  {
+   "id": "Sstepb",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     15.4,
+     -0.6
+    ],
+    "s": [
+     16.4,
+     -0.6
+    ]
+   },
+   "label": "$S_{sb}$",
+   "opts": {
+    "diode": false
+   }
+  },
+  {
+   "id": "Rc",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     -2.3
+    ],
+    "b": [
+     14.4,
+     -2.3
+    ]
+   },
+   "label": "$R_c$"
+  },
+  {
+   "id": "Rstepc",
+   "kind": "R",
+   "pins": {
+    "a": [
+     13.2,
+     -3.3
+    ],
+    "b": [
+     14.4,
+     -3.3
+    ]
+   },
+   "label": "$R_{sc}$"
+  },
+  {
+   "id": "Sstepc",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     15.4,
+     -3.3
+    ],
+    "s": [
+     16.4,
+     -3.3
+    ]
+   },
+   "label": "$S_{sc}$",
+   "opts": {
+    "diode": false
+   }
+  }
+ ],
+ "wires": [
+  [
+   [
+    2.0,
+    3.4
+   ],
+   [
+    2.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    3.6,
+    3.4
+   ],
+   [
+    3.6,
+    1.0
+   ]
+  ],
+  [
+   [
+    5.2,
+    3.4
+   ],
+   [
+    5.2,
+    1.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    3.1
+   ],
+   [
+    6.4,
+    3.1
+   ]
+  ],
+  [
+   [
+    3.6,
+    2.15
+   ],
+   [
+    6.4,
+    2.15
+   ]
+  ],
+  [
+   [
+    5.2,
+    1.2
+   ],
+   [
+    6.4,
+    1.2
+   ]
+  ],
+  [
+   [
+    0.0,
+    4.4
+   ],
+   [
+    5.2,
+    4.4
+   ]
+  ],
+  [
+   [
+    0,
+    -0.0
+   ],
+   [
+    5.2,
+    -0.0
+   ]
+  ],
+  [
+   [
+    7.6,
+    3.1
+   ],
+   [
+    9.6,
+    3.1
+   ]
+  ],
+  [
+   [
+    7.6,
+    2.15
+   ],
+   [
+    10.4,
+    2.15
+   ]
+  ],
+  [
+   [
+    7.6,
+    1.2
+   ],
+   [
+    11.2,
+    1.2
+   ]
+  ],
+  [
+   [
+    0,
+    -0.0
+   ],
+   [
+    0,
+    -1.0
+   ]
+  ],
+  [
+   [
+    -1.2,
+    -1.0
+   ],
+   [
+    -2,
+    -1.0
+   ]
+  ],
+  [
+   [
+    9.6,
+    3.1
+   ],
+   [
+    12.5,
+    3.1
+   ],
+   [
+    13.2,
+    3.1
+   ]
+  ],
+  [
+   [
+    12.5,
+    3.1
+   ],
+   [
+    12.5,
+    2.1
+   ],
+   [
+    13.2,
+    2.1
+   ]
+  ],
+  [
+   [
+    14.4,
+    3.1
+   ],
+   [
+    16.8,
+    3.1
+   ]
+  ],
+  [
+   [
+    14.4,
+    2.1
+   ],
+   [
+    15.4,
+    2.1
+   ]
+  ],
+  [
+   [
+    16.4,
+    2.1
+   ],
+   [
+    16.8,
+    2.1
+   ]
+  ],
+  [
+   [
+    10.4,
+    2.15
+   ],
+   [
+    10.4,
+    0.4
+   ]
+  ],
+  [
+   [
+    10.4,
+    0.4
+   ],
+   [
+    12.5,
+    0.4
+   ],
+   [
+    13.2,
+    0.4
+   ]
+  ],
+  [
+   [
+    12.5,
+    0.4
+   ],
+   [
+    12.5,
+    -0.6
+   ],
+   [
+    13.2,
+    -0.6
+   ]
+  ],
+  [
+   [
+    14.4,
+    0.4
+   ],
+   [
+    16.8,
+    0.4
+   ]
+  ],
+  [
+   [
+    14.4,
+    -0.6
+   ],
+   [
+    15.4,
+    -0.6
+   ]
+  ],
+  [
+   [
+    16.4,
+    -0.6
+   ],
+   [
+    16.8,
+    -0.6
+   ]
+  ],
+  [
+   [
+    11.2,
+    1.2
+   ],
+   [
+    11.2,
+    -2.3
+   ]
+  ],
+  [
+   [
+    11.2,
+    -2.3
+   ],
+   [
+    12.5,
+    -2.3
+   ],
+   [
+    13.2,
+    -2.3
+   ]
+  ],
+  [
+   [
+    12.5,
+    -2.3
+   ],
+   [
+    12.5,
+    -3.3
+   ],
+   [
+    13.2,
+    -3.3
+   ]
+  ],
+  [
+   [
+    14.4,
+    -2.3
+   ],
+   [
+    16.8,
+    -2.3
+   ]
+  ],
+  [
+   [
+    14.4,
+    -3.3
+   ],
+   [
+    15.4,
+    -3.3
+   ]
+  ],
+  [
+   [
+    16.4,
+    -3.3
+   ],
+   [
+    16.8,
+    -3.3
+   ]
+  ],
+  [
+   [
+    16.8,
+    3.1
+   ],
+   [
+    16.8,
+    -4.4
+   ],
+   [
+    -2,
+    -4.4
+   ],
+   [
+    -2,
+    -1
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   3.6,
+   3.1
+  ],
+  [
+   5.2,
+   3.1
+  ],
+  [
+   5.2,
+   2.15
+  ],
+  [
+   10.4,
+   1.2
+  ],
+  [
+   11.2,
+   0.4
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "u1_Vdc.a": "u1_N",
+  "u1_Vdc.b": "u1_P",
+  "u1_S1.d": "u1_P",
+  "u1_S1.s": "u1_A",
+  "u1_S2.d": "u1_A",
+  "u1_S2.s": "u1_N",
+  "u1_S3.d": "u1_P",
+  "u1_S3.s": "u1_B",
+  "u1_S4.d": "u1_B",
+  "u1_S4.s": "u1_N",
+  "u1_S5.d": "u1_P",
+  "u1_S5.s": "u1_C",
+  "u1_S6.d": "u1_C",
+  "u1_S6.s": "u1_N",
+  "u1_La.a": "u1_A",
+  "u1_La.b": "PCC_a",
+  "u1_Lb.a": "u1_B",
+  "u1_Lb.b": "PCC_b",
+  "u1_Lc.a": "u1_C",
+  "u1_Lc.b": "PCC_c",
+  "u1_Rn.a": "u1_N",
+  "u1_Rn.b": "N",
+  "Ra.a": "PCC_a",
+  "Ra.b": "N",
+  "Rstepa.a": "PCC_a",
+  "Rstepa.b": "step_a",
+  "Sstepa.d": "step_a",
+  "Sstepa.s": "N",
+  "Rb.a": "PCC_b",
+  "Rb.b": "N",
+  "Rstepb.a": "PCC_b",
+  "Rstepb.b": "step_b",
+  "Sstepb.d": "step_b",
+  "Sstepb.s": "N",
+  "Rc.a": "PCC_c",
+  "Rc.b": "N",
+  "Rstepc.a": "PCC_c",
+  "Rstepc.b": "step_c",
+  "Sstepc.d": "step_c",
+  "Sstepc.s": "N"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "u1_Vdc.a",
+  "components": {
+   "u1_Vdc": {
+    "dc": "300"
+   },
+   "u1_S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_S2": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_S3": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_S4": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_S5": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_S6": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "10k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "100n",
+    "fall": "100n",
+    "model": "ideal_switch"
+   },
+   "u1_La": {
+    "value": "0.005",
+    "initial": "0",
+    "series_resistance": "0.5"
+   },
+   "u1_Lb": {
+    "value": "0.005",
+    "initial": "0",
+    "series_resistance": "0.5"
+   },
+   "u1_Lc": {
+    "value": "0.005",
+    "initial": "0",
+    "series_resistance": "0.5"
+   },
+   "u1_Rn": {
+    "value": "1G"
+   },
+   "Ra": {
+    "value": "30.0"
+   },
+   "Rstepa": {
+    "value": "30.0"
+   },
+   "Sstepa": {
+    "ron": ".01",
+    "roff": "1G",
+    "frequency": "1.4285714285714286",
+    "duty": "0.8571428571428572",
+    "delay": ".5",
+    "rise": "10u",
+    "fall": "10u",
+    "model": "ideal_switch"
+   },
+   "Rb": {
+    "value": "30.0"
+   },
+   "Rstepb": {
+    "value": "30.0"
+   },
+   "Sstepb": {
+    "ron": ".01",
+    "roff": "1G",
+    "frequency": "1.4285714285714286",
+    "duty": "0.8571428571428572",
+    "delay": ".5",
+    "rise": "10u",
+    "fall": "10u",
+    "model": "ideal_switch"
+   },
+   "Rc": {
+    "value": "30.0"
+   },
+   "Rstepc": {
+    "value": "30.0"
+   },
+   "Sstepc": {
+    "ron": ".01",
+    "roff": "1G",
+    "frequency": "1.4285714285714286",
+    "duty": "0.8571428571428572",
+    "delay": ".5",
+    "rise": "10u",
+    "fall": "10u",
+    "model": "ideal_switch"
+   }
+  },
+  "transient": {
+   "step": "100u",
+   "max_step": "20u",
+   "stop": "1.2"
+  },
+  "probes": [
+   {
+    "name": "u1_va",
+    "kind": "voltage",
+    "positive": "u1_La.a",
+    "negative": "Ra.b"
+   },
+   {
+    "name": "u1_ia",
+    "kind": "current",
+    "element": "u1_La"
+   },
+   {
+    "name": "u1_vb",
+    "kind": "voltage",
+    "positive": "u1_Lb.a",
+    "negative": "Ra.b"
+   },
+   {
+    "name": "u1_ib",
+    "kind": "current",
+    "element": "u1_Lb"
+   },
+   {
+    "name": "u1_vc",
+    "kind": "voltage",
+    "positive": "u1_Lc.a",
+    "negative": "Ra.b"
+   },
+   {
+    "name": "u1_ic",
+    "kind": "current",
+    "element": "u1_Lc"
+   },
+   {
+    "name": "u1_vdc",
+    "kind": "voltage",
+    "positive": "u1_Vdc.b",
+    "negative": "u1_Vdc.a"
+   },
+   {
+    "name": "pcc_va",
+    "kind": "voltage",
+    "positive": "Ra.a",
+    "negative": "Ra.b"
+   },
+   {
+    "name": "pcc_vb",
+    "kind": "voltage",
+    "positive": "Rb.a",
+    "negative": "Rb.b"
+   },
+   {
+    "name": "pcc_vc",
+    "kind": "voltage",
+    "positive": "Rc.a",
+    "negative": "Rc.b"
+   }
+  ]
+ },
+ "closed_loop": {
+  "control": {
+   "kind": "control",
+   "name": "gfm_vsm_control",
+   "profile": "ieee-double",
+   "blocks": [
+    {
+     "id": "u1_va",
+     "type": "tag",
+     "at": [
+      0.4,
+      5.7
+     ],
+     "text": "$v_a$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_vb",
+     "type": "tag",
+     "at": [
+      0.4,
+      5
+     ],
+     "text": "$v_b$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_vc",
+     "type": "tag",
+     "at": [
+      0.4,
+      4.3
+     ],
+     "text": "$v_c$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_clv",
+     "type": "block",
+     "at": [
+      2,
+      5
+     ],
+     "text": "Clarke",
+     "size": [
+      1.2,
+      1.8
+     ]
+    },
+    {
+     "id": "u1_ia",
+     "type": "tag",
+     "at": [
+      0.4,
+      1.7
+     ],
+     "text": "$i_a$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_ib",
+     "type": "tag",
+     "at": [
+      0.4,
+      1
+     ],
+     "text": "$i_b$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_ic",
+     "type": "tag",
+     "at": [
+      0.4,
+      0.30000000000000004
+     ],
+     "text": "$i_c$",
+     "style": "meas",
+     "size": [
+      0.7,
+      0.52
+     ]
+    },
+    {
+     "id": "u1_cli",
+     "type": "block",
+     "at": [
+      2,
+      1
+     ],
+     "text": "Clarke",
+     "size": [
+      1.2,
+      1.8
+     ]
+    },
+    {
+     "id": "u1_paa",
+     "type": "mul",
+     "at": [
+      4.8,
+      6
+     ],
+     "text": ""
+    },
+    {
+     "id": "u1_pbb",
+     "type": "mul",
+     "at": [
+      4.8,
+      4
+     ],
+     "text": ""
+    },
+    {
+     "id": "u1_qba",
+     "type": "mul",
+     "at": [
+      4.8,
+      2
+     ],
+     "text": ""
+    },
+    {
+     "id": "u1_qab",
+     "type": "mul",
+     "at": [
+      4.8,
+      0
+     ],
+     "text": ""
+    },
+    {
+     "id": "u1_ps",
+     "type": "sum",
+     "at": [
+      6.2,
+      5
+     ],
+     "text": "",
+     "signs": {
+      "n": "+",
+      "s": "+"
+     }
+    },
+    {
+     "id": "u1_p",
+     "type": "block",
+     "at": [
+      7.5,
+      5
+     ],
+     "text": "$3/2$",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_qs",
+     "type": "sum",
+     "at": [
+      6.2,
+      1
+     ],
+     "text": "",
+     "signs": {
+      "n": "+",
+      "s": "-"
+     }
+    },
+    {
+     "id": "u1_q",
+     "type": "block",
+     "at": [
+      7.5,
+      1
+     ],
+     "text": "$3/2$",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_dw",
+     "type": "block",
+     "at": [
+      10.3,
+      5
+     ],
+     "text": "$-1/(Ms+D)$",
+     "size": [
+      3.6,
+      0.7
+     ]
+    },
+    {
+     "id": "u1_qf",
+     "type": "block",
+     "at": [
+      9.3,
+      1
+     ],
+     "text": "$\\frac{1}{1+\\tau_q s}$",
+     "size": [
+      1.8,
+      0.7
+     ]
+    },
+    {
+     "id": "u1_dv",
+     "type": "block",
+     "at": [
+      11.3,
+      1
+     ],
+     "text": "$-n_q$",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_omega",
+     "type": "sum",
+     "at": [
+      12.8,
+      5
+     ],
+     "text": "",
+     "signs": {
+      "w": "+",
+      "n": "+"
+     }
+    },
+    {
+     "id": "u1_w0",
+     "type": "tag",
+     "at": [
+      12.8,
+      6.5
+     ],
+     "text": "$\\omega_0$",
+     "style": "ref",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_em",
+     "type": "sum",
+     "at": [
+      12.8,
+      1
+     ],
+     "text": "",
+     "signs": {
+      "w": "+",
+      "n": "+"
+     }
+    },
+    {
+     "id": "u1_e0",
+     "type": "tag",
+     "at": [
+      12.8,
+      2.5
+     ],
+     "text": "$E_0$",
+     "style": "ref",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_theta",
+     "type": "block",
+     "at": [
+      14.4,
+      5
+     ],
+     "text": "$1/s$",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_ipk",
+     "type": "block",
+     "at": [
+      16,
+      1
+     ],
+     "text": "Park$^{-1}$",
+     "size": [
+      1.2,
+      1.2
+     ]
+    },
+    {
+     "id": "u1_zero",
+     "type": "tag",
+     "at": [
+      14.4,
+      -0.5
+     ],
+     "text": "$0$",
+     "style": "ref",
+     "size": [
+      1,
+      0.6
+     ]
+    },
+    {
+     "id": "u1_sv",
+     "type": "block",
+     "at": [
+      18,
+      1
+     ],
+     "text": "SVPWM",
+     "size": [
+      1.2,
+      1.2
+     ]
+    },
+    {
+     "id": "u1_vdc",
+     "type": "tag",
+     "at": [
+      18,
+      3
+     ],
+     "text": "$V_{dc}$",
+     "style": "meas",
+     "size": [
+      1,
+      0.6
+     ]
+    }
+   ],
+   "links": [
+    {
+     "from": "u1_va.e",
+     "to": "u1_clv.w+0.7"
+    },
+    {
+     "from": "u1_vb.e",
+     "to": "u1_clv.w"
+    },
+    {
+     "from": "u1_vc.e",
+     "to": "u1_clv.w-0.7"
+    },
+    {
+     "from": "u1_ia.e",
+     "to": "u1_cli.w+0.7"
+    },
+    {
+     "from": "u1_ib.e",
+     "to": "u1_cli.w"
+    },
+    {
+     "from": "u1_ic.e",
+     "to": "u1_cli.w-0.7"
+    },
+    {
+     "from": "u1_clv.e+0.4",
+     "to": "u1_paa.w",
+     "via": [
+      [
+       3,
+       5.4
+      ],
+      [
+       3,
+       6
+      ]
+     ]
+    },
+    {
+     "from": "u1_cli.e+0.4",
+     "to": "u1_paa.s",
+     "via": [
+      [
+       3.4,
+       1.4
+      ],
+      [
+       3.4,
+       5.2
+      ],
+      [
+       4.8,
+       5.2
+      ]
+     ]
+    },
+    {
+     "from": "u1_clv.e-0.4",
+     "to": "u1_pbb.w",
+     "via": [
+      [
+       3.2,
+       4.6
+      ],
+      [
+       3.2,
+       4
+      ]
+     ]
+    },
+    {
+     "from": "u1_cli.e-0.4",
+     "to": "u1_pbb.s",
+     "via": [
+      [
+       3.6,
+       0.6
+      ],
+      [
+       3.6,
+       3.2
+      ],
+      [
+       4.8,
+       3.2
+      ]
+     ]
+    },
+    {
+     "from": [
+      3.2,
+      4
+     ],
+     "to": "u1_qba.w",
+     "via": [
+      [
+       3.2,
+       2
+      ]
+     ]
+    },
+    {
+     "from": [
+      3.4,
+      1.4
+     ],
+     "to": "u1_qba.s",
+     "via": [
+      [
+       4.8,
+       1.4
+      ]
+     ]
+    },
+    {
+     "from": [
+      3,
+      5.4
+     ],
+     "to": "u1_qab.w",
+     "via": [
+      [
+       3,
+       0
+      ]
+     ]
+    },
+    {
+     "from": [
+      3.6,
+      0.6
+     ],
+     "to": "u1_qab.s",
+     "via": [
+      [
+       3.6,
+       -0.8
+      ],
+      [
+       4.8,
+       -0.8
+      ]
+     ]
+    },
+    {
+     "from": "u1_paa.e",
+     "to": "u1_ps.n",
+     "via": [
+      [
+       6.2,
+       6
+      ]
+     ]
+    },
+    {
+     "from": "u1_pbb.e",
+     "to": "u1_ps.s",
+     "via": [
+      [
+       6.2,
+       4
+      ]
+     ]
+    },
+    {
+     "from": "u1_ps.e",
+     "to": "u1_p.w"
+    },
+    {
+     "from": "u1_qba.e",
+     "to": "u1_qs.n",
+     "via": [
+      [
+       6.2,
+       2
+      ]
+     ]
+    },
+    {
+     "from": "u1_qab.e",
+     "to": "u1_qs.s",
+     "via": [
+      [
+       6.2,
+       0
+      ]
+     ]
+    },
+    {
+     "from": "u1_qs.e",
+     "to": "u1_q.w"
+    },
+    {
+     "from": "u1_p.e",
+     "to": "u1_dw.w"
+    },
+    {
+     "from": "u1_q.e",
+     "to": "u1_qf.w"
+    },
+    {
+     "from": "u1_qf.e",
+     "to": "u1_dv.w"
+    },
+    {
+     "from": "u1_w0.s",
+     "to": "u1_omega.n"
+    },
+    {
+     "from": "u1_e0.s",
+     "to": "u1_em.n"
+    },
+    {
+     "from": "u1_dw.e",
+     "to": "u1_omega.w"
+    },
+    {
+     "from": "u1_dv.e",
+     "to": "u1_em.w"
+    },
+    {
+     "from": "u1_omega.e",
+     "to": "u1_theta.w"
+    },
+    {
+     "from": "u1_em.e",
+     "to": "u1_ipk.w+0.4",
+     "via": [
+      [
+       14,
+       1
+      ],
+      [
+       14,
+       1.4
+      ]
+     ]
+    },
+    {
+     "from": "u1_zero.e",
+     "to": "u1_ipk.w-0.4",
+     "via": [
+      [
+       15.1,
+       -0.5
+      ],
+      [
+       15.1,
+       0.6
+      ]
+     ]
+    },
+    {
+     "from": "u1_theta.e",
+     "to": "u1_ipk.n",
+     "via": [
+      [
+       16,
+       5
+      ]
+     ]
+    },
+    {
+     "from": "u1_ipk.e+0.3",
+     "to": "u1_sv.w+0.3"
+    },
+    {
+     "from": "u1_ipk.e-0.3",
+     "to": "u1_sv.w-0.3"
+    },
+    {
+     "from": "u1_vdc.s",
+     "to": "u1_sv.n"
+    },
+    {
+     "from": "u1_sv.e+0.4",
+     "to": [
+      19.8,
+      1.4
+     ],
+     "open": true,
+     "label": "$d_a$"
+    },
+    {
+     "from": "u1_sv.e",
+     "to": [
+      19.8,
+      1
+     ],
+     "open": true,
+     "label": "$d_b$"
+    },
+    {
+     "from": "u1_sv.e-0.4",
+     "to": [
+      19.8,
+      0.6
+     ],
+     "open": true,
+     "label": "$d_c$"
+    }
+   ],
+   "functions": {
+    "u1_clv": {
+     "fn": "clarke",
+     "in": {
+      "a": "w+0.7",
+      "b": "w",
+      "c": "w-0.7"
+     },
+     "out": {
+      "alpha": "e+0.4",
+      "beta": "e-0.4"
+     }
+    },
+    "u1_cli": {
+     "fn": "clarke",
+     "in": {
+      "a": "w+0.7",
+      "b": "w",
+      "c": "w-0.7"
+     },
+     "out": {
+      "alpha": "e+0.4",
+      "beta": "e-0.4"
+     }
+    },
+    "u1_ipk": {
+     "fn": "ipark",
+     "in": {
+      "d": "w+0.4",
+      "q": "w-0.4",
+      "theta": "n"
+     },
+     "out": {
+      "alpha": "e+0.3",
+      "beta": "e-0.3"
+     }
+    },
+    "u1_sv": {
+     "fn": "svpwm",
+     "in": {
+      "alpha": "w+0.3",
+      "beta": "w-0.3",
+      "vdc": "n"
+     },
+     "out": {
+      "da": "e+0.4",
+      "db": "e",
+      "dc": "e-0.4"
+     }
+    }
+   },
+   "loop": {
+    "params": {
+     "u1_nq": 0.02,
+     "u1_tau_q": 0.03,
+     "u1_M": 80,
+     "u1_D": 500
+    },
+    "tf": {
+     "u1_p": {
+      "gain": 1.5
+     },
+     "u1_q": {
+      "gain": 1.5
+     },
+     "u1_dw": {
+      "num": [
+       -1
+      ],
+      "den": [
+       "u1_M",
+       "u1_D"
+      ]
+     },
+     "u1_qf": {
+      "num": [
+       1
+      ],
+      "den": [
+       "u1_tau_q",
+       1
+      ]
+     },
+     "u1_dv": {
+      "gain": "-u1_nq"
+     },
+     "u1_theta": {
+      "num": [
+       1
+      ],
+      "den": [
+       1,
+       0
+      ]
+     }
+    }
+   },
+   "code": {
+    "fs": 20000,
+    "method": "tustin",
+    "arith": "double",
+    "outputs": [
+     "u1_sv.da",
+     "u1_sv.db",
+     "u1_sv.dc"
+    ]
+   },
+   "title": "虚拟同步机孤岛逆变器"
+  },
+  "inputs": {
+   "u1_va": {
+    "probe": "u1_va"
+   },
+   "u1_vb": {
+    "probe": "u1_vb"
+   },
+   "u1_vc": {
+    "probe": "u1_vc"
+   },
+   "u1_ia": {
+    "probe": "u1_ia"
+   },
+   "u1_ib": {
+    "probe": "u1_ib"
+   },
+   "u1_ic": {
+    "probe": "u1_ic"
+   },
+   "u1_w0": {
+    "value": 314.1592653589793
+   },
+   "u1_e0": {
+    "value": 100
+   },
+   "u1_zero": {
+    "value": 0
+   },
+   "u1_vdc": {
+    "probe": "u1_vdc"
+   }
+  },
+  "outputs": {
+   "u1_sv.da": {
+    "switches": [
+     "u1_S1"
+    ],
+    "complement": [
+     "u1_S2"
+    ],
+    "model": "average"
+   },
+   "u1_sv.db": {
+    "switches": [
+     "u1_S3"
+    ],
+    "complement": [
+     "u1_S4"
+    ],
+    "model": "average"
+   },
+   "u1_sv.dc": {
+    "switches": [
+     "u1_S5"
+    ],
+    "complement": [
+     "u1_S6"
+    ],
+    "model": "average"
+   }
+  },
+  "note": "Balanced islanded voltage-source average model, ideal inner voltage tracking, zero P/Q references. Load step at 0.5 s."
+ }
+}

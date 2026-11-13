@@ -39,7 +39,7 @@ function textGuideBox(box, label = false) {
 // starts (the others do not move).  The part's body is taken from the last
 // check relative to its pins, so it moves with them during the drag.
 function smartGuides(e) {
-  const others = layout.elements.filter(o => o !== e && o.pins).map(o => ({id: o.id, ...guideBox(o.id, o.pins)}));
+  const others = layout.elements.filter(o => o.id !== e.id && o.pins).map(o => ({id: o.id, ...guideBox(o.id, o.pins)}));
   return guidesFor(guideBox(e.id, e.pins), others);
 }
 
@@ -159,15 +159,91 @@ function guidesFor(me, others) {
   return api;
 }
 
+// Arrow points align to their neighbours and to visible straight segments.
+// Keep the reference geometry fixed for this gesture, just like box guides.
+function arrowGuides(points, index, sourceIndex = -1) {
+  const anchors = [points[index - 1], points[index + 1]].filter(Boolean);
+  const shown = layout.modules && report?.module_info ? currentView(layout, report.module_info) : layout;
+  const segments = [];
+  function addSegments(path, moving = -1) {
+    for (let i = 1; i < path.length; i++) {
+      if (i !== moving && i - 1 !== moving) segments.push([path[i - 1], path[i]]);
+    }
+  }
+  addSegments(points, index);
+  shown.wires.forEach(path => addSegments(path));
+  (shown.callouts || []).forEach((c, i) => {
+    if (sourceObjectIndex('callouts', i) !== sourceIndex && c.style === 'line' && !c.bend)
+      addSegments([c.from, ...(c.via || []), c.to]);
+  });
+  const api = {lines: [], snap(p, event) {
+    api.lines = [];
+    const grid = p.map(v => r4(snap(v)));
+    if (!anchors.length) return grid;
+    const reach = GUIDE_PX * view.w / Math.max(svg.getBoundingClientRect().width, 1);
+    const line = (kind, a, b, reference) => ({kind, from:a, to:b, reference});
+    if (event.shiftKey) {
+      const a = anchors[0], horizontal = Math.abs(p[0] - a[0]) >= Math.abs(p[1] - a[1]);
+      const q = horizontal ? [grid[0], a[1]] : [a[0], grid[1]];
+      api.lines = [line(horizontal ? 'horizontal' : 'vertical', a, q)];
+      return q;
+    }
+    if (event.altKey) return grid;
+    // Both neighbours can constrain a corner, keeping each adjoining leg square.
+    const q = grid.slice();
+    for (const axis of [0, 1]) {
+      const matches = anchors.filter(a => Math.abs(p[axis] - a[axis]) <= reach && Math.abs(p[1-axis] - a[1-axis]) > reach);
+      matches.sort((a, b) => Math.abs(p[axis] - a[axis]) - Math.abs(p[axis] - b[axis]));
+      if (matches.length) {
+        q[axis] = matches[0][axis];
+        api.lines.push(line(axis === 0 ? 'vertical' : 'horizontal', matches[0], q));
+      }
+    }
+    if (api.lines.length) return q;
+    let best = null;
+    for (const reference of segments) {
+      const [a, b] = reference, dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy);
+      // Axis-aligned references are already covered by the neighbouring anchors.
+      if (Math.abs(dx) < 1e-9 || Math.abs(dy) < 1e-9) continue;
+      for (const [ux, uy, kind] of [[dx/length, dy/length, 'parallel'], [-dy/length, dx/length, 'perpendicular']]) {
+        for (const anchor of anchors) {
+          const distance = (p[0] - anchor[0])*ux + (p[1] - anchor[1])*uy;
+          const projected = [anchor[0] + distance*ux, anchor[1] + distance*uy];
+          const gap = Math.hypot(p[0] - projected[0], p[1] - projected[1]);
+          if (Math.abs(distance) > reach && gap <= reach && (!best || gap < best.gap - 1e-9))
+            best = {gap, point:projected.map(r4), anchor, kind, reference};
+        }
+      }
+    }
+    if (!best) return grid;
+    api.lines = [line(best.kind, best.anchor, best.point, best.reference)];
+    return best.point;
+  }};
+  return api;
+}
+
 // Dashed alignment lines in magenta and spacing marks, drawn over the
 // drawing while the drag lasts.
 function drawGuides() {
-  const g = drag?.guides;
+  const g = drag?.guides || boxDraft?.guides;
   if (!g || !g.lines.length) return;
   const root = el("g", {class: "smart-guides", "pointer-events": "none"}, svg);
   const stroke = {stroke: "#d6249f", "stroke-width": .02, fill: "none"};
   const pt = (axis, v, w) => axis === 0 ? [v, w] : [w, v];
-  for (const line of g.lines) {
+  for (const [index, line] of g.lines.entries()) {
+    if (line.from) {
+      const pixel = view.w / Math.max(svg.getBoundingClientRect().width, 1);
+      for (const [a, b] of [line.reference, [line.from, line.to]].filter(Boolean)) {
+        el('line', {x1:a[0], y1:-a[1], x2:b[0], y2:-b[1], ...stroke,
+          'stroke-width':1.4*pixel, 'stroke-dasharray':`${5*pixel} ${4*pixel}`, 'data-guide':line.kind}, root);
+      }
+      const label = el('text', {x:line.to[0]+8*pixel, y:-line.to[1]-(8+16*index)*pixel,
+        fill:stroke.stroke, 'font-size':12*pixel, 'font-family':'sans-serif',
+        stroke:'white', 'stroke-width':3*pixel, 'paint-order':'stroke', 'data-guide-label':line.kind}, root);
+      const text = {horizontal:'水平', vertical:'竖直', parallel:'平行', perpendicular:'垂直'}[line.kind];
+      label.textContent = window.cdI18n ? cdI18n.translate(text) : text;
+      continue;
+    }
     const {axis, v, at} = line, other = 1 - axis;
     const box = [g.me.box[0] + at[0], g.me.box[1] + at[1], g.me.box[2] + at[0], g.me.box[3] + at[1]];
     if (line.kind === "space") {

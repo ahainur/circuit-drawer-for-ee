@@ -61,6 +61,7 @@ CALLOUT_LABEL_POS = ("above", "below", "left", "right", "inline")
 # sampled signal, a head at either end or none, and an isolation mark.
 CALLOUT_DASHES = ("solid", "dashed", "dotted")
 CALLOUT_HEADS = ("end", "start", "both", "none")
+CALLOUT_CORNERS = ("sharp", "round")
 # Printed outline widths, in pt; bounded to keep the outline smaller than the
 # block shaft. None keeps the historical profile-dependent width.
 CALLOUT_BORDER_WIDTH = (0.1, 3.0)
@@ -73,7 +74,7 @@ CALLOUT_APPEARANCE_FIELDS = {
 }
 CALLOUT_KEYS = frozenset({"id", "from", "to", "style", "color", "label", "label_pos", "size",
                          "bend", "wave_amplitude", "wave_cycles", "via", "label_at", "dash",
-                         "head", "isolation", "detail"}) | CALLOUT_APPEARANCE_FIELDS.keys()
+                         "head", "isolation", "detail", "corner"}) | CALLOUT_APPEARANCE_FIELDS.keys()
 TRANSPARENCY_NOTE = "块箭头使用了透明填充：PDF 保留透明度；转 EPS 或部分印刷流程会拍平透明度，请核对转换后的遮挡效果。"
 
 STACK_MAX = 6               # more panels than this reads as noise
@@ -92,6 +93,7 @@ WAVE_AMPLITUDE = 0.06      # cm: small pointer ripple, independent of column sca
 WAVE_CYCLES = 2
 MAX_WAVE_CYCLES = 8        # keep a short pointer readable and geometry bounded
 CALLOUT_LABEL_GAP = 0.08    # cm between a callout's midpoint and its label
+CALLOUT_CORNER_CUT = 0.12   # printed cm trimmed on either side of a rounded corner
 # Isolation mark across a signal line: two short bars with the line cut
 # between them, the way papers mark an isolated (optocoupler, isolated ADC)
 # feedback path.  Sizes in printed cm, independent of the column scaling.
@@ -158,6 +160,7 @@ class Region:
     # element ids that make up this module: the validator keeps them inside,
     # and the model and later exports read the module split from here
     members: list[str] = field(default_factory=list)
+    id: str | None = None
 
     def rect(self, k: int = 0) -> tuple[float, float, float, float]:
         """The front rectangle (k = 0) or the k-th panel behind it."""
@@ -192,6 +195,7 @@ class Callout:
     fill_opacity: float = 1.0
     foreground: bool = False
     over_parts: bool = False
+    corner: str = "sharp"          # rounding of via corners on line arrows
 
 
 def parse_region(d: Any, i: int, layout=None, s=None, prof=None, *, schema_only=False) -> Region:
@@ -231,8 +235,8 @@ def parse_region(d: Any, i: int, layout=None, s=None, prof=None, *, schema_only=
     if fill == "none" and border == "none":
         raise RegionError(f"{name}: with no fill and no border nothing would be drawn")
     bc = canon(d.get("border_color"))
-    if bc is not None and not valid_color(bc, allow_none=False):
-        raise RegionError(f"{name}: border_color must be a palette name or #rrggbb")
+    if bc is not None and not (valid_color(bc, allow_none=False) or valid_ink(bc)):
+        raise RegionError(f"{name}: border_color must be one of {list(REGION_BORDER_COLORS)} or #rrggbb")
     pos = d.get("label_pos", "below")
     if pos not in REGION_LABEL_POS:
         raise RegionError(f"{name}: label_pos must be one of {list(REGION_LABEL_POS)}")
@@ -264,12 +268,12 @@ def parse_region(d: Any, i: int, layout=None, s=None, prof=None, *, schema_only=
             fills = [canon(f) for f in fills]
         if not isinstance(fills, list) or not all(valid_color(f, False) for f in fills):
             raise RegionError(f"{name}: stack.fills must list palette names or #rrggbb")
-        base = fill if fill != "none" else "gray"
+        base = fill if fill != "none" else "#ffffff"
         for k in range(1, n + 1):
             f = fills[k - 1] if k - 1 < len(fills) else base
-            layers.append((dx * k, dy * k, f if k - 1 < len(fills) else f"{base}@{k}"))
+            layers.append((dx * k, dy * k, f if k - 1 < len(fills) or fill == "none" else f"{base}@{k}"))
     return Region(x0, y0, x1, y1, fill, border, bc, label, pos, size, layers, name,
-                  list(members))
+                  list(members), d.get("id"))
 
 
 def parse_callout(d: Any, i: int) -> Callout:
@@ -321,6 +325,11 @@ def parse_callout(d: Any, i: int) -> Callout:
     via = [_point(p, "via point") for p in via]
     if via and (style != "line" or d.get("bend", 0)):
         raise RegionError(f"{name}: via requires a straight line style without bend")
+    corner = d.get("corner", "sharp")
+    if corner not in CALLOUT_CORNERS:
+        raise RegionError(f"{name}: corner must be one of {list(CALLOUT_CORNERS)}")
+    if "corner" in d and style != "line":
+        raise RegionError(f"{name}: corner requires style=line")
     points = [a, *via, b]
     if any(math.dist(p, q) < 1e-6 for p, q in zip(points, points[1:])):
         raise RegionError(f"{name}: consecutive arrow points must be different")
@@ -371,7 +380,7 @@ def parse_callout(d: Any, i: int) -> Callout:
         appearance[key] = value
     return Callout(a, b, style, color, label, pos, _num(size) if size is not None else None, name,
                    bend=bend, wave_amplitude=amplitude, wave_cycles=int(cycles), via=via, label_at=label_at,
-                   dash=dash, head=head, isolation=isolation, detail=detail, **appearance)
+                   dash=dash, head=head, isolation=isolation, detail=detail, corner=corner, **appearance)
 
 
 def _sections(layout: Layout, key: str) -> list:
@@ -427,6 +436,11 @@ def safe_regions(layout: Layout, s=None, prof=None) -> tuple[list[Region], list[
 def rgb(color: str, mono: bool = False, edge: bool = False) -> tuple[int, int, int]:
     """Fill (or edge) colour as 0-255 RGB.  ``name@k`` is the palette colour
     k panels back in a stack: a little darker for each step."""
+    # Existing palette edges retain their tint; additional ink names use ink RGB.
+    if edge and color not in PALETTE and valid_ink(color) and _hex(color) is None:
+        return ink_rgb(color, mono)
+    if color.lower() == "#ffffff" and not edge:
+        return (255, 255, 255)
     shade = 0
     if "@" in color:
         color, k = color.split("@")
@@ -502,6 +516,7 @@ INKS: dict[str, str] = {
     "gray":    "#707070",
     "black":   "#000000",
 }
+REGION_BORDER_COLORS = tuple(dict.fromkeys((*PALETTE, *INKS)))
 INK_ALIASES: dict[str, str] = {
     "pink": "magenta", "fuchsia": "magenta", "grey": "gray", "cyan": "teal",
     "violet": "purple", "品红": "magenta", "洋红": "magenta", "粉": "magenta",

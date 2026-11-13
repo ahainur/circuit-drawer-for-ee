@@ -1,0 +1,261 @@
+{
+  "kind": "control",
+  "name": "buck_digital",
+  "title": "1 MHz Buck 数字控制延迟与量化",
+  "profile": "ieee-double",
+  "blocks": [
+    {
+      "id": "ref",
+      "type": "tag",
+      "style": "ref",
+      "at": [
+        0.75,
+        0
+      ],
+      "size": [
+        1.0,
+        0.5
+      ],
+      "text": "$V_{\\mathrm{ref}}$"
+    },
+    {
+      "id": "e1",
+      "type": "sum",
+      "at": [
+        2.0,
+        0
+      ],
+      "signs": {
+        "w": "+",
+        "s": "-"
+      }
+    },
+    {
+      "id": "gc",
+      "type": "block",
+      "at": [
+        3.7,
+        0
+      ],
+      "size": [
+        1.4,
+        0.8
+      ],
+      "text": "$G_{c}(s)$",
+      "label": "Type III",
+      "label_pos": "above"
+    },
+    {
+      "id": "pwm",
+      "type": "block",
+      "at": [
+        5.8,
+        0
+      ],
+      "size": [
+        1.0,
+        0.8
+      ],
+      "text": "$\\frac{1}{V_{M}}$",
+      "label": "PWM",
+      "label_pos": "above"
+    },
+    {
+      "id": "plant",
+      "type": "block",
+      "at": [
+        8.1,
+        0
+      ],
+      "size": [
+        1.6,
+        0.8
+      ],
+      "text": "$G_{vd}(s)$",
+      "label": "Buck power stage",
+      "label_pos": "above"
+    },
+    {
+      "id": "h",
+      "type": "block",
+      "at": [
+        5.8,
+        -1.3
+      ],
+      "size": [
+        1.0,
+        0.6
+      ],
+      "text": "$H$",
+      "label": "Divider",
+      "label_pos": "below"
+    }
+  ],
+  "links": [
+    {
+      "from": "ref.e",
+      "to": "e1.w"
+    },
+    {
+      "from": "e1.e",
+      "to": "gc.w",
+      "label": "$v_{e}$"
+    },
+    {
+      "from": "gc.e",
+      "to": "pwm.w",
+      "label": "$v_{c}$"
+    },
+    {
+      "from": "pwm.e",
+      "to": "plant.w",
+      "label": "$d$"
+    },
+    {
+      "from": "plant.e",
+      "to": [
+        10.6,
+        0
+      ],
+      "open": true
+    },
+    {
+      "from": [
+        9.6,
+        0
+      ],
+      "via": [
+        [
+          9.6,
+          -1.3
+        ]
+      ],
+      "to": "h.e"
+    },
+    {
+      "from": "h.w",
+      "via": [
+        [
+          2.0,
+          -1.3
+        ]
+      ],
+      "to": "e1.s"
+    }
+  ],
+  "texts": [
+    {
+      "at": [
+        10.68,
+        0
+      ],
+      "text": "$v_{o}$",
+      "anchor": "west"
+    }
+  ],
+  "regions": [
+    {
+      "from": [
+        -0.1,
+        -2.15
+      ],
+      "to": [
+        11.3,
+        1.35
+      ],
+      "fill": "green",
+      "label": "Voltage-mode buck loop",
+      "label_pos": "inside"
+    }
+  ],
+  "loop": {
+    "params": {
+      "Vin": 48,
+      "Vo": 12,
+      "Vref": 1,
+      "L": 4.7e-06,
+      "C": 2.2e-05,
+      "ESR": 0,
+      "Rload": 2.4,
+      "VM": 1
+    },
+    "tf": {
+      "gc": {
+        "comp": {
+          "fi": 1322.0,
+          "fz": [
+            6171.8,
+            6171.8
+          ],
+          "fp": [
+            259250.0,
+            259250.0
+          ]
+        }
+      },
+      "pwm": {
+        "gain": "1/VM"
+      },
+      "plant": {
+        "model": "buck",
+        "vin": "Vin",
+        "l": "L",
+        "c": "C",
+        "r": "Rload",
+        "rc": "ESR"
+      },
+      "h": {
+        "gain": "Vref/Vo"
+      }
+    },
+    "breaks": [
+      {
+        "at": "pwm",
+        "label": "$T(z)$"
+      }
+    ],
+    "closed": [
+      {
+        "from": "ref",
+        "to": "plant",
+        "label": "$v_{o}/V_{\\mathrm{ref}}$"
+      }
+    ],
+    "freq": [
+      10,
+      1000000.0
+    ]
+  },
+  "code": {
+    "fs": 1000000.0,
+    "method": "tustin",
+    "arith": "double",
+    "q": 24,
+    "external": [
+      "plant"
+    ],
+    "blocks": {
+      "gc": {
+        "min": 0,
+        "max": 0.9
+      },
+      "pwm": {
+        "min": 0,
+        "max": 0.9
+      }
+    }
+  },
+  "digital": {
+    "delay_samples": 1,
+    "adc": {
+      "plant": {
+        "bits": 12,
+        "min": 0,
+        "max": 24
+      }
+    },
+    "pwm_bits": 14,
+    "word_bits": 24,
+    "fraction_bits": 18
+  }
+}

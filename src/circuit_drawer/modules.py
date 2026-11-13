@@ -41,6 +41,7 @@ TITLE_PAD = 1.4              # room left for the port labels on both sides
 GLYPH_INSET = 0.25           # device mark kept this far inside the box
 TITLE_GAP = 0.35             # name above a box that shows a mark
 PARTIAL_TITLE_GAP = 0.35     # instance name above a partly collapsed module
+CAPACITY_GAP = 1.0          # layout units between the complete extents of adjacent modules
 
 
 def _object(value, required=(), optional=(), where="modules"):
@@ -95,7 +96,7 @@ def _provisional_nets(lay):
     return copy, missing
 
 
-APPEARANCE_KEYS = ("fill", "border", "border_color", "title")
+APPEARANCE_KEYS = ("fill", "border", "border_color", "title", "title_offset", "title_size")
 BOX_BORDERS = ("solid", "dashed", "dotted", "none")
 GROUP_PAD = 0.3      # layout units between a group's drawn instance and its panel
 
@@ -103,8 +104,18 @@ GROUP_PAD = 0.3      # layout units between a group's drawn instance and its pan
 def _appearance(raw, name):
     """An instance's ``appearance``: its folded box's fill, border style and
     colour (region values) and the title written in it."""
-    if not isinstance(raw, dict) or set(raw) - set(APPEARANCE_KEYS) or not all(isinstance(v, str) and v for v in raw.values()):
-        raise ModuleError(f"实例 {name}.appearance 只接受 {' / '.join(APPEARANCE_KEYS)}，值为文字")
+    if not isinstance(raw, dict) or set(raw) - set(APPEARANCE_KEYS) or not all(
+            isinstance(v, str) and (v or k == "title") for k, v in raw.items() if k not in {"title_offset", "title_size"}):
+        raise ModuleError(f"实例 {name}.appearance 只接受 {' / '.join(APPEARANCE_KEYS)}，title_offset 为坐标，title_size 为字号，其余值为文字")
+    if "title_size" in raw:
+        from .geometry import FONT_RANGE
+        value = raw["title_size"]
+        if type(value) not in (int, float) or not math.isfinite(value) or not FONT_RANGE[0] <= value <= FONT_RANGE[1]:
+            raise ModuleError(f"实例 {name}.appearance.title_size 须为 {FONT_RANGE[0]}–{FONT_RANGE[1]} pt")
+    offset = raw.get("title_offset", [0, 0])
+    if not isinstance(offset, list) or len(offset) != 2 or any(
+            type(v) not in (int, float) or not math.isfinite(v) for v in offset):
+        raise ModuleError(f"实例 {name}.appearance.title_offset 需要两个有限数值 [dx, dy]")
     if raw.get("border", "solid") not in BOX_BORDERS:
         raise ModuleError(f"实例 {name}.appearance.border 只接受 {' / '.join(BOX_BORDERS)}")
     if raw.get("border") == "none" and raw.get("fill", "none") == "none":
@@ -113,9 +124,8 @@ def _appearance(raw, name):
 
 
 def _groups(instances, already_hidden):
-    """``group`` on one instance: it is drawn for ``members`` (instances of the
-    same definition), which stay in the circuit but are drawn only as panels
-    stacked behind it."""
+    """Display groups keep every member in the complete physical circuit."""
+    from .completeness import INSTANCE_STYLES
     defs = {i.get("id"): i.get("definition") for i in instances if isinstance(i, dict)}
     out, taken = {}, set()
     for inst in instances:
@@ -123,19 +133,24 @@ def _groups(instances, already_hidden):
             continue
         name, spec = inst["id"], inst["group"]
         where = f"实例 {name}.group"
-        if not isinstance(spec, dict) or set(spec) - {"members", "fill", "label", "label_pos"} or not isinstance(spec.get("members"), list):
-            raise ModuleError(f"{where} 需要 members（同一定义的其他实例 ID 列表），可选 fill / label / label_pos")
+        if not isinstance(spec, dict) or set(spec) - {"members", "style", "fill", "label", "label_pos"} or not isinstance(spec.get("members"), list):
+            raise ModuleError(f"{where} 需要 members（其他实例 ID 列表），可选 style / fill / label / label_pos")
+        style = spec.get("style", "stack")
+        if style not in INSTANCE_STYLES:
+            raise ModuleError(f"{where}.style 须为 {' / '.join(INSTANCE_STYLES)}")
         members = spec["members"]
-        if not members or len(set(members)) != len(members):
+        if not members or not all(isinstance(m, str) for m in members) or len(set(members)) != len(members):
             raise ModuleError(f"{where}.members 不能为空或重复")
+        if style == "ellipsis" and len(members) < 2:
+            raise ModuleError(f"{where}: 省略显示至少需要三个不同的实际实例")
         for m in members:
             if m == name or m not in defs:
                 raise ModuleError(f"{where}.members 中的 {m!r} 不是另一个实例")
-            if defs[m] != defs[name]:
+            if style == "stack" and defs[m] != defs[name]:
                 raise ModuleError(f"{where}: {m} 用的是 {defs[m]}，不是 {defs[name]}；一组只能是同一个模块")
             if m in taken or m in already_hidden:
                 raise ModuleError(f"{where}: {m} 已经在别的组里")
-        if name in taken:
+        if name in taken or name in already_hidden:
             raise ModuleError(f"{where}: {name} 本身已被别的组代表")
         for key in ("fill", "label", "label_pos"):
             if key in spec and not isinstance(spec[key], str):
@@ -287,7 +302,10 @@ def _wire_contacts(source, view, ports, provisional):
     graph_layout = Layout.from_dict(source.to_dict())
     graph_layout.elements = [e for e in view.elements if "/" not in e.id]
     insulated = {_k(p) for p in source.hops}
-    public = {ref: _k(p) for ref, p in ports.items() if _k(p) not in insulated}
+    movable = {p["id"] for p in source.extra.get("modules", {}).get("parts", [])}
+    part_pins = {f"{e.id}.{pin}": point for e in graph_layout.elements if e.id in movable
+                 for pin, point in e.pins.items()}
+    public = {ref: _k(p) for ref, p in {**ports, **part_pins}.items() if _k(p) not in insulated}
     graph_layout.wires = [_split_joins(w, set(public.values())) for w in source.wires]
     graph = WireGraph(graph_layout)
     endpoints = defaultdict(list)
@@ -315,7 +333,7 @@ def _wire_contacts(source, view, ports, provisional):
             continue
         # An existing disagreement between ordinary pins still belongs to the
         # validator. A module contact must never legitimise that short circuit.
-        declared = {source.netlist[r] for r in refs if r in source.netlist and r not in provisional}
+        declared = {view.netlist[r] for r in refs if r in source.netlist and r not in provisional}
         touched.update((r, declared) for r in refs if r in public)
         if len(declared) > 1:
             continue
@@ -403,6 +421,12 @@ def _shown(sh, mode, at, s, prof):
     return _Drawn(exp, _port_points(exp, sh.prefix, sh.ports), _extent(exp, s, prof), [])
 
 
+def collapsed_dimensions(n, title, symbol):
+    height = max(COLLAPSED_SIZE, n * PORT_PITCH)
+    width = COLLAPSED_SIZE if symbol != "text" else max(COLLAPSED_SIZE, len(title) * TITLE_CHAR_WIDTH + TITLE_PAD)
+    return {"w": width, "h": height}
+
+
 def _collapsed(part, sh, s, prof, at):
     """A small block with the module name or a function mark, and its ports
     evenly spaced on the left and right edges, top to bottom in the order the
@@ -416,11 +440,8 @@ def _collapsed(part, sh, s, prof, at):
         right.sort(key=lambda p: sh.port_layout[p]["order"])
     n = max(len(left), len(right), 1)
     marked = sh.symbol != "text"
-    if sh.size:
-        width, height = sh.size["w"], sh.size["h"]
-    else:
-        height = max(COLLAPSED_SIZE, n * PORT_PITCH)
-        width = COLLAPSED_SIZE if marked else max(COLLAPSED_SIZE, len(sh.title) * TITLE_CHAR_WIDTH + TITLE_PAD)
+    size = sh.size or collapsed_dimensions(n, sh.title, sh.symbol)
+    width, height = size["w"], size["h"]
     if left:
         x0 = min(where[p][0] for p in left)
     elif right:
@@ -439,6 +460,8 @@ def _collapsed(part, sh, s, prof, at):
             ref = ports[p]
             el = box.add(prefix + ref[:-2], "port", label=None if marked else _tex_name(p),
                          label_pos=inside, p=placed[p])
+            original = part.element(prefix + ref[:-2])
+            el.opts.update({k: original.opts[k] for k in ("scale", "scale_length", "scale_width", "label_size") if k in original.opts})
             box.netlist[f"{el.id}.p"] = part.netlist[prefix + ref]
             by_net[box.netlist[f"{el.id}.p"]].append(f"{el.id}.p")
     frame = [round(v, 4) for v in (x0, y0, x1, y1)]
@@ -446,13 +469,16 @@ def _collapsed(part, sh, s, prof, at):
     box.extra["regions"] = [{"id": prefix + "box", "from": frame[:2], "to": frame[2:], "fill": style.get("fill", "none"),
                              "border": style.get("border", "solid"),
                              **({} if style.get("border") == "none" else {"border_color": style.get("border_color", "#000000")})}]
-    if not marked:
-        box.text((round((x0 + x1) / 2, 4), round((y0 + y1) / 2, 4)), sh.title)
-    else:
+    if marked:
         k = 0 if sh.symbol in CONVERTERS else GLYPH_INSET
         box.extra["glyphs"] = [{"kind": sh.symbol, "from": [frame[0] + k, frame[1] + k],
                                 "to": [frame[2] - k, frame[3] - k]}]
-        box.text((round((x0 + x1) / 2, 4), round(y1 + TITLE_GAP, 4)), sh.title)
+    offset = style.get("title_offset", [0, 0])
+    if sh.title:
+        title_y = y1 + TITLE_GAP if marked else (y0 + y1) / 2
+        box.text((round((x0 + x1) / 2 + offset[0], 4), round(title_y + offset[1], 4)), sh.title)
+        box.annotations[-1].size = style.get("title_size")
+    # Title editing must not shift instances placed automatically below this one.
     top = y1 + (TITLE_GAP * 2 if marked else 0)
     return _Drawn(box, placed, [frame[0], frame[1], frame[2], round(top, 4)],
                   [g for g in by_net.values() if len(g) > 1])
@@ -484,6 +510,7 @@ def _root_ends(elements):
 # orthogonal shapes and never moves a part. If no legal route exists, report
 # the layout problem instead of manufacturing an unchecked fallback wire.
 ROUTE_STEP = 0.4      # spacing of the detours tried beside ports and parts
+BOX_ROUTE_GAP = ROUTE_STEP / 2  # preferred clearance; tight layouts retry with actual frames
 ROUTE_TRIES = 6       # detours tried on each side
 # grid states the fallback router may expand before giving up: a route that
 # exists is found long before this; an impossible one would otherwise search
@@ -511,10 +538,10 @@ def _frozen(value):
 
 
 @lru_cache(maxsize=64)
-def _cached_grid_route(a_end, b_end, wires, pins, bodies, same, target_wires, budget):
+def _cached_grid_route(a_end, b_end, wires, pins, bodies, same, target_wires, budget, insulated=()):
     # A check and the editor's projection assemble the same drawing, so the
     # same (often failing) search comes twice; inputs are frozen tuples.
-    path = _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires, budget=budget)
+    path = _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires, budget=budget, insulated=insulated)
     return None if path is None else tuple(path)
 
 
@@ -557,7 +584,8 @@ def _bodies(lay, s, prof):
         from .geometry import footprint
         for e in lay.elements:
             fp = footprint(e, s, prof)
-            out.extend((b.x0, b.y0, b.x1, b.y1) for b in fp.labels)
+            # Footprints use printed centimetres; routing uses layout units.
+            out.extend((b.x0 / s.x, b.y0 / s.y, b.x1 / s.x, b.y1 / s.y) for b in fp.labels)
     return out
 
 
@@ -608,7 +636,7 @@ def _through(a, b, box):
     return x0 + EPS < a[0] < x1 - EPS and min(hi, y1) - max(lo, y0) > EPS
 
 
-def _route(a_end, b_end, lay, same=(), *, s, prof):
+def _route(a_end, b_end, lay, same=(), *, s, prof, avoid=()):
     """Return a clean path, insulated hop points and same-net junctions.
     Shapes tried: straight, one bend, and two-bend paths whose middle leg is
     centred or set ROUTE_STEP apart beside either end.  ``same`` holds link
@@ -617,13 +645,14 @@ def _route(a_end, b_end, lay, same=(), *, s, prof):
     (a, fa, sa), (b, fb, sb) = a_end, b_end
     a, b = (round(a[0], 4), round(a[1], 4)), (round(b[0], 4), round(b[1], 4))
     authored = bool(lay.extra.get("module_authoring"))
+    insulated = frozenset(tuple(h) for h in lay.hops)
     if authored:
         from .modes import WireGraph
         if WireGraph(lay).tree([a, b]) is not None:
             return [], [], set()
     wires = [s for w in lay.wires for s in _segs([tuple(p) for p in w])]
     pins = [tuple(p) for e in lay.elements for p in e.pins.values()]
-    bodies = _bodies(lay, s, prof)
+    bodies = _bodies(lay, s, prof) + list(avoid)
     def offsets(u, v):
         # Half-step corridors are needed between a user-picked terminal and
         # an adjacent existing source; library ports usually have more room.
@@ -656,8 +685,13 @@ def _route(a_end, b_end, lay, same=(), *, s, prof):
         if not _leaves(path, a, fa, sa) or not _leaves(path, b, fb, sb):
             continue
         path = _trim(_trim(path, same)[::-1], same)[::-1]
+        if any(p in insulated for p in path):
+            continue  # a requested hop may be crossed, never used as a branch or bend
+        # Library instances can acquire almost aligned ports after a resize.
+        # Reserve the same lane clearance as the fallback grid router instead
+        # of accepting a shorter path that the drawing validator will reject.
         cost = _cost(path, (a, fa, sa), (b, fb, sb), wires, pins, bodies, same,
-                     ROUTE_STEP * 0.75 if lay.extra.get("module_authoring") else 0, index)
+                     ROUTE_STEP * 0.75, index)
         if cost is not None and (best is None or cost < best[0]):
             best = (cost, path)
     target_wires = []
@@ -676,24 +710,28 @@ def _route(a_end, b_end, lay, same=(), *, s, prof):
         path = best[1]
     else:
         path = _cached_grid_route(*map(_frozen, (a_end, b_end, wires, pins, bodies, same, target_wires)),
-                                  getattr(_ROUTING, "budget", None) or GRID_ROUTE_BUDGET)
+                                  getattr(_ROUTING, "budget", None) or GRID_ROUTE_BUDGET, tuple(sorted(insulated)))
         path = path and list(path)
     if not path:
         raise ModuleError("该尺寸无法布线：请增大模块间距或调整方框尺寸，原连接不会改成无效折线")
-    return _crossings(path, wires, same, authored)
+    return _crossings(path, wires, same, authored, insulated)
 
 
-def _crossings(path, wires, same, authored):
+def _crossings(path, wires, same, authored, insulated=()):
     """The path split at same-net junctions, its insulated hops, and the
     junction points, against the wire segments already drawn."""
     joins = set()
     hops = []
     for p, q in _segs(path):
         for w in wires:
+            own = authored and _same_wire(w, same)
+            if own:
+                # An authored node can be the end of two source wires. Keep
+                # that junction instead of routing around its endpoint.
+                joins.update(end for end in w if end not in insulated and _on(end, p, q, interior=True))
             c = _cross(p, q, *w)
             if c:
-                own = authored and _same_wire(w, same)
-                if own:
+                if own and c not in insulated:
                     joins.add(c)
                 else:
                     hops.append(c)
@@ -725,7 +763,7 @@ def _manual_route(a_end, b_end, via, lay, same=()):
     # where it runs along a wire of its own net, it meets that wire in a T
     path = _trim(_trim(path, same)[::-1], same)[::-1]
     wires = [s for w in lay.wires for s in _segs([tuple(p) for p in w])]
-    return _crossings(path, wires, same, bool(lay.extra.get("module_authoring")))
+    return _crossings(path, wires, same, bool(lay.extra.get("module_authoring")), frozenset(tuple(h) for h in lay.hops))
 
 
 def _routes(spec):
@@ -844,7 +882,7 @@ class _Index:
 
 
 def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, clearance=ROUTE_STEP * .75,
-                budget=None):
+                budget=None, insulated=()):
     """Visibility-grid fallback for ports picked inside a user's old drawing.
 
     Unlike the library's two-bend paths, this can navigate around several
@@ -857,6 +895,7 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
     a, fa, sa = a_end
     b, fb, sb = b_end
     a, b = tuple(a), tuple(b)
+    insulated = frozenset(insulated)
     coordinates = [a, b, *pins, *(p for w in wires for p in w)]
     xs = {p[0] for p in coordinates}
     ys = {p[1] for p in coordinates}
@@ -890,9 +929,9 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
             nx, ny = x + dx, y + dy
             # A hop must cross a wire inside a segment, never stop/turn on it.
             # Skip grid vertices on foreign wire interiors to permit that hop.
-            while 0 <= nx < len(xs) and 0 <= ny < len(ys) and any(
+            while 0 <= nx < len(xs) and 0 <= ny < len(ys) and ((xs[nx], ys[ny]) in insulated or any(
                     _on((xs[nx], ys[ny]), *w, interior=True) and not _same_wire(w, same)
-                    for w in index.wires_at((xs[nx], ys[ny]))):
+                    for w in index.wires_at((xs[nx], ys[ny])))):
                 nx += dx; ny += dy
             if not (0 <= nx < len(xs) and 0 <= ny < len(ys)):
                 continue
@@ -901,7 +940,8 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
                 continue
             if q == b and not _leaves([p, q], b, fb, sb):
                 continue
-            edge = (p, q)
+            # Edge cost is direction-independent; the reverse visit reuses it.
+            edge = (p, q) if p < q else (q, p)
             if edge not in cache:
                 cache[edge] = _cost([p, q], a_end, b_end, wires, pins, bodies, same, clearance, index)
             extra = cache[edge]
@@ -968,12 +1008,15 @@ def _cost(path, a_end, b_end, wires, pins, bodies, same=(), clearance=0, index=N
         if any(_on(x, p, q) for x in (index.pins_near(p, q) if index else pins) if x not in (a, b)
                and not (x in ends and any(_on(x, *w) for w in same))):
             return None
-        if any(_on(x, p, q, interior=True) for x in (index.ends_near(p, q) if index else [x for w in wires for x in w])):
+        if any(_on(x, p, q, interior=True) and not any(_on(x, *w) for w in same)
+               for x in (index.ends_near(p, q) if index else [x for w in wires for x in w])):
             return None
     for v in path:
         for w in (index.wires_at(v) if index else wires):
-            if clearance and _on(v, *w) and not _same_wire(w, same):
-                return None  # a foreign-net wire end is not a legal bend/junction
+            if clearance and v not in (a, b) and _on(v, *w) and not _same_wire(w, same):
+                # Named endpoint pins may already terminate internal wires of
+                # an expanded module; intermediate foreign junctions may not.
+                return None
             # a branch may start on a wire of its own net: that is the junction
             if _on(v, *w, interior=True) and not (v in ends and _same_wire(w, same)):
                 return None
@@ -1023,11 +1066,49 @@ class Assembly:
     origins: dict = field(default_factory=dict)             # instance -> the ``at`` it is drawn at
     instance_wires: dict = field(default_factory=dict)      # instance -> [first, end) of its view wires
     wire_contacts: dict[str, set[str]] = field(default_factory=dict)  # public pin -> touched root net names
+    titles: dict = field(default_factory=dict)              # view annotation index -> instance and title offset
+    part_pins: dict = field(default_factory=dict)           # port-relative external pins in the drawn view
+    # Connectivity for checks and simulation: ``full`` itself when every
+    # instance is expanded; otherwise each instance expanded on its own sheet
+    # (see SHEET_GAP), joined to the top level only through its ports.
+    sheets: Layout | None = None
+    sheet_links: list = field(default_factory=list)          # explicit pin joins for ``sheets``
+    root_wires: dict = field(default_factory=dict)           # view wire index -> authored wire index
+    instance_decorations: dict = field(default_factory=dict)  # instance -> section -> [first, end)
+    port_owners: dict = field(default_factory=dict)           # public port -> visible instance
+    port_refs: dict = field(default_factory=dict)             # public port -> full circuit pin
+    omitted_joins: list = field(default_factory=list)         # real port links ending in an ellipsis
+    ellipsis_markers: dict = field(default_factory=dict)      # view annotation index -> first instance
+
+    def connectivity(self, prof, scale=None):
+        """Check ``sheets`` for what is connected to what.
+
+        The sheets side by side are wider than any column, so they are fitted
+        the way a single definition is (check_definitions): to a page as wide
+        as they are. Drawing issues are then left out, see DRAWING_ONLY, unless
+        one stopped the check before every pin was given a net."""
+        from .validate import check, extent
+        if self.sheets is self.full:
+            return check(self.full, prof, scale, connections=self.links)
+        b = extent(self.sheets, Scale(prof.max_scale, prof.max_scale), prof)
+        wide = replace(prof, width_cm=max(prof.width_cm, b.x1 - b.x0 + DEFINITION_WIDTH_MARGIN))
+        report = check(self.sheets, wide, connections=self.sheet_links)
+        pins = {f"{e.id}.{p}" for e in self.sheets.elements for p in e.pins}
+        if pins <= report.nets.keys():
+            report.issues = [i for i in report.issues if i.code not in DRAWING_ONLY]
+        return report
+
+    @property
+    def contact_pins(self):
+        return {**self.ports, **self.part_pins}
 
 
 LIBRARY = Path(__file__).parent / "module_library"
 AUTO_GAP = 1.0     # layout units between instances stacked without "at"
 PART_GAP = 1.3     # layout units from a module port to a part placed beside it
+# Clearance between the extents of private connectivity sheets; external parts
+# stay with the top-level drawing, and no wires are routed across this gap.
+SHEET_GAP = 4.0
 
 
 def _partial(spec, full, ports, name):
@@ -1103,13 +1184,21 @@ def _with_parts(source, parts):
     out = Layout.from_dict(source.to_dict())
     taken = {e.id for e in out.elements}
     for k, part in enumerate(parts):
-        _object(part, ("id", "kind"), ("label",), f"modules.parts 第 {k + 1} 项")
+        _object(part, ("id", "kind"), ("label", "offset", "opts"), f"modules.parts 第 {k + 1} 项")
         name = _name(part["id"], "modules.parts 的 id")
+        offset = part.get("offset", [0, 0])
+        if (not isinstance(offset, list) or len(offset) != 2
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in offset)):
+            raise ModuleError(f"modules.parts {name}.offset 必须是两个有限数值 [dx, dy]")
         if name in taken or part["kind"] not in TWO_TERMINAL:
             raise ModuleError(f"modules.parts {name}: id 重复，或 kind 不是两端元件 {sorted(TWO_TERMINAL)}")
         taken.add(name)
         pins = PIN_NAMES[part["kind"]]
         out.add(name, part["kind"], label=part.get("label"), **{pins[0]: (0, 0), pins[1]: (0, 1)})
+        if "opts" in part:
+            if not isinstance(part["opts"], dict):
+                raise ModuleError(f"modules.parts {name}.opts 必须是元件选项对象")
+            out.element(name).opts = deepcopy(part["opts"])
         out.netlist.update({f"{name}.{p}": f"part:{name}.{p}" for p in pins})
     return out
 
@@ -1132,7 +1221,9 @@ def _place_parts(out, parts, pairs, ports_at, faces):
         if fa != fb or abs(qa[1] - qb[1]) < 1e-6:
             raise ModuleError(f"自动放置的 {el.id} 两个引脚须连到同一侧、高度不同的端口")
         x = min(qa[0], qb[0]) - PART_GAP if fa < 0 else max(qa[0], qb[0]) + PART_GAP
-        el.pins = {pa: (round(x, 4), qa[1]), pb: (round(x, 4), qb[1])}
+        dx, dy = part.get("offset", [0, 0])
+        el.pins = {pa: (round(x + dx, 4), round(qa[1] + dy, 4)),
+                   pb: (round(x + dx, 4), round(qb[1] + dy, 4))}
         el.label_pos = el.label_pos or ("left" if fa < 0 else "right")
 
 
@@ -1141,9 +1232,45 @@ def _definitions(spec):
     if not isinstance(definitions, dict) or not isinstance(instances, list):
         raise ModuleError("modules.instances 必须是列表，definitions 必须是对象")
     definitions = {**_library_for(instances, definitions), **definitions}
+    for instance in instances:
+        if isinstance(instance, dict) and isinstance(instance.get("definition"), str) and instance["definition"] not in definitions:
+            choices = sorted(set(library_names()) | {n for n in definitions if isinstance(n, str)})
+            raise ModuleError(f"实例 {instance.get('id', '?')}: 模块定义 {instance['definition']} 不存在；可选 {', '.join(choices)}")
     if not definitions:
         raise ModuleError(f"modules.definitions 为空；可直接引用模块库 {library_names()}")
     return definitions
+
+
+def capacity(source, profile="double"):
+    """Expanded-definition width budget, not a routing or validity guarantee.
+
+    Profiles bound width only: a fitting vertical column has no finite count
+    until the author chooses a page-height budget. Fonts and symbols retain
+    their physical sizes when evaluating the minimum allowed layout scale.
+    """
+    from .validate import extent
+    prof = get_profile(profile) if isinstance(profile, str) else profile
+    if "modules" not in source.extra:
+        return {}
+    result = {}
+    for name, definition in _definitions(source.extra["modules"]).items():
+        drawing = Layout.from_dict(definition["layout"])
+        if not drawing.elements:
+            result[name] = {"empty": True}
+            continue
+        box = extent(drawing, Scale(1, 1), prof)
+        columns = {}
+        for key in ("single", "double"):
+            column = get_profile(key)
+            minimum = extent(drawing, Scale(column.min_scale, column.y_min_scale), column)
+            width = minimum.x1 - minimum.x0
+            gap = CAPACITY_GAP * column.min_scale
+            count = max(0, math.floor((column.width_cm + gap) / (width + gap)))
+            columns[key] = {"horizontal": count, "vertical": None if count else 0,
+                            "minimum_width_cm": width, "column_width_cm": column.width_cm}
+        result[name] = {"width_cm": box.x1 - box.x0, "height_cm": box.y1 - box.y0,
+                        "gap": CAPACITY_GAP, "columns": columns}
+    return result
 
 
 def _read_definition(name, definition):
@@ -1213,11 +1340,23 @@ def _read_definition(name, definition):
 def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
     scale = scale or Scale(1, 1)
     prof = prof or get_profile("double")
+    root_wires = {i: i for i in range(len(source.wires))}
     # Older saved authoring projects may still contain boundary posts. Derive
     # direct pin links without rewriting their stored coordinate table.
     if isinstance(source.extra.get("module_authoring"), dict):
         from .module_authoring import direct_boundary_links
-        source = direct_boundary_links(source)
+        prepared = direct_boundary_links(source)
+        if prepared is not source:
+            # Legacy boundary trees can be removed or split into derived links.
+            # Identify the unchanged authored wires before any routing occurs.
+            unused = list(root_wires)
+            root_wires = {}
+            for j, wire in enumerate(prepared.wires):
+                k = next((k for k in unused if source.wires[k] == wire), None)
+                if k is not None:
+                    unused.remove(k)
+                    root_wires[j] = k
+        source = prepared
     spec = source.extra.get("modules")
     _object(spec, ("version", "instances"), ("definitions", "root_ports", "links", "parts", "routes"))
     if type(spec["version"]) is not int or spec["version"] != 1:
@@ -1228,8 +1367,6 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
     view_mode = source.extra.get("module_view", "expanded")
     if view_mode not in ("expanded", "folded"):
         raise ModuleError("module_view 只接受 expanded / folded")
-    if source.modes and instances:
-        raise ModuleError("模块初版支持静态图和 SPICE；请在普通展开电路中编辑模态，不能忽略模块的跨端口回路")
     templates, titles, symbols, partials = {}, {}, {}, {}
     for name, definition in definitions.items():
         lay, ports, defaults, title, symbol, partial = _read_definition(name, definition)
@@ -1320,6 +1457,7 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
         lay = Layout.from_dict(original.to_dict())
         views = [lay] + ([Layout.from_dict(partials[inst["definition"]].to_dict())]
                          if inst["definition"] in partials else [])
+        style = _appearance(inst.get("appearance", {}), name)
         if "label" in inst:
             label = inst["label"]
             _object(label, ("at", "text"), (), f"实例 {name}.label")
@@ -1328,6 +1466,7 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                     or any(type(v) not in (int, float) or not math.isfinite(v) for v in pos)):
                 raise ModuleError(f"实例 {name}.label 需要文字和有限的局部坐标 at")
             lay.text(tuple(pos), label["text"])
+            lay.annotations[-1].size = style.get("title_size")
         prefix = name + "/"
         mapped = bind(lay, {p: ports[p] for p in cfg}, cfg, prefix)
         faces = _faces(lay, ports, scale, prof)
@@ -1352,8 +1491,8 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
         if len(views) > 1 and "label" in inst:
             top = _extent(views[1], scale, prof)
             views[1].text(((top[0] + top[2]) / 2, top[3] + PARTIAL_TITLE_GAP), inst["label"]["text"])
-        style = _appearance(inst.get("appearance", {}), name)
-        title = style.pop("title", None) or (inst["label"]["text"] if "label" in inst else titles[inst["definition"]] or name)
+            views[1].annotations[-1].size = style.get("title_size")
+        title = style.pop("title", inst["label"]["text"] if "label" in inst else titles[inst["definition"]] or name)
         ids = {prefix + e.id for e in lay.elements}
         if actual_ids & ids:
             raise ModuleError(f"实例 {name} 展开后的器件 ID 与顶层重复")
@@ -1367,41 +1506,71 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             raise ModuleError(f"公共网络 {name} 只有一个端口 {refs[0]}；请检查 bindings 拼写或补齐另一端")
     from .completeness import inspect_stacks
     completeness = inspect_stacks(source, resolved_instances=names)
-    hidden = []
+    if completeness["style_issues"]:
+        raise ModuleError("；".join(completeness["style_issues"]))
+    hidden, ellipses = [], []
     if view_mode == "folded":
         if not completeness["ok"]:
             raise ModuleError("折叠前请核对叠面板用途：" + "；".join(completeness["issues"]))
         grouped = set()
-        for usage in source.extra.get("stack_usage", {}).values():
+        for region_id, usage in source.extra.get("stack_usage", {}).items():
             if usage.get("purpose") == "instances":
                 group = usage["instances"]
                 if grouped.intersection(group):
                     raise ModuleError("同一实例不能出现在多个折叠面板中")
                 grouped.update(group)
-                hidden.extend(group[1:])
+                if usage.get("style", "stack") == "ellipsis":
+                    ellipses.append(group)
+                    hidden.extend(group[1:-1])
+                else:
+                    hidden.extend(group[1:])
         if not hidden:
             raise ModuleError("folded 需要 stack_usage 中声明实际实例组，第一项为保留的前面板")
     groups = _groups(instances, set(hidden))
-    for group in groups.values():
-        hidden.extend(group["members"])
+    ellipsis_members = {name for group in ellipses for name in group}
+    if any(ellipsis_members.intersection([name, *group["members"]]) for name, group in groups.items()):
+        raise ModuleError("省略实例组不能与其他一组显示重叠")
+    for lead, group in groups.items():
+        if group.get("style", "stack") == "ellipsis":
+            ellipses.append([lead, *group["members"]])
+            hidden.extend(group["members"][:-1])
+        else:
+            hidden.extend(group["members"])
     contact_pairs, contact_wires, touched_ports, contact_ports = [], source.wires, {}, {}
-    def drawing(omit, folded, shown, decorated=True, routed=True, project_contacts=False):
+    def drawing(omit, folded, shown, decorated=True, routed=True, project_contacts=False, sheets=False):
+        """One picture of the assembly. With ``sheets`` every instance is
+        drawn expanded on its own sheet to the right of the top level, like a
+        Simulink subsystem's own window: nothing inside it can touch another
+        instance or the top-level wiring, and the links become explicit pin
+        connections (``meta["connections"]``) instead of routed wires."""
         out = Layout.from_dict(root.to_dict())
         if project_contacts:
             out.wires = deepcopy(contact_wires)
+        if sheets:
+            # External parts belong to the top-level sheet, including their
+            # offsets and ordinary wire contacts. Only module internals move.
+            for part in spec.get("parts", []):
+                out.element(part["id"]).pins = dict(view.element(part["id"]).pins)
         if not decorated:
             for key in DECORATION_SECTIONS:
                 out.extra.pop(key, None)
+            out.extra.pop("control_view", None)  # its frame belongs only to the drawn sheet
             out.annotations = []
         usages = source.extra.get("stack_usage", {})
         usages = usages if isinstance(usages, dict) else {}
-        if not folded:
-            for region in out.extra.get("regions", []):
-                usage = usages.get(region.get("id"))
-                if isinstance(usage, dict) and usage.get("purpose") == "instances":
-                    region.pop("stack", None)
+        for region in out.extra.get("regions", []):
+            usage = usages.get(region.get("id"))
+            if isinstance(usage, dict) and usage.get("purpose") == "instances" and (
+                    not folded or usage.get("style", "stack") == "ellipsis"):
+                region.pop("stack", None)
         ports_at, faces, frames, joins, placed, drawings = {}, {}, {}, [], [], {}
-        meta = {"link_wires": [], "unrouted": [], "ports": {}, "origins": {}, "instance_wires": {}}
+        active_ellipses = [g for g in ellipses if all(n in omit for n in g[1:-1])
+                           and g[0] not in omit and g[-1] not in omit]
+        omitted_group = {member: set(g) for g in active_ellipses for member in g[1:-1]}
+        meta = {"link_wires": [], "unrouted": [], "ports": {}, "origins": {}, "instance_wires": {}, "titles": {},
+                "connections": [], "instance_decorations": {}, "port_owners": {}, "omitted_joins": [], "ellipsis_markers": {}}
+        if sheets:
+            cursor = (_extent(out, scale, prof)[2] if out.elements or out.wires else 0) + SHEET_GAP
         for name in names:
             if name in omit:
                 continue
@@ -1409,7 +1578,11 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             mode = shown(sh)
             origin = list(sh.at or [0, 0])
             drawn = _shown(sh, mode, origin, scale, prof)
-            if sh.at is None and placed:
+            if sheets:
+                origin = [round(origin[0] + cursor - drawn.frame[0], 4), round(origin[1] - drawn.frame[1], 4)]
+                drawn = _shown(sh, mode, origin, scale, prof)
+                cursor = drawn.frame[2] + SHEET_GAP
+            elif sh.at is None and placed:
                 # stack under the instances already drawn, as they are drawn now
                 target = min(f[1] for f in placed) - AUTO_GAP
                 origin = [0, round(target - drawn.frame[3], 4)]
@@ -1417,6 +1590,8 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             meta["origins"][name] = origin
             placed.append(drawn.frame)
             frames[name] = drawn.frame
+            starts = {"annotations": len(out.annotations), "hops": len(out.hops),
+                      **{key: len(out.extra.get(key, [])) for key in DECORATION_SECTIONS}}
             if name in groups and all(m in omit for m in groups[name]["members"]):
                 # one instance drawn for a group: the others are panels behind it
                 gspec, f, pad = groups[name], drawn.frame, GROUP_PAD
@@ -1429,26 +1604,41 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             joins += drawn.joins
             drawings[name] = drawn.layout
             ports_at.update({(name, p): q for p, q in drawn.ports.items()})
+            meta["port_owners"].update({f"{name}.{p}": name for p in drawn.ports})
             faces.update({(name, p): f for p, f in sh.faces.items()})
             copy = drawn.layout
+            if mode == "collapsed" and sh.title:
+                meta["titles"][len(out.annotations)] = {"id": name, "offset": sh.style.get("title_offset", [0, 0])}
             meta["instance_wires"][name] = [len(out.wires), len(out.wires) + len(copy.wires)]
             out.elements.extend(copy.elements); out.wires.extend(copy.wires)
             out.hops.extend(copy.hops); out.annotations.extend(copy.annotations)
             out.netlist.update(copy.netlist)
             for key in DECORATION_SECTIONS:
                 out.extra.setdefault(key, []).extend(copy.extra.get(key, []))
+            counts = {"annotations": len(out.annotations), "hops": len(out.hops),
+                      **{key: len(out.extra.get(key, [])) for key in DECORATION_SECTIONS}}
+            meta["instance_decorations"][name] = {key: [start, counts[key]] for key, start in starts.items()}
             if mode == "collapsed" and sh.unconnected:
                 # a folded box's open port is a lone pin: mark it as meant to be open
                 out.extra.setdefault("no_connect", []).extend(
                     sh.prefix + sh.ports[p] for p in sh.unconnected if f"{name}.{p}" not in touched_ports)
         # A hidden member's external circuit still needs an endpoint. Reuse a
         # visible port only on the SAME net; otherwise retain a named terminal.
-        representatives = {member: lead for lead, group in groups.items() for member in group["members"]}
+        representatives = {member: lead for lead, group in groups.items()
+                           if group.get("style", "stack") == "stack" for member in group["members"]}
         for name in names:
             if name not in omit:
                 continue
             sh = shapes[name]
             needed = [p for p in sh.ports if (name, p) in resolve.linked]
+            if name in omitted_group:
+                # Internal chain links are represented by the omission marker.
+                # An external tap still gets its own named terminal, preserving
+                # its actual net instead of silently using an endpoint's port.
+                group = omitted_group[name]
+                needed = [p for p in needed if f"{name}.{p}" in touched_ports or any(
+                    ref == f"{name}.{p}" and other.rpartition(".")[0] not in group
+                    for a, b, _ in resolve.pairs for ref, other in ((a, b), (b, a)))]
             if not needed:
                 continue
             origin = list(sh.at or [0, 0])
@@ -1465,6 +1655,7 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                 contact = contact_ports.get(f"{name}.{port}") if f"{name}.{port}" in touched_ports else None
                 if contact is None and peer in ports_at and out.netlist[shapes[lead].prefix + shapes[lead].ports[port]] == net:
                     ports_at[(name, port)], faces[(name, port)] = ports_at[peer], faces[peer]
+                    meta["port_owners"][f"{name}.{port}"] = lead
                 else:
                     el = terminals.layout.element(ref[:-2])
                     if contact is not None:
@@ -1475,10 +1666,18 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                     out.elements.append(el)
                     out.netlist[ref] = net
                     ports_at[(name, port)], faces[(name, port)] = el.pins["p"], sh.faces[port]
+                    meta["port_owners"][f"{name}.{port}"] = name
                     retained = True
             if retained:
                 placed.append(terminals.frame)
-        _place_parts(out, spec.get("parts", []), resolve.pairs, ports_at, faces)
+        if active_ellipses:
+            from .geometry import module_ellipsis
+            for group in active_ellipses:
+                at, text = module_ellipsis(frames[group[0]], frames[group[-1]], scale)
+                meta["ellipsis_markers"][len(out.annotations)] = group[0]
+                out.text(tuple(at), text)
+        if not sheets:
+            _place_parts(out, spec.get("parts", []), resolve.pairs, ports_at, faces)
         ends = _root_ends([e for e in out.elements if "/" not in e.id])
         ends.update({f"{n}.{p}": (q, faces[(n, p)], True) for (n, p), q in ports_at.items()})
         drawn_nets = defaultdict(list)
@@ -1506,7 +1705,19 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             return (-_link_order(pair, ends), -height) if source.extra.get("module_authoring") else (_link_order(pair, ends), 0)
         meta["ports"] = {f"{n}.{p}": list(q) for (n, p), q in ports_at.items()}
         routed_pairs = resolve.pairs if project_contacts else resolve.pairs[:len(spec.get("links", []))]
+        if sheets:
+            def pin(r):
+                n, _, p = r.rpartition(".")
+                return shapes[n].prefix + shapes[n].ports[p] if (n, p) in ports_at else r
+            meta["connections"] = [[pin(a), pin(b)] for a, b, _ in routed_pairs if a in ends and b in ends]
+            return out, frames, joins, drawings, meta
         for a, b, net in sorted(routed_pairs, key=route_order):
+            if ((a not in ends and a.rpartition(".")[0] in omitted_group)
+                    or (b not in ends and b.rpartition(".")[0] in omitted_group)):
+                def full_ref(ref):
+                    name, _, port = ref.rpartition(".")
+                    return shapes[name].prefix + shapes[name].ports[port] if name in shapes else ref
+                meta["omitted_joins"].append([full_ref(a), full_ref(b)])
             if a in ends and b in ends:
                 if ends[a][0] == ends[b][0]:
                     continue  # extracted boundary terminals coincide while expanded
@@ -1523,7 +1734,23 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                     path, hops, junctions = _manual_route(ends[a], ends[b], manual, out, drawn_nets[net])
                 else:
                     try:
-                        path, hops, junctions = _route(ends[a], ends[b], out, drawn_nets[net], s=scale, prof=prof)
+                        # A collapsed frame is an opaque subsystem body. Wires
+                        # can meet its boundary ports, but must go around its interior.
+                        boxes = {n:f for n,f in frames.items() if shown(shapes[n]) == "collapsed"}
+                        owners = {meta['port_owners'].get(ref, ref.rpartition('.')[0]) for ref in (a,b)}
+                        preferred = [f if n in owners else
+                                     [f[0]-BOX_ROUTE_GAP, f[1]-BOX_ROUTE_GAP, f[2]+BOX_ROUTE_GAP, f[3]+BOX_ROUTE_GAP]
+                                     for n,f in boxes.items()]
+                        try:
+                            path, hops, junctions = _route(ends[a], ends[b], out, drawn_nets[net],
+                                                          s=scale, prof=prof, avoid=preferred)
+                        except ModuleError:
+                            # Clearance is a preference, never an invisible obstacle
+                            # over a real endpoint or a narrow but usable corridor.
+                            if preferred == list(boxes.values()):
+                                raise
+                            path, hops, junctions = _route(ends[a], ends[b], out, drawn_nets[net],
+                                                          s=scale, prof=prof, avoid=boxes.values())
                     except ModuleError:
                         if getattr(_ROUTING, "budget", None):
                             raise   # a size search only needs to know it fails
@@ -1537,7 +1764,9 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                 if len(path) >= 2:
                     out.wires.append(path)
                     meta["link_wires"].append({"wire": len(out.wires) - 1, "link": [a, b], "manual": manual is not None})
-                out.hops.extend(hops)
+                for hop in hops:
+                    if hop not in out.hops:
+                        out.hops.append(hop)
                 drawn_nets[net].extend(_segs([tuple(p) for p in path]))
         return out, frames, joins, drawings, meta
     # Root regions, blocks, arrows and texts are placed for the drawn view.
@@ -1563,8 +1792,16 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
         view, frames, joins, _, view_meta = drawing(hidden, view_mode == "folded", lambda sh: sh.display)
     full, _, _, expanded, _ = drawing([], False, lambda sh: "expanded", decorated=not differs,
                                        routed=not differs, project_contacts=differs)
+    # The electrical check of a folded figure: when an instance is folded or
+    # hidden, ``full`` is only an overlay of where the internals would land if
+    # expanded, and two boxes that clear each other can still have overlapping
+    # internals there. Connectivity is read from separate sheets instead.
+    sheets, sheet_meta = full, {"connections": []}
+    if differs:
+        sheets, _, _, _, sheet_meta = drawing([], False, lambda sh: "expanded", decorated=False,
+                                              routed=False, project_contacts=True, sheets=True)
     for ref in provisional:          # undeclared, as the editor's netlist panel shows them
-        full.netlist.pop(ref, None); view.netlist.pop(ref, None)
+        full.netlist.pop(ref, None); view.netlist.pop(ref, None); sheets.netlist.pop(ref, None)
     collapsed = {n for n in names if shapes[n].display != "expanded"}
     # The simulation exporters draw a collapsed instance as a subsystem box
     # and everything else expanded; the view already is that drawing unless
@@ -1589,14 +1826,32 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
             raise ModuleError("顶层 simulation.components 只填顶层器件；实例参数写 defaults / overrides")
         sim["components"] = {**values, **root_values}
         full.extra["simulation"] = sim
+        if sheets is not full:
+            sheets.extra["simulation"] = deepcopy(sim)
     if "electrical" in source.extra:
         full.extra["electrical"] = deepcopy(source.extra["electrical"])
+        if sheets is not full:
+            sheets.extra["electrical"] = deepcopy(source.extra["electrical"])
     from .module_authoring import validate_metadata
     validate_metadata(source, full)
-    return Assembly(full, view, list(links.values()), names, hidden, joins, frames,
+    assembly = Assembly(full, view, list(links.values()), names, hidden, joins, frames,
                     sorted(collapsed), [n for n in names if shapes[n].partial is not None],
                     exported, boxed, view_meta["link_wires"], view_meta["unrouted"], view_meta["ports"],
-                    view_meta["origins"], view_meta["instance_wires"], touched_ports)
+                    view_meta["origins"], view_meta["instance_wires"], touched_ports, view_meta["titles"],
+                    {f"{part['id']}.{pin}": list(point) for part in spec.get("parts", [])
+                     for pin, point in view.element(part["id"]).pins.items()})
+    assembly.sheets = sheets
+    assembly.sheet_links = list(links.values()) + sheet_meta["connections"]
+    # View construction only appends wires. Inserting junction vertices into
+    # a root wire changes its geometry, never its ownership or wire index.
+    assembly.root_wires = root_wires
+    assembly.instance_decorations = view_meta["instance_decorations"]
+    assembly.port_owners = view_meta["port_owners"]
+    assembly.port_refs = {f"{name}.{port}": sh.prefix + ref
+                          for name, sh in shapes.items() for port, ref in sh.ports.items()}
+    assembly.omitted_joins = view_meta["omitted_joins"]
+    assembly.ellipsis_markers = view_meta["ellipsis_markers"]
+    return assembly
 
 
 # Definition geometry is independent of the final figure's column width.
@@ -1706,7 +1961,22 @@ def _instance_issues(issues, source, assembly):
 
 def _view_links(assembly):
     refs = assembly.view.netlist
-    return [[r for r in group if r in refs] for group in assembly.links] + assembly.joins
+    return [[r for r in group if r in refs] for group in assembly.links] + assembly.joins + assembly.omitted_joins
+
+
+# Issue codes about how a drawing looks rather than what it connects. On the
+# separate sheets of folded instances they would describe a picture nobody
+# sees; the drawn view and each module definition are checked for them.
+DRAWING_ONLY = frozenset({
+    "arrow-as-text", "arrow-off-wire", "bad-block", "bad-hop", "bad-region", "block-on-symbol", "block-overlap",
+    "block-text-overflow", "body-overlap", "callout-on-symbol", "callout-overlap-allowed", "callout-through-block",
+    "collinear-overlap", "dangling-wire", "detail-off", "detail-wired", "electrical-label-space", "inline-label-end",
+    "isolation-on-label", "line-through-block", "line-through-body", "member-outside", "module-box-overlap",
+    "not-orthogonal", "on-wire-allowed", "open-pin", "region-cuts-symbol", "region-fit-overrides", "short-wire",
+    "shorted-pins", "text-on-block", "text-on-callout", "text-on-line", "text-on-symbol", "text-overlap",
+    "too-close", "too-cramped", "drawing-scale-width", "too-short", "touches-lead", "unlisted-member", "unmarked-crossing",
+    "unused-hop", "winding-gap", "zero-length",
+})
 
 
 def checked(source, prof, scale=None):
@@ -1744,14 +2014,22 @@ def checked(source, prof, scale=None):
             assembly = assemble(source, drawn_scale, prof)
     view_report = check(assembly.view, prof, drawn_scale, connections=_view_links(assembly))
     from .validate import Issue
+    if any(i.code == "too-cramped" for i in view_report.issues):
+        budget = capacity(source, prof)
+        key = "single" if prof.name == "ieee-single" else "double"
+        rows = [f"{name} 横排最多 {item['columns'][key]['horizontal']} 个"
+                for name, item in budget.items() if not item.get("empty")]
+        hint = "；展开尺寸占宽估算：" + "，".join(rows) + "。建议竖排、折叠或切换双栏；仍须校验实际接线和标签。"
+        view_report.issues = [Issue(i.code, i.message + hint, i.level) if i.code == "too-cramped" else i
+                              for i in view_report.issues]
     for a, b in assembly.unrouted:
         view_report.issues.append(Issue("module-route", f"连接 {a} — {b} 自动布线失败（该尺寸无法布线）：已先画一条直角线；"
                                         "拖动这条线改走向，或增大模块间距、调整方框尺寸"))
     view_report.issues.extend(collapsed_box_issues(assembly.view, assembly.collapsed, drawn_scale, prof))
-    # Hidden instances are checked at the printed scale. Collapsed internals
-    # retain their own expanded scale, as before.
-    full_scale = None if assembly.collapsed else view_report.scale
-    full_report = check(assembly.full, prof, full_scale, connections=assembly.links)
+    # Folded or hidden instances: like a Simulink subsystem, what is drawn is
+    # the box and its ports. The geometry inside is checked once per
+    # definition (check_definitions); for them only the connections count.
+    full_report = assembly.connectivity(prof, view_report.scale)
     keys = {(i.code, i.message) for i in view_report.issues}
     combined = definitions.issues + view_report.issues + [i for i in full_report.issues if (i.code, i.message) not in keys]
     view_report.issues = _instance_issues(combined, source, assembly)

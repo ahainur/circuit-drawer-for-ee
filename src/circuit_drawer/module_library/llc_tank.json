@@ -1,0 +1,201 @@
+{
+ "title": "LLC tank",
+ "symbol": "text",
+ "layout": {
+  "name": "llc_tank",
+  "elements": [
+   {
+    "id": "Cr",
+    "kind": "C",
+    "pins": {
+     "a": [
+      1.9,
+      2.5
+     ],
+     "b": [
+      2.8,
+      2.5
+     ]
+    },
+    "label": "$C_r$"
+   },
+   {
+    "id": "Lr",
+    "kind": "L",
+    "pins": {
+     "a": [
+      2.8,
+      2.5
+     ],
+     "b": [
+      3.9,
+      2.5
+     ]
+    },
+    "label": "$L_r$"
+   },
+   {
+    "id": "Lm",
+    "kind": "L",
+    "pins": {
+     "a": [
+      4.15,
+      2.5
+     ],
+     "b": [
+      4.15,
+      1.2
+     ]
+    },
+    "label": "$L_m$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_P",
+    "kind": "port",
+    "pins": {
+     "p": [
+      1.0,
+      2.5
+     ]
+    },
+    "label": "$P$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_N",
+    "kind": "port",
+    "pins": {
+     "p": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$N$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_OP",
+    "kind": "port",
+    "pins": {
+     "p": [
+      5.7,
+      2.5
+     ]
+    },
+    "label": "$OP$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_ON",
+    "kind": "port",
+    "pins": {
+     "p": [
+      5.7,
+      1.2
+     ]
+    },
+    "label": "$ON$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     1,
+     2.5
+    ],
+    [
+     1.9,
+     2.5
+    ]
+   ],
+   [
+    [
+     3.9,
+     2.5
+    ],
+    [
+     5.7,
+     2.5
+    ]
+   ],
+   [
+    [
+     1,
+     0
+    ],
+    [
+     4.9,
+     0
+    ],
+    [
+     4.9,
+     1.2
+    ]
+   ],
+   [
+    [
+     4.15,
+     1.2
+    ],
+    [
+     5.7,
+     1.2
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {
+   "Lm.b": "DCN",
+   "Cr.a": "A",
+   "Cr.b": "X",
+   "Lr.a": "X",
+   "Lr.b": "P",
+   "Lm.a": "P",
+   "Port_P.p": "A",
+   "Port_N.p": "DCN",
+   "Port_OP.p": "P",
+   "Port_ON.p": "DCN"
+  }
+ },
+ "ports": {
+  "P": "Port_P.p",
+  "N": "Port_N.p",
+  "OP": "Port_OP.p",
+  "ON": "Port_ON.p"
+ },
+ "port_layout": {
+  "P": {
+   "side": "left",
+   "order": 0
+  },
+  "N": {
+   "side": "left",
+   "order": 1
+  },
+  "OP": {
+   "side": "right",
+   "order": 2
+  },
+  "ON": {
+   "side": "right",
+   "order": 3
+  }
+ },
+ "defaults": {
+  "Lr": {
+   "value": "20u",
+   "initial": "0"
+  },
+  "Cr": {
+   "value": "126.6514795529n",
+   "initial": "0"
+  },
+  "Lm": {
+   "value": "100u",
+   "initial": "0"
+  }
+ }
+}

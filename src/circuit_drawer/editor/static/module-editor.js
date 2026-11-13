@@ -13,7 +13,8 @@ function focusedModule() {
 function drawModuleFocus() {
   drawLinkFocus();
   const frame = focusedModule() && report?.module_info?.frames?.[focusedModuleId];
-  if (frame) el("rect", {id: "moduleFocus", x: frame[0], y: -frame[3], width: frame[2]-frame[0], height: frame[3]-frame[1],
+  const d = moduleOffsets().get(focusedModuleId) || [0, 0];
+  if (frame) el("rect", {id: "moduleFocus", x: frame[0]+d[0], y: -frame[3]-d[1], width: frame[2]-frame[0], height: frame[3]-frame[1],
     fill: "none", stroke: "var(--accent)", "stroke-width": .035, "stroke-dasharray": ".12 .08", "pointer-events": "none"}, svg);
 }
 // The folded box whose resize corner (drawn by drawResizeHandles) is under the pointer.
@@ -67,10 +68,7 @@ for (const display of ["expanded", "collapsed", "partial"]) {
   moduleButton("menuModule" + display[0].toUpperCase() + display.slice(1)).onclick = () => setModuleDisplay(focusedModuleId, display);
 }
 for (const display of ["expanded", "collapsed"]) {
-  moduleButton("menuAll" + display[0].toUpperCase() + display.slice(1)).onclick = async () => {
-    const candidate = clone(layout); candidate.modules.instances.forEach(i => { i.display = display; });
-    try { await applyModuleSource(candidate); } catch (e) { flash(e.message, true); }
-  };
+  moduleButton("menuAll" + display[0].toUpperCase() + display.slice(1)).onclick = () => setModuleDisplay(null,display);
 }
 moduleButton("menuEditDefinition").onclick = () => editModuleDefinition(focusedModuleId);
 moduleButton("menuDissolve").onclick = async () => {
@@ -107,16 +105,21 @@ moduleButton("menuModuleSymbol").onclick = () => {
 function modulePointerDown(ev) {
   if (ev.button === 2) { ev.stopImmediatePropagation(); return true; }
   if (ev.button !== 0 || wireDraft || boxDraft) return false;
-  const ref = objectAtTarget(ev.target);
+  const instance = instanceOfTarget(ev);
+  const ref = objectAtTarget(ev.target) || (instance ? {type:'instance',id:instance} : null);
   if (selectionBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return true; }
+  const title = ev.target.closest('[data-module-title]');
+  if (title && !ev.shiftKey && !modePick && !groupHas(ref)) return startDragModuleTitle(ev, title.dataset.moduleTitle);
   const label = ev.target.closest('[data-element-label]');
   if (label && !ev.shiftKey && !modePick && startDragLabel(ev, label.dataset.elementLabel)) return true;
   if (ev.shiftKey && ref) {
     ev.preventDefault(); ev.stopImmediatePropagation();
     svg.focus({preventScroll:true});
     if (!selectionCount() && selected) groupAdd(selected);
+    if (!selectionCount() && focusedModuleId) groupAdd({type:'instance',id:focusedModuleId});
     groupToggle(ref);
-    selected = null; render(); moduleSelectionStatus(); return true;
+    selected = null; focusedModuleId = null; focusedLink = null;
+    render(); moduleSelectionStatus(); return true;
   }
   // A coloured region is background too: a drag starting on one that is not
   // selected draws a selection box; a click without moving selects the region.
@@ -129,6 +132,7 @@ function modulePointerDown(ev) {
     ev.preventDefault(); ev.stopImmediatePropagation();
     svg.focus({preventScroll:true});
     if (ev.shiftKey && selected) groupAdd(selected);
+    if (ev.shiftKey && focusedModuleId) groupAdd({type:'instance',id:focusedModuleId});
     moduleBox = {a: toUnits(ev), b: toUnits(ev), additive: ev.shiftKey, start:[ev.clientX,ev.clientY], pointer:ev.pointerId,
                  region: onRegion && layout.regions?.[regionIndex] ? regionIndex : undefined};
     svg.setPointerCapture(ev.pointerId); return true;
@@ -139,6 +143,11 @@ function modulePointerDown(ev) {
 
 function moduleSelectionStatus() {
   const box = moduleButton("props"); box.className = 'hint';
+  if(instanceSelection.size) {
+    box.textContent = `已选 ${selectionCount()} 个对象，其中 ${instanceSelection.size} 个模块实例。拖动选中对象或按方向键可一起移动；Shift+方向键十格，可一步撤销。只选三个以上模块时可右键“省略中间实例”。`;
+    if(selectionCount()!==instanceSelection.size)box.append(document.createTextNode(' 省略前请取消选择普通元件、导线和图形。'));
+    return;
+  }
   box.textContent = `已选 ${selectionCount()} 个对象（${moduleSelection.size} 个元件）。拖动其中任意一个或按方向键可整体移动；Shift+方向键十格，Delete 删除，Ctrl+C / X / D 复制／剪切／创建副本。整组操作可一步撤销，Shift 点选可增减。`;
 }
 
@@ -163,7 +172,7 @@ svg.addEventListener("pointerup", ev => {
     if (ref.points.every(p => p[0] >= Math.min(a[0],b[0]) && p[0] <= Math.max(a[0],b[0]) && p[1] >= Math.min(a[1],b[1]) && p[1] <= Math.max(a[1],b[1]))) groupAdd(ref);
   }
   if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
-  moduleMarquee = false; selected = null; showProps(); render();
+  moduleMarquee = false; selected = null; focusedModuleId = null; focusedLink = null; showProps(); render();
 }, true);
 svg.addEventListener('pointercancel', () => { moduleBox=null; render(); }, true);
 
@@ -223,7 +232,7 @@ function openPortForm(state) {
       <p><button id="moduleParametersAll">全选</button> <button id="moduleParametersNone">全不选</button>
         <span class="hint">参数列表内按 Ctrl+A 全选，Ctrl+Shift+A 全不选。</span></p>
       <div id="moduleParameterRows" tabindex="0" aria-label="可按实例修改的元件参数" style="max-height:160px;overflow:auto"></div></details>
-    ${layout.modes?.length ? "<p>当前模态将保存在项目中；最后一个实例解散后恢复。模块期间不编辑跨端口模态。</p>" : ""}
+    ${layout.modes?.length ? "<p>封装会同步模态中的器件编号，模态仍保留在当前项目中。</p>" : ""}
     ${state.editing ? "" : '<p><label><input type="checkbox" id="moduleToLibrary"> 同时存进我的模块库（其他电路文件也能用）</label></p>'}
     <p><button id="moduleSaveConfirm" class="primary">${state.editing ? "保存定义并同步所有实例" : "保存并原地替换"}</button> <span id="moduleSaveError" role="status"></span></p>`);
   const dialog = document.getElementById("dlg");
@@ -447,12 +456,12 @@ svg.addEventListener("drop",ev=>{ev.preventDefault();draggedModule=null;placeGho
   const name=ev.dataTransfer.getData("application/x-circuit-module");
   if(name)openModulePlacement(name,toUnits(ev));
   const lib=ev.dataTransfer.getData("application/x-circuit-library-module");
-  if(lib)openModulePlacement(null,toUnits(ev),null,JSON.parse(lib));});
+  if(lib)openModulePlacement(null,toUnits(ev),JSON.parse(lib));});
 // Window capture runs before the projection's pointer guard.
 window.addEventListener("pointerdown",ev=>{
   if(!pendingModule||!svg.contains(ev.target)||ev.button!==0)return;
   ev.preventDefault();ev.stopImmediatePropagation();const pick=pendingModule;pendingModule=null;placeGhost(null);
-  if(typeof pick==="string")openModulePlacement(pick,toUnits(ev));else openModulePlacement(null,toUnits(ev),null,pick);
+  if(typeof pick==="string")openModulePlacement(pick,toUnits(ev));else openModulePlacement(null,toUnits(ev),pick);
 },true);
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"){pendingModule=null;placeGhost(null);moduleMarquee=false;moduleBox=null;render();}});
 // The module being placed: its extent in its own coordinates (catalogue box)
@@ -481,17 +490,6 @@ function definitionPorts(definition){
   const own=layout.modules?.definitions?.[definition];
   if(own)return Object.keys(own.ports||{});
   return moduleCatalogue?.builtin?.find(e=>e.name===definition)?.ports||null;
-}
-// What a port may connect to: the top-level parts' pins, the parts placed for
-// the modules (modules.parts, such as Vin and RL) and the other instances' ports.
-function portEndpoints(existing){
-  const endpoints=layout.elements.flatMap(e=>Object.keys(e.pins).map(p=>`${e.id}.${p}`));
-  const drawn=new Map((report?.module_info?.view?.elements||[]).map(e=>[e.id,e]));
-  for(const part of layout.modules?.parts||[])
-    endpoints.push(...Object.keys(drawn.get(part.id)?.pins||{}).map(p=>`${part.id}.${p}`));
-  for(const inst of layout.modules?.instances||[])
-    if(inst.id!==existing)endpoints.push(...(definitionPorts(inst.definition)||[]).map(p=>`${inst.id}.${p}`));
-  return endpoints;
 }
 // Server messages quote the validator after a Chinese lead-in ("请先修正电路：…；…"):
 // word each quoted problem as the issue list does.
@@ -529,42 +527,23 @@ function placementAdvice(id,before){
 }
 // name: a definition in this table; entry: a library module ({library, name, title, ports}),
 // copied into the table when it is placed
-async function openModulePlacement(name,point,existing=null,entry=null){
-  const connections={},ports=entry?entry.ports:definitionPorts(name);
-  if(!ports){flash(`还没读到模块 ${name} 的端口；请稍候再试`,true);refreshModuleLibrary();return;}
-  if(!existing){
-    const at=placedAt(point,pickBox(entry||name));
-    const before={scale:report?.scale_cm_per_unit?.[0],issues:new Set((report?.issues||[]).map(i=>i.code+"|"+i.message))};
-    for(const port of ports)connections[port]="";
-    try{
-      if(entry)await moduleCommit("/api/module-library-place",{library:entry.library,name:entry.name,at,connections});
-      else await moduleCommit("/api/module-add",{name,at,connections});
-      focusedModuleId=layout.modules.instances.at(-1).id;
-      render();showInstanceProps(focusedModuleId);refreshModuleLibrary();
-      flash(report?.ok ? "模块已放置。可直接从端口画线，或把端口拖到已有导线上。" : placementAdvice(focusedModuleId,before));
-    }catch(error){flash(zhModule(error.message),true);}
-    return;
-  }
-  const endpoints=portEndpoints(existing);
-  showDialog(`实例 ${existing} 的端口连接`,`<p>这里设置按名称指定的连接。画布上的普通导线按实际接触接通，需在画布上编辑或删除。</p><div id="moduleConnections"></div><button id="modulePlace" class="primary">保存连接</button><p id="modulePlaceError" role="status"></p>`);
-  for(const port of ports){
-    const me=`${existing}.${port}`,links=(layout.modules.links||[]).filter(pair=>pair.includes(me));
-    connections[port]=links[0]?.find(ref=>ref!==me)||"";
-    // a connection this list does not offer is kept as it is, never dropped
-    const options=connections[port]&&!endpoints.includes(connections[port])?[...endpoints,connections[port]]:endpoints;
-    const row=document.createElement("label");row.style.cssText="display:block;margin:8px 0";
-    row.innerHTML=`${esc(port)} <select aria-label="${esc(port)} 连接"><option value="">留空（未连接）</option>${options.map(ref=>`<option value="${esc(ref)}">${esc(ref)}</option>`).join("")}</select>`+
-      (links.length>1?` <span class="hint">另有 ${links.length-1} 条连接（${esc(links.slice(1).map(pair=>pair.find(ref=>ref!==me)).join("、"))}）保持不变；选“留空”会一并断开</span>`:"");
-    row.querySelector("select").value=connections[port];row.querySelector("select").onchange=ev=>connections[port]=ev.target.value;moduleButton("moduleConnections").appendChild(row);
-  }
-  moduleButton("modulePlace").onclick=async()=>{try{
-    await moduleCommit("/api/module-connections",{id:existing,connections});
-    refreshModuleLibrary();
-  }catch(e){moduleButton("modulePlaceError").textContent=zhModule(e.message);}};
+async function openModulePlacement(name, point, entry = null) {
+  const ports = entry ? entry.ports : definitionPorts(name);
+  if (!ports) { flash(`还没读到模块 ${name} 的端口；请稍候再试`, true); refreshModuleLibrary(); return; }
+  const connections = Object.fromEntries(ports.map(port => [port, ""]));
+  const at = placedAt(point, pickBox(entry || name));
+  const before = {scale: report?.scale_cm_per_unit?.[0], issues: new Set((report?.issues || []).map(i => i.code + "|" + i.message))};
+  try {
+    if (entry) await moduleCommit("/api/module-library-place", {library: entry.library, name: entry.name, at, connections});
+    else await moduleCommit("/api/module-add", {name, at, connections});
+    focusedModuleId = layout.modules.instances.at(-1).id;
+    render(); showInstanceProps(focusedModuleId); refreshModuleLibrary();
+    flash(report?.ok ? "模块已放置。可直接从端口画线，或把端口拖到已有导线上。" : placementAdvice(focusedModuleId, before));
+  } catch (error) { flash(zhModule(error.message), true); }
 }
 
 // A definition draft is not a whole project and must never overwrite its file.
-for(const id of ["save","saveAs","saveTpl","describe","tweak","addModule","spice","waveforms"]){
+for(const id of ["save","saveAs","saveTpl","openExample","describe","tweak","addModule","spice","waveforms"]){
   moduleButton(id).addEventListener("click",ev=>{
     if(!definitionEdit)return;ev.preventDefault();ev.stopImmediatePropagation();
     flash("请先保存模块定义或取消编辑，再操作整个项目。",true);
@@ -576,7 +555,21 @@ for(const id of ["save","saveAs","saveTpl","describe","tweak","addModule","spice
 // The canvas shows the assembled view (report.module_info.view). The table's
 // own wires come first in it (root_wires maps view index -> table index), each
 // instance's wires follow (instance_wires), then the link wires (link_wires).
-let focusedLink = null, instanceDrag = null;
+let focusedLink = null, instanceDrag = null, modulePreview = null;
+function drawModuleMotion() {
+  const offsets = moduleOffsets();
+  const keys = {annotations:'ann', regions:'region', blocks:'block', callouts:'callout', glyphs:'glyph', wave_symbols:'wave-symbol'};
+  for (const [id, sections] of Object.entries(viewInfo().instance_decorations || {})) {
+    const d = offsets.get(id); if (!d) continue;
+    for (const [section, key] of Object.entries(keys)) {
+      const [first, end] = sections[section] || [0, 0];
+      for (const node of svg.querySelectorAll(`g[data-${key}]`)) {
+        const index = +node.getAttribute(`data-${key}`);
+        if (index >= first && index < end) node.setAttribute('transform', `translate(${d[0]} ${-d[1]}) ${node.getAttribute('transform') || ''}`);
+      }
+    }
+  }
+}
 function viewInfo() { return report?.module_info || {}; }
 function instanceOfWire(j) {
   return Object.entries(viewInfo().instance_wires || {}).find(([, [a, b]]) => j >= a && j < b)?.[0] || null;
@@ -611,7 +604,7 @@ function moduleCanvasPointerDown(ev) {
   const info = viewInfo(), wire = ev.target.closest("[data-wire]");
   if (wire) {
     const j = +wire.dataset.wire;
-    if (info.root_wires?.[j] === j) return false;           // the table's own wire
+    if (info.root_wires?.[j] !== undefined) return false;   // the table's own wire
     const link = (info.link_wires || []).find(w => w.wire === j);
     if (link) { startLinkPick(ev, link); return true; }
   }
@@ -619,9 +612,91 @@ function moduleCanvasPointerDown(ev) {
   if (id) { startInstanceDrag(ev, id); return true; }
   const eid = ev.target.closest("g.element[data-id]")?.dataset.id;
   if (eid && (info.auto_parts || []).includes(eid)) {
-    flash(`${eid} 由模块自动摆放在端口旁，随模块移动；要自己摆放，先解散所在实例`, true); return true;
+    startAutoPartDrag(ev, eid); return true;
   }
   return !!wire && info.root_wires?.[+wire.dataset.wire] === undefined;   // other derived wires
+}
+
+function autoPartMover(id, drawn = null) {
+  const part = layout.modules.parts.find(p => p.id === id);
+  drawn = clone(drawn || currentView(layout, viewInfo()).elements.find(e => e.id === id));
+  const offset = part.offset || [0, 0], pins = clone(drawn.pins), move = pinMover(drawn);
+  return next => {
+    const delta = next.map((v, k) => r4(v - offset[k]));
+    move(Object.fromEntries(Object.entries(pins).map(([pin, at]) => [pin, shiftedPoint(at, delta)])));
+    part.offset = next.map(r4);
+  };
+}
+
+function showAutoPartProps(id, box) {
+  const part = layout.modules?.parts?.find(p => p.id === id);
+  if (!part) return;
+  const name = document.createElement('span'); name.textContent = `${id}（${part.kind}）`;
+  row(box, '元件', name);
+  const hint = document.createElement('p'); hint.className = 'hint';
+  hint.textContent = '位置按端口相对偏移保存，展开和折叠时分别计算。';
+  hint.style.gridColumn = '1 / -1'; box.appendChild(hint);
+  for (const [axis, label] of [[0, '水平偏移'], [1, '竖直偏移']]) {
+    const input = numInput((part.offset || [0, 0])[axis], value => {
+      const next = [...(part.offset || [0, 0])]; next[axis] = value;
+      autoPartMover(id)(next);
+    });
+    input.id = axis ? 'modulePartOffsetY' : 'modulePartOffsetX';
+    row(box, label, input);
+  }
+  const label = document.createElement('input'); label.value = part.label || '';
+  label.id = 'elementLabel';
+  label.onchange = () => { pushHistory(); part.label = label.value; changed(); };
+  row(box, '标签', label);
+  if (report.symbol_styles?.kinds.includes(part.kind)) {
+    const style = symbolStyleSelect(part.opts?.symbol_style); style.id = 'elementSymbolStyle';
+    style.onchange = () => { pushHistory(); setSymbolStyle(part, style.value); changed(); };
+    row(box, '符号风格', style);
+  }
+}
+
+function startAutoPartDrag(ev, id) {
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  svg.setPointerCapture(ev.pointerId);
+  svg.focus({preventScroll:true});
+  clearGroupSelection(); focusedModuleId = null; focusedLink = null;
+  selected = {type:'modulePart', id};
+  showSidebar('properties'); showProps();
+  const before = clone(layout), start = toUnits(ev);
+  // Use the existing selection transaction so a click or cancellation keeps the source.
+  const transaction = {
+    group: true, deferCheck: true, source: before, members: [],
+    moved: false, point: start, alt: false,
+    move(point, event) {
+      this.point = point;
+      this.alt = !!event?.altKey;
+      if (!this.apply) return;
+      if (!this.moved && same(point, start)) return;
+      const delta = this.guides.snap(point[0] - start[0], point[1] - start[1], this.alt);
+      if (!this.moved && same(delta, [0, 0])) return;
+      if (!this.moved) {
+        pushHistory();
+        this.moved = true;
+      }
+      this.apply(shiftedPoint(this.offset, delta));
+    }
+  };
+  drag = transaction;
+  selectionBusy = true;
+  syncSelectionControls();
+  transaction.ready = api('/api/module-part-prepare', {layout:before, profile, id}).then(result => {
+    if (drag !== transaction) return;
+    if (editorTableSnapshot(layout) !== editorTableSnapshot(before)) {
+      transaction.error = '图纸已变化，请重新选择后拖动';
+      return;
+    }
+    transaction.offset = result.offset;
+    transaction.apply = autoPartMover(id, result.element);
+    transaction.guides = projected(() => smartGuides(result.element));
+    transaction.move(transaction.point, {altKey:transaction.alt});
+    render();
+  }).catch(error => { transaction.error = error.message; });
 }
 
 const PRESS_CLICK_MS = 600;   // a press and its click / double-click (browsers allow ~500 ms)
@@ -631,7 +706,9 @@ function startInstanceDrag(ev, id) {
   const info = viewInfo(), inst = layout.modules.instances.find(i => i.id === id);
   const redraw = !!selected;   // only a dropped element selection needs the full redraw
   focusedModuleId = id; focusedLink = null; selected = null;
-  instanceDrag = {id, origin: info.origins?.[id] || inst.at || [0, 0], frame: info.frames?.[id], start: toUnits(ev), d: [0, 0]};
+  instanceDrag = {id, origin: info.origins?.[id] || inst.at || [0, 0], start: toUnits(ev), d: [0, 0],
+    before: JSON.stringify(layout), table: clone(layout), pointer: ev.pointerId};
+  modulePreview = instanceDrag;
   svg.setPointerCapture(ev.pointerId);
   // Replacing the pressed SVG node would turn a double-click (fold / unfold)
   // into two single clicks, so normally only the focus outline is redrawn.
@@ -643,33 +720,44 @@ svg.addEventListener("pointermove", ev => {
   if (!instanceDrag) return;
   ev.stopImmediatePropagation();
   const p = toUnits(ev), d = [r4(snap(p[0] - instanceDrag.start[0])), r4(snap(p[1] - instanceDrag.start[1]))];
+  if (same(d, instanceDrag.d)) return;
   instanceDrag.d = d;
-  const f = instanceDrag.frame;
-  if (!f) return;
-  const ghost = document.getElementById("instanceGhost") || el("rect", {id: "instanceGhost", fill: "#2457d610",
-    stroke: "var(--accent)", "stroke-width": .03, "stroke-dasharray": ".1 .06", "pointer-events": "none"}, svg);
-  Object.entries({x: f[0] + d[0], y: -(f[3] + d[1]), width: f[2] - f[0], height: f[3] - f[1]}).forEach(([k, v]) => ghost.setAttribute(k, v));
+  instanceDrag.table.modules.instances.find(i => i.id === instanceDrag.id).at = shiftedPoint(instanceDrag.origin, d);
+  renderNextFrame();
 }, true);
 svg.addEventListener("pointerup", ev => {
   if (!instanceDrag) return;
   ev.stopImmediatePropagation();
-  const {id, origin, d} = instanceDrag; instanceDrag = null;
-  document.getElementById("instanceGhost")?.remove();
-  if (!d[0] && !d[1]) return;
-  moveModuleInstance(id, [r4(origin[0] + d[0]), r4(origin[1] + d[1])]);
+  const pending = instanceDrag, {id, origin, d} = pending; instanceDrag = null;
+  if (!d[0] && !d[1]) { modulePreview = null; return; }
+  if (JSON.stringify(layout) !== pending.before) {
+    modulePreview = null; render(); flash('等待模块操作时图纸已改变，已保留当前编辑，请重试。', true); return;
+  }
+  moveModuleInstance(id, shiftedPoint(origin, d)).finally(() => {
+    if (modulePreview === pending) modulePreview = null;
+    render();
+  });
 }, true);
+function cancelInstanceDrag() {
+  if (!instanceDrag) return;
+  const pointer = instanceDrag.pointer;
+  instanceDrag = modulePreview = instancePress = null;
+  if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
+  renderNextFrame();
+}
+window.addEventListener('pointercancel', cancelInstanceDrag);
+window.addEventListener('blur', cancelInstanceDrag);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cancelInstanceDrag(); });
 
 async function moveModuleInstance(id, at) {
-  const candidate = clone(layout);
+  const before = JSON.stringify(layout), candidate = clone(layout);
   const inst = candidate.modules.instances.find(i => i.id === id);
-  const origin = viewInfo().origins[id];
-  const pins = Object.fromEntries(Object.entries(viewInfo().ports).filter(([ref])=>ref.startsWith(id+".")));
-  const newPins = Object.fromEntries(Object.entries(pins).map(([ref,p])=>[ref,p.map((v,k)=>r4(v+at[k]-origin[k]))]));
-  pinMover({pins}, candidate)(newPins);
   inst.at = at;
   selectionBusy = true; ++pendingTrialChecks; checking = true;
   let failure = null;
   try {
+    await checkModuleGeometry(candidate, JSON.parse(before));
+    if (JSON.stringify(layout) !== before) throw new Error("等待模块操作时图纸已改变，已保留当前编辑，请重试。");
     await moduleCommit("/api/module-contact", {id}, candidate, false);
   } catch (error) { failure = error; }
   finally {
@@ -700,12 +788,10 @@ function showInstanceProps(id) {
   const inst = layout.modules.instances.find(i => i.id === id), box = moduleButton("props");
   if (!inst) return;
   const own = !!layout.modules.definitions?.[inst.definition];
-  // a bundled module named without a copy in this file: its ports come from the library list
-  const ports = definitionPorts(inst.definition);
   box.className = "";   // not the two-column grid an element's fields use
   box.innerHTML = `<p><b>模块实例 ${esc(id)}</b>（${esc(inst.definition)}）</p>
     <p class="hint">拖动可整体移动；内部元件请在“编辑模块定义”里改，所有同类实例一起更新。</p>
-    <p><button id="instParams">实例参数…</button> <button id="instLinks" ${ports ? "" : 'disabled title="模块定义不在本文件，模块库列表还没读到它的端口；请稍候再试"'}>端口连接…</button> <button id="instDisplay">展开 / 折叠</button></p>
+    <p><button id="instParams">实例参数…</button> <button id="instDisplay">展开 / 折叠</button></p>
     <p><button id="instDefinition" ${own ? "" : "disabled"}>编辑模块定义</button> <button id="instDissolve">解散为普通元件</button> <button id="instDelete">删除实例</button></p>
     <p><button id="instToLibrary" ${own ? "" : "disabled"}>存进我的模块库…</button> <span class="hint">${esc(librarySourceText(inst.definition))}</span></p>
     <div id="instUpdate"></div><div id="instAppearance"></div><div id="instGroup"></div>`;
@@ -714,7 +800,6 @@ function showInstanceProps(id) {
   instanceAppearance(inst, moduleButton("instAppearance"));
   instanceGroup(inst, moduleButton("instGroup"));
   moduleButton("instParams").onclick = () => moduleParameters(id);
-  moduleButton("instLinks").onclick = () => openModulePlacement(inst.definition, inst.at || [0, 0], id);
   moduleButton("instDisplay").onclick = () => {
     const cycle = ["expanded", "collapsed"].concat((viewInfo().partial || []).includes(id) ? ["partial"] : []);
     setModuleDisplay(id, cycle[(cycle.indexOf(inst.display || "expanded") + 1) % cycle.length]);
@@ -746,7 +831,7 @@ function deleteInstance(id) {
     if (inst && !m.links.some(pair => pair.includes(ref)) && !(inst.unconnected || []).includes(port))
       inst.unconnected = [...(inst.unconnected || []), port];
   }
-  if (!m.instances.length && layout.module_authoring?.modes) layout.modes = clone(layout.module_authoring.modes);
+  if (!m.instances.length && !layout.modes?.length && layout.module_authoring?.modes) layout.modes = clone(layout.module_authoring.modes);
   focusedModuleId = null; changed(); flash(`已删除实例 ${id}`);
 }
 function moduleFocusActive() { return !!(focusedModuleId || focusedLink); }
@@ -800,8 +885,8 @@ async function deleteLink([a, b]) {
     if (inst && !m.links.some(pair => pair.includes(ref)) && !(inst.unconnected || []).includes(port))
       inst.unconnected = [...(inst.unconnected || []), port];
   }
-  // Taking a link away only splits nets. A new short means the two ends still
-  // touch in the full (expanded) drawing, which a folded view does not show.
+  // Taking a link away only splits nets. Refuse when visible ports still
+  // touch, or when the remaining drawing would short the newly separated nets.
   const trial = await trialCheck(candidate);
   if (JSON.stringify(layout) !== before) return;   // a newer edit owns the table
   if (!trial?.module_info || trial.issues.some(i => i.code === "bad-module")) {
@@ -811,7 +896,7 @@ async function deleteLink([a, b]) {
   const ports = trial.module_info.ports;
   if ((ports[a] && ports[b] && same(ports[a], ports[b])) ||
       trial.issues.some(i => i.code === "netlist-short" && !known.has(i.message))) {
-    flash(`没有删除连接 ${a} ↔ ${b}：两个实例的端口在展开图里重合，去掉连接后仍碰在一起，会成为看不见的短接。请先按住实例拖开，留出间距，再删除连接`, true);
+    flash(`没有删除连接 ${a} ↔ ${b}：图中的端口仍重合或相连，直接删除会造成接线与网表不一致。请先拖开实例或调整接线，再删除连接`, true);
     return;
   }
   pushHistory(); layout = candidate;
@@ -899,8 +984,10 @@ function propRow(box, label, control) {
 // The folded box's title, fill and border; stored on the instance (appearance)
 function instanceAppearance(inst, box) {
   const choices = report?.region_options || {fills: [], borders: []}, a = inst.appearance || {};
+  let editVersion = 0;
   box.innerHTML = "<p><b>折叠方框外观</b> <span class=\"hint\">（折叠显示时生效）</span></p>";
   const set = async (key, value, fallback) => {
+    const version = ++editVersion;
     const next = {...(inst.appearance || {}), [key]: value};
     if (next.border === "none" && (next.fill || "none") === "none") {
       flash("无边框时要先选填充色，否则方框看不见", true); showInstanceProps(inst.id); return;
@@ -908,22 +995,39 @@ function instanceAppearance(inst, box) {
     const before = JSON.stringify(layout), candidate = clone(layout);
     const target = candidate.modules.instances.find(i => i.id === inst.id);
     target.appearance = {...(target.appearance || {})};
-    if (!value || value === fallback) delete target.appearance[key]; else target.appearance[key] = value;
+    if (key !== "title" && (!value || value === fallback)) delete target.appearance[key]; else target.appearance[key] = value;
     if (!Object.keys(target.appearance).length) delete target.appearance;
     try {
-      if (key === "title") await checkModuleGeometry(candidate, report);
-      if (JSON.stringify(layout) !== before) return;
+      if (key === "title") await checkModuleGeometry(candidate, JSON.parse(before));
+      if (version !== editVersion || JSON.stringify(layout) !== before) return;
       pushHistory(); layout = candidate; changed();
     } catch (error) { flash(error.message, true); }
   };
-  const title = document.createElement("input"); title.id = "instTitle"; title.value = a.title || "";
-  title.placeholder = inst.label?.text || inst.definition; title.onchange = () => set("title", title.value.trim(), "");
+  const title = document.createElement("input"); title.id = "instTitle";
+  const ownTitle = Object.keys(viewInfo().titles || {}).find(i => viewInfo().titles[i].id === inst.id);
+  title.value = a.title ?? viewInfo().view?.annotations?.[ownTitle]?.text ?? inst.label?.text ?? inst.definition;
+  title.placeholder = "留空隐藏标题"; title.onchange = () => set("title", title.value.trim());
   propRow(box, "标题文字", title);
   propRow(box, "填充", choice(["none", ...choices.fills.filter(f => f !== "none")], a.fill || "none", COLOR_NAMES, v => set("fill", v, "none"), "instFill"));
   propRow(box, "边框", choice(["solid", "dashed", "dotted", "none"], a.border || "solid", BORDER_NAMES, v => set("border", v, "solid"), "instBorder"));
   const inks = Object.keys(choices.inks || {black: 1});
   propRow(box, "边框颜色", choice(inks.includes("black") ? inks : ["black", ...inks], a.border_color || "black", COLOR_NAMES,
     v => set("border_color", v === "black" ? "" : v, ""), "instBorderColor"));
+}
+function startDragModuleTitle(ev, id) {
+  const inst = layout.modules?.instances.find(item => item.id === id);
+  if (!inst) return false;
+  ev.preventDefault(); ev.stopImmediatePropagation(); svg.setPointerCapture(ev.pointerId);
+  selected = null; focusedModuleId = id; showInstanceProps(id); svg.focus({preventScroll:true});
+  const start = toUnits(ev), screen = [ev.clientX, ev.clientY], offset = inst.appearance?.title_offset || [0, 0];
+  drag = {label: 'module:' + id, moved: false, move(p, event) {
+    if (!this.moved) {
+      if (Math.hypot(event.clientX - screen[0], event.clientY - screen[1]) < WIRE_DRAG_PX) return;
+      pushHistory(); this.moved = true;
+    }
+    inst.appearance = {...inst.appearance, title_offset: offset.map((v, k) => r4(v + p[k] - start[k]))};
+  }};
+  return true;
 }
 // Draw this instance for a group of same-definition instances: the members
 // stay in the circuit and are shown as panels stacked behind it.
@@ -932,7 +1036,13 @@ function instanceGroup(inst, box) {
   const inGroup = new Set(m.instances.filter(i => i.id !== inst.id).flatMap(i => i.group?.members || []));
   if (inGroup.has(inst.id)) {
     const owner = m.instances.find(i => (i.group?.members || []).includes(inst.id));
+    if(owner.group.style==='ellipsis') {
+      box.textContent='本实例属于省略显示组；右键首尾实例可恢复全部实例。'; return;
+    }
     box.innerHTML = `<p class="hint">本实例由 ${esc(owner.id)} 代表显示（画成它背后的底板）。</p>`; return;
+  }
+  if(inst.group?.style==='ellipsis') {
+    box.textContent='中间实例已省略；右键首尾实例可恢复全部实例。'; return;
   }
   const peers = m.instances.filter(i => i.id !== inst.id && i.definition === inst.definition && !inGroup.has(i.id) && !i.group);
   box.innerHTML = "<p><b>一组显示</b> <span class=\"hint\">（只画本实例，勾选的同类实例画成背后的底板，仿真照样包含它们）</span></p>";

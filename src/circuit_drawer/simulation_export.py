@@ -1,4 +1,4 @@
-"""Validated electrical graph shared by the Simscape and PLECS exporters.
+"""Validated electrical graph shared by the Simscape, PLECS and PSIM exporters.
 
 Only explicit simulation data is translated; labels are never executable code.
 The source drawing and its coordinates are not modified.
@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .layout import Layout
-from .spice import SpiceError, make_deck, number, resolved_layout, OPTIONAL_FIELDS
+from .spice import SpiceError, native_metadata, number, resolved_layout, OPTIONAL_FIELDS
 
 # A tangent at this *declared, adjustable* operating current approximates the
 # SPICE diode at 27 deg C. Both target libraries use a piecewise-linear diode.
@@ -183,7 +183,7 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
         raise SpiceError('LEVEL=1 开关近似选项 approximate_mosfet 必须为 true 或 false')
     if control not in MODES:
         raise SpiceError(f'闭环控制器导出模式须为 {list(MODES)}，不是 {control!r}')
-    deck = make_deck(layout, profile, base_dir)
+    deck = native_metadata(layout, profile, base_dir)
     flat, report, assembly = resolved_layout(layout, profile)
     reference = number(diode_current, '二极管线性化参考电流')
     if reference <= 0:
@@ -191,7 +191,7 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
     mapping = flat.extra.get('model_mapping', {})
     level1 = mapping.get('switch', {}).get('model') == 'mosfet'
     if level1 and not approximate_mosfet:
-        raise SpiceError('Simulink / PLECS 的 SPICE LEVEL=1 MOSFET 需要明确确认近似。'
+        raise SpiceError('外部仿真导出的 SPICE LEVEL=1 MOSFET 需要明确确认近似。'
                          '请在“导出说明与近似设置”勾选“按导通电阻近似 LEVEL=1 开关”，'
                          '或在命令行加 --approximate-mosfet。导出使用各器件填写的 Ron/Roff，'
                          '请先核对这两个值与实际工作点。')
@@ -363,9 +363,13 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                 core = internal()
                 leakage = part('L', [n('p1'), core], {'value': values['leakage_inductance'], 'initial': 0}, pos, e.id)
             primary = []
-            for winding, a, b in windings:
-                p = part('T', [core, n('p2'), n(a), n(b)],
-                         {'ratio': sign * values['ratio'] / len(windings)}, pos, e.id)
+            turns = [(w, a, b, sign * values['ratio'] / len(windings)) for w, a, b in windings]
+            # extra windings of a multi-winding transformer: one more ideal
+            # two-winding stage on the same primary core node, dot at wka
+            from .spice import extra_ratios
+            turns += [(w, f'{w}a', f'{w}b', ratio) for w, ratio in extra_ratios(e, cfg, values)]
+            for winding, a, b, ratio in turns:
+                p = part('T', [core, n('p2'), n(a), n(b)], {'ratio': ratio}, pos, e.id)
                 primary.append((p, 0))
                 entries[e.id, winding] = [(p, 2)]
             if values.get('magnetizing_inductance', 0):
@@ -375,9 +379,15 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
             ref = n('sct' if 'sct' in e.pins else 's2')
             if ref != n('p2'):
                 part('R', [ref, n('p2')], {'value': values['reference_resistance']}, pos, e.id)
+            for w, *_ in turns[len(windings):]:
+                if n(f'{w}b') not in (n('p2'), ref):
+                    part('R', [n(f'{w}b'), n('p2')], {'value': values['reference_resistance']}, pos, e.id)
         else:
             a, b = (n('c'), n('e')) if e.kind == 'igbt' else (n('d'), n('s'))
             if loop and e.id in loop.driven:
+                # Native backends currently expand average legs into switches.
+                from .spice import check_pwm_timing
+                check_pwm_timing(e.id, values, tr)
                 # the gate comes from the control panel's carrier compare
                 s = Signal(f'signal_{len(circuit.signals) + 1}', 'control', {**values, 'switch': e.id}, (pos[0], pos[1] + 100))
                 circuit.signals.append(s)
@@ -505,14 +515,18 @@ def _controller(circuit, loop, mode, driven, probe_outputs, tr):
             s = Signal(name, 'dc', {'kind': 'dc', 'dc': cfg['value'], 'input': bid}, (0, 0))
         circuit.signals.append(s)
         references[bid] = name
-    panel = build(loop, mode, driven, probe_outputs, references)
+    from .closed_loop import ClosedLoopError
+    try:
+        panel = build(loop, mode, driven, probe_outputs, references)
+    except ClosedLoopError as exc:
+        raise SpiceError(str(exc)) from None
     circuit.panel = panel
     circuit.control = describe(panel)
     pl = loop.plan
     how = ('连续时间模型（与 ngspice 闭环一致，用于对照）' if mode == 'continuous' else
            f'离散模型（code.fs = {pl.fs:g} Hz，Ts = {pl.ts:g} s，{pl.method}；系数与 codegen 生成的 DSP 代码相同，按双精度，不含定点舍入）')
     circuit.notes.append(f'闭环控制：控制表 {loop.name} 的控制器按{how}导出为原生控制方块，排在图下方的控制面板；'
-                         f'被驱动开关的门极由占空比与载波比较生成，simulation 里的固定 duty 不再使用。')
+                         'PWM 输出比较占空比与载波，VCO 输出积分 Hz 指令；simulation 里的固定 duty 不再使用。')
     circuit.notes.extend('闭环控制：' + w for w in panel.warnings)
 
 
@@ -531,8 +545,8 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
     """``control``: continuous or discrete controller for a ``closed_loop`` table;
     ``base_dir``: the circuit file's folder, where its control table path is read from.
     ``approximate_mosfet`` is per-export consent, never a saved layout field."""
-    if target not in ('simulink', 'plecs'):
-        raise SpiceError('仿真导出目标必须为 simulink 或 plecs')
+    if target not in ('simulink', 'plecs', 'psim'):
+        raise SpiceError('仿真导出目标必须为 simulink、plecs 或 psim')
     circuit = build_circuit(layout, profile, diode_current, control=control, base_dir=base_dir,
                             approximate_mosfet=approximate_mosfet)
     name = model_stem(stem)
@@ -545,6 +559,16 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
         how = f'在 MATLAB 中切换到本目录，执行 model = build_{name}; 然后 sim(model)。脚本保存 {name}.slx。'
         content = emit(circuit, name)
         options = {}
+    elif target == 'psim':
+        from .psim import emit
+        filename = f'build_{name}.py'
+        requirements = 'PSIM 2026 或以上及其官方 Python API（psimapipy）；生成导出文件无需安装 PSIM。'
+        how = (f'在本目录执行 python {filename} --psim-home "PSIM安装目录"，生成 {name}.psimsch。'
+               '加 --run 可在 PSIM 原生求解并输出同名测量 CSV；--out 指定结果目录。')
+        content = emit(circuit, name)
+        options = {'maximum_requested_step_s': min(circuit.transient['step'], circuit.transient['max_step']),
+                   'csv_output_step_s': circuit.transient['step'],
+                   'connections': 'checked net labels'}
     else:
         from .plecs import emit
         filename = name + '.plecs'

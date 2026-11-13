@@ -1,0 +1,691 @@
+{
+ "name": "llc_below",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.9
+    ]
+   },
+   "label": "$V_\\mathrm{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     3.9
+    ],
+    "s": [
+     1.0,
+     2.9
+    ]
+   },
+   "label": "$S_{1}$"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     1.0
+    ],
+    "s": [
+     1.0,
+     0.0
+    ]
+   },
+   "label": "$S_{2}$"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     3.9
+    ],
+    "s": [
+     2.35,
+     2.9
+    ]
+   },
+   "label": "$S_{3}$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     1.0
+    ],
+    "s": [
+     2.35,
+     0.0
+    ]
+   },
+   "label": "$S_{4}$"
+  },
+  {
+   "id": "Cr",
+   "kind": "C",
+   "pins": {
+    "a": [
+     2.6,
+     2.5
+    ],
+    "b": [
+     3.35,
+     2.5
+    ]
+   },
+   "label": "$C_r$"
+  },
+  {
+   "id": "Lr",
+   "kind": "L",
+   "pins": {
+    "a": [
+     3.35,
+     2.5
+    ],
+    "b": [
+     4.5,
+     2.5
+    ]
+   },
+   "label": "$L_r$"
+  },
+  {
+   "id": "Lm",
+   "kind": "L",
+   "pins": {
+    "a": [
+     4.5,
+     2.5
+    ],
+    "b": [
+     4.5,
+     1.2
+    ]
+   },
+   "label": "$L_m$",
+   "label_pos": "left"
+  },
+  {
+   "id": "T",
+   "kind": "transformer",
+   "pins": {
+    "p1": [
+     5.15,
+     2.5
+    ],
+    "p2": [
+     5.15,
+     1.2
+    ],
+    "s1": [
+     5.85,
+     3.1
+    ],
+    "sct": [
+     5.85,
+     1.85
+    ],
+    "s2": [
+     5.85,
+     0.6
+    ]
+   },
+   "opts": {
+    "ratio": "$1:n$"
+   }
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     5.85,
+     3.1
+    ],
+    "b": [
+     6.75,
+     3.1
+    ]
+   },
+   "label": "$D_1$"
+  },
+  {
+   "id": "D2",
+   "kind": "D",
+   "pins": {
+    "a": [
+     5.85,
+     0.6
+    ],
+    "b": [
+     6.75,
+     0.6
+    ]
+   },
+   "label": "$D_2$",
+   "label_pos": "below"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     7.1,
+     3.1
+    ],
+    "b": [
+     7.1,
+     1.85
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     8.15,
+     3.1
+    ],
+    "b": [
+     8.15,
+     1.85
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "left"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.9
+   ],
+   [
+    2.35,
+    3.9
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    2.35,
+    0.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.9
+   ],
+   [
+    1.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    2.35,
+    2.9
+   ],
+   [
+    2.35,
+    1.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.5
+   ],
+   [
+    2.6,
+    2.5
+   ]
+  ],
+  [
+   [
+    4.5,
+    2.5
+   ],
+   [
+    5.15,
+    2.5
+   ]
+  ],
+  [
+   [
+    5.15,
+    1.2
+   ],
+   [
+    2.35,
+    1.2
+   ]
+  ],
+  [
+   [
+    6.75,
+    3.1
+   ],
+   [
+    9.05,
+    3.1
+   ]
+  ],
+  [
+   [
+    6.75,
+    0.6
+   ],
+   [
+    9.05,
+    0.6
+   ],
+   [
+    9.05,
+    3.1
+   ]
+  ],
+  [
+   [
+    5.85,
+    1.85
+   ],
+   [
+    8.15,
+    1.85
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   2.35,
+   2.5
+  ]
+ ],
+ "annotations": [
+  {
+   "at": [
+    8.6,
+    2.895
+   ],
+   "text": "$+$"
+  },
+  {
+   "at": [
+    8.6,
+    2.475
+   ],
+   "text": "$v_o$"
+  },
+  {
+   "at": [
+    8.6,
+    2.055
+   ],
+   "text": "$-$"
+  }
+ ],
+ "netlist": {
+  "Vin.b": "DCP",
+  "S1.d": "DCP",
+  "S3.d": "DCP",
+  "Vin.a": "DCN",
+  "S2.s": "DCN",
+  "S4.s": "DCN",
+  "S1.s": "NA",
+  "S2.d": "NA",
+  "S3.s": "NB",
+  "S4.d": "NB",
+  "Cr.a": "NA",
+  "Cr.b": "NX",
+  "Lr.a": "NX",
+  "Lr.b": "NP",
+  "T.p1": "NP",
+  "T.p2": "NB",
+  "Lm.a": "NP",
+  "Lm.b": "NB",
+  "T.s1": "NT1",
+  "D1.a": "NT1",
+  "T.s2": "NT2",
+  "D2.a": "NT2",
+  "D1.b": "OP",
+  "D2.b": "OP",
+  "Co.a": "OP",
+  "RL.a": "OP",
+  "Co.b": "ON",
+  "RL.b": "ON",
+  "T.sct": "ON"
+ },
+ "modes": [
+  {
+   "name": "Mode 1",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{0}, t_{1}]$: $S_1$, $S_4$ on, power to the load",
+   "on": [
+    "S1",
+    "S4",
+    "D1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "Cr",
+     "Lr",
+     "T:p|Lm",
+     "S4"
+    ],
+    [
+     "T:s1",
+     "D1",
+     "Co|RL"
+    ]
+   ]
+  },
+  {
+   "name": "Mode 2",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{1}, t_{2}]$: $i_r = i_m$, rectifier off",
+   "on": [
+    "S1",
+    "S4"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "Cr",
+     "Lr",
+     "Lm",
+     "S4"
+    ],
+    [
+     "RL",
+     "Co"
+    ]
+   ]
+  },
+  {
+   "name": "Mode 3",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{2}, t_{3}]$: dead time, body diodes of $S_2$, $S_3$",
+   "on": [
+    "S2:diode",
+    "S3:diode",
+    "D2"
+   ],
+   "loops": [
+    [
+     "Cr",
+     "Lr",
+     "T:p|Lm",
+     "S3:diode",
+     "Vin",
+     "S2:diode"
+    ],
+    [
+     "T:s2",
+     "D2",
+     "Co|RL"
+    ]
+   ]
+  },
+  {
+   "name": "Mode 4",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{3}, t_{4}]$: $S_2$, $S_3$ on, power to the load",
+   "on": [
+    "S2",
+    "S3",
+    "D2"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S3",
+     "T:p|Lm",
+     "Lr",
+     "Cr",
+     "S2"
+    ],
+    [
+     "T:s2",
+     "D2",
+     "Co|RL"
+    ]
+   ]
+  },
+  {
+   "name": "Mode 5",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{4}, t_{5}]$: $i_r = i_m$, rectifier off",
+   "on": [
+    "S2",
+    "S3"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S3",
+     "Lm",
+     "Lr",
+     "Cr",
+     "S2"
+    ],
+    [
+     "RL",
+     "Co"
+    ]
+   ]
+  },
+  {
+   "name": "Mode 6",
+   "condition": "$f_s < f_r$",
+   "caption": "$[t_{5}, t_{6}]$: dead time, body diodes of $S_1$, $S_4$",
+   "on": [
+    "S1:diode",
+    "S4:diode",
+    "D1"
+   ],
+   "loops": [
+    [
+     "T:p|Lm",
+     "Lr",
+     "Cr",
+     "S1:diode",
+     "Vin",
+     "S4:diode"
+    ],
+    [
+     "T:s1",
+     "D1",
+     "Co|RL"
+    ]
+   ]
+  }
+ ],
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "48",
+    "wave": {
+     "kind": "step",
+     "initial": "0",
+     "final": "48",
+     "delay": "0",
+     "rise": "2u"
+    }
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "80000",
+    "duty": "0.484",
+    "delay": "1.25e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "S2": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "80000",
+    "duty": "0.484",
+    "delay": "1.8750000000000002e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "S3": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "80000",
+    "duty": "0.484",
+    "delay": "1.8750000000000002e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "S4": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "80000",
+    "duty": "0.484",
+    "delay": "1.25e-05",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "Cr": {
+    "value": "126.6514795529n",
+    "initial": "0"
+   },
+   "Lr": {
+    "value": "20u",
+    "initial": "0"
+   },
+   "Lm": {
+    "value": "100u",
+    "initial": "0"
+   },
+   "T": {
+    "ratio": "1",
+    "reference_resistance": "1T",
+    "model": "ideal_transformer",
+    "polarity": "same"
+   },
+   "D1": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "D2": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "Co": {
+    "value": "220u",
+    "initial": "0"
+   },
+   "RL": {
+    "value": "12"
+   }
+  },
+  "transient": {
+   "step": "100n",
+   "max_step": "100n",
+   "node_capacitance": "1n",
+   "stop": "25m"
+  },
+  "probes": [
+   {
+    "name": "v_p",
+    "kind": "voltage",
+    "positive": "T.p1",
+    "negative": "T.p2"
+   },
+   {
+    "name": "i_p",
+    "kind": "current",
+    "element": "T",
+    "winding": "primary"
+   },
+   {
+    "name": "i_in",
+    "kind": "current",
+    "element": "Vin"
+   },
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "Co.a",
+    "negative": "Co.b"
+   },
+   {
+    "name": "i_r",
+    "kind": "current",
+    "element": "Lr"
+   },
+   {
+    "name": "i_m",
+    "kind": "current",
+    "element": "Lm"
+   },
+   {
+    "name": "v_su",
+    "kind": "voltage",
+    "positive": "T.s1",
+    "negative": "T.sct"
+   },
+   {
+    "name": "v_sl",
+    "kind": "voltage",
+    "positive": "T.sct",
+    "negative": "T.s2"
+   },
+   {
+    "name": "i_su",
+    "kind": "current",
+    "element": "T",
+    "winding": "upper"
+   },
+   {
+    "name": "i_sl",
+    "kind": "current",
+    "element": "T",
+    "winding": "lower"
+   }
+  ]
+ }
+}

@@ -1,0 +1,292 @@
+{
+ "name": "single_phase_diode_bridge",
+ "elements": [
+  {
+   "id": "Vac",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     1.5
+    ],
+    "b": [
+     0.0,
+     3.5
+    ]
+   },
+   "label": "$v_{ac}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.0,
+     3.0
+    ],
+    "b": [
+     2.0,
+     4.5
+    ]
+   },
+   "label": "$D_1$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D2",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.0,
+     0.0
+    ],
+    "b": [
+     2.0,
+     1.5
+    ]
+   },
+   "label": "$D_2$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D3",
+   "kind": "D",
+   "pins": {
+    "a": [
+     4.0,
+     3.0
+    ],
+    "b": [
+     4.0,
+     4.5
+    ]
+   },
+   "label": "$D_3$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D4",
+   "kind": "D",
+   "pins": {
+    "a": [
+     4.0,
+     0.0
+    ],
+    "b": [
+     4.0,
+     1.5
+    ]
+   },
+   "label": "$D_4$",
+   "label_pos": "right"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     6.0,
+     4.5
+    ],
+    "b": [
+     6.0,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    2.0,
+    1.5
+   ],
+   [
+    2.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    1.5
+   ],
+   [
+    4.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    3.5
+   ],
+   [
+    1.0,
+    3.5
+   ],
+   [
+    1.0,
+    2.7
+   ],
+   [
+    2.0,
+    2.7
+   ]
+  ],
+  [
+   [
+    0.0,
+    1.5
+   ],
+   [
+    1.0,
+    1.5
+   ],
+   [
+    1.0,
+    2.0
+   ],
+   [
+    4.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    4.5
+   ],
+   [
+    6.0,
+    4.5
+   ]
+  ],
+  [
+   [
+    2.0,
+    0.0
+   ],
+   [
+    6.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   2.0,
+   2.0
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vac.a": "B",
+  "Vac.b": "A",
+  "D1.a": "A",
+  "D1.b": "DCP",
+  "D2.a": "DCN",
+  "D2.b": "A",
+  "D3.a": "B",
+  "D3.b": "DCP",
+  "D4.a": "DCN",
+  "D4.b": "B",
+  "RL.a": "DCP",
+  "RL.b": "DCN"
+ },
+ "modes": [
+  {
+   "name": "Positive half cycle",
+   "on": [
+    "D1",
+    "D4"
+   ],
+   "loops": [
+    [
+     "Vac",
+     "D1",
+     "RL",
+     "D4"
+    ]
+   ],
+   "caption": "Positive half cycle",
+   "condition": "Ideal diodes; resistive load; sinusoidal source"
+  },
+  {
+   "name": "Negative half cycle",
+   "on": [
+    "D3",
+    "D2"
+   ],
+   "loops": [
+    [
+     "Vac",
+     "D3",
+     "RL",
+     "D2"
+    ]
+   ],
+   "caption": "Negative half cycle",
+   "condition": "Ideal diodes; resistive load; sinusoidal source"
+  }
+ ],
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/single_phase_diode_bridge.csv",
+  "sha256": "e0cfdefd7724c0c9785367df6ee4b1a1400258bc036ec1b80e895e4837ddb9fb",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "ms",
+  "relative_time": true,
+  "slice_style": "shade",
+  "arrange": "grid",
+  "window": [
+   0,
+   0.02
+  ],
+  "boundaries": [
+   0.0,
+   0.01,
+   0.02
+  ],
+  "intervals": [
+   "Positive half cycle",
+   "Negative half cycle"
+  ],
+  "channels": [
+   {
+    "column": "v_ac_V",
+    "label": "v_ac",
+    "unit": "V",
+    "color": "#c8102e"
+   },
+   {
+    "column": "v_out_V",
+    "label": "v_out",
+    "unit": "V",
+    "color": "#2457d6"
+   },
+   {
+    "column": "i_out_A",
+    "label": "i_out",
+    "unit": "A",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "94c94a7f37af2c038c6585e76efdc5ab159215834e3b091ed398400fbac6661b",
+  "notes": [
+   {
+    "kind": "text",
+    "channel": "v_ac_V",
+    "at": [
+     0.013999999999999999,
+     4
+    ],
+    "text": "Ideal analytical reference"
+   }
+  ]
+ }
+}

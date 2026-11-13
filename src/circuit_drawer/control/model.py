@@ -60,7 +60,7 @@ SECTIONS = ("blocks", "links", "texts", "regions")
 # sections that carry numbers, not drawing: ``loop`` (transfer functions,
 # plant, loop breaks) is read by ``loop.py``, ``code`` (sample rate, number
 # format, limits) by ``codegen.py``; neither is drawn
-DATA_SECTIONS = ("loop", "code", "functions", "control_ai")
+DATA_SECTIONS = ("loop", "code", "digital", "functions", "control_ai")
 
 _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _PORT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$")
@@ -170,6 +170,9 @@ def validate_appearance(obj: dict, section: str, name: str) -> None:
         if f.type == "ink":
             _ink(value, f"{name}: {f.name}")
         elif f.type == "fill" and value is not None:
+            from ..regions import canon, valid_ink
+            if section == "regions" and f.name == "border_color" and valid_ink(canon(value)):
+                continue
             try:
                 block_fill(value)
             except ControlError as exc:

@@ -1,0 +1,224 @@
+{
+ "title": "Full bridge",
+ "symbol": "text",
+ "layout": {
+  "name": "full_bridge_mos",
+  "elements": [
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.9
+     ],
+     "s": [
+      1.0,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      1.0
+     ],
+     "s": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "S3",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      3.9
+     ],
+     "s": [
+      2.35,
+      2.9
+     ]
+    },
+    "label": "$S_{3}$"
+   },
+   {
+    "id": "S4",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      1.0
+     ],
+     "s": [
+      2.35,
+      0.0
+     ]
+    },
+    "label": "$S_{4}$"
+   },
+   {
+    "id": "Port_P",
+    "kind": "port",
+    "pins": {
+     "p": [
+      0.0,
+      3.9
+     ]
+    },
+    "label": "$P$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_N",
+    "kind": "port",
+    "pins": {
+     "p": [
+      0.0,
+      0.0
+     ]
+    },
+    "label": "$N$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_A",
+    "kind": "port",
+    "pins": {
+     "p": [
+      4.0,
+      2.5
+     ]
+    },
+    "label": "$A$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_B",
+    "kind": "port",
+    "pins": {
+     "p": [
+      4.0,
+      1.2
+     ]
+    },
+    "label": "$B$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     2.35,
+     3.9
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     2.35,
+     0.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.9
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   [
+    [
+     2.35,
+     2.9
+    ],
+    [
+     2.35,
+     1.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     4.0,
+     2.5
+    ]
+   ],
+   [
+    [
+     2.35,
+     1.2
+    ],
+    [
+     4.0,
+     1.2
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.35,
+    2.5
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "S1.d": "DCP",
+   "S3.d": "DCP",
+   "S2.s": "DCN",
+   "S4.s": "DCN",
+   "S1.s": "NA",
+   "S2.d": "NA",
+   "S3.s": "NB",
+   "S4.d": "NB",
+   "Port_P.p": "DCP",
+   "Port_N.p": "DCN",
+   "Port_A.p": "NA",
+   "Port_B.p": "NB"
+  }
+ },
+ "ports": {
+  "P": "Port_P.p",
+  "N": "Port_N.p",
+  "A": "Port_A.p",
+  "B": "Port_B.p"
+ },
+ "port_layout": {
+  "P": {
+   "side": "left",
+   "order": 0
+  },
+  "N": {
+   "side": "left",
+   "order": 1
+  },
+  "A": {
+   "side": "right",
+   "order": 2
+  },
+  "B": {
+   "side": "right",
+   "order": 3
+  }
+ }
+}

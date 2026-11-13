@@ -1,0 +1,300 @@
+{
+ "name": "dc_bus_system",
+ "elements": [],
+ "wires": [],
+ "blocks": [
+  {
+   "id": "bess",
+   "from": [
+    0,
+    4.0
+   ],
+   "to": [
+    1.0,
+    5.0
+   ],
+   "icon": "battery",
+   "text": "BESS"
+  },
+  {
+   "id": "dc1",
+   "from": [
+    2.0,
+    4.0
+   ],
+   "to": [
+    3.0,
+    5.0
+   ],
+   "icon": "dcdc"
+  },
+  {
+   "id": "pv",
+   "from": [
+    0,
+    2.0
+   ],
+   "to": [
+    1.0,
+    3.0
+   ],
+   "icon": "pv",
+   "text": "PV"
+  },
+  {
+   "id": "dc2",
+   "from": [
+    2.0,
+    2.0
+   ],
+   "to": [
+    3.0,
+    3.0
+   ],
+   "icon": "dcdc"
+  },
+  {
+   "id": "inv",
+   "from": [
+    5.6,
+    4.0
+   ],
+   "to": [
+    6.6,
+    5.0
+   ],
+   "icon": "dcac"
+  },
+  {
+   "id": "grid",
+   "from": [
+    7.6,
+    4.0
+   ],
+   "to": [
+    8.6,
+    5.0
+   ],
+   "icon": "ac",
+   "text": "Grid"
+  },
+  {
+   "id": "dc3",
+   "from": [
+    5.6,
+    2.0
+   ],
+   "to": [
+    6.6,
+    3.0
+   ],
+   "icon": "dcdc"
+  },
+  {
+   "id": "rack",
+   "from": [
+    7.6,
+    2.0
+   ],
+   "to": [
+    8.6,
+    3.0
+   ],
+   "icon": "rack",
+   "text": "Server rack"
+  },
+  {
+   "id": "cap",
+   "from": [
+    5.6,
+    0.0
+   ],
+   "to": [
+    6.6,
+    1.0
+   ],
+   "icon": "capacitor",
+   "text": "DC link"
+  }
+ ],
+ "annotations": [
+  {
+   "at": [
+    4.675,
+    -0.55
+   ],
+   "text": "DC bus"
+  }
+ ],
+ "callouts": [
+  {
+   "id": "l0",
+   "from": [
+    1.0,
+    4.5
+   ],
+   "to": [
+    2.0,
+    4.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l1",
+   "from": [
+    3.0,
+    4.5
+   ],
+   "to": [
+    4.6,
+    4.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l2",
+   "from": [
+    1.0,
+    2.5
+   ],
+   "to": [
+    2.0,
+    2.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l3",
+   "from": [
+    3.0,
+    2.5
+   ],
+   "to": [
+    4.6,
+    2.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l4",
+   "from": [
+    4.75,
+    4.5
+   ],
+   "to": [
+    5.6,
+    4.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l5",
+   "from": [
+    6.6,
+    4.5
+   ],
+   "to": [
+    7.6,
+    4.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l6",
+   "from": [
+    4.75,
+    2.5
+   ],
+   "to": [
+    5.6,
+    2.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l7",
+   "from": [
+    6.6,
+    2.5
+   ],
+   "to": [
+    7.6,
+    2.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l8",
+   "from": [
+    4.75,
+    0.5
+   ],
+   "to": [
+    5.6,
+    0.5
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l9",
+   "from": [
+    4.6,
+    -0.2
+   ],
+   "to": [
+    4.6,
+    5.4
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "l10",
+   "from": [
+    4.75,
+    -0.2
+   ],
+   "to": [
+    4.75,
+    5.4
+   ],
+   "style": "line",
+   "head": "none",
+   "color": "black"
+  },
+  {
+   "id": "path",
+   "from": [
+    1.5,
+    5.6
+   ],
+   "to": [
+    8.1,
+    5.6
+   ],
+   "style": "block",
+   "color": "red",
+   "label": "power path",
+   "label_pos": "above"
+  }
+ ]
+}

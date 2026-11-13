@@ -50,7 +50,6 @@ def _texts(dia: Diagram) -> list[str]:
 
 def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False) -> str:
     dia, g = rep.diagram, rep.geometry
-    s = g.scale
     cjk = any(has_wide(t) for t in _texts(dia))
     out = [preamble(prof, cjk).replace(r"\usepackage{circuitikz}",
                                        "\\usepackage{circuitikz}\n\\usetikzlibrary{arrows.meta}")]
@@ -59,6 +58,15 @@ def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False) -> 
                rf"line width={prof.line_pt}pt, line join=round]" "\n")
     if grid:
         out.append(_grid(rep))
+    out.append(body(rep, prof, mono))
+    out.append("\\end{tikzpicture}\n" + ("\\end{CJK}\n" if cjk else "") + "\\end{document}\n")
+    return "".join(out)
+
+
+def body(rep: Report, prof: Profile, mono: bool = False) -> str:
+    """The checked diagram, also used inside a circuit's controller frame."""
+    dia, g = rep.diagram, rep.geometry
+    s, out = g.scale, []
     if dia.regions:
         out.append("% ---- regions (background) ----\n")
         out += [_region(r, s, prof, mono) for r in dia.regions]
@@ -81,7 +89,6 @@ def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False) -> 
                        rf"{{${'-' if sign == '-' else '+'}$}};" "\n")
     out.append("% ---- text ----\n")
     out += [_label(lb, g.s, mono) for lb in g.labels if not lb.owner.endswith(" sign")]
-    out.append("\\end{tikzpicture}\n" + ("\\end{CJK}\n" if cjk else "") + "\\end{document}\n")
     return "".join(out)
 
 

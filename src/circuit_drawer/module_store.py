@@ -29,9 +29,22 @@ FORMAT = 1
 LIBRARIES = ("builtin", "user")
 # names shown for the bundled modules (their tables keep the short ids), and
 # the longer description the panel shows on hover
-BUILTIN_TITLES = {"buck": "Buck", "boost": "Boost", "dab": "DAB", "llc_halfbridge": "LLC 半桥"}
+BUILTIN_TITLES = {"buck": "Buck", "boost": "Boost", "dab": "DAB", "llc_halfbridge": "LLC 半桥",
+                  "half_bridge_mos": "MOSFET 半桥", "half_bridge_igbt": "IGBT 半桥",
+                  "full_bridge_mos": "MOSFET 全桥", "npc_leg": "NPC 桥臂", "llc_tank": "LLC 谐振腔",
+                  "fb_diode_rectifier": "二极管全桥整流", "ct_rectifier": "中心抽头整流",
+                  "hb_submodule": "半桥子模块", "fb_submodule": "全桥子模块"}
 BUILTIN_NOTES = {"buck": "降压变换器", "boost": "升压变换器", "dab": "双有源桥（两个全桥 + 变压器）",
-                 "llc_halfbridge": "半桥 LLC 谐振变换器（含整流）"}
+                 "llc_halfbridge": "半桥 LLC 谐振变换器（含整流）",
+                 "half_bridge_mos": "两只 MOSFET，直流正负端与桥臂中点",
+                 "half_bridge_igbt": "两只 IGBT，直流正负端与桥臂中点",
+                 "full_bridge_mos": "四只 MOSFET，直流正负端与两个桥臂中点",
+                 "npc_leg": "四只 IGBT、两只箝位二极管，外接分裂母线中点",
+                 "llc_tank": "串联 Cr、Lr 与并联 Lm，返回端共网",
+                 "fb_diode_rectifier": "四二极管整流桥，不含输出滤波",
+                 "ct_rectifier": "两二极管整流，外接中心抽头变压器，不含输出滤波",
+                 "hb_submodule": "半桥及浮动直流电容，电容初值为演示值",
+                 "fb_submodule": "全桥及浮动直流电容，电容初值为演示值"}
 
 
 def user_module_dir() -> Path:
@@ -77,6 +90,22 @@ def library_definition(library: str, name: str) -> dict:
             raise ModuleError(f"我的模块库里没有 {name}")
         return _user_entry(path)["definition"]
     raise ModuleError(f"模块库只有 {' / '.join(LIBRARIES)}")
+
+
+def builtin_blocks() -> list[dict]:
+    """Compact CLI/AI catalogue; one-to-one drawing size includes all labels."""
+    from .geometry import Scale
+    from .profiles import get_profile
+    from .validate import extent
+    prof = get_profile("double")
+    rows = []
+    for name in library_names():
+        definition = library_definition("builtin", name)
+        box = extent(Layout.from_dict(definition["layout"]), Scale(1, 1), prof)
+        rows.append({"name": name, "note": BUILTIN_NOTES.get(name, ""),
+                     "ports": list(definition["ports"]),
+                     "width": box.x1 - box.x0, "height": box.y1 - box.y0})
+    return rows
 
 
 def _box(definition: dict) -> list | None:
@@ -174,13 +203,6 @@ def place(lay: Layout, library: str, name: str, at, connections: dict,
         raise ModuleError("这张图的模块按网络名连接（旧写法），请先点“转换为端口连接”再从模块库放置")
     spec.setdefault("instances", [])
     spec.setdefault("links", [])
-    if raw.get("modes"):
-        # as when saving a selection as a module: operating modes cannot cross
-        # module ports yet, so they wait here and return when the last
-        # instance is dissolved
-        author = raw.setdefault("module_authoring", {"aliases": {}, "order": [e["id"] for e in raw["elements"]],
-                                                     "terminals": []})
-        author["modes"] = raw.pop("modes")
     definitions = spec.setdefault("definitions", {})
     target = next((d for d, existing in definitions.items()
                    if isinstance(existing, dict) and existing.get("source") == {"library": library, "name": name, "revision": rev}

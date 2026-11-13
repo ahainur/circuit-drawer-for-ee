@@ -64,9 +64,13 @@ def evaluate(v: Any, env: dict[str, float], what: str) -> float:
     if isinstance(v, bool):
         raise LoopError(f"{what} must be a number or a formula, not {v!r}")
     if isinstance(v, (int, float)):
-        if not math.isfinite(v):
+        try:
+            number = float(v)
+        except OverflowError:
+            raise LoopError(f"{what} must be finite") from None
+        if not math.isfinite(number):
             raise LoopError(f"{what} must be finite")
-        return float(v)
+        return number
     if not isinstance(v, str):
         raise LoopError(f"{what} must be a number or a formula, not {v!r}")
     try:
@@ -97,12 +101,12 @@ def evaluate(v: Any, env: dict[str, float], what: str) -> float:
                         f"{sorted(_FUNCS)} only")
     try:
         out = ev(tree)
-    except (ZeroDivisionError, OverflowError, ValueError) as exc:
+        if not math.isfinite(out):
+            raise LoopError(f"{what}: {v!r} is not finite")
+    except (ZeroDivisionError, OverflowError, ValueError, TypeError) as exc:
         if isinstance(exc, LoopError):
             raise
         raise LoopError(f"{what}: {v!r} cannot be evaluated ({exc})") from None
-    if not math.isfinite(out):
-        raise LoopError(f"{what}: {v!r} is not finite")
     return out
 
 
@@ -417,6 +421,9 @@ class Network:
         self.inputs = _inputs(rep)                # block -> [(port, source block)]
         self.nodes: dict[str, Node] = {}
         self.problems: dict[str, str] = {}
+        self.digital = None
+        self.sample_plan = None
+        self.digital_resolution = []
         for b in self.dia.blocks:
             self._node(b)
 
@@ -431,7 +438,8 @@ class Network:
                    f"cannot pass through it")
             self.problems[b.id] = why
             from .functions import KINDS
-            for name in getattr(KINDS.get(fn.get("fn")), "outputs", ()):
+            outputs = fn.get("out", {}) if fn.get("fn") == "c" else getattr(KINDS.get(fn.get("fn")), "outputs", ())
+            for name in outputs:
                 self.nodes[f"{b.id}.{name}"] = Node(f"{b.id}.{name}")
                 self.problems[f"{b.id}.{name}"] = why
                 self.inputs.setdefault(f"{b.id}.{name}", list(ins))
@@ -725,7 +733,11 @@ def network(rep, raw_loop=None) -> tuple[Network, LoopSpec]:
     spec, errors = parse_loop(raw, rep.diagram)
     if errors:
         raise LoopError("; ".join(errors))
-    return Network(rep, spec), spec
+    net = Network(rep, spec)
+    if "digital" in rep.diagram.raw:
+        from .digital import network as digital_network
+        net.digital, net.sample_plan = digital_network(rep, net, spec)
+    return net, spec
 
 
 def analyse(rep) -> dict[str, Any]:
@@ -744,9 +756,9 @@ def analyse(rep) -> dict[str, Any]:
             "fc_hz": _r(m.fc), "pm_deg": _r(m.pm), "gm_db": _r(m.gm),
             "crossovers": [{"f_hz": _r(f), "pm_deg": _r(p)} for f, p in m.crossovers],
             "phase_crossovers": [{"f_hz": _r(f), "gm_db": _r(g)} for f, g in m.phase_crossovers],
-            "loop_gain": {"k": _r(lz.k), "zeros": describe(lz.zeros), "poles": describe(lz.poles)},
-            "closed_loop_poles": describe(poles),
-            "stable": not [p for p in poles if p.real > 0],
+            "loop_gain": {"k": _r(lz.k), "zeros": _roots_text(lz.zeros, net.digital), "poles": _roots_text(lz.poles, net.digital)},
+            "closed_loop_poles": _roots_text(poles, net.digital),
+            "stable": all(abs(p) < 1 - 1e-9 for p in poles) if net.digital else not [p for p in poles if p.real > 0],
         })
     closed = []
     for c in spec.closed:
@@ -757,8 +769,23 @@ def analyse(rep) -> dict[str, Any]:
         closed.append({"from": c.src, "to": c.dst, "label": c.label,
                        "gain_at_fmin": _r(dc), "bandwidth_hz": _r(bw)})
     blocks = {bid: _tf_text(tf) for bid, tf in spec.tf.items()}
-    return {"params": spec.params, "blocks": blocks, "loops": loops, "closed": closed,
-            "stable": all(lp["stable"] for lp in loops)}
+    result = {"params": spec.params, "blocks": blocks, "loops": loops, "closed": closed,
+              "stable": all(lp["stable"] for lp in loops)}
+    if net.digital:
+        from .digital import LINEAR_NOTE
+        result["digital"] = {"fs_hz": net.sample_plan.fs, "delay_samples": net.digital.delay_samples,
+                             "freq_hz": list(spec.freq), "resolution": net.digital_resolution,
+                             "word_bits": net.digital.word_bits, "fraction_bits": net.digital.fraction_bits,
+                             "terms": {bid: [{"from": src, "num_z": gain.zpk.num(), "den_z": gain.zpk.den()}
+                                             for src, gain in nd.terms] for bid, nd in net.nodes.items()},
+                             "note": LINEAR_NOTE}
+    return result
+
+
+def _roots_text(values, digital):
+    if digital:
+        return [f"z = {p.real:.6g}{p.imag:+.6g}j, |z| = {abs(p):.6g}" for p in values]
+    return describe(values)
 
 
 def _tf_text(tf: Tf) -> dict[str, Any]:
@@ -801,6 +828,8 @@ def design(rep, block: str, fc: float, pm: float, kind: int | None = None,
     """K-factor (Venable) Type I/II/III compensator for ``block``, placing the
     loop's crossover at ``fc`` Hz with ``pm`` degrees of phase margin."""
     net, spec = network(rep)
+    if net.digital:
+        raise LoopError("数字模式请调整 loop.tf 后重新计算。k 因子补偿器设计使用连续时间模型")
     if block not in net.blocks:
         raise LoopError(f"no block {block!r}")
     probe = at or (spec.breaks[0].at if spec.breaks else None)

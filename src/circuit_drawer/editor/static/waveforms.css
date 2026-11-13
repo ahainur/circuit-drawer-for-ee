@@ -35,3 +35,7 @@ body:has(#wavePanel:not([hidden])) { grid-template-rows: auto minmax(220px,1fr) 
 .wave-label, .wave-note { cursor:move; }
 .wave-handle { fill:#fff; stroke:#2457d6; stroke-width:1.5; cursor:grab; }
 #waveChart:focus { outline:none; }
+#waveAIResult { height:40vh; overflow:auto; padding:12px; background:#eee; }
+#waveAIChart { display:block; margin:auto; background:white; font-family:"Times New Roman",serif; pointer-events:none; }
+#waveAIState { white-space:pre-line; }
+#waveAIState > span { display:block; }

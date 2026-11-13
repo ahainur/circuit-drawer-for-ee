@@ -38,7 +38,7 @@ from typing import Any
 
 SQ3 = math.sqrt(3.0)
 TWO_PI = 2 * math.pi
-KEYS = ("fn", "in", "out", "note")
+KEYS = ("fn", "in", "out", "c", "note")
 PORT = re.compile(r"^([nsew])([+-]\d+(?:\.\d+)?)?$")
 OFFSET_TOL = 1e-6
 
@@ -58,6 +58,7 @@ KINDS = {
     "ipark": Kind(("d", "q", "theta"), ("alpha", "beta"), (), "dq -> alpha beta at angle theta"),
     "svpwm": Kind(("alpha", "beta", "vdc"), ("da", "db", "dc"), (), "alpha beta, DC link -> phase duty cycles"),
     "wrap": Kind(("x",), ("y",), (), "angle -> [0, 2 pi)"),
+    "c": Kind((), (), (), "custom scalar C step with explicit old/next state; native export only"),
 }
 
 
@@ -71,6 +72,7 @@ class Fn:
     kind: str
     ins: dict[str, tuple[str, float]] = field(default_factory=dict)    # name -> (side, offset)
     outs: dict[str, tuple[str, float]] = field(default_factory=dict)
+    c: dict | None = None
 
     def signal(self, name: str) -> str:
         return f"{self.block}.{name}"
@@ -117,11 +119,21 @@ def parse(raw: Any, dia) -> tuple[dict[str, Fn], list[str]]:
         bad = sorted(set(d) - set(KEYS))
         if bad:
             errors.append(f"{what}: unknown keys {bad}; allowed are {list(KEYS)}")
-        kind = KINDS.get(d.get("fn"))
+        name = d.get("fn")
+        kind = KINDS.get(name) if isinstance(name, str) else None
         if kind is None:
             errors.append(f"{what}.fn must be one of {list(KINDS)}")
             continue
         fn = Fn(bid, d["fn"])
+        if fn.kind == "c":
+            from .custom_c import parse as parse_c
+            fn.c, c_errors = parse_c(d.get("c"), d.get("in"), d.get("out"), what + ".c")
+            errors += c_errors
+            if c_errors:
+                continue
+            kind = Kind(tuple(sorted(d["in"])), tuple(sorted(d["out"])), (), kind.doc)
+        elif "c" in d:
+            errors.append(f"{what}.c 仅用于 fn 为 c 的方块")
         for key, names, required, store in (("in", kind.inputs, set(kind.inputs) - set(kind.optional), fn.ins),
                                            ("out", kind.outputs, set(), fn.outs)):
             given = d.get(key) or {}
@@ -173,11 +185,16 @@ def wiring(fns: dict[str, Fn], links, errors: list[str]) -> None:
                               f"inputs; name it in functions.{bid}.in" if off else
                               f"functions.{bid}: the line ending at {bid}.{side} is not one of its inputs; "
                               f"name it in functions.{bid}.in")
+        for side, off in ends_out.get(bid, []):
+            if fn.output_at(side, off) is None:
+                errors.append(f"functions.{bid}.out：连线起点 {side}{off:+g} 未声明为输出端口")
 
 
 # ---- evaluation --------------------------------------------------------------------
 def evaluate(kind: str, x: dict[str, float]) -> dict[str, float]:
     """Python reference, the same formulas as the C and SPICE forms."""
+    if kind == "c":
+        raise FunctionError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
     if kind == "clarke":
         a, b = x["a"], x["b"]
         c = x["c"] if "c" in x else -a - b
@@ -204,6 +221,8 @@ def evaluate(kind: str, x: dict[str, float]) -> dict[str, float]:
 def expressions(kind: str, x: dict[str, str], lang: str) -> dict[str, str]:
     """Output name -> expression of the input expressions ``x``.  ``lang``:
     "c" (float), "cd" (double) or "spice" (an ngspice B source)."""
+    if kind == "c":
+        raise FunctionError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
     f = "f" if lang == "c" else ""
     cos = (lambda a: f"cos{f}({a})")
     sin = (lambda a: f"sin{f}({a})")

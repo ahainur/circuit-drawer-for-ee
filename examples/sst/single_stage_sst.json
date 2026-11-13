@@ -1,0 +1,1571 @@
+{
+  "name": "single_stage_sst_modules",
+  "elements": [
+    {
+      "id": "Vx",
+      "kind": "vac",
+      "pins": {
+        "a": [
+          -0.6,
+          7.2
+        ],
+        "b": [
+          -0.6,
+          8.4
+        ]
+      },
+      "label": "$v_x$"
+    },
+    {
+      "id": "O",
+      "kind": "port",
+      "pins": {
+        "p": [
+          -0.6,
+          6.5
+        ]
+      },
+      "label": "$O$",
+      "opts": {
+        "color": "red"
+      }
+    },
+    {
+      "id": "Lg",
+      "kind": "L",
+      "pins": {
+        "a": [
+          -0.2,
+          15
+        ],
+        "b": [
+          1.2,
+          15
+        ]
+      },
+      "label": "$L_g$"
+    },
+    {
+      "id": "X",
+      "kind": "port",
+      "pins": {
+        "p": [
+          1.5,
+          12.4
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    },
+    {
+      "id": "Lr1",
+      "kind": "L",
+      "pins": {
+        "a": [
+          6.4,
+          15
+        ],
+        "b": [
+          7.8,
+          15
+        ]
+      },
+      "label": "$L_{r1}$",
+      "opts": {
+        "current": "$i_{px1}$"
+      }
+    },
+    {
+      "id": "T1",
+      "kind": "transformer",
+      "pins": {
+        "p1": [
+          8.5,
+          15
+        ],
+        "p2": [
+          8.5,
+          13.8
+        ],
+        "s1": [
+          9.3,
+          15
+        ],
+        "s2": [
+          9.3,
+          13.8
+        ]
+      },
+      "opts": {
+        "ratio": "$n_1:1$",
+        "scale": 0.8
+      }
+    },
+    {
+      "id": "Cr1",
+      "kind": "C",
+      "pins": {
+        "a": [
+          8.5,
+          13
+        ],
+        "b": [
+          8.5,
+          12
+        ]
+      },
+      "label": "$C_{r1}$"
+    },
+    {
+      "id": "Qx1",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          12,
+          16
+        ],
+        "e": [
+          12,
+          15
+        ]
+      },
+      "label": "$Q_{x1}$",
+      "opts": {
+        "scale": 0.8,
+        "label_size": 7
+      }
+    },
+    {
+      "id": "Qx2",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          12,
+          13.4
+        ],
+        "e": [
+          12,
+          12.4
+        ]
+      },
+      "label": "$Q_{x2}$",
+      "opts": {
+        "scale": 0.8,
+        "label_size": 7
+      }
+    },
+    {
+      "id": "Qx3",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          14,
+          16
+        ],
+        "e": [
+          14,
+          15
+        ]
+      },
+      "label": "$Q_{x3}$",
+      "opts": {
+        "scale": 0.8,
+        "label_size": 7
+      }
+    },
+    {
+      "id": "Qx4",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          14,
+          13.4
+        ],
+        "e": [
+          14,
+          12.4
+        ]
+      },
+      "label": "$Q_{x4}$",
+      "opts": {
+        "scale": 0.8,
+        "label_size": 7
+      }
+    },
+    {
+      "id": "Cx",
+      "kind": "C",
+      "pins": {
+        "a": [
+          15.5,
+          16
+        ],
+        "b": [
+          15.5,
+          12.4
+        ]
+      },
+      "label": "$C_x$"
+    },
+    {
+      "id": "LVp",
+      "kind": "port",
+      "pins": {
+        "p": [
+          19.8,
+          9
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    },
+    {
+      "id": "LVn",
+      "kind": "port",
+      "pins": {
+        "p": [
+          21.1,
+          8
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    },
+    {
+      "id": "Sf1",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          3.4,
+          0
+        ],
+        "e": [
+          3.4,
+          -1
+        ]
+      },
+      "label": "$S_{f1}$",
+      "opts": {
+        "scale": 0.8
+      }
+    },
+    {
+      "id": "Sf2",
+      "kind": "igbt",
+      "pins": {
+        "c": [
+          3.4,
+          -2
+        ],
+        "e": [
+          3.4,
+          -3
+        ]
+      },
+      "label": "$S_{f2}$",
+      "opts": {
+        "scale": 0.8
+      }
+    },
+    {
+      "id": "Fx",
+      "kind": "port",
+      "pins": {
+        "p": [
+          2.2,
+          -1.5
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    },
+    {
+      "id": "Cf1",
+      "kind": "C",
+      "pins": {
+        "a": [
+          5.5,
+          0
+        ],
+        "b": [
+          5.5,
+          -1.5
+        ]
+      },
+      "label": "$C_{f1}$"
+    },
+    {
+      "id": "Cf2",
+      "kind": "C",
+      "pins": {
+        "a": [
+          5.5,
+          -1.5
+        ],
+        "b": [
+          5.5,
+          -3
+        ]
+      },
+      "label": "$C_{f2}$"
+    },
+    {
+      "id": "CFp",
+      "kind": "port",
+      "pins": {
+        "p": [
+          6.5,
+          0
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    },
+    {
+      "id": "CFn",
+      "kind": "port",
+      "pins": {
+        "p": [
+          6.5,
+          -3
+        ]
+      },
+      "opts": {
+        "bare": true
+      }
+    }
+  ],
+  "wires": [
+    [
+      [
+        -0.6,
+        6.5
+      ],
+      [
+        -0.6,
+        7.2
+      ]
+    ],
+    [
+      [
+        -0.6,
+        8.4
+      ],
+      [
+        -0.6,
+        15
+      ],
+      [
+        -0.2,
+        15
+      ]
+    ],
+    [
+      [
+        1.2,
+        15
+      ],
+      [
+        6.4,
+        15
+      ]
+    ],
+    [
+      [
+        1.5,
+        15
+      ],
+      [
+        1.5,
+        12.4
+      ]
+    ],
+    [
+      [
+        7.8,
+        15
+      ],
+      [
+        8.5,
+        15
+      ]
+    ],
+    [
+      [
+        8.5,
+        13.8
+      ],
+      [
+        8.5,
+        13
+      ]
+    ],
+    [
+      [
+        8.5,
+        12
+      ],
+      [
+        8.5,
+        0.8
+      ],
+      [
+        7.3,
+        0.8
+      ],
+      [
+        7.3,
+        -1.5
+      ],
+      [
+        5.5,
+        -1.5
+      ]
+    ],
+    [
+      [
+        9.3,
+        15
+      ],
+      [
+        12,
+        15
+      ]
+    ],
+    [
+      [
+        9.3,
+        13.8
+      ],
+      [
+        14,
+        13.8
+      ]
+    ],
+    [
+      [
+        12,
+        15
+      ],
+      [
+        12,
+        13.4
+      ]
+    ],
+    [
+      [
+        14,
+        15
+      ],
+      [
+        14,
+        13.4
+      ]
+    ],
+    [
+      [
+        12,
+        16
+      ],
+      [
+        19.8,
+        16
+      ],
+      [
+        19.8,
+        9
+      ]
+    ],
+    [
+      [
+        12,
+        12.4
+      ],
+      [
+        21.1,
+        12.4
+      ],
+      [
+        21.1,
+        8
+      ]
+    ],
+    [
+      [
+        3.4,
+        -1
+      ],
+      [
+        3.4,
+        -2
+      ]
+    ],
+    [
+      [
+        2.2,
+        -1.5
+      ],
+      [
+        3.4,
+        -1.5
+      ]
+    ],
+    [
+      [
+        3.4,
+        0
+      ],
+      [
+        6.5,
+        0
+      ]
+    ],
+    [
+      [
+        3.4,
+        -3
+      ],
+      [
+        6.5,
+        -3
+      ]
+    ]
+  ],
+  "hops": [
+    [
+      12,
+      13.8
+    ],
+    [
+      19.8,
+      12.4
+    ]
+  ],
+  "annotations": [
+    {
+      "at": [
+        6.9,
+        -1.9
+      ],
+      "text": "$O'$",
+      "color": "red"
+    },
+    {
+      "at": [
+        4.7,
+        15
+      ],
+      "text": "$i_x$",
+      "arrow": "right",
+      "side": "above"
+    }
+  ],
+  "netlist": {
+    "Vx.a": "O",
+    "Vx.b": "G1",
+    "O.p": "O",
+    "Lg.a": "G1",
+    "Lg.b": "X",
+    "X.p": "X",
+    "Lr1.a": "X",
+    "Lr1.b": "R1",
+    "T1.p1": "R1",
+    "T1.p2": "R2",
+    "T1.s1": "HA",
+    "T1.s2": "HB",
+    "Cr1.a": "R2",
+    "Cr1.b": "OP",
+    "Qx1.c": "LP",
+    "Qx1.e": "HA",
+    "Qx2.c": "HA",
+    "Qx2.e": "LN",
+    "Qx3.c": "LP",
+    "Qx3.e": "HB",
+    "Qx4.c": "HB",
+    "Qx4.e": "LN",
+    "Cx.a": "LP",
+    "Cx.b": "LN",
+    "LVp.p": "LP",
+    "LVn.p": "LN",
+    "Sf1.c": "CFP",
+    "Sf1.e": "FX",
+    "Sf2.c": "FX",
+    "Sf2.e": "CFN",
+    "Fx.p": "FX",
+    "Cf1.a": "CFP",
+    "Cf1.b": "OP",
+    "Cf2.a": "OP",
+    "Cf2.b": "CFN",
+    "CFp.p": "CFP",
+    "CFn.p": "CFN"
+  },
+  "modules": {
+    "version": 1,
+    "definitions": {
+      "sm": {
+        "layout": {
+          "name": "sm_full_bridge",
+          "elements": [
+            {
+              "id": "Si1",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  1.2,
+                  3.8
+                ],
+                "e": [
+                  1.2,
+                  2.8
+                ]
+              },
+              "label": "$S_{i1}$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Si2",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  1.2,
+                  1.0
+                ],
+                "e": [
+                  1.2,
+                  0.0
+                ]
+              },
+              "label": "$S_{i2}$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Si3",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  2.8,
+                  3.8
+                ],
+                "e": [
+                  2.8,
+                  2.8
+                ]
+              },
+              "label": "$S_{i3}$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Si4",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  2.8,
+                  1.0
+                ],
+                "e": [
+                  2.8,
+                  0.0
+                ]
+              },
+              "label": "$S_{i4}$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Csm",
+              "kind": "C",
+              "pins": {
+                "a": [
+                  3.8,
+                  2.4
+                ],
+                "b": [
+                  3.8,
+                  1.4
+                ]
+              },
+              "label": "$C_\\mathrm{SM}$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "SMa",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  0.3,
+                  2.2
+                ]
+              },
+              "label": "$A$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7,
+                "label_offset": [
+                  0.35,
+                  0.12
+                ]
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "SMb",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  0.3,
+                  1.4
+                ]
+              },
+              "label": "$B$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7,
+                "label_offset": [
+                  0.35,
+                  -0.12
+                ]
+              },
+              "label_pos": "below"
+            }
+          ],
+          "wires": [
+            [
+              [
+                1.2,
+                3.8
+              ],
+              [
+                3.8,
+                3.8
+              ]
+            ],
+            [
+              [
+                1.2,
+                0.0
+              ],
+              [
+                3.8,
+                0.0
+              ]
+            ],
+            [
+              [
+                1.2,
+                2.8
+              ],
+              [
+                1.2,
+                1.0
+              ]
+            ],
+            [
+              [
+                2.8,
+                2.8
+              ],
+              [
+                2.8,
+                1.0
+              ]
+            ],
+            [
+              [
+                3.8,
+                3.8
+              ],
+              [
+                3.8,
+                2.4
+              ]
+            ],
+            [
+              [
+                3.8,
+                1.4
+              ],
+              [
+                3.8,
+                0.0
+              ]
+            ],
+            [
+              [
+                0.3,
+                2.2
+              ],
+              [
+                1.2,
+                2.2
+              ]
+            ],
+            [
+              [
+                0.3,
+                1.4
+              ],
+              [
+                0.7,
+                1.4
+              ],
+              [
+                0.7,
+                1.8
+              ],
+              [
+                2.8,
+                1.8
+              ]
+            ]
+          ],
+          "hops": [
+            [
+              1.2,
+              1.8
+            ]
+          ],
+          "annotations": [],
+          "netlist": {
+            "Si1.c": "smP",
+            "Si1.e": "smA",
+            "Si2.c": "smA",
+            "Si2.e": "smN",
+            "Si3.c": "smP",
+            "Si3.e": "smB",
+            "Si4.c": "smB",
+            "Si4.e": "smN",
+            "Csm.a": "smP",
+            "Csm.b": "smN",
+            "SMa.p": "smA",
+            "SMb.p": "smB"
+          },
+          "regions": [
+            {
+              "id": "cell",
+              "from": [
+                0,
+                -0.25
+              ],
+              "to": [
+                4.7,
+                4.05
+              ],
+              "fill": "green",
+              "border": "none"
+            }
+          ]
+        },
+        "ports": {
+          "A": "SMa.p",
+          "B": "SMb.p"
+        },
+        "title": "SM",
+        "symbol": "acdc",
+        "port_layout": {
+          "A": {
+            "side": "left",
+            "order": 0
+          },
+          "B": {
+            "side": "left",
+            "order": 1
+          }
+        }
+      },
+      "idc": {
+        "layout": {
+          "name": "idc_resonant_dab",
+          "elements": [
+            {
+              "id": "Q1",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  1.0,
+                  3.8
+                ],
+                "e": [
+                  1.0,
+                  2.8
+                ]
+              },
+              "label": "$Q_1$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q2",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  1.0,
+                  1.0
+                ],
+                "e": [
+                  1.0,
+                  0.0
+                ]
+              },
+              "label": "$Q_2$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q3",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  2.6,
+                  3.8
+                ],
+                "e": [
+                  2.6,
+                  2.8
+                ]
+              },
+              "label": "$Q_3$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q4",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  2.6,
+                  1.0
+                ],
+                "e": [
+                  2.6,
+                  0.0
+                ]
+              },
+              "label": "$Q_4$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q5",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  7.6,
+                  3.8
+                ],
+                "e": [
+                  7.6,
+                  2.8
+                ]
+              },
+              "label": "$Q_5$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q6",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  7.6,
+                  1.0
+                ],
+                "e": [
+                  7.6,
+                  0.0
+                ]
+              },
+              "label": "$Q_6$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q7",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  9.0,
+                  3.8
+                ],
+                "e": [
+                  9.0,
+                  2.8
+                ]
+              },
+              "label": "$Q_7$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Q8",
+              "kind": "igbt",
+              "pins": {
+                "c": [
+                  9.0,
+                  1.0
+                ],
+                "e": [
+                  9.0,
+                  0.0
+                ]
+              },
+              "label": "$Q_8$",
+              "label_pos": "right",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Cr2",
+              "kind": "C",
+              "pins": {
+                "a": [
+                  3.0,
+                  2.4
+                ],
+                "b": [
+                  4.0,
+                  2.4
+                ]
+              },
+              "label": "$C_\\mathrm{r2}$",
+              "label_pos": "above",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "Lr2",
+              "kind": "L",
+              "pins": {
+                "a": [
+                  4.0,
+                  2.4
+                ],
+                "b": [
+                  5.2,
+                  2.4
+                ]
+              },
+              "label": "$L_\\mathrm{r2}$",
+              "label_pos": "above",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "T3",
+              "kind": "transformer",
+              "pins": {
+                "p1": [
+                  5.6,
+                  2.4
+                ],
+                "p2": [
+                  5.6,
+                  1.4
+                ],
+                "s1": [
+                  6.3,
+                  2.4
+                ],
+                "s2": [
+                  6.3,
+                  1.4
+                ]
+              },
+              "label": "",
+              "opts": {
+                "ratio": "$n_2\\!:\\!1$",
+                "scale": 0.8,
+                "label_size": 7
+              }
+            },
+            {
+              "id": "P",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  0,
+                  3.8
+                ]
+              },
+              "label": "$P$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "N",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  0,
+                  0
+                ]
+              },
+              "label": "$N$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              },
+              "label_pos": "below"
+            },
+            {
+              "id": "OP",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  10,
+                  3.8
+                ]
+              },
+              "label": "$OP$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              },
+              "label_pos": "above"
+            },
+            {
+              "id": "ON",
+              "kind": "port",
+              "pins": {
+                "p": [
+                  10,
+                  0
+                ]
+              },
+              "label": "$ON$",
+              "opts": {
+                "scale": 0.8,
+                "label_size": 7
+              },
+              "label_pos": "below"
+            }
+          ],
+          "wires": [
+            [
+              [
+                0.0,
+                3.8
+              ],
+              [
+                2.6,
+                3.8
+              ]
+            ],
+            [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                2.6,
+                0.0
+              ]
+            ],
+            [
+              [
+                1.0,
+                2.8
+              ],
+              [
+                1.0,
+                1.0
+              ]
+            ],
+            [
+              [
+                2.6,
+                2.8
+              ],
+              [
+                2.6,
+                1.0
+              ]
+            ],
+            [
+              [
+                7.6,
+                2.8
+              ],
+              [
+                7.6,
+                1.0
+              ]
+            ],
+            [
+              [
+                9.0,
+                2.8
+              ],
+              [
+                9.0,
+                1.0
+              ]
+            ],
+            [
+              [
+                1.0,
+                2.4
+              ],
+              [
+                3.0,
+                2.4
+              ]
+            ],
+            [
+              [
+                5.2,
+                2.4
+              ],
+              [
+                5.6,
+                2.4
+              ]
+            ],
+            [
+              [
+                5.6,
+                1.4
+              ],
+              [
+                2.6,
+                1.4
+              ]
+            ],
+            [
+              [
+                6.3,
+                2.4
+              ],
+              [
+                7.6,
+                2.4
+              ]
+            ],
+            [
+              [
+                6.3,
+                1.4
+              ],
+              [
+                9.0,
+                1.4
+              ]
+            ],
+            [
+              [
+                7.6,
+                3.8
+              ],
+              [
+                10.0,
+                3.8
+              ]
+            ],
+            [
+              [
+                7.6,
+                0.0
+              ],
+              [
+                10.0,
+                0.0
+              ]
+            ]
+          ],
+          "hops": [
+            [
+              2.6,
+              2.4
+            ],
+            [
+              7.6,
+              1.4
+            ]
+          ],
+          "annotations": [],
+          "netlist": {
+            "Q1.c": "dP",
+            "Q1.e": "dA",
+            "Q2.c": "dA",
+            "Q2.e": "dN",
+            "Q3.c": "dP",
+            "Q3.e": "dB",
+            "Q4.c": "dB",
+            "Q4.e": "dN",
+            "Q5.c": "eP",
+            "Q5.e": "eA",
+            "Q6.c": "eA",
+            "Q6.e": "eN",
+            "Q7.c": "eP",
+            "Q7.e": "eB",
+            "Q8.c": "eB",
+            "Q8.e": "eN",
+            "Cr2.a": "dA",
+            "Cr2.b": "dC",
+            "Lr2.a": "dC",
+            "Lr2.b": "dD",
+            "T3.p1": "dD",
+            "T3.p2": "dB",
+            "T3.s1": "eA",
+            "T3.s2": "eB",
+            "P.p": "dP",
+            "N.p": "dN",
+            "OP.p": "eP",
+            "ON.p": "eN"
+          }
+        },
+        "ports": {
+          "P": "P.p",
+          "N": "N.p",
+          "OP": "OP.p",
+          "ON": "ON.p"
+        },
+        "title": "IDC",
+        "symbol": "dcdc",
+        "port_layout": {
+          "P": {
+            "side": "left",
+            "order": 0
+          },
+          "N": {
+            "side": "left",
+            "order": 1
+          },
+          "OP": {
+            "side": "right",
+            "order": 2
+          },
+          "ON": {
+            "side": "right",
+            "order": 3
+          }
+        }
+      }
+    },
+    "instances": [
+      {
+        "id": "SM1",
+        "definition": "sm",
+        "at": [
+          1.7,
+          10.2
+        ],
+        "display": "collapsed",
+        "symbol": "acdc",
+        "collapsed_size": {
+          "w": 2,
+          "h": 2
+        },
+        "appearance": {
+          "title": "$\\mathrm{SM}_1$",
+          "fill": "green"
+        }
+      },
+      {
+        "id": "SM2",
+        "definition": "sm",
+        "at": [
+          1.7,
+          5.2
+        ],
+        "display": "collapsed",
+        "symbol": "acdc",
+        "collapsed_size": {
+          "w": 2,
+          "h": 2
+        },
+        "appearance": {
+          "title": "$\\mathrm{SM}_2$",
+          "fill": "green"
+        }
+      },
+      {
+        "id": "SM3",
+        "definition": "sm",
+        "at": [
+          1.7,
+          0.2
+        ],
+        "display": "collapsed",
+        "symbol": "acdc",
+        "collapsed_size": {
+          "w": 2,
+          "h": 2
+        },
+        "appearance": {
+          "title": "$\\mathrm{SM}_3$",
+          "fill": "green"
+        }
+      },
+      {
+        "id": "IDC",
+        "definition": "idc",
+        "at": [
+          8.5,
+          -5.5
+        ],
+        "display": "collapsed",
+        "symbol": "dcdc",
+        "collapsed_size": {
+          "w": 2,
+          "h": 2
+        },
+        "appearance": {
+          "title": "IDC",
+          "fill": "green"
+        }
+      }
+    ],
+    "links": [
+      [
+        "X.p",
+        "SM1.A"
+      ],
+      [
+        "SM1.B",
+        "SM2.A"
+      ],
+      [
+        "SM2.B",
+        "SM3.A"
+      ],
+      [
+        "SM3.B",
+        "Fx.p"
+      ],
+      [
+        "CFp.p",
+        "IDC.P"
+      ],
+      [
+        "CFn.p",
+        "IDC.N"
+      ],
+      [
+        "IDC.OP",
+        "Co.a"
+      ],
+      [
+        "IDC.ON",
+        "Co.b"
+      ],
+      [
+        "Co.a",
+        "LVp.p"
+      ],
+      [
+        "Co.b",
+        "LVn.p"
+      ]
+    ],
+    "parts": [
+      {
+        "id": "Co",
+        "kind": "C",
+        "label": "$C_o$"
+      }
+    ]
+  },
+  "regions": [
+    {
+      "id": "phase_x",
+      "from": [
+        1.8,
+        0.1
+      ],
+      "to": [
+        16.7,
+        16.8
+      ],
+      "fill": "none",
+      "border": "dashed"
+    }
+  ],
+  "callouts": [
+    {
+      "from": [
+        0.9,
+        12.4
+      ],
+      "to": [
+        0.9,
+        1.4
+      ],
+      "style": "line",
+      "color": "black",
+      "head": "both",
+      "label": "$v_{rx}$",
+      "label_pos": "left",
+      "detail": false
+    },
+    {
+      "from": [
+        17.2,
+        15.8
+      ],
+      "to": [
+        17.2,
+        12.6
+      ],
+      "style": "line",
+      "color": "black",
+      "head": "both",
+      "label": "$v_{L\\mathrm{dc}}$",
+      "label_pos": "right",
+      "detail": false
+    }
+  ]
+}

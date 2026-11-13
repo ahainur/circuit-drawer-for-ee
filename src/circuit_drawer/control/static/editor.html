@@ -78,6 +78,7 @@
 
 </style>
 <link rel="stylesheet" href="/menu.css">
+<link rel="stylesheet" href="/hints.css">
 <link rel="stylesheet" href="/theme-eda.css">
 </head>
 <body>
@@ -89,7 +90,7 @@
       <button data-menu="view" id="menu-view" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-view-panel">视图</button>
       <button data-menu="insert" id="menu-insert" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-insert-panel">插入</button>
       <button data-menu="ai" id="menu-ai" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-ai-panel">AI</button>
-      <button data-menu="analysis" id="menu-analysis" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-analysis-panel">分析</button>
+      <button data-menu="analysis" id="menu-analysis" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-analysis-panel">实验功能</button>
       <button data-menu="help" id="menu-help" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-help-panel">帮助</button>
     </nav>
     <span class="file" id="file" translate="no">Circuit Drawer</span><span id="dirty" class="hint"></span>
@@ -200,6 +201,7 @@
     <div class="row" id="selActions" style="display:none">
       <button id="applyBtn">应用修改</button>
       <button id="lBtn" title="给斜的连线加一个拐点，先横后竖">加 L 形拐点</button>
+      <button id="customCBtn" style="display:none">设置 C 代码…</button>
     </div>
     <h3>模板与片段</h3>
     <div class="row"><select id="tplSel"></select><button id="tplLoad">从模板新建</button></div>
@@ -656,6 +658,7 @@ function showSelection() {
   $("selJson").style.display = item ? "" : "none";
   $("selActions").style.display = item ? "" : "none";
   $("lBtn").style.display = item && item.kind === "link" ? "" : "none";
+  $("customCBtn").style.display = item?.kind === "block" && item.obj.type === "block" ? "" : "none";
   if (item) {
     $("selInfo").textContent = { block: `方块 ${item.id}`, text: `文字 texts[${item.i}]`, link: `连线 links[${item.i}]`, region: `区域 regions[${item.i}]` }[item.kind]
       + "：在下面修改外观或文字；高级设置可编辑 JSON。";
@@ -740,7 +743,7 @@ function showAppearance() {
   row("线型", "dash", constants.dashes, ["link"]);
   row("填充", "fill", [...Object.keys(constants.palette), "none"], ["region"], "fill", constants.palette);
   row("边框样式", "border", constants.borders, ["region"]);
-  row("边框颜色", "border_color", Object.keys(constants.palette), ["region"], "fill", constants.palette_edges);
+  row("边框颜色", "border_color", Object.keys(constants.border_colors), ["region"], "fill", constants.border_colors);
 }
 // ---------------------------------------------------------------- text and formula box
 // which fields of each kind of object hold printed text: field -> name shown in the page
@@ -1255,6 +1258,62 @@ function dialog(title, body) {
   $("dlgTitle").textContent = title; $("dlgBody").innerHTML = ""; $("dlgBody").appendChild(body);
   if (!$("dlg").open) $("dlg").showModal();
 }
+$("customCBtn").onclick = () => {
+  const item = selectedItem();
+  if (item?.kind !== "block" || item.obj.type !== "block") return;
+  const base = clone(table), basis = JSON.stringify(table), requestedProfile = profile;
+  const existing = base.functions?.[item.id], custom = existing?.fn === "c";
+  const box = document.createElement("div"); box.style.width = "min(720px,85vw)";
+  box.innerHTML = `<p class="hint">固定采样率的标量 C 计算，导出到 PLECS C-Script 或 Simulink C Function。ngspice 不支持。</p>
+    <p class="hint">应用会替换此方块的传递函数与逐块限幅；限幅请写在代码内。整张控制表使用 double。</p>
+    <p><label for="customCFs">采样率（整张控制表，Hz）</label> <input id="customCFs" type="number" min="0" step="any"></p>
+    <label for="customCInputs">输入名称与端口（JSON）</label><textarea id="customCInputs" rows="2" spellcheck="false"></textarea>
+    <label for="customCOutputs">输出名称与端口（JSON）</label><textarea id="customCOutputs" rows="2" spellcheck="false"></textarea>
+    <label for="customCStates">状态初值（JSON，可为空对象）</label><textarea id="customCStates" rows="2" spellcheck="false"></textarea>
+    <label for="customCBody">每拍计算的 C 语句</label><textarea id="customCBody" rows="10" spellcheck="false" translate="no"></textarea>
+    <p class="hint">输入和旧状态只读；给输出赋值，用 next_状态名 更新状态。不使用 static 状态或外部副作用。保存时检查字段和接线，C 语法由目标编译器检查。</p>
+    <button id="customCApply">应用 C 代码</button> <span id="customCStatus" role="status"></span>`;
+  dialog("C 代码方块", box);
+  const fields = ["customCFs","customCInputs","customCOutputs","customCStates","customCBody"].map(id => $(id));
+  const values = [base.code?.fs ?? "", pretty(custom ? existing.in : {u:"w"}),
+    pretty(custom ? existing.out : {y:"e"}), pretty(custom ? existing.c?.states || {} : {}),
+    custom ? existing.c?.body ?? "" : "y = u;"];
+  fields.forEach((field,i) => field.value = values[i]);
+  const draft = () => JSON.stringify(fields.map(field => field.value));
+  $("customCApply").onclick = async () => {
+    const button = $("customCApply"), state = $("customCStatus"), submitted = draft();
+    button.disabled = true; state.textContent = "正在检查…";
+    try {
+      const fs = Number(fields[0].value);
+      if (!Number.isFinite(fs) || fs <= 0) throw new Error("采样率须为大于零的有限数值");
+      const next = clone(base);
+      next.functions ||= {};
+      next.functions[item.id] = {...existing,fn:"c",in:JSON.parse(fields[1].value),out:JSON.parse(fields[2].value),
+        c:{states:JSON.parse(fields[3].value),body:fields[4].value}};
+      next.code = {...next.code,fs,arith:"double"};
+      const outputPorts = next.functions[item.id].out;
+      if (Array.isArray(next.code.outputs) && outputPorts && typeof outputPorts === "object" && !Array.isArray(outputPorts)) {
+        const names = Object.keys(outputPorts), prefix = item.id + ".";
+        next.code.outputs = next.code.outputs.flatMap(name => {
+          if (name === item.id) return names.map(key => prefix + key);
+          if (typeof name !== "string" || !name.startsWith(prefix) || names.includes(name.slice(prefix.length))) return [name];
+          const oldPort = existing.out?.[name.slice(prefix.length)];
+          const renamed = oldPort && names.find(key => outputPorts[key] === oldPort);
+          return [renamed ? prefix + renamed : name];
+        });
+      }
+      if (next.loop?.tf) delete next.loop.tf[item.id];
+      if (next.code.blocks) delete next.code.blocks[item.id];
+      const verdict = await api("/api/check",{table:next,profile:requestedProfile});
+      if (!$("dlg").open || !$("dlgBody").contains(box)) return;
+      if (JSON.stringify(table) !== basis || profile !== requestedProfile || draft() !== submitted)
+        throw new Error("图纸或代码草稿已改变，请重新检查；未应用旧结果");
+      if (!verdict.ok) throw new Error(verdict.errors.join("；"));
+      commit(next); $("dlg").close();
+    } catch (e) { state.textContent = e.message; }
+    finally { button.disabled = false; }
+  };
+};
 async function preview() {
   const box = document.createElement("div");
   box.innerHTML = `<div class="row"><label><input type="checkbox" id="pvGrid"> 网格</label><label><input type="checkbox" id="pvMono"> 黑白</label><button id="pvGo">刷新</button><span class="hint" id="pvMsg">编译中…</span></div><img id="pvImg" alt="">`;
@@ -1284,7 +1343,9 @@ function loopTables(rep) {
     <td style="color:${l.stable ? "var(--good)" : "var(--bad)"}">${l.stable ? "稳定" : "不稳定"}</td></tr>
     <tr><td colspan="5" class="hint">闭环极点：${esc(l.closed_loop_poles.join("；") || "无")}</td></tr>`).join("");
   const cl = rep.closed.map((c) => `<tr><td>${plain(c.label)}</td><td colspan="4">低频增益 ${c.gain_at_fmin}，带宽 ${c.bandwidth_hz === null ? "超出扫频范围" : c.bandwidth_hz + " Hz"}</td></tr>`).join("");
-  return `<table><tr><th>开环</th><th>穿越频率</th><th>相位裕度</th><th>增益裕度</th><th></th></tr>${rows}${cl}</table>`;
+  const resolution = (rep.digital?.resolution || []).map(r => `<p>${esc(r.output)} → ${esc(r.input)} · ADC Δ = ${r.adc_step.toPrecision(4)}, PWM Δ = ${r.pwm_step_at_input.toPrecision(4)}${r.coarse_pwm ? '<br><span class="hint">PWM 折算步长大于 ADC 步长，请比较高分辨率设置下的时域波形。</span>' : ''}</p>`).join("");
+  const digital = rep.digital ? `<p class="hint">${esc(rep.digital.note)}</p><p>fs = ${rep.digital.fs_hz} Hz, <span>计算延迟（拍）</span> ${rep.digital.delay_samples}</p>${resolution}` : "";
+  return `${digital}<table><tr><th>开环</th><th>穿越频率</th><th>相位裕度</th><th>增益裕度</th><th></th></tr>${rows}${cl}</table>`;
 }
 function loopDlg() {
   const box = document.createElement("div");
@@ -1303,16 +1364,56 @@ function loopDlg() {
       <div id="dsOut" class="hint"></div>
       <details><summary class="hint">loop 部分（传递函数、功率级、断点）</summary>
         <textarea id="lpJson"></textarea><div class="row"><button id="lpApply">应用</button></div></details>
+      <details id="lpDigitalBox"><summary>数字控制延迟与量化</summary><div id="lpDigital"></div>
+        <button id="lpDigitalApply" disabled>应用数字设置</button><p class="hint" id="lpDigitalMsg"></p></details>
     </div></div>`;
   dialog("环路分析（Bode 图与导出相同）", box);
   $("lpJson").value = table.loop ? JSON.stringify(table.loop, null, 1) : `{\n "tf": {},\n "plant": [],\n "breaks": []\n}`;
+  let loopRequest = 0;
   const go = async () => {
+    const request = ++loopRequest;
     $("lpMsg").textContent = "计算中…";
     try { const r = await api("/api/loop", { table, profile, mono: $("lpMono").checked });
+      if (request !== loopRequest || !box.isConnected) return;
       $("lpImg").src = "data:image/png;base64," + r.png; $("lpRep").innerHTML = loopTables(r.report); $("lpMsg").textContent = ""; }
-    catch (e) { $("lpMsg").textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
+    catch (e) { if (request === loopRequest && box.isConnected) $("lpMsg").textContent = e.message + (e.data && e.data.errors ? "：" + e.data.errors.join("；") : ""); }
   };
   let designed = null;
+  let digitalForm = null;
+  const loadDigital = async () => {
+    const before = JSON.stringify(table);
+    try {
+      const result = await api("/api/controller-info", {table});
+      if (!box.isConnected) return;
+      if (before !== JSON.stringify(table)) return loadDigital();
+      digitalForm = CircuitDrawerDigital.create(table, result.inputs);
+      $("lpDigital").replaceChildren(digitalForm.element);
+      $("lpDigitalApply").disabled = false;
+      $("lpDigitalMsg").textContent = "";
+      $("lpDigitalBox").open = !!table.digital;
+    } catch (e) { if (box.isConnected) $("lpDigitalMsg").textContent = e.message; }
+  };
+  $("lpDigitalApply").onclick = async () => {
+    if (!digitalForm) return;
+    try {
+      const settings = digitalForm.read(), before = JSON.stringify(table), draft = JSON.stringify(settings);
+      const candidate = JSON.parse(before);
+      if (settings.digital) {
+        candidate.digital = settings.digital;
+        candidate.code = {...candidate.code, fs: settings.code.fs};
+      } else delete candidate.digital;
+      const result = await api("/api/controller-info", {table:candidate});
+      if (!box.isConnected) return;
+      if (before !== JSON.stringify(table) || draft !== JSON.stringify(digitalForm.read())) {
+        $("lpDigitalMsg").textContent = "设置或图纸已改变，请重新应用数字设置。"; return;
+      }
+      commit(candidate); go();
+      digitalForm = CircuitDrawerDigital.create(candidate, result.inputs);
+      $("lpDigital").replaceChildren(digitalForm.element);
+      $("lpDigitalMsg").textContent = "";
+    } catch (e) { if (box.isConnected) $("lpDigitalMsg").textContent = e.message; }
+  };
+  loadDigital();
   $("lpGo").onclick = go;
   $("lpApply").onclick = () => {
     try { const t = JSON.parse(JSON.stringify(table)); t.loop = JSON.parse($("lpJson").value); commit(t); go(); }
@@ -1545,5 +1646,6 @@ document.querySelectorAll("[data-add]").forEach(button => {
 </script>
 <script src="/menu.js"></script>
 <script src="/ai-settings.js"></script>
+<script src="/digital-control.js"></script>
 </body>
 </html>

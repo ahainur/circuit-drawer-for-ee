@@ -1,0 +1,239 @@
+{
+ "template": {
+  "name": "synchronous_buck",
+  "title": "Synchronous Buck",
+  "aliases": [
+   "synchronous buck",
+   "同步buck",
+   "同步降压"
+  ],
+  "description": "Synchronous MOSFET stage, positive CCM. Modes assume reverse channel conduction; changing device type requires reviewing conduction modes.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "synchronous_buck",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      3.0
+     ]
+    },
+    "label": "$V_\\mathrm{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.0
+     ],
+     "s": [
+      2.2,
+      3.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "below"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.5,
+      2.0
+     ],
+     "s": [
+      2.5,
+      0.0
+     ]
+    },
+    "label": "$S_2$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      2.8,
+      3.0
+     ],
+     "b": [
+      4.0,
+      3.0
+     ]
+    },
+    "label": "$L_1$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      4.3,
+      3.0
+     ],
+     "b": [
+      4.3,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      5.4,
+      3.0
+     ],
+     "b": [
+      5.4,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "left"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.0
+    ],
+    [
+     1.0,
+     3.0
+    ]
+   ],
+   [
+    [
+     2.2,
+     3.0
+    ],
+    [
+     2.8,
+     3.0
+    ]
+   ],
+   [
+    [
+     2.5,
+     2.0
+    ],
+    [
+     2.5,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.0,
+     3.0
+    ],
+    [
+     5.4,
+     3.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     5.4,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [
+   {
+    "at": [
+     6.05,
+     1.92
+    ],
+    "text": "$+$"
+   },
+   {
+    "at": [
+     6.05,
+     1.5
+    ],
+    "text": "$v_o$"
+   },
+   {
+    "at": [
+     6.05,
+     1.08
+    ],
+    "text": "$-$"
+   }
+  ],
+  "netlist": {
+   "Vin.b": "IN",
+   "S1.d": "IN",
+   "S1.s": "SW",
+   "L1.a": "SW",
+   "L1.b": "OUT",
+   "Co.a": "OUT",
+   "RL.a": "OUT",
+   "Vin.a": "GND",
+   "Co.b": "GND",
+   "RL.b": "GND",
+   "S2.d": "SW",
+   "S2.s": "GND"
+  },
+  "modes": [
+   {
+    "name": "Switch on",
+    "condition": "Ideal synchronous MOSFET CCM; no dead time; reverse channel conduction",
+    "caption": "$S_1$ on, $S_2$ off",
+    "on": [
+     "S1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "L1",
+      "Co|RL"
+     ]
+    ]
+   },
+   {
+    "name": "Freewheel",
+    "condition": "Ideal synchronous MOSFET CCM; no dead time; reverse channel conduction",
+    "caption": "$S_1$ off, $S_2$ freewheeling",
+    "on": [
+     "S2"
+    ],
+    "loops": [
+     [
+      "S2",
+      "L1",
+      "Co|RL"
+     ]
+    ]
+   }
+  ]
+ }
+}

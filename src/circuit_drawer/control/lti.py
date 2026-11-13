@@ -107,13 +107,13 @@ def roots(p: list) -> list[complex]:
     return out + sorted(res, key=lambda c: (abs(c), c.imag))
 
 
-def same_root(a: complex, b: complex) -> bool:
-    return abs(a - b) <= ROOT_TOL * max(abs(a), abs(b)) + ROOT_ABS
+def same_root(a: complex, b: complex, tolerance=ROOT_TOL) -> bool:
+    return abs(a - b) <= tolerance * max(abs(a), abs(b)) + min(ROOT_ABS, tolerance)
 
 
-def _take(pool: list[complex], r: complex) -> bool:
+def _take(pool: list[complex], r: complex, tolerance=ROOT_TOL) -> bool:
     for i, q in enumerate(pool):
-        if same_root(q, r):
+        if same_root(q, r, tolerance):
             del pool[i]
             return True
     return False
@@ -126,19 +126,20 @@ class Zpk:
     k: float = 0.0
     zeros: list[complex] = field(default_factory=list)
     poles: list[complex] = field(default_factory=list)
+    root_tol: float = ROOT_TOL
 
     @classmethod
     def const(cls, k: float) -> "Zpk":
         return cls(float(k))
 
     @classmethod
-    def from_poly(cls, num: list, den: list) -> "Zpk":
+    def from_poly(cls, num: list, den: list, *, root_tol=ROOT_TOL) -> "Zpk":
         num, den = trim([complex(c) for c in num]), trim([complex(c) for c in den])
         if den == [0]:
             raise ZeroDivisionError("denominator is zero")
         if num == [0]:
             return cls(0.0)
-        return cls((num[0] / den[0]).real, roots(num), roots(den)).cancel()
+        return cls((num[0] / den[0]).real, roots(num), roots(den), root_tol).cancel()
 
     def cancel(self) -> "Zpk":
         if self.k == 0:
@@ -146,9 +147,9 @@ class Zpk:
         zs, ps = list(self.zeros), list(self.poles)
         keep = []
         for z in zs:
-            if not _take(ps, z):
+            if not _take(ps, z, self.root_tol):
                 keep.append(z)
-        return Zpk(self.k, keep, ps)
+        return Zpk(self.k, keep, ps, self.root_tol)
 
     def num(self) -> list[float]:
         return real_poly([self.k * c for c in from_roots(self.zeros)])
@@ -171,31 +172,33 @@ class Zpk:
         o = _zpk(o)
         if self.is_zero() or o.is_zero():
             return Zpk(0.0)
-        return Zpk(self.k * o.k, self.zeros + o.zeros, self.poles + o.poles).cancel()
+        return Zpk(self.k * o.k, self.zeros + o.zeros, self.poles + o.poles,
+                   min(self.root_tol, o.root_tol)).cancel()
 
     __rmul__ = __mul__
 
     def __neg__(self) -> "Zpk":
-        return Zpk(-self.k, list(self.zeros), list(self.poles))
+        return Zpk(-self.k, list(self.zeros), list(self.poles), self.root_tol)
 
     def inverse(self) -> "Zpk":
         if self.is_zero():
             raise ZeroDivisionError("inverse of zero")
-        return Zpk(1 / self.k, list(self.poles), list(self.zeros))
+        return Zpk(1 / self.k, list(self.poles), list(self.zeros), self.root_tol)
 
     def __truediv__(self, o: "Zpk | float") -> "Zpk":
         return self * _zpk(o).inverse()
 
     def __add__(self, o: "Zpk | float") -> "Zpk":
         o = _zpk(o)
+        tolerance = min(self.root_tol, o.root_tol)
         if o.is_zero():
-            return Zpk(self.k, list(self.zeros), list(self.poles))
+            return Zpk(self.k, list(self.zeros), list(self.poles), tolerance)
         if self.is_zero():
-            return Zpk(o.k, list(o.zeros), list(o.poles))
+            return Zpk(o.k, list(o.zeros), list(o.poles), tolerance)
         # common denominator: the shared poles once, then each side's own
         mine, theirs, shared = list(self.poles), list(o.poles), []
         for p in list(mine):
-            if _take(theirs, p):
+            if _take(theirs, p, tolerance):
                 mine.remove(p)
                 shared.append(p)
         a = [self.k * c for c in pmul(from_roots(self.zeros), from_roots(theirs))]
@@ -207,7 +210,7 @@ class Zpk:
         num = trim(num)
         if num == [0]:
             return Zpk(0.0)
-        return Zpk(num[0].real, roots(num), shared + mine + theirs).cancel()
+        return Zpk(num[0].real, roots(num), shared + mine + theirs, tolerance).cancel()
 
     __radd__ = __add__
 

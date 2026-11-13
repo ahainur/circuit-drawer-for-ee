@@ -24,27 +24,30 @@ document.getElementById("emi").onclick = async () => {
     const row = (label, control) => `<label class="export-row">${esc(label)} ${control}</label>`;
     const probes = (base.simulation?.probes || []).filter(p=>p.kind==='voltage').map(p=>[p.name,p.name]);
     const elements = kind => base.elements.filter(e=>e.kind===kind).map(e=>[e.id,e.id]);
-    panel.innerHTML = `<p>${esc(info.note)}</p>
-      <p>先画好两条电源线的 LISN、50 Ω 接收端和机壳回路。可在“AI → 描述新拓扑…”输入 buck_emi，再点“直接载入模板”（无需调用模型）。修改供电电压与采样时间请到“分析 → SPICE 仿真…”。</p>
+    panel.innerHTML = `<div class="help-row"><span class="hint">先画好 LISN 与机壳回路，选好测量通道再运行。</span>${helpTip('EMI 估算说明', [esc(info.note),
+        '先画好两条电源线的 LISN、50 Ω 接收端和机壳回路。可在“AI → 描述新拓扑…”输入 buck_emi，再点“直接载入模板”（无需调用模型）。修改供电电压与采样时间请到“仿真 → SPICE 仿真…”。'])}</div>
       <details id="emiSettings" open><summary>测量设置与参数</summary><fieldset id="emiFields"><legend>测量与时间窗</legend>
       ${Object.entries(info.inputs).map(([k,v])=>row(v[0], ['positive','negative'].includes(k)?select('emi_'+k,probes,cfg[k]):k==='reference'?select('emi_'+k,Object.entries(info.references),cfg[k]):input('emi_'+k,cfg[k]))).join('')}
-      <details><summary>滤波器初算与重跑</summary><p>选择已经画在图上的器件。共模绕组 p1/s1 朝 LISN，p2/s2 接两只差模电感的 a；电感 b 接 X 两端与各 Y 的 a，Y 的 b 接机壳。推荐只改这些器件的数值。</p>
+      <details><summary>滤波器初算与重跑</summary><div class="help-row"><span class="hint">选择已画在图上的滤波器件，只改它们的数值。</span>${helpTip('滤波器接法说明', [
+        '选择已经画在图上的器件。共模绕组 p1/s1 朝 LISN，p2/s2 接两只差模电感的 a；电感 b 接 X 两端与各 Y 的 a，Y 的 b 接机壳。推荐只改这些器件的数值。',
+        '共模电感每绕组 L、耦合 k；程序换算为现有耦合绕组模型。X/Y 是接法名称，器件额定电压、漏电和安规等级需自行核定。'])}</div>
       ${Object.entries(info.filter_parts).map(([k,[label,kind]])=>row(label,select('emif_'+k,elements(kind),cfg.filter?.[k],true))).join('')}
       ${Object.entries(info.filter_inputs).map(([k,v])=>row(v[0],input('emif_'+k,cfg.filter?.[k]??v[1]))).join('')}
-      <p>共模电感每绕组 L、耦合 k；程序换算为现有耦合绕组模型。X/Y 是接法名称，器件额定电压、漏电和安规等级需自行核定。</p></details>
-      <button id="emiSave">采用测量设置</button>
-      <button id="emiRun">运行当前参数</button><button id="emiCompare">初算滤波器并重跑对比</button>
+      </details>
+      <button id="emiSave" title="把测量设置写入图纸，可撤销">采用测量设置</button>
+      <button id="emiRun" title="用当前参数运行 ngspice，画出频谱">运行当前参数</button><button id="emiCompare" title="按所选滤波器件初算参数，重跑并与原参数对比">初算滤波器并重跑对比</button>
       <details><summary>导线上对机壳的寄生电容</summary>
-      <p>先用普通电容把导线与机壳连起来，再在这里登记。a 接被测导线，b 接机壳；采用后在画布和论文图中用虚线显示。</p>
+      <div class="help-row"><span class="hint">先画一只电容：a 接被测导线，b 接机壳。</span>${helpTip('寄生电容说明', [
+        '先用普通电容把导线与机壳连起来，再在这里登记。a 接被测导线，b 接机壳；采用后在画布和论文图中用虚线显示。',
+        '平行板 C=ε₀εᵣA/d，不含边缘场。采用值只更新已画电容，可撤销。',
+        '实测／Q3D：先把报告转换为 CSV，表头为 element,net,capacitance_F，电容单位必须是 F；不直接读取 .aedt 或电容矩阵。'])}</div>
       ${row('已画电容',select('emip_element',elements('C'),cfg.parasitics?.[0]?.element))}
       ${row('关联导线的引脚',input('emip_net',cfg.parasitics?.[0]?.net||''))}
       ${row('来源',select('emip_source',Object.entries(info.sources),cfg.parasitics?.[0]?.source||'manual'))}
       ${row('直接填写电容 (F)',input('emip_value','100p'))}
       ${row('平行板面积 (mm²)',input('emip_area_mm2','100'))}${row('间距 (mm)',input('emip_gap_mm','0.1'))}${row('相对介电常数',input('emip_epsilon_r','4'))}
-      <p>平行板 C=ε₀εᵣA/d，不含边缘场。采用值只更新已画电容，可撤销。</p>
-      <button id="emiParasitic">采用寄生参数</button>
-      <p>实测／Q3D：先把报告转换为 CSV，表头为 element,net,capacitance_F，电容单位必须是 F；不直接读取 .aedt 或电容矩阵。</p>
-      <label>CSV 文件 <input id="emiImport" type="file" accept=".csv,text/csv"></label>
+      <button id="emiParasitic" title="只更新已画电容的数值，可撤销">采用寄生参数</button>
+      <label title="表头 element,net,capacitance_F，电容单位 F">CSV 文件 <input id="emiImport" type="file" accept=".csv,text/csv"></label>
       </details></fieldset></details><p id="emiState" role="status"></p><div id="emiResult"></div>`;
     const $ = id => panel.querySelector('#'+id);
     const state = (text,bad=false) => { if(active()){ $('emiState').textContent=text; $('emiState').className=bad?'bad':'hint'; } };
@@ -109,7 +112,7 @@ document.getElementById("emi").onclick = async () => {
         const result=await api('/api/emi-run',{layout:request,profile,compare,out_dir:joinPath(defaultExportDir,'emi')});
         lastEMIEstimate={result,origin,request:JSON.stringify(request)};
         if(active()){showResult(lastEMIEstimate);state('计算完成。请查看参考差距及滤波前后波形，不代表正式测试合格。');}
-        else flash('EMI 计算完成，可重新打开“分析 → 传导 EMI 估算…”查看。');
+        else flash('EMI 计算完成，可重新打开“实验功能 → 传导 EMI 估算…”查看。');
       }catch(e){if(active())state(e.message,true);else flash('EMI 计算失败：'+e.message,true);}
       finally{emiRunning=false;if(active())$('emiFields').disabled=false;}
     }
@@ -122,7 +125,7 @@ document.getElementById("emi").onclick = async () => {
     };
     $('emiImport').onchange=async event=>{
       const file=event.target.files[0];if(!file)return;
-      if(file.size>65536){state('寄生参数 CSV 最大 64 KiB',true);return;}
+      if(file.size>65536){state('寄生参数 CSV 超过 64 KiB，请只保留 element、net、capacitance_F 三列',true);return;}
       const source=$('emip_source').value;
       if(!['measured','q3d'].includes(source)){state('导入前请选择“实测”或“Q3D 导出值”来源',true);return;}
       prepare('import',{csv:await file.text(),source});

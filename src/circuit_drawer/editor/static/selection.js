@@ -2,14 +2,15 @@
 let selectionBusy = false, spacePan = false, panGesture = null;
 const selectedParts = () => layout.elements.filter(e => moduleSelection.has(e.id));
 const shiftedPoint = (p, d) => p.map((v, k) => r4(v + d[k]));
-const objectSelection = Object.fromEntries(['wire','ann','regions','blocks','callouts'].map(k=>[k,new Set()]));
+const objectSelection = Object.fromEntries(['wire','ann','regions','blocks','callouts','glyphs'].map(k=>[k,new Set()]));
+const instanceSelection = new Set();
 const selectionSection = type => ({wire:'wires',ann:'annotations'})[type] || type;
-const selectionCount = () => moduleSelection.size + Object.values(objectSelection).reduce((n,s)=>n+s.size,0);
-function clearGroupSelection() { moduleSelection.clear(); Object.values(objectSelection).forEach(s=>s.clear()); }
-function groupHas(ref) { return !!ref && (ref.type==='el'?moduleSelection.has(ref.id):objectSelection[ref.type]?.has(ref.index)); }
-function groupAdd(ref) { if(ref?.type==='el')moduleSelection.add(ref.id); else objectSelection[ref?.type]?.add(ref.index); }
+const selectionCount = () => instanceSelection.size + moduleSelection.size + Object.values(objectSelection).reduce((n,s)=>n+s.size,0);
+function clearGroupSelection() { moduleSelection.clear(); instanceSelection.clear(); Object.values(objectSelection).forEach(s=>s.clear()); }
+function groupHas(ref) { return !!ref && (ref.type==='instance'?instanceSelection.has(ref.id):ref.type==='el'?moduleSelection.has(ref.id):objectSelection[ref.type]?.has(ref.index)); }
+function groupAdd(ref) { if(ref?.type==='instance')instanceSelection.add(ref.id); else if(ref?.type==='el')moduleSelection.add(ref.id); else objectSelection[ref?.type]?.add(ref.index); }
 function groupToggle(ref) {
-  const set=ref.type==='el'?moduleSelection:objectSelection[ref.type], key=ref.type==='el'?ref.id:ref.index;
+  const set=ref.type==='instance'?instanceSelection:ref.type==='el'?moduleSelection:objectSelection[ref.type], key=['el','instance'].includes(ref.type)?ref.id:ref.index;
   if(set.has(key))set.delete(key);else set.add(key);
 }
 function selectedObjects(source=layout) {
@@ -24,7 +25,7 @@ function sourceObjectIndex(type,index) {
 function objectAtTarget(target) {
   const part=target.closest('g.element[data-id]')?.dataset.id;
   if(part && layout.elements.some(e=>e.id===part))return {type:'el',id:part};
-  for(const [key,type] of [['wire','wire'],['ann','ann'],['region','regions'],['block','blocks'],['callout','callouts']]) {
+  for(const [key,type] of [['wire','wire'],['ann','ann'],['region','regions'],['block','blocks'],['callout','callouts'],['glyph','glyphs']]) {
     const node=target.closest(`[data-${key}]`); if(!node)continue;
     const index=sourceObjectIndex(type,+node.dataset[key]);
     if(index!==undefined && layout[selectionSection(type)]?.[index])return {type,index};
@@ -33,23 +34,30 @@ function objectAtTarget(target) {
 }
 function selectionCandidates() {
   const candidates=layout.elements.map(e=>({type:'el',id:e.id,points:Object.values(e.pins)}));
+  for (const [id,b] of Object.entries(viewInfo().frames || {}))
+    candidates.push({type:'instance',id,points:[[b[0],b[1]],[b[2],b[3]]]});
   layout.wires.forEach((w,index)=>candidates.push({type:'wire',index,points:w}));
-  svg.querySelectorAll('g[data-ann],g[data-region],g[data-block],g[data-callout]').forEach(node=>{
+  svg.querySelectorAll('g[data-ann],g[data-region],g[data-block],g[data-callout],g[data-glyph]').forEach(node=>{
     const ref=objectAtTarget(node);if(!ref)return;
     const b=node.getBBox(); candidates.push({...ref,points:[[b.x,-b.y],[b.x+b.width,-b.y-b.height]]});
   });
   return candidates;
 }
 function selectAllObjects() {
-  clearGroupSelection();selectionCandidates().forEach(groupAdd);selected=null;
+  clearGroupSelection();selectionCandidates().forEach(groupAdd);selected=null;focusedModuleId=null;focusedLink=null;
   showSidebar('properties');showProps();render();
 }
 function drawGroupSelection() {
   if(!selectionCount())return;
   const overlay=el('g',{id:'groupSelectionOverlay','pointer-events':'none'},svg);
+  for (const id of instanceSelection) {
+    const b=boxRect(id); if(!b)continue;
+    el('rect',{'data-selected-instance':id,x:b[0],y:-b[3],width:b[2]-b[0],height:b[3]-b[1],fill:'var(--accent-soft)',
+      stroke:'var(--accent)','fill-opacity':.15,'stroke-width':.035,'stroke-dasharray':'.12 .06'},overlay);
+  }
   for(const {type,index,item} of selectedObjects()) {
     if(type==='wire') {el('path',{d:wirePath(item),fill:'none',stroke:'var(--accent)','stroke-width':.045},overlay);continue;}
-    const key={ann:'ann',regions:'region',blocks:'block',callouts:'callout'}[type];
+    const key={ann:'ann',regions:'region',blocks:'block',callouts:'callout',glyphs:'glyph'}[type];
     const node=[...svg.querySelectorAll(`g[data-${key}]`)].find(n=>sourceObjectIndex(type,+n.dataset[key])===index);
     if(!node)continue;const b=node.getBBox();
     el('rect',{x:b.x,y:b.y,width:b.width,height:b.height,fill:'none',stroke:'var(--accent)','stroke-width':.035,'stroke-dasharray':'.12 .06'},overlay);
@@ -64,21 +72,127 @@ function shiftDecoration(item,delta) {
   for(const key of ['at','from','to'])if(Array.isArray(item[key]))item[key]=shiftedPoint(item[key],delta);
   if(item.via)item.via=item.via.map(p=>shiftedPoint(p,delta));
 }
+function groupRotateReason() {
+  if (instanceSelection.size) return '模块请进入定义后旋转内部元件';
+  if (!moduleSelection.size || selectedObjects().some(o=>o.type!=='wire')) return '请选中元件及导线后一起旋转';
+  return '';
+}
+function rotateGroup(direction = 1) {
+  const reason=groupRotateReason();if(reason){flash(reason,true);return;}
+  return groupTransaction((parts,plan,source,objects)=>{
+    const points=[...parts.flatMap(e=>Object.values(e.pins)),...plan.runs.filter(r=>r.inside).flatMap(r=>r.wire)];
+    const center=[0,1].map(k=>snap((Math.min(...points.map(p=>p[k]))+Math.max(...points.map(p=>p[k])))/2));
+    const turn=p=>[r4(center[0]+direction*(p[1]-center[1])),r4(center[1]-direction*(p[0]-center[0]))];
+    pushHistory();
+    for (const original of parts) {
+      const part=layout.elements.find(e=>e.id===original.id);
+      part.pins=Object.fromEntries(Object.entries(original.pins).map(([pin,p])=>[pin,turn(p)]));
+      if (part.label_pos) part.label_pos=(direction===1?TURN:TURN_BACK)[part.label_pos];
+      if (part.opts?.label_offset) {const [x,y]=original.opts.label_offset;part.opts.label_offset=[direction*y,-direction*x];}
+    }
+    layout.wires=planWires(plan,[0,0],turn);layout.hops=planHops(plan,layout.wires,[0,0],turn);
+    const chosen=new Set(objects.filter(o=>o.type==='wire').map(o=>o.index));
+    objectSelection.wire.clear();plan.runs.forEach((r,i)=>{if(chosen.has(r.source))objectSelection.wire.add(i);});
+    changed();
+  });
+}
 
 function syncSelectionControls() {
   const ids = new Set(layout.elements.map(e => e.id));
   for (const id of moduleSelection) if (!ids.has(id)) moduleSelection.delete(id);
+  for (const id of instanceSelection) if (!viewInfo().frames?.[id]) instanceSelection.delete(id);
   for(const [type,indices] of Object.entries(objectSelection))for(const i of indices)if(!layout[selectionSection(type)]?.[i])indices.delete(i);
-  const parts = selectedParts(), count=selectionCount(), canCopy = !!count || ['el','wire','ann','regions','blocks','callouts'].includes(selected?.type);
-  document.getElementById('del').disabled = selectionBusy || !(count || selected);
+  const parts = selectedParts(), count=selectionCount(), canCopy = !!count || ['el','wire','ann','regions','blocks','callouts','glyphs'].includes(selected?.type);
+  document.getElementById('del').disabled = selectionBusy || !!instanceSelection.size || !(count || selected);
   for (const id of ['cutSelection', 'copySelection', 'duplicateSelection'])
-    document.getElementById(id).disabled = selectionBusy || !canCopy;
+    document.getElementById(id).disabled = selectionBusy || !!instanceSelection.size || !canCopy;
   document.getElementById('pasteSelection').disabled = selectionBusy || !clipboard;
-  for (const id of ['rotateSelection', 'mirrorSelection', 'growSymbol', 'shrinkSymbol'])
+  document.getElementById('mergeOverlaps').disabled = wireMergeBusy || selectionBusy || !layout.wires.length;
+  for (const id of ['rotateSelection','rotateSelectionCCW'])
+    document.getElementById(id).disabled = selectionBusy || (count>1 ? !!groupRotateReason() : selected?.type!=='el' && parts.length!==1);
+  for (const id of ['mirrorSelection', 'growSymbol', 'shrinkSymbol'])
     document.getElementById(id).disabled = selectionBusy || count > 1 || (selected?.type !== 'el' && parts.length !== 1);
   if (count && !selected) moduleSelectionStatus();
 }
 document.addEventListener('editor-menu-open', syncSelectionControls);
+
+function circuitScaleSelection() {
+  const chosen = {elements:[...moduleSelection],wires:[...objectSelection.wire]};
+  for (const [type, indices] of Object.entries(objectSelection)) chosen[selectionSection(type)] = [...indices];
+  if (instanceSelection.size) chosen.instances = [...instanceSelection];
+  if (!selectionCount() && selected) {
+    if (selected.type === 'el') chosen.elements.push(selected.id);
+    else if (selected.type === 'modulePart') chosen.parts = [selected.id];
+    else if (selected.type === 'wave_symbols') chosen.wave_symbols = [selected.index];
+    else if (selected.type in objectSelection) chosen[selectionSection(selected.type)].push(selected.index);
+  }
+  if (!selectionCount() && focusedModuleId) chosen.instances = [focusedModuleId];
+  return Object.values(chosen).some(items=>items.length) ? chosen : null;
+}
+function circuitNetGroups(nets) {
+  const groups = new Map();
+  for (const [pin, net] of Object.entries(nets || {})) {
+    if (!groups.has(net)) groups.set(net, []);
+    groups.get(net).push(pin);
+  }
+  return JSON.stringify([...groups.values()].map(pins=>pins.sort()).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
+}
+document.getElementById('scaleCircuit').onclick = () => {
+  const before = editorTableSnapshot(layout), source = clone(layout), requestedProfile = profile;
+  const selection = circuitScaleSelection();
+  showDialog('整体等比缩放', `<p>以选区中心为基准，同时调整元件、引脚、导线和间距。字号可同步缩放，线宽保持原值。</p>
+    <label>范围 <select id="circuitScaleScope"><option value="selected">当前选区</option><option value="all">整张电路</option></select></label>
+    <label>缩放倍率 <input id="circuitScaleFactor" type="number" value="0.8" min="0.01" step="0.1"></label>
+    <label><input id="circuitScaleText" type="checkbox" checked>同步缩放字号</label>
+    <p class="hint">0.8 表示缩小到 80%。缩放后固定当前图纸比例，避免自动适配抵消改变；过小或超出栏宽会提示。</p>
+    <p><button id="circuitScalePreview">预览缩放</button> <button id="circuitScaleApply" disabled>应用到当前图</button>
+    <button id="circuitScaleAuto">恢复自动适配</button></p>
+    <p id="circuitScaleState" role="status"></p><img id="circuitScaleImage" alt="缩放预览" hidden style="max-width:100%;max-height:55vh;object-fit:contain">`);
+  const scope = document.getElementById('circuitScaleScope'), factor = document.getElementById('circuitScaleFactor');
+  const fonts = document.getElementById('circuitScaleText'), preview = document.getElementById('circuitScalePreview');
+  const apply = document.getElementById('circuitScaleApply'), reset = document.getElementById('circuitScaleAuto');
+  const state = document.getElementById('circuitScaleState'), image = document.getElementById('circuitScaleImage');
+  scope.value = selection ? 'selected' : 'all'; scope.querySelector('[value="selected"]').disabled = !selection;
+  reset.disabled = !source.drawing_scale;
+  let serial = 0, candidate = null;
+  const active = version => dlg.open && apply.isConnected && version === serial;
+  const unchanged = () => before === editorTableSnapshot(layout) && profile === requestedProfile;
+  const invalidate = () => { ++serial; candidate=null; apply.disabled=true; preview.disabled=false; image.hidden=true; state.textContent=''; };
+  for (const input of [scope,factor,fonts]) input.oninput = invalidate;
+  preview.onclick = async () => {
+    invalidate(); const version = serial;
+    preview.disabled=true; state.className='hint'; state.textContent='校验中…';
+    try {
+      const prepared = await api('/api/scale-drawing', {layout:source, profile:requestedProfile,
+        selection:scope.value==='all'?null:selection, factor:+factor.value, text:fonts.checked});
+      if (!active(version)) return;
+      const proposed=prepared.layout, point=p=>p.map((v,k)=>r4(prepared.anchor[k]+(v-prepared.anchor[k])*prepared.factor));
+      if (prepared.factor !== 1) {
+        proposed.wires=planWires(prepared.plan,[0,0],point);
+        proposed.hops=prepared.all ? source.hops.map(point) : planHops(prepared.plan,proposed.wires,[0,0],point);
+      }
+      const checked=await api('/api/check',{layout:proposed,profile:requestedProfile});
+      if (!active(version)) return;
+      if (!checked.ok) throw new Error(checked.issues.filter(i=>i.level==='error').map(i=>i.message).join('\n'));
+      if (circuitNetGroups(checked.nets)!==circuitNetGroups(prepared.before_nets)) throw new Error('缩放改变了电气连接，请调整倍率或扩大选区。');
+      const result=await api('/api/preview',{layout:proposed,profile:requestedProfile});
+      if (!active(version)) return;
+      if (!unchanged()) throw new Error('图纸已变化，请重新打开缩放窗口。');
+      image.src='data:image/png;base64,'+result.png; image.hidden=false;
+      candidate=proposed; apply.disabled=false; state.textContent='预览已就绪；应用后可一步撤销。';
+    } catch(error) { if(active(version)){state.className='bad';state.textContent=error.message;} }
+    finally { if(active(version)) preview.disabled=false; }
+  };
+  apply.onclick=()=>{
+    if(!candidate || !unchanged()){state.textContent='图纸已变化，请重新打开缩放窗口。';apply.disabled=true;return;}
+    if(editorTableSnapshot(candidate)!==before){pushHistory();layout=candidate;selected=null;clearGroupSelection();changed(false);}
+    dlg.close();
+  };
+  reset.onclick=()=>{
+    if(!unchanged()){state.textContent='图纸已变化，请重新打开缩放窗口。';return;}
+    pushHistory();delete layout.drawing_scale;changed(false);dlg.close();
+  };
+};
 
 function startCanvasPan(ev) {
   ev.preventDefault(); ev.stopImmediatePropagation();
@@ -112,33 +226,29 @@ window.addEventListener('keydown', ev => {
   ev.preventDefault(); spacePan = true;
 }, true);
 
-function planWires(plan, delta) {
+function planWires(plan, delta, transform = p => shiftedPoint(p, delta)) {
   const moves = p => plan.moving.some(q => same(p, q)) && !plan.fixed.some(q => same(p, q));
   const wires = plan.runs.map(run => {
-    if (run.inside) return run.wire.map(p => shiftedPoint(p, delta));
+    if (run.inside) return run.wire.map(transform);
     let w = clone(run.wire);
     if (w.length < 2) return w;
     // Highest endpoint first; inserted corners never change the first index.
-    if (moves(run.wire.at(-1))) w = moveWirePoint(w, w.length - 1, shiftedPoint(run.wire.at(-1), delta));
-    if (moves(run.wire[0])) w = moveWirePoint(w, 0, shiftedPoint(run.wire[0], delta));
+    if (moves(run.wire.at(-1))) w = moveWirePoint(w, w.length - 1, transform(run.wire.at(-1)));
+    if (moves(run.wire[0])) w = moveWirePoint(w, 0, transform(run.wire[0]));
     return w;
   });
-  for (const p of plan.fixed) wires.push(moveWirePoint([p, p.slice()], 1, shiftedPoint(p, delta)));
+  for (const p of plan.fixed) if (!same(p, transform(p))) wires.push(moveWirePoint([p, p.slice()], 1, transform(p)));
   return wires;
 }
-function planHops(plan, wires, delta) {
+function planHops(plan, wires, delta, transform = p => shiftedPoint(p, delta)) {
   return plan.hops.flatMap(marker => {
     if (!marker.runs.some(i => plan.runs[i].inside)) return [marker.at];
-    if (marker.runs.every(i => plan.runs[i].inside)) return [shiftedPoint(marker.at, delta)];
+    if (marker.runs.every(i => plan.runs[i].inside)) return [transform(marker.at)];
     // One crossing wire moved, the other stayed: keep the bridge at their
     // actual crossing. If they no longer cross, the bridge is no longer needed.
     const candidates = [];
     for (const i of marker.runs) for (const j of marker.runs) if (i < j)
-      for (let a = 1; a < wires[i].length; a++) for (let b = 1; b < wires[j].length; b++) {
-        const p = wires[i][a-1], q = wires[i][a], r = wires[j][b-1], s = wires[j][b];
-        const x = p[0] === q[0] ? p[0] : r[0], y = p[1] === q[1] ? p[1] : r[1];
-        if ((p[0] === q[0]) !== (r[0] === s[0]) && inside([x,y],p,q) && inside([x,y],r,s)) candidates.push([x,y]);
-      }
+      candidates.push(...wireIntersections(wires[i], wires[j]));
     candidates.sort((a,b) => Math.hypot(a[0]-marker.at[0],a[1]-marker.at[1])-Math.hypot(b[0]-marker.at[0],b[1]-marker.at[1]));
     return candidates.slice(0,1);
   });
@@ -151,14 +261,15 @@ function startGroupDrag(ev) {
   const reason=groupMoveReason();if(reason){flash(reason);svg.releasePointerCapture(ev.pointerId);return;}
   selected = null;
   const before = clone(layout), parts = clone(selectedParts()), objects=selectedObjects(before), start = toUnits(ev);
-  const d = {group:true, source:before, members:[...parts.map(e=>({type:'el',id:e.id})),...objects.map(({type,index})=>({type,index}))],moved:false, delta:[0,0], move(p) {
+  const instances=[...instanceSelection];
+  const d = {group:true, source:before, members:[...instances.map(id=>({type:'instance',id})),...parts.map(e=>({type:'el',id:e.id})),...objects.map(({type,index})=>({type,index}))],moved:false, delta:[0,0], move(p) {
     this.delta = p.map((v,k) => r4(snap(v-start[k])));
     if (!this.plan || !this.moved && same(this.delta,[0,0])) return;
     if (!this.moved) { pushHistory(); this.moved = true; }
     applyGroupMove(parts,objects,this.plan,this.delta);
   }};
   drag = d; selectionBusy = true; syncSelectionControls();
-  d.ready = api('/api/selection-plan',{layout:before, profile, ids:parts.map(e=>e.id),wires:objects.filter(o=>o.type==='wire').map(o=>o.index)})
+  d.ready = api('/api/selection-plan',{layout:before, profile, ids:parts.map(e=>e.id),instances,wires:objects.filter(o=>o.type==='wire').map(o=>o.index)})
     .then(plan => {
       if (drag !== d) return;
       if (editorTableSnapshot(layout) !== editorTableSnapshot(before)) { d.error='图纸已变化，请重新选择后拖动'; return; }
@@ -176,26 +287,32 @@ async function finishGroupDrag(d) {
 function cancelGroupDrag() {
   const d = drag; if (!d?.group) return;
   drag = null; selectionBusy = false;
-  if (d.moved) { layout = d.source; clearGroupSelection();d.members.forEach(groupAdd);history.pop(); changed(); } else render();
+  if (d.moved) { layout = d.source; selected = null; clearGroupSelection();d.members.forEach(groupAdd);history.pop(); changed(); } else render();
 }
 window.addEventListener('pointercancel', cancelGroupDrag);
 window.addEventListener('blur', cancelGroupDrag);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cancelGroupDrag(); });
 
-async function groupTransaction(action) {
+async function groupTransaction(action, moveInstances = false) {
   if (selectionBusy || drag) return false;
+  if (instanceSelection.size && !moveInstances) { flash('此操作请先取消选择模块实例'); return false; }
   const parts = clone(selectedParts()); if (!selectionCount()) return false;
   const before = editorTableSnapshot(layout), source = clone(layout);
   const objects=selectedObjects(source);
   selectionBusy = true; syncSelectionControls();
   try {
-    const plan = await api('/api/selection-plan',{layout:source,profile,ids:parts.map(e=>e.id),wires:objects.filter(o=>o.type==='wire').map(o=>o.index)});
+    const plan = await api('/api/selection-plan',{layout:source,profile,ids:parts.map(e=>e.id),instances:[...instanceSelection],wires:objects.filter(o=>o.type==='wire').map(o=>o.index)});
     if (editorTableSnapshot(layout) !== before) { flash('图纸已变化，请重新选择后操作'); return false; }
     action(parts, plan, source, objects); return true;
   } catch (e) { flash(e.message,true); return false; }
   finally { selectionBusy = false; syncSelectionControls(); }
 }
 function applyGroupMove(parts,objects,plan,delta) {
+  for (const inst of layout.modules?.instances || []) {
+    const origin=plan.origins?.[inst.id];
+    if (origin && plan.instances.length) inst.at=plan.instances.includes(inst.id)?shiftedPoint(origin,delta):origin.slice();
+  }
+  for (const [key,route] of Object.entries(plan.routes || {})) layout.modules.routes[key]=route.map(p=>shiftedPoint(p,delta));
   for(const original of parts)layout.elements.find(e=>e.id===original.id).pins=
     Object.fromEntries(Object.entries(original.pins).map(([k,p])=>[k,shiftedPoint(p,delta)]));
   for(const {type,index,item} of objects)if(type!=='wire'){
@@ -207,7 +324,7 @@ function applyGroupMove(parts,objects,plan,delta) {
 }
 function nudgeGroup(delta) {
   const reason=groupMoveReason();if(reason){flash(reason);return;}
-  return groupTransaction((parts,plan,source,objects)=>{pushHistory();applyGroupMove(parts,objects,plan,delta);changed();});
+  return groupTransaction((parts,plan,source,objects)=>{pushHistory();applyGroupMove(parts,objects,plan,delta);changed();}, true);
 }
 function groupClipboard(parts, plan, source, cut, objects) {
   const ids = new Set(parts.map(e=>e.id)), belongs = ref => ids.has(ref.slice(0,ref.lastIndexOf('.')));
@@ -278,6 +395,7 @@ function forgetElements(ids) {
   // a region fitted to its members cannot outlive all of them
   if (layout.regions) layout.regions = layout.regions.filter(r=>!(r.fit && !r.members));
   layout.elements = layout.elements.filter(e=>!ids.has(e.id));
+  if (layout.modules?.parts) layout.modules.parts = layout.modules.parts.filter(p=>!ids.has(p.id));
   for (const ref of Object.keys(layout.netlist || {})) if (belongs(ref)) delete layout.netlist[ref];
   if (layout.no_connect) layout.no_connect = layout.no_connect.filter(ref=>!belongs(ref));
   for (const id of ids) if (layout.simulation?.components) delete layout.simulation.components[id];

@@ -1,0 +1,463 @@
+{
+ "template": {
+  "name": "two_switch_forward",
+  "title": "Two-switch forward converter",
+  "aliases": [
+   "two-switch forward",
+   "双管正激",
+   "双开关正激"
+  ],
+  "description": "Isolated 1:1 forward with two reset diodes and explicit magnetizing inductance. D=0.3; reset and idle intervals are distinct.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/document-viewer/lit/html/SLVAFW4"
+  ]
+ },
+ "layout": {
+  "name": "two_switch_forward",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      6.0
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      5.0,
+      6.0
+     ],
+     "s": [
+      5.0,
+      4.8
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "right"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      5.0,
+      1.2
+     ],
+     "s": [
+      5.0,
+      0.0
+     ]
+    },
+    "label": "$S_2$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Dr1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      1.5,
+      0.0
+     ],
+     "b": [
+      1.5,
+      1.5
+     ]
+    },
+    "label": "$D_{r1}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Dr2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.7,
+      4.8
+     ],
+     "b": [
+      2.7,
+      6.0
+     ]
+    },
+    "label": "$D_{r2}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Lm",
+    "kind": "L",
+    "pins": {
+     "a": [
+      4.0,
+      3.7
+     ],
+     "b": [
+      4.0,
+      2.3
+     ]
+    },
+    "label": "$L_m$",
+    "label_pos": "left"
+   },
+   {
+    "id": "T",
+    "kind": "transformer",
+    "pins": {
+     "p1": [
+      5.0,
+      3.7
+     ],
+     "p2": [
+      5.0,
+      2.3
+     ],
+     "s1": [
+      5.6,
+      3.7
+     ],
+     "s2": [
+      5.6,
+      2.3
+     ]
+    },
+    "opts": {
+     "ratio": "$1:1$"
+    }
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      6.8,
+      3.7
+     ],
+     "b": [
+      8.0,
+      3.7
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      8.4,
+      0.0
+     ],
+     "b": [
+      8.4,
+      2.5
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Lo",
+    "kind": "L",
+    "pins": {
+     "a": [
+      8.8,
+      3.7
+     ],
+     "b": [
+      10.0,
+      3.7
+     ]
+    },
+    "label": "$L_o$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      10.6,
+      3.7
+     ],
+     "b": [
+      10.6,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      11.8,
+      3.7
+     ],
+     "b": [
+      11.8,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     6.0
+    ],
+    [
+     5.0,
+     6.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     5.0,
+     0.0
+    ]
+   ],
+   [
+    [
+     5.0,
+     4.8
+    ],
+    [
+     5.0,
+     3.7
+    ]
+   ],
+   [
+    [
+     5.0,
+     2.3
+    ],
+    [
+     5.0,
+     1.2
+    ]
+   ],
+   [
+    [
+     4.0,
+     3.7
+    ],
+    [
+     5.0,
+     3.7
+    ]
+   ],
+   [
+    [
+     4.0,
+     2.3
+    ],
+    [
+     5.0,
+     2.3
+    ]
+   ],
+   [
+    [
+     1.5,
+     1.5
+    ],
+    [
+     1.5,
+     4.3
+    ],
+    [
+     5.0,
+     4.3
+    ]
+   ],
+   [
+    [
+     5.0,
+     1.8
+    ],
+    [
+     2.7,
+     1.8
+    ],
+    [
+     2.7,
+     4.8
+    ]
+   ],
+   [
+    [
+     5.6,
+     3.7
+    ],
+    [
+     6.8,
+     3.7
+    ]
+   ],
+   [
+    [
+     8.0,
+     3.7
+    ],
+    [
+     8.8,
+     3.7
+    ]
+   ],
+   [
+    [
+     8.4,
+     2.5
+    ],
+    [
+     8.4,
+     3.7
+    ]
+   ],
+   [
+    [
+     10.0,
+     3.7
+    ],
+    [
+     11.8,
+     3.7
+    ]
+   ],
+   [
+    [
+     5.6,
+     2.3
+    ],
+    [
+     5.6,
+     0.0
+    ],
+    [
+     11.8,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.7,
+    4.3
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "Vin.a": "GND",
+   "Vin.b": "IN",
+   "S1.d": "IN",
+   "S1.s": "P",
+   "S2.d": "Q",
+   "S2.s": "GND",
+   "Dr1.a": "GND",
+   "Dr1.b": "P",
+   "Dr2.a": "Q",
+   "Dr2.b": "IN",
+   "Lm.a": "P",
+   "Lm.b": "Q",
+   "T.p1": "P",
+   "T.p2": "Q",
+   "T.s1": "SEC",
+   "T.s2": "ON",
+   "D1.a": "SEC",
+   "D1.b": "RECT",
+   "D2.a": "ON",
+   "D2.b": "RECT",
+   "Lo.a": "RECT",
+   "Lo.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "ON",
+   "RL.a": "OUT",
+   "RL.b": "ON"
+  },
+  "modes": [
+   {
+    "name": "Transfer",
+    "on": [
+     "S1",
+     "S2",
+     "D1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "T:p|Lm",
+      "S2"
+     ],
+     [
+      "T:s",
+      "D1",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Transfer",
+    "condition": "Ideal forward, 1:1 turns, D=0.3, output CCM; explicit magnetizing reset, no leakage transient"
+   },
+   {
+    "name": "Reset",
+    "on": [
+     "Dr1",
+     "Dr2",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Lm",
+      "Dr2",
+      "Vin",
+      "Dr1"
+     ],
+     [
+      "D2",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Reset",
+    "condition": "Ideal forward, 1:1 turns, D=0.3, output CCM; explicit magnetizing reset, no leakage transient"
+   },
+   {
+    "name": "Freewheel",
+    "on": [
+     "D2"
+    ],
+    "loops": [
+     [
+      "D2",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Freewheel",
+    "condition": "Ideal forward, 1:1 turns, D=0.3, output CCM; explicit magnetizing reset, no leakage transient"
+   }
+  ]
+ }
+}

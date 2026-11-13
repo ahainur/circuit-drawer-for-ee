@@ -18,7 +18,9 @@ Branch references in a loop:
 - ``X``: element X.  ``S2:diode``: switch S2 conducting through its diode
   (drawn like an on switch; the name records the state).
 - ``T:p`` / ``T:s``: primary / whole secondary winding of transformer T;
-  ``T:s1`` (s1 to sct) and ``T:s2`` (sct to s2) for a centre tap.
+  ``T:s1`` (s1 to sct) and ``T:s2`` (sct to s2) for a centre tap;
+  ``T:w3`` .. ``T:w6`` (w3a to w3b ...) for the extra windings of a
+  multi-winding transformer.
 - ``A|B``: A and B in parallel between the same two nets.
 
 A loop is read in the order written: current leaves each branch into the
@@ -37,11 +39,12 @@ from __future__ import annotations
 import heapq
 import math
 import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 from .geometry import EPS as CM_EPS
 from .geometry import Box, centred, scaled
-from .layout import SWITCHES, Layout, Point, branch_pins
+from .layout import EXTRA_WINDINGS, SWITCHES, Layout, Point, branch_pins, windings
 from .profiles import Profile
 from .validate import Report, footprints
 
@@ -52,6 +55,34 @@ class ModeError(ValueError):
     pass
 
 
+SOURCE_FIELDS = {"kind": "simulation", "signature": "SHA-256 of the simulated physical circuit",
+                 "settings_hash": "SHA-256 of the recognition settings",
+                 "settings": "optional recognition settings, reused when regenerating",
+                 "transient_hash": "optional SHA-256 of the simulation transient settings"}
+
+
+def validate_source(source):
+    if (not isinstance(source, dict) or set(source) - set(SOURCE_FIELDS)
+            or not {"kind", "signature", "settings_hash"} <= set(source)):
+        raise ModeError("modes.source 必须包含 kind、signature、settings_hash。")
+    if source["kind"] != SOURCE_FIELDS["kind"]:
+        raise ModeError("modes.source.kind 必须是 simulation。")
+    for key in ("signature", "settings_hash", *(["transient_hash"] if "transient_hash" in source else [])):
+        if not isinstance(source[key], str) or not re.fullmatch(r"[0-9a-f]{64}", source[key]):
+            raise ModeError(f"modes.source.{key} 必须是 64 位小写十六进制签名。")
+    if "settings" in source:
+        from .auto_modes import recognition_settings, _hash
+        settings = source["settings"]
+        if not isinstance(settings, dict):
+            raise ModeError("modes.source.settings 必须是识别设置对象。")
+        try:
+            checked = recognition_settings(settings, settings.get("distinguish", []))
+        except ValueError as exc:
+            raise ModeError(f"modes.source.settings: {exc}") from exc
+        if checked != settings or _hash(settings) != source["settings_hash"]:
+            raise ModeError("modes.source.settings 与 settings_hash 不一致。")
+
+
 @dataclass
 class Mode:
     name: str
@@ -60,16 +91,19 @@ class Mode:
     loops: list[list[str]] = field(default_factory=list)
     arrows: list[dict] | None = None
     condition: str = ""        # operating point the mode belongs to, e.g. "$f_s < f_r$"
+    source: dict | None = None
 
     @classmethod
     def from_dict(cls, d: dict) -> "Mode":
+        if "source" in d:
+            validate_source(d["source"])
         loops = d.get("loops") or []
         if isinstance(loops, list) and loops and isinstance(loops[0], str):
             loops = [loops]
         return cls(name=str(d.get("name", "mode")), caption=str(d.get("caption", "")),
                    on=list(d["on"]) if d.get("on") is not None else None,
                    loops=[list(l) for l in loops], arrows=d.get("arrows"),
-                   condition=str(d.get("condition", "")))
+                   condition=str(d.get("condition", "")), source=deepcopy(d.get("source")))
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name}
@@ -83,7 +117,18 @@ class Mode:
             d["arrows"] = self.arrows
         if self.condition:
             d["condition"] = self.condition
+        if self.source is not None:
+            validate_source(self.source)
+            d["source"] = deepcopy(self.source)
         return d
+
+
+@dataclass
+class Trace:
+    edges: set[int]
+    sources: list[Point]
+    sinks: list[Point]
+    loop: int | None = None
 
 
 @dataclass
@@ -96,6 +141,9 @@ class Lit:
     channel: set[str] = field(default_factory=set)             # switches on through the channel
     diode: set[str] = field(default_factory=set)               # switches on through their diode
     problems: list[str] = field(default_factory=list)
+    traces: list[Trace] = field(default_factory=list)         # physical paths for module projection
+    regions: dict[str, bool] = field(default_factory=dict)   # module boxes / partial blocks
+    glyphs: dict[int, bool] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +173,7 @@ class Edge:
 
 
 class WireGraph:
-    def __init__(self, layout: Layout):
+    def __init__(self, layout: Layout, connections=()):
         stops = {_k(p) for w in layout.wires for p in w}
         stops |= {_k(p) for el in layout.elements for p in el.pins.values()}
         self.edges: list[Edge] = []
@@ -147,6 +195,18 @@ class WireGraph:
                     self.adj.setdefault(b, []).append((a, e))
                     run.append(e)
             self.runs.append(run)
+        pins = {f"{el.id}.{n}": _k(p) for el in layout.elements for n, p in el.pins.items()}
+        for group in connections:
+            points = [pins[ref] for ref in group if ref in pins]
+            for a, b in zip(points, points[1:]):
+                # Explicit module joins have no drawn segment. Keep a real wire
+                # path when it exists, so an alias cannot bypass its highlighting.
+                if self.tree([a, b]) is not None:
+                    continue
+                e = len(self.edges)
+                self.edges.append(Edge(-1, a, b, 0.0))
+                self.adj.setdefault(a, []).append((b, e))
+                self.adj.setdefault(b, []).append((a, e))
 
     def tree(self, terminals: list[Point]) -> set[int] | None:
         """Edges of a short tree joining all terminals (grown one nearest
@@ -229,7 +289,8 @@ class Member:
     diode: bool = False
 
 
-WINDINGS = {"p": ("p1", "p2"), "s": ("s1", "s2"), "s1": ("s1", "sct"), "s2": ("sct", "s2")}
+WINDINGS = {"p": ("p1", "p2"), "s": ("s1", "s2"), "s1": ("s1", "sct"), "s2": ("sct", "s2"),
+            **{w: (f"{w}a", f"{w}b") for w in EXTRA_WINDINGS}}
 
 
 def _member(layout: Layout, ref: str) -> Member:
@@ -239,11 +300,15 @@ def _member(layout: Layout, ref: str) -> Member:
     except KeyError:
         raise ModeError(f"{ref}: no element {name!r} in this figure") from None
     if el.kind == "transformer":
+        names = [w for w, *_ in windings(el)]
         if part not in WINDINGS:
-            raise ModeError(f"{ref}: name a winding of {name}: {name}:p, {name}:s"
-                            + (f", {name}:s1, {name}:s2" if "sct" in el.pins else ""))
+            raise ModeError(f"{ref}: name a winding of {name}: "
+                            + ", ".join(f"{name}:{w}" for w in (["p", "s", *names[1:]] if "sct" in el.pins else names)))
         pins = WINDINGS[part]
         if any(p not in el.pins for p in pins):
+            if part in EXTRA_WINDINGS:
+                raise ModeError(f"{ref}: {name} has no winding {part}; its windings are "
+                                + ", ".join(f"{name}:{w}" for w in names))
             raise ModeError(f"{ref}: {name} has no centre tap; use {name}:s")
         return Member(ref, name, part, pins)
     if part not in ("", "diode"):
@@ -262,8 +327,7 @@ def _edges_of(layout: Layout) -> list[Member]:
     out = []
     for el in layout.elements:
         if el.kind == "transformer":
-            parts = ("p", "s1", "s2") if "sct" in el.pins else ("p", "s")
-            out += [Member(f"{el.id}:{p}", el.id, p, WINDINGS[p]) for p in parts]
+            out += [Member(f"{el.id}:{p}", el.id, p, (a, b)) for p, a, b in windings(el)]
         elif branch_pins(el.kind):
             out.append(_member(layout, el.id))
     return out
@@ -354,6 +418,7 @@ def solve(layout: Layout, mode: Mode, report: Report, graph: WireGraph | None = 
                     raise ModeError(f"{mode.name}: no wire joins {loop[i]} to "
                                     f"{loop[(i + 1) % len(loop)]}")
                 lit.edges |= tree
+                lit.traces.append(Trace(tree, srcs, snks, li))
                 for e, sgn in graph.orient(tree, srcs, snks).items():
                     if oriented.get(e, sgn) != sgn:
                         clash.add(e)
@@ -393,6 +458,7 @@ def solve(layout: Layout, mode: Mode, report: Report, graph: WireGraph | None = 
             tree = graph.tree(pts)
             if tree:
                 lit.edges |= tree
+                lit.traces.append(Trace(tree, pts, []))
     if mode.arrows:
         for a in mode.arrows:
             ang = {"right": 0.0, "up": 90.0, "left": 180.0, "down": 270.0}.get(
@@ -526,6 +592,8 @@ def _place_arrows(layout: Layout, graph: WireGraph, report: Report, prof: Profil
             if e in clash:
                 continue
             E = graph.edges[e]
+            if E.wire < 0:
+                continue
             a, b = scaled(E.a, s), scaled(E.b, s)
             L = math.dist(a, b)
             if L < ARROW_MIN_RUN:
@@ -642,6 +710,7 @@ class Paint:
         return {"p": on if "p" in parts else self.off,
                 "s1": on if sec["s1"] else self.off,
                 "s2": on if sec["s2"] else self.off,
+                **{w: on if w in parts else self.off for w in EXTRA_WINDINGS},
                 "core": f"color={tikz_color(self.style.color)}" if parts else self.off}
 
     def wire_runs(self, i: int, w: list[Point]) -> list[tuple[list[Point], str]]:
@@ -670,9 +739,41 @@ class Paint:
         ch, di = el_id in self.lit.channel, el_id in self.lit.diode
         return "both" if ch and di else "on" if ch else "diode" if di else "off"
 
+    def region(self, ref: str) -> str:
+        if not isinstance(ref, str) or ref not in self.lit.regions:
+            return ""
+        return (self.on if self.lit.regions[ref] else self.off).replace("color=", "draw=", 1)
+
+    def glyph(self, index: int) -> str:
+        if index not in self.lit.glyphs:
+            return "black"
+        return self.on_symbol if self.lit.glyphs[index] else self.off
+
 
 def modes_of(layout: Layout) -> list[Mode]:
     return [Mode.from_dict(m) for m in layout.modes]
+
+
+def rename_modes(raw: dict, names: dict) -> None:
+    """Move branch references with an encapsulated/dissolved device, not its geometry."""
+    def branch(value):
+        def member(ref):
+            eid, sep, part = ref.strip().partition(":")
+            return names.get(eid, eid) + sep + part
+        return "|".join(member(ref) for ref in value.split("|"))
+    for mode in raw.get("modes", []):
+        if mode.get("on") is not None:
+            mode["on"] = [branch(ref) for ref in mode["on"]]
+        if mode.get("loops"):
+            mode["loops"] = [branch(loop) if isinstance(loop, str) else [branch(ref) for ref in loop]
+                             for loop in mode["loops"]]
+    for source in [m.get("source") for m in raw.get("modes", [])] + [raw.get("waveform", {}).get("mode_source")]:
+        if isinstance(source, dict) and isinstance(source.get("settings"), dict):
+            from .auto_modes import _hash
+            settings = source["settings"]
+            if isinstance(settings.get("distinguish"), list):
+                settings["distinguish"] = [branch(ref) for ref in settings["distinguish"]]
+                source["settings_hash"] = _hash(settings)
 
 
 def overlay(layout: Layout, index: int, report: Report, prof: Profile,
@@ -680,27 +781,34 @@ def overlay(layout: Layout, index: int, report: Report, prof: Profile,
     """What the editor needs to show mode ``index`` on its canvas: lit
     elements (with lit winding parts), lit wire pieces and arrows."""
     mode = modes_of(layout)[index]
-    graph = WireGraph(layout)
-    lit = solve(layout, mode, report, graph, prof, max_arrows)
+    from .mode_scene import ModeScene
+    scene = ModeScene(layout, prof, report)
+    lit = scene.draw(mode, max_arrows)
+    graph = scene.view_graph
     return {"name": mode.name, "caption": mode.caption,
             "parts": {k: sorted(v) for k, v in lit.parts.items()},
             "segments": [[list(graph.edges[e].a), list(graph.edges[e].b)]
-                         for e in sorted(lit.edges)],
+                         for e in sorted(lit.edges) if graph.edges[e].wire >= 0],
             "arrows": [[at[0], at[1], ang, li] for (at, ang), li
                        in zip(lit.arrows, lit.arrow_loops or [None] * len(lit.arrows))],
             "channel": sorted(lit.channel), "diode": sorted(lit.diode),
-            "notes": lit.problems}
+            "regions": lit.regions, "glyphs": lit.glyphs, "notes": lit.problems}
 
 
-def check_modes(layout: Layout, report: Report) -> list[dict]:
+def check_modes(layout: Layout, report: Report, prof=None, assembly=None) -> list[dict]:
     """Every mode of the table against the current drawing: after the main
     figure is edited, a mode that names a removed part or no longer closes
     is reported here instead of failing at export."""
     out = []
-    graph = WireGraph(layout)
+    from .mode_scene import ModeScene
+    from .profiles import get_profile
+    try:
+        scene = ModeScene(layout, prof or get_profile("double"), report, assembly)
+    except (ValueError, KeyError, TypeError) as exc:
+        return [{"name": m.name, "ok": False, "error": str(exc)} for m in modes_of(layout)]
     for m in modes_of(layout):
         try:
-            lit = solve(layout, m, report, graph)
+            lit = scene.draw(m, max_arrows=0)
             out.append({"name": m.name, "ok": True, "notes": lit.problems})
         except ModeError as exc:
             out.append({"name": m.name, "ok": False, "error": str(exc)})
@@ -764,7 +872,7 @@ def set_state(layout: Layout, report: Report, mode: Mode, el_id: str,
     order = [ref[_member(layout, d).el] for d in order]
     order += [ref[d] for d in on if ref[d] not in order]
     return Mode(mode.name, mode.caption, order, loops,
-                mode.arrows if loops == mode.loops else None, mode.condition)
+                mode.arrows if loops == mode.loops else None, mode.condition, deepcopy(mode.source))
 
 
 def complete_loops(layout: Layout, report: Report, on: dict[str, str],
@@ -869,4 +977,4 @@ def _shortest_loop(dev: Member, active: list[Member], net, layout: Layout) -> li
 def reverse_loop(mode: Mode, index: int) -> Mode:
     loops = [list(l) for l in mode.loops]
     loops[index] = loops[index][::-1]
-    return Mode(mode.name, mode.caption, mode.on, loops, None, mode.condition)
+    return Mode(mode.name, mode.caption, mode.on, loops, None, mode.condition, deepcopy(mode.source))

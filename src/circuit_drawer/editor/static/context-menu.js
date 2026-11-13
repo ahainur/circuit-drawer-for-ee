@@ -86,7 +86,8 @@ function openCanvasContext(ev, title, entries) {
 function groupContext(ev) {
   selected=null;showSidebar('properties');showProps();render();syncSelectionControls();
   const entries=['cutSelection','copySelection','pasteSelection','duplicateSelection','del'].map(id=>contextCommand(id));
-  entries.push(null,...['rotateSelection','mirrorSelection'].map(id=>contextCommand(id,'请单独选中一个元件后操作')));
+  entries.push(contextCommand('scaleCircuit'));
+  entries.push(null,contextCommand('rotateSelection',groupRotateReason()),contextCommand('rotateSelectionCCW',groupRotateReason()),contextCommand('mirrorSelection','请单独选中一个元件后操作'));
   entries.push(null,{label:'存为模块…',id:'contextSaveModule',reason:definitionEdit?'请先保存或取消模块定义':
     !moduleSelection.size || selectedObjects().length?'请只选元件；存为模块会自动包含组内导线':'',run:openSaveModule});
   openCanvasContext(ev,`已选 ${selectionCount()} 个对象`,entries);
@@ -117,6 +118,7 @@ function measurementEntries(e) {
   return entries.length?[null,...entries]:[];
 }
 async function addContextMeasurement(probe,prefix) {
+  if(definitionEdit){flash('请先保存模块定义或取消编辑，再操作整个项目。',true);return;}
   const snapshot=editorTableSnapshot(layout),info=await api('/api/spice-info',{layout,profile});
   if(snapshot!==editorTableSnapshot(layout)){flash('图纸已变化，请重新添加测量');return;}
   const used=new Set((layout.simulation?.probes||[]).map(p=>String(p.name).toLowerCase()));
@@ -136,17 +138,18 @@ function wireMeasurement(index) {
   const net=report?.wire_nets?.[viewIndex], positive=net===undefined?null:Object.keys(report.nets||{}).find(ref=>report.nets[ref]===net);
   const ground=layout.simulation?.ground;
   return {label:'测此点对地电压',id:'contextMeasureNode',reason:!positive?'该导线还没有可引用的电气引脚':
-    !ground || report?.nets?.[ground]===undefined?'请先在“分析 → SPICE 仿真…”选择并保存参考地':
+    !ground || report?.nets?.[ground]===undefined?'请先在“仿真 → SPICE 仿真…”选择并保存参考地':
     (layout.simulation?.probes||[]).length>=report.probe_limit?`测量通道已达到 ${report.probe_limit} 个`:'',
     run:()=>addContextMeasurement({kind:'voltage',positive,negative:ground},'v_node')};
 }
 function crossingEntry(at) {
-  const tolerance=WIRE_PICK_PX/Math.abs(svg.getScreenCTM().a),segments=layout.wires.flatMap(w=>w.slice(1).map((p,i)=>[w[i],p]));
+  const tolerance=WIRE_PICK_PX/Math.abs(svg.getScreenCTM().a),segments=crossingWires().flatMap(w=>w.slice(1).map((p,i)=>[w[i],p]));
   const on=(p,a,b)=>same(p,a)||same(p,b)||inside(p,a,b);
   for(const [a,b] of segments)for(const [c,d] of segments){
     if(a[1]!==b[1] || c[0]!==d[0])continue;
     const p=[c[0],a[1]];
     if(!on(p,a,b)||!on(p,c,d)||Math.hypot(p[0]-at[0],p[1]-at[1])>tolerance)continue;
+    if(!layout.wires.some(w=>w.slice(1).some((q,i)=>on(p,w[i],q))))continue;
     const arms=new Set();for(const [q,r] of segments)if(on(p,q,r))for(const end of [q,r]){
       if(end[1]===p[1] && end[0]!==p[0])arms.add(end[0]<p[0]?'L':'R');
       if(end[0]===p[0] && end[1]!==p[1])arms.add(end[1]<p[1]?'D':'U');
@@ -154,7 +157,7 @@ function crossingEntry(at) {
     if(arms.size!==4)continue;
     const hop=layout.hops.some(h=>same(h,p));
     return {label:hop?'在交叉处相连（节点）':'在交叉处跨线（不相连）',id:'contextCrossing',
-      reason:layout.elements.some(e=>Object.values(e.pins).some(q=>same(q,p)))?'此处接有元件引脚，不能改为跨线':'',run:()=>{
+      reason:projected(()=>layout.elements.some(e=>Object.values(e.pins).some(q=>same(q,p))))?'此处接有元件引脚，不能改为跨线':'',run:()=>{
         pushHistory();if(hop)toNode(p);else if(!toHop(p)){history.pop();return;}
         clearGroupSelection();selected=null;changed();}};
   }
@@ -170,10 +173,11 @@ function componentContext(ev, id, pin=null) {
   const kind=layout.elements.find(e=>e.id===id).kind;
   const entries=['cutSelection','copySelection','pasteSelection','duplicateSelection','del'].map(id=>contextCommand(id,
     id==='pasteSelection' && !clipboard ? '请先复制或剪切对象' : ''));
+  entries.push(contextCommand('scaleCircuit'));
   // the toolbar's delete button has no shortcut label; the key is Delete
-  const del=entries.at(-1); del.label='删除'; del.shortcut='Delete';
+  const del=entries.find(entry=>entry.id==='context-del'); del.label='删除'; del.shortcut='Delete';
   const mirrorReason=why || (!['nmos','pmos','igbt','scr',...TWO_TERMINAL].includes(kind)?'此类元件暂不支持镜像／反向':'');
-  entries.push(null,contextCommand('rotateSelection',why),contextCommand('mirrorSelection',mirrorReason),
+  entries.push(null,contextCommand('rotateSelection',why),contextCommand('rotateSelectionCCW',why),contextCommand('mirrorSelection',mirrorReason),
     {label:'编辑标签…',id:'contextLabel',reason:why || (kind==='transformer'?'此元件使用变比标记，请在属性栏编辑变比':''),run:focusPropertyText},
     {label:'仿真参数…',id:'contextSpice',reason:why || (kind==='port'?'端子没有独立的仿真参数':''),run:()=>openSpiceForElement(id)});
   if (group) entries.push(null,{label:'存为模块…',id:'contextSaveModule',reason:definitionEdit?'请先保存或取消模块定义':'',run:openSaveModule});
@@ -214,9 +218,62 @@ function wireContext(ev,index,at) {
     {label:'删除折点',id:'contextWireRemove',reason:point<=0||point>=w.length-1?'请右键内部折点；端点需保留':'',run:deleteWirePoint},
     {label:'在此处拆成两条',id:'contextWireSplit',reason:endpoint?'端点不能拆分':hop?'跨线处请先确定连接方式':'',run:()=>splitWire(at)},
     {label:'和首尾相接的导线合成一条',id:'contextWireMerge',reason:joins.length?'':'没有首尾相接的其它导线',...(joins.length===1?{run:joins[0].run}:{children:joins})},
+    contextCommand('mergeOverlaps'),
     null,...['cutSelection','copySelection','duplicateSelection'].map(id=>contextCommand(id)),
     {label:'删除这条线',id:'contextWireDelete',run:()=>{selected={type:'wire',index};delSelected();}},
     null,wireMeasurement(index),...(crossingEntry(at)?[crossingEntry(at)]:[]),...issueEntries({type:'wire',index})
+  ]);
+}
+function ellipsisOwner(id) {
+  const own=layout.modules?.instances.find(i=>i.group?.style==='ellipsis' && (i.id===id || i.group.members.includes(id)));
+  if(own)return own;
+  const legacy=layout.module_view==='folded' && Object.entries(layout.stack_usage || {}).find(([,u])=>
+    u.purpose==='instances' && u.style==='ellipsis' && u.instances.includes(id));
+  return legacy?{id:legacy[1].instances[0],region:legacy[0]}:null;
+}
+function ellipsisSelectionReason(ids) {
+  if(selectionCount()!==instanceSelection.size)return '省略前请取消选择普通元件、导线和图形';
+  if(ids.length<3)return '至少选择三个模块实例，保留首尾并省略中间实例';
+  const grouped = [...(layout.modules?.instances || []).filter(i=>i.group).flatMap(i=>[i.id,...i.group.members]),
+    ...Object.values(layout.stack_usage || {}).filter(u=>u.purpose==='instances').flatMap(u=>u.instances || [])];
+  if(ids.some(id=>grouped.includes(id)))return '所选实例已有分组，请先恢复全部实例';
+  return '';
+}
+async function changeInstanceEllipsis(ids, restore=false) {
+  const before=editorTableSnapshot(layout), candidate=clone(layout);
+  if(restore) {
+    const owner=ellipsisOwner(ids[0]); if(!owner)return;
+    if(owner.region!==undefined) {
+      delete candidate.stack_usage[owner.region];
+      delete candidate.regions.find(r=>r.id===owner.region).stack;
+      if(!Object.values(candidate.stack_usage).some(u=>u.purpose==='instances'))candidate.module_view='expanded';
+    } else delete candidate.modules.instances.find(i=>i.id===owner.id).group;
+  } else {
+    const reason=ellipsisSelectionReason(ids); if(reason){flash(reason);return;}
+    // Order the chosen frames along their dominant axis, independent of click order.
+    const centres=ids.map(id=>{const b=viewInfo().frames[id];return {id,x:(b[0]+b[2])/2,y:(b[1]+b[3])/2};});
+    const span=k=>Math.max(...centres.map(c=>c[k]))-Math.min(...centres.map(c=>c[k]));
+    const horizontal=span('x')>span('y');
+    centres.sort((a,b)=>(horizontal?a.x-b.x:b.y-a.y) || a.id.localeCompare(b.id));
+    const ordered=centres.map(c=>c.id);
+    candidate.modules.instances.find(i=>i.id===ordered[0]).group={style:'ellipsis',members:ordered.slice(1)};
+  }
+  selectionBusy=true;syncSelectionControls();
+  try {
+    const trial=await trialCheck(candidate);
+    if(editorTableSnapshot(layout)!==before)return;
+    const broken=!trial?'校验没有完成':trial.issues?.find(i=>i.code==='bad-module')?.message || (trial.module_info?'':'模块拼装失败');
+    if(broken){flash(`没有改省略显示：${zhModule(broken)}。原图已保留`,true);return;}
+    pushHistory();layout=candidate;clearGroupSelection();selected=null;focusedModuleId=null;focusedLink=null;
+    changed();
+  } finally {selectionBusy=false;syncSelectionControls();}
+}
+function instanceSelectionContext(ev) {
+  const ids=[...instanceSelection];showSidebar('properties');moduleSelectionStatus();
+  openCanvasContext(ev,'模块多选',[
+    contextCommand('scaleCircuit'),
+    {label:'省略中间实例',id:'contextEllipsis',reason:ellipsisSelectionReason(ids),run:()=>changeInstanceEllipsis(ids)},
+    {label:'取消选择',id:'contextClearInstances',run:()=>{clearGroupSelection();showProps();render();}}
   ]);
 }
 function instanceContext(ev,id) {
@@ -229,9 +286,10 @@ function instanceContext(ev,id) {
     const button=document.getElementById(source);
     return {label,id,reason,run:()=>button.onclick()};
   };
-  const entries=[fromProps('编辑模块定义','contextDefinition','instDefinition',own?'':'内置实例需先转换为项目模块'),
+  const entries=[contextCommand('scaleCircuit'),{label:'省略中间实例',id:'contextEllipsis',reason:'至少选择三个模块实例，保留首尾并省略中间实例'},
+    ...(ellipsisOwner(id)?[{label:'恢复全部实例',id:'contextRestoreInstances',run:()=>changeInstanceEllipsis([id],true)}]:[]),null,
+    fromProps('编辑模块定义','contextDefinition','instDefinition',own?'':'内置实例需先转换为项目模块'),
     fromProps('实例参数…','contextParameters','instParams'),
-    fromProps('端口连接…','contextConnections','instLinks',definitionPorts(inst.definition)?'':'模块库列表还没读到它的端口，请稍候再试'),
     fromProps('展开 / 折叠','contextDisplay','instDisplay',layout.modules.links?'':'旧式叠板请用“视图 → 模块显示”切换'),
     fromProps('解散为普通元件','contextDissolve','instDissolve'),
     fromProps('存进我的模块库…','contextLibrarySave','instToLibrary',own?'':'请先保存为项目模块')];
@@ -249,6 +307,7 @@ function blankContext(ev,at) {
     {label:'在这里插入 ›',id:'contextInsert',children:components},null,
     ...['drawRegion','drawBlock','drawCallout'].map(id=>contextCommand(id)),null,
     {label:'全选顶层对象',id:'contextSelectAll',reason:selectionCandidates().length?'':'没有可选的顶层对象',run:selectAllObjects},
+    contextCommand('scaleCircuit'),
     contextCommand('menuFit')]);
 }
 function canvasContextMenu(ev) {
@@ -258,6 +317,12 @@ function canvasContextMenu(ev) {
   if (wireDraft || boxDraft || pendingModule) { flash('请先完成当前绘制或按 Esc 取消，再打开右键菜单'); return; }
   const at=toUnits(ev), node=ev.target.closest('[data-region],[data-block],[data-callout]');
   const ref=objectAtTarget(ev.target);
+  const annotation=ev.target.closest('[data-ann]');
+  const omission=annotation && viewInfo().ellipsis_markers?.[annotation.dataset.ann];
+  if(omission && ellipsisOwner(omission))return instanceContext(ev,omission);
+  const instance=instanceOfTarget(ev) || (node && instanceAt(ev));
+  if(instanceSelection.size && (instanceSelection.has(instance) || groupHas(ref) || ev.target===svg || ev.target.classList.contains('bg')))
+    return instanceSelectionContext(ev);
   if(groupHas(ref) && selectionCount()>1)return groupContext(ev);
   if(ref?.type==='ann')return annotationContext(ev,ref.index);
   // Resize/bend handles are lifted above the drawing at the SVG root, outside
@@ -269,7 +334,6 @@ function canvasContextMenu(ev) {
     const viewIndex=+node.dataset[key], index=layout.modules?viewInfo().root_decorations?.[type]?.[viewIndex]:viewIndex;
     if (index!==undefined && layout[type]?.[index]) return decorationContext(ev,type,index);
   }
-  const instance=instanceOfTarget(ev) || (node && instanceAt(ev));
   if(instance) return instanceContext(ev,instance);
   const wave=ev.target.closest('[data-wave-symbol]');
   if(wave && !layout.modules){

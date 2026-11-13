@@ -103,13 +103,20 @@ main { grid-template-columns: 240px minmax(200px, 1fr) 304px; }
 #emptyCanvas h2 { font-size: 18px; color: var(--ink); font-weight: 600; margin: var(--space-2); }
 #emptyCanvas p { font-size: var(--font-small); margin: 0 0 var(--space-4); }
 #emptyCanvas button { pointer-events: auto; margin: 0 var(--space-1); padding: 7px var(--space-3); }
-.example-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--space-2); margin: var(--space-4) 0; }
+.example-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--space-2); margin: var(--space-4) 0; max-height: 55vh; overflow-y: auto; }
 .example-list button { padding: var(--space-4); }
 @media (max-width: 1100px) {
   main { grid-template-columns: 216px minmax(160px,1fr) 280px; }
   .quick-tools button { padding: 5px 6px; }
   .tool-group { padding: 0 var(--space-1); }
 }
+.reference-images { margin: 12px 0; padding: 10px; border: 1px dashed var(--line); }
+.reference-images.dragover { border-color: var(--accent); background: #edf4ff; }
+.reference-thumbs { display: flex; flex-wrap: wrap; gap: 10px; }
+.reference-thumb { display: grid; justify-items: start; gap: 4px; max-width: 180px; }
+.reference-thumb img { height: 72px; max-width: 180px; object-fit: contain; border: 1px solid var(--line); }
+.reference-thumb span { max-width: 100%; overflow-wrap: anywhere; }
+.reference-images [data-ref-errors] p { overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   main { grid-template-columns: 164px minmax(0,1fr); grid-template-rows: minmax(180px,1fr) minmax(160px,.65fr); }
   #componentPanel { padding: 0 var(--space-2); }
@@ -123,3 +130,9 @@ main { grid-template-columns: 240px minmax(200px, 1fr) 304px; }
   #emptyCanvas h2 { font-size: 15px; }
   #emptyCanvas p { max-width: 190px; }
 }
+
+.mode-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.mode-row > select { flex: 1; min-width: 0; }
+#modeInfo { margin-top: 4px; }
+.mode-tag { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 11px; color: var(--muted); }
+.mode-warning { color: #b26b00; }

@@ -186,6 +186,7 @@ class Proposal:
 
 def tuning_parameters(layout, profile, base_dir):
     """A whitelist of existing numbers, with destinations in the authored table."""
+    from .modules import _definitions
     full, _, assembly = spice.resolved_layout(layout, profile)
     source = assembly.full if assembly else full
     catalog = {}
@@ -195,6 +196,7 @@ def tuning_parameters(layout, profile, base_dir):
 
     spec = layout.extra.get("modules", {})
     instances = {i["id"]: (n, i) for n, i in enumerate(spec.get("instances", []))}
+    definitions = _definitions(spec) if assembly else {}
     for e in source.elements:
         values = source.extra.get("simulation", {}).get("components", {}).get(e.id, {})
         owner, _, local = e.id.partition("/")
@@ -207,7 +209,7 @@ def tuning_parameters(layout, profile, base_dir):
             value = values[tail[0]] if len(tail) == 1 else wave[tail[1]]
             if owner in instances and local:
                 n, instance = instances[owner]
-                definition = spec["definitions"][instance["definition"]]
+                definition = definitions[instance["definition"]]
                 if "editable" in definition and not any(p["element"] == local and p["field"] == field
                                                         for p in definition["editable"]):
                     continue
@@ -251,6 +253,26 @@ def tuning_parameters(layout, profile, base_dir):
                 if k != "probe" and k in cfg:
                     add(("closed_loop", "inputs", bid, k), cfg[k], f"控制输入 {bid} · {k}")
     return full, catalog, control
+
+
+def apply_parameters(layout, catalog, updates, control=None):
+    if not isinstance(updates, dict) or not updates or set(updates) - catalog.keys():
+        raise spice.SpiceError("parameter-updates: updates 只允许当前 adjustable 清单中的参数路径，至少提供一项；不能修改模块定义、连线、模型或控制结构")
+    raw, values = layout.to_dict(), {}
+    for name, value in updates.items():
+        p = catalog[name]
+        value = spice.number(value, name)
+        values[name] = value
+        if value == spice.number(p["value"], name):
+            continue  # keeping a default must not freeze it as an instance override
+        keys = p["keys"]
+        if keys[:2] == ("closed_loop", "control") and not isinstance(raw["closed_loop"]["control"], dict):
+            raw["closed_loop"]["control"] = deepcopy(control)
+        target = raw
+        for key in keys[:-1]:
+            target = target[key] if isinstance(target, list) else target.setdefault(key, {})
+        target[keys[-1]] = value
+    return Layout.from_dict(raw), values
 
 
 class RecommendationWorkflow:
@@ -355,23 +377,7 @@ class RecommendationWorkflow:
         return Proposal(data)
 
     def _tuned(self, updates):
-        if not isinstance(updates, dict) or not updates or set(updates) - self.catalog.keys():
-            raise spice.SpiceError("parameter-updates: updates 只允许当前 adjustable 清单中的参数路径，至少提供一项；不能修改模块定义、连线、模型或控制结构")
-        raw, values = self.layout.to_dict(), {}
-        for name, value in updates.items():
-            p = self.catalog[name]
-            value = spice.number(value, name)
-            values[name] = value
-            if value == spice.number(p["value"], name):
-                continue  # keeping a default must not freeze it as an instance override
-            keys = p["keys"]
-            if keys[:2] == ("closed_loop", "control") and not isinstance(raw["closed_loop"]["control"], dict):
-                raw["closed_loop"]["control"] = deepcopy(self.control)
-            target = raw
-            for key in keys[:-1]:
-                target = target[key] if isinstance(target, list) else target.setdefault(key, {})
-            target[keys[-1]] = value
-        return Layout.from_dict(raw), values
+        return apply_parameters(self.layout, self.catalog, updates, self.control)
 
     def evaluate(self, reply):
         data = extract_table(reply)

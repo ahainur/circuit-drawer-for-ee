@@ -174,8 +174,8 @@ def _filter_connections(lay, f, nets, ground):
         raise ValueError("滤波器接法不符：共模绕组 p1/s1 朝 LISN，p2/s2 分别接差模电感 a，"
                          "差模电感 b 接 X 两端及各 Y 的 a，Y 的 b 接机壳；回线不可短接机壳")
     el = next(e for e in lay.elements if e.id == f["choke"])
-    if "sct" in el.pins or el.opts.get("dots", "same") != "same":
-        raise ValueError("共模电感需同侧同名端的双绕组，不支持中心抽头")
+    if any(k != "p1" and k != "p2" and k != "s1" and k != "s2" for k in el.pins) or el.opts.get("dots", "same") != "same":
+        raise ValueError("共模电感需同侧同名端的双绕组，不支持中心抽头或第三、第四绕组")
 
 
 def problems(lay, nets):

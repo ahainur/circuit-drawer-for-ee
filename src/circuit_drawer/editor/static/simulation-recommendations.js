@@ -5,7 +5,7 @@ function initSimulationRecommendations(info, base, profile, accept, current) {
     <p class="hint">基础 Buck、Boost 和交错 Buck 按公式计算；其他电路或文字需求使用现有 AI 配置。
       留空时采用明确列出的演示工况。每项附理由，并自动做一次短 ngspice 检查。</p>
     <p class="hint">模块和闭环使用 AI，从已有可运行工况调参：只改实例允许调整的参数和控制器已有数值。
-      调整外部控制表时，保存为本电路的内嵌副本，原控制表文件不变。短检查按连续控制模型运行，不证明离散控制稳定。</p>
+      调整外部控制表时，保存为本电路的内嵌副本。短检查按控制表选择连续或数字模型，结果对应所给参数与运行区间。</p>
     <fieldset id="recommendInputs" style="border:0;padding:0"><div class="spice-fields">
       ${Object.entries(info.recommendation_inputs).map(([key,label]) => `<label>${esc(label)}
         <input data-requirement="${esc(key)}" placeholder="留空使用建议工况" autocomplete="off"></label>`).join("")}</div>
@@ -21,6 +21,7 @@ function initSimulationRecommendations(info, base, profile, accept, current) {
   const dialog = host.closest("dialog"), state = $("recommendState");
   let jobId = null, proposal = null, snapshot = null, draftSnapshot = null, cancelled = false, serial = 0;
   function busy(value) {
+    document.getElementById("spiceParameterSearch").inert = value;
     $("recommendInputs").disabled = value;
     $("recommendCancel").hidden = !value;
     document.getElementById("spiceOptions").disabled = value;

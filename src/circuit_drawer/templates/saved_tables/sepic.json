@@ -1,0 +1,323 @@
+{
+ "template": {
+  "name": "sepic",
+  "title": "SEPIC converter",
+  "aliases": [
+   "SEPIC converter",
+   "SEPIC变换器"
+  ],
+  "description": "Two uncoupled inductors and an explicit energy-transfer capacitor; ideal CCM, negligible capacitor ripple. Positive output.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "sepic",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      4.0
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      1.0,
+      4.0
+     ],
+     "b": [
+      2.2,
+      4.0
+     ]
+    },
+    "label": "$L_1$"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.6,
+      3.0
+     ],
+     "s": [
+      2.6,
+      1.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Cx",
+    "kind": "C",
+    "pins": {
+     "a": [
+      3.2,
+      4.0
+     ],
+     "b": [
+      4.4,
+      4.0
+     ]
+    },
+    "label": "$C_x$"
+   },
+   {
+    "id": "L2",
+    "kind": "L",
+    "pins": {
+     "a": [
+      4.8,
+      1.0
+     ],
+     "b": [
+      4.8,
+      3.0
+     ]
+    },
+    "label": "$L_2$",
+    "label_pos": "left"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.2,
+      4.0
+     ],
+     "b": [
+      6.4,
+      4.0
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      6.8,
+      4.0
+     ],
+     "b": [
+      6.8,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.0,
+      4.0
+     ],
+     "b": [
+      8.0,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     4.0
+    ],
+    [
+     1.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.2,
+     4.0
+    ],
+    [
+     3.2,
+     4.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     4.0
+    ],
+    [
+     2.6,
+     3.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     1.0
+    ],
+    [
+     2.6,
+     0.0
+    ]
+   ],
+   [
+    [
+     4.4,
+     4.0
+    ],
+    [
+     5.2,
+     4.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     4.0
+    ],
+    [
+     4.8,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.8,
+     1.0
+    ],
+    [
+     4.8,
+     0.0
+    ]
+   ],
+   [
+    [
+     6.4,
+     4.0
+    ],
+    [
+     6.8,
+     4.0
+    ]
+   ],
+   [
+    [
+     6.8,
+     4.0
+    ],
+    [
+     8.0,
+     4.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     8.0,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [
+   {
+    "at": [
+     9.6,
+     2.0
+    ],
+    "text": "$v_o>0$"
+   }
+  ],
+  "netlist": {
+   "Vin.a": "GND",
+   "Vin.b": "IN",
+   "L1.a": "IN",
+   "L1.b": "A",
+   "S1.d": "A",
+   "S1.s": "GND",
+   "Cx.a": "A",
+   "Cx.b": "B",
+   "L2.a": "GND",
+   "L2.b": "B",
+   "D1.a": "B",
+   "D1.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "GND",
+   "RL.a": "OUT",
+   "RL.b": "GND"
+  },
+  "modes": [
+   {
+    "name": "Switch on",
+    "on": [
+     "S1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "S1"
+     ],
+     [
+      "Cx",
+      "S1",
+      "L2"
+     ],
+     [
+      "RL",
+      "Co"
+     ]
+    ],
+    "caption": "Switch on",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   },
+   {
+    "name": "Switch off",
+    "on": [
+     "D1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "Cx",
+      "D1",
+      "Co|RL"
+     ],
+     [
+      "L2",
+      "D1",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Switch off",
+    "condition": "Ideal CCM; positive inductor current; switching transitions omitted"
+   }
+  ]
+ }
+}

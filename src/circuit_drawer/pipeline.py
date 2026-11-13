@@ -12,7 +12,7 @@ from .layout import Layout
 from .options import parse
 from .profiles import get_profile
 from .validate import Report, check
-from .modes import Mode, ModeError, Paint, Style, WireGraph, modes_of, solve
+from .modes import Mode, ModeError, Paint, Style, modes_of
 
 
 class LayoutRejected(ValueError):
@@ -37,7 +37,7 @@ def from_template(name: str, text: str | None = None, **given) -> Layout:
 def render(layout: Layout, profile: str = "ieee-single",
            out_dir: str | Path | None = None, stem: str | None = None,
            formats: tuple[str, ...] = FORMATS, grid: bool = False,
-           mono: bool = False) -> Result:
+           mono: bool = False, *, base_dir=None) -> Result:
     """Validate, then emit and (optionally) compile.  Raises LayoutRejected
     instead of drawing anything when the table breaks a hard rule.  ``mono``
     draws background regions and callouts in greys."""
@@ -48,7 +48,7 @@ def render(layout: Layout, profile: str = "ieee-single",
     from .regions import transparency_notes
     from .validate import Issue
     report.issues.extend(Issue("transparency-export", note, "note") for note in transparency_notes(layout))
-    tex = emit(layout, prof, report, grid, mono=mono)
+    tex = emit(layout, prof, report, grid, mono=mono, base_dir=base_dir)
     res = Result(layout, report, tex)
     if out_dir is not None:
         res.files = build(tex, Path(out_dir), stem or layout.name, formats)
@@ -67,15 +67,15 @@ def render_modes(layout: Layout, profile: str = "ieee-single",
                  out_dir: str | Path | None = None, stem: str | None = None,
                  formats: tuple[str, ...] = FORMATS, style: Style | None = None,
                  modes: list[Mode] | None = None, only: list[int] | None = None,
-                 sheet: bool = True, node_labels: bool = False) -> list[ModeResult]:
+                 sheet: bool = True, node_labels: bool = False, *, base_dir=None) -> list[ModeResult]:
     """One figure per operating mode, all from the same validated table.
     ``modes`` defaults to the table's own; ``only`` picks some (1-based).
     With ``sheet`` and files being made, ``<stem>_modes`` puts them all on
     one page with (a), (b), ... captions; it is returned as the last result."""
-    if "modules" in layout.extra:
-        raise ModeError("模块初版尚不支持跨模块模态高亮；请在普通电路中编辑模态")
     prof = get_profile(profile)
-    report = check(layout, prof)
+    from .validate import check_with_assembly
+    from .mode_scene import ModeScene
+    report, assembly = check_with_assembly(layout, prof)
     if not report.ok:
         raise LayoutRejected(report)
     modes = modes if modes is not None else modes_of(layout)
@@ -83,7 +83,7 @@ def render_modes(layout: Layout, profile: str = "ieee-single",
         raise ModeError(f"{layout.name} has no operating modes; add a 'modes' list to the "
                         f"table or pass --modes file.json")
     style = style or Style()
-    graph = WireGraph(layout)
+    scene = ModeScene(layout, prof, report, assembly)
     stem = stem or layout.name
     out = []
     want = formats
@@ -93,8 +93,10 @@ def render_modes(layout: Layout, profile: str = "ieee-single",
     for i, mode in enumerate(modes, 1):
         if only and i not in only:
             continue
-        lit = solve(layout, mode, report, graph, prof, style.arrows)
-        tex = emit(layout, prof, report, paint=Paint(layout, lit, graph, prof, style), node_labels=node_labels)
+        lit = scene.draw(mode, style.arrows)
+        tex = emit(scene.view, prof, scene.view_report,
+                   paint=Paint(scene.view, lit, scene.view_graph, prof, style), node_labels=node_labels,
+                   base_dir=base_dir)
         from .regions import transparency_notes
         res = ModeResult(mode, tex, notes=lit.problems + transparency_notes(layout))
         if out_dir is not None:

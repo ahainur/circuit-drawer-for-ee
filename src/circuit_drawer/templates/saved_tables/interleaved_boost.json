@@ -1,0 +1,448 @@
+{
+ "template": {
+  "name": "interleaved_boost",
+  "title": "Two-phase interleaved boost",
+  "aliases": [
+   "interleaved boost",
+   "交错boost",
+   "两相交错升压"
+  ],
+  "description": "Two independent inductors, 180 degree interleaving, D=0.3, ideal positive CCM. Both-off intervals are retained.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "interleaved_boost",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      6.0
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "L1",
+    "kind": "L",
+    "pins": {
+     "a": [
+      1.3,
+      5.0
+     ],
+     "b": [
+      2.6,
+      5.0
+     ]
+    },
+    "label": "$L_1$"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      3.0,
+      4.5
+     ],
+     "s": [
+      3.0,
+      3.0
+     ]
+    },
+    "label": "$S_1$",
+    "label_pos": "left"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.5,
+      5.0
+     ],
+     "b": [
+      5.8,
+      5.0
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "L2",
+    "kind": "L",
+    "pins": {
+     "a": [
+      1.3,
+      2.5
+     ],
+     "b": [
+      2.6,
+      2.5
+     ]
+    },
+    "label": "$L_2$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      3.0,
+      2.0
+     ],
+     "s": [
+      3.0,
+      0.5
+     ]
+    },
+    "label": "$S_2$",
+    "label_pos": "left"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.5,
+      2.5
+     ],
+     "b": [
+      5.8,
+      2.5
+     ]
+    },
+    "label": "$D_2$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      7.5,
+      5.0
+     ],
+     "b": [
+      7.5,
+      0.0
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      8.7,
+      5.0
+     ],
+     "b": [
+      8.7,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     6.0
+    ],
+    [
+     1.0,
+     6.0
+    ],
+    [
+     1.0,
+     2.5
+    ]
+   ],
+   [
+    [
+     1.0,
+     5.0
+    ],
+    [
+     1.3,
+     5.0
+    ]
+   ],
+   [
+    [
+     2.6,
+     5.0
+    ],
+    [
+     4.5,
+     5.0
+    ]
+   ],
+   [
+    [
+     3.0,
+     5.0
+    ],
+    [
+     3.0,
+     4.5
+    ]
+   ],
+   [
+    [
+     5.8,
+     5.0
+    ],
+    [
+     7.0,
+     5.0
+    ]
+   ],
+   [
+    [
+     3.0,
+     3.0
+    ],
+    [
+     4.0,
+     3.0
+    ],
+    [
+     4.0,
+     0.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     1.3,
+     2.5
+    ]
+   ],
+   [
+    [
+     2.6,
+     2.5
+    ],
+    [
+     4.5,
+     2.5
+    ]
+   ],
+   [
+    [
+     3.0,
+     2.5
+    ],
+    [
+     3.0,
+     2.0
+    ]
+   ],
+   [
+    [
+     5.8,
+     2.5
+    ],
+    [
+     7.0,
+     2.5
+    ]
+   ],
+   [
+    [
+     3.0,
+     0.5
+    ],
+    [
+     3.0,
+     0.0
+    ]
+   ],
+   [
+    [
+     7.0,
+     2.5
+    ],
+    [
+     7.0,
+     5.0
+    ]
+   ],
+   [
+    [
+     7.0,
+     5.0
+    ],
+    [
+     7.5,
+     5.0
+    ]
+   ],
+   [
+    [
+     7.5,
+     5.0
+    ],
+    [
+     8.7,
+     5.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     8.7,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    4.0,
+    2.5
+   ]
+  ],
+  "annotations": [
+   {
+    "at": [
+     10.3,
+     2.5
+    ],
+    "text": "$v_o>0$"
+   }
+  ],
+  "netlist": {
+   "Vin.a": "GND",
+   "Vin.b": "IN",
+   "L1.a": "IN",
+   "L1.b": "A1",
+   "S1.d": "A1",
+   "S1.s": "GND",
+   "D1.a": "A1",
+   "D1.b": "OUT",
+   "L2.a": "IN",
+   "L2.b": "A2",
+   "S2.d": "A2",
+   "S2.s": "GND",
+   "D2.a": "A2",
+   "D2.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "GND",
+   "RL.a": "OUT",
+   "RL.b": "GND"
+  },
+  "modes": [
+   {
+    "name": "Phase 1 on",
+    "on": [
+     "S1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "S1"
+     ],
+     [
+      "Vin",
+      "L2",
+      "D2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Phase 1 on",
+    "condition": "Ideal positive CCM; D=0.3; gates shifted by half a switching period"
+   },
+   {
+    "name": "Both off A",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "D1",
+      "Co|RL"
+     ],
+     [
+      "Vin",
+      "L2",
+      "D2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Both off A",
+    "condition": "Ideal positive CCM; D=0.3; gates shifted by half a switching period"
+   },
+   {
+    "name": "Phase 2 on",
+    "on": [
+     "D1",
+     "S2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "D1",
+      "Co|RL"
+     ],
+     [
+      "Vin",
+      "L2",
+      "S2"
+     ]
+    ],
+    "caption": "Phase 2 on",
+    "condition": "Ideal positive CCM; D=0.3; gates shifted by half a switching period"
+   },
+   {
+    "name": "Both off B",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "L1",
+      "D1",
+      "Co|RL"
+     ],
+     [
+      "Vin",
+      "L2",
+      "D2",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Both off B",
+    "condition": "Ideal positive CCM; D=0.3; gates shifted by half a switching period"
+   }
+  ]
+ }
+}

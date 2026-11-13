@@ -21,6 +21,8 @@ TEMPLATES = {
     "foc_pmsm": "PMSM 磁场定向控制 (FOC)：转速外环、dq 电流 PI、Clarke/Park、SVPWM",
     "mpc_fcs": "有限控制集模型预测电流控制 (FCS-MPC)：预测模型、代价函数、最优开关选择",
     "buck_vmode": "Buck 电压模式单环：Type III 补偿、PWM 增益、功率级、分压反馈（含环路参数）",
+    "buck_digital": "1 MHz Buck 数字控制延迟与量化",
+    "gfm_sync": "两机相角同步小信号模型",
 }
 
 

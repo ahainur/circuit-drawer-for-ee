@@ -24,7 +24,7 @@ from ..geometry import region_label_box
 from ..profiles import PROFILES, get_profile
 from . import library
 from ..regions import (BORDERS, CALLOUT_DASHES, COLOR_ALIASES, INKS, INK_ALIASES,
-                       PALETTE, css_rgb, ink_rgb)
+                       PALETTE, REGION_BORDER_COLORS, canon, css_rgb, ink_rgb)
 from .check import CONTACT_R, PT_CM, SUM_R, check, port_point
 from .model import (BOX_TYPES, CIRCLE_TYPES, POLE, SIDES, TAG_FILLS, TAG_STYLE,
                     block_fill, fill_names, fill_options)
@@ -42,6 +42,7 @@ def appearance_constants() -> dict:
             "inks": INKS, "ink_aliases": INK_ALIASES, "color_aliases": COLOR_ALIASES,
             "palette": {k: css_rgb(k) for k in PALETTE},
             "palette_edges": {k: css_rgb(k, edge=True) for k in PALETTE},
+            "border_colors": {k: css_rgb(canon(k), edge=True) for k in REGION_BORDER_COLORS},
             "borders": BORDERS, "dashes": CALLOUT_DASHES}
 
 
@@ -256,7 +257,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "editor.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/theme-eda.css", "/ai-settings.js"):
+                elif self.path in ("/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/digital-control.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js") else "text/css; charset=utf-8")
                 elif self.path == "/api/state":
@@ -331,6 +332,10 @@ class Editor:
             def _loop(self, req: dict) -> dict:
                 return loop_report(req["table"], req.get("profile") or editor.profile,
                                    bool(req.get("mono")))
+
+            def _controller_info(self, req: dict) -> dict:
+                from ..closed_loop import describe
+                return describe(req["table"], editor.path.parent)
 
             def _design(self, req: dict) -> dict:
                 return loop_design(req["table"], req.get("profile") or editor.profile, req)
@@ -414,6 +419,7 @@ ROUTES = {
     "/api/template": "_template",
     "/api/tex-preview": "_tex_preview",
     "/api/loop": "_loop",
+    "/api/controller-info": "_controller_info",
     "/api/design": "_design",
     "/api/export-bode": "_export_bode",
     "/api/export-code": "_export_code",

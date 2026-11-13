@@ -1,0 +1,252 @@
+{
+ "template": {
+  "name": "single_phase_diode_bridge",
+  "title": "Single-phase diode bridge",
+  "aliases": [
+   "single phase diode bridge",
+   "单相二极管整流桥",
+   "单相不控整流桥"
+  ],
+  "description": "Full-wave rectification into a resistor, without a smoothing capacitor.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://docs.plexim.com/plecs-demos/basic-topologies/diode-rectifier/"
+  ]
+ },
+ "layout": {
+  "name": "single_phase_diode_bridge",
+  "elements": [
+   {
+    "id": "Vac",
+    "kind": "vac",
+    "pins": {
+     "a": [
+      0.0,
+      1.5
+     ],
+     "b": [
+      0.0,
+      3.5
+     ]
+    },
+    "label": "$v_{ac}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.0,
+      3.0
+     ],
+     "b": [
+      2.0,
+      4.5
+     ]
+    },
+    "label": "$D_1$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      2.0,
+      0.0
+     ],
+     "b": [
+      2.0,
+      1.5
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D3",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.0,
+      3.0
+     ],
+     "b": [
+      4.0,
+      4.5
+     ]
+    },
+    "label": "$D_3$",
+    "label_pos": "right"
+   },
+   {
+    "id": "D4",
+    "kind": "D",
+    "pins": {
+     "a": [
+      4.0,
+      0.0
+     ],
+     "b": [
+      4.0,
+      1.5
+     ]
+    },
+    "label": "$D_4$",
+    "label_pos": "right"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      6.0,
+      4.5
+     ],
+     "b": [
+      6.0,
+      0.0
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     2.0,
+     1.5
+    ],
+    [
+     2.0,
+     3.0
+    ]
+   ],
+   [
+    [
+     4.0,
+     1.5
+    ],
+    [
+     4.0,
+     3.0
+    ]
+   ],
+   [
+    [
+     0.0,
+     3.5
+    ],
+    [
+     1.0,
+     3.5
+    ],
+    [
+     1.0,
+     2.7
+    ],
+    [
+     2.0,
+     2.7
+    ]
+   ],
+   [
+    [
+     0.0,
+     1.5
+    ],
+    [
+     1.0,
+     1.5
+    ],
+    [
+     1.0,
+     2.0
+    ],
+    [
+     4.0,
+     2.0
+    ]
+   ],
+   [
+    [
+     2.0,
+     4.5
+    ],
+    [
+     6.0,
+     4.5
+    ]
+   ],
+   [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     6.0,
+     0.0
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.0,
+    2.0
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "Vac.a": "B",
+   "Vac.b": "A",
+   "D1.a": "A",
+   "D1.b": "DCP",
+   "D2.a": "DCN",
+   "D2.b": "A",
+   "D3.a": "B",
+   "D3.b": "DCP",
+   "D4.a": "DCN",
+   "D4.b": "B",
+   "RL.a": "DCP",
+   "RL.b": "DCN"
+  },
+  "modes": [
+   {
+    "name": "Positive half cycle",
+    "on": [
+     "D1",
+     "D4"
+    ],
+    "loops": [
+     [
+      "Vac",
+      "D1",
+      "RL",
+      "D4"
+     ]
+    ],
+    "caption": "Positive half cycle",
+    "condition": "Ideal diodes; resistive load; sinusoidal source"
+   },
+   {
+    "name": "Negative half cycle",
+    "on": [
+     "D3",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vac",
+      "D3",
+      "RL",
+      "D2"
+     ]
+    ],
+    "caption": "Negative half cycle",
+    "condition": "Ideal diodes; resistive load; sinusoidal source"
+   }
+  ]
+ }
+}

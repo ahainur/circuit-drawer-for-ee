@@ -547,7 +547,8 @@
    {
     "id": "Vin",
     "kind": "V",
-    "label": "$V_\\mathrm{in}$"
+    "label": "$V_\\mathrm{in}$",
+    "offset": [0, 0]
    },
    {
     "id": "RL",

@@ -1,0 +1,178 @@
+{
+ "title": "CT rectifier",
+ "symbol": "acdc",
+ "layout": {
+  "name": "ct_rectifier",
+  "elements": [
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.65,
+      3.1
+     ],
+     "b": [
+      6.55,
+      3.1
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.65,
+      0.6
+     ],
+     "b": [
+      6.55,
+      0.6
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "below"
+   },
+   {
+    "id": "Port_A",
+    "kind": "port",
+    "pins": {
+     "p": [
+      5.65,
+      3.1
+     ]
+    },
+    "label": "$A$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_C",
+    "kind": "port",
+    "pins": {
+     "p": [
+      5.65,
+      1.85
+     ]
+    },
+    "label": "$C$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_B",
+    "kind": "port",
+    "pins": {
+     "p": [
+      5.65,
+      0.6
+     ]
+    },
+    "label": "$B$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_OP",
+    "kind": "port",
+    "pins": {
+     "p": [
+      9.5,
+      3.1
+     ]
+    },
+    "label": "$OP$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_ON",
+    "kind": "port",
+    "pins": {
+     "p": [
+      8.5,
+      1.85
+     ]
+    },
+    "label": "$ON$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     6.55,
+     3.1
+    ],
+    [
+     9.5,
+     3.1
+    ]
+   ],
+   [
+    [
+     6.55,
+     0.6
+    ],
+    [
+     9,
+     0.6
+    ],
+    [
+     9,
+     3.1
+    ]
+   ],
+   [
+    [
+     5.65,
+     1.85
+    ],
+    [
+     8.5,
+     1.85
+    ]
+   ]
+  ],
+  "hops": [],
+  "annotations": [],
+  "netlist": {
+   "D1.a": "S1NET",
+   "D2.a": "S2NET",
+   "D1.b": "OUT",
+   "D2.b": "OUT",
+   "Port_A.p": "S1NET",
+   "Port_C.p": "RETURN",
+   "Port_B.p": "S2NET",
+   "Port_OP.p": "OUT",
+   "Port_ON.p": "RETURN"
+  }
+ },
+ "ports": {
+  "A": "Port_A.p",
+  "C": "Port_C.p",
+  "B": "Port_B.p",
+  "OP": "Port_OP.p",
+  "ON": "Port_ON.p"
+ },
+ "port_layout": {
+  "A": {
+   "side": "left",
+   "order": 0
+  },
+  "C": {
+   "side": "left",
+   "order": 1
+  },
+  "B": {
+   "side": "left",
+   "order": 2
+  },
+  "OP": {
+   "side": "right",
+   "order": 3
+  },
+  "ON": {
+   "side": "right",
+   "order": 4
+  }
+ }
+}

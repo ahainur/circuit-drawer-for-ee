@@ -1,0 +1,272 @@
+{
+ "name": "single_phase_full_bridge",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.9
+    ]
+   },
+   "label": "$V_{dc}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     3.9
+    ],
+    "s": [
+     1.0,
+     2.9
+    ]
+   },
+   "label": "$S_{1}$"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     1.0
+    ],
+    "s": [
+     1.0,
+     0.0
+    ]
+   },
+   "label": "$S_{2}$"
+  },
+  {
+   "id": "S3",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     3.9
+    ],
+    "s": [
+     2.35,
+     2.9
+    ]
+   },
+   "label": "$S_{3}$"
+  },
+  {
+   "id": "S4",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.35,
+     1.0
+    ],
+    "s": [
+     2.35,
+     0.0
+    ]
+   },
+   "label": "$S_{4}$"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.0,
+     2.5
+    ],
+    "b": [
+     4.0,
+     1.2
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.9
+   ],
+   [
+    2.35,
+    3.9
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    2.35,
+    0.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.9
+   ],
+   [
+    1.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    2.35,
+    2.9
+   ],
+   [
+    2.35,
+    1.0
+   ]
+  ],
+  [
+   [
+    1.0,
+    2.5
+   ],
+   [
+    4.0,
+    2.5
+   ]
+  ],
+  [
+   [
+    2.35,
+    1.2
+   ],
+   [
+    4.0,
+    1.2
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   2.35,
+   2.5
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Vin.b": "DCP",
+  "S1.d": "DCP",
+  "S3.d": "DCP",
+  "Vin.a": "DCN",
+  "S2.s": "DCN",
+  "S4.s": "DCN",
+  "S1.s": "NA",
+  "S2.d": "NA",
+  "S3.s": "NB",
+  "S4.d": "NB",
+  "RL.a": "NA",
+  "RL.b": "NB"
+ },
+ "modes": [
+  {
+   "name": "Positive",
+   "on": [
+    "S1",
+    "S4"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "RL",
+     "S4"
+    ]
+   ],
+   "caption": "Positive",
+   "condition": "Ideal square-wave modulation, resistive load, no switching dead time"
+  },
+  {
+   "name": "Negative",
+   "on": [
+    "S2",
+    "S3"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S3",
+     "RL",
+     "S2"
+    ]
+   ],
+   "caption": "Negative",
+   "condition": "Ideal square-wave modulation, resistive load, no switching dead time"
+  }
+ ],
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/single_phase_full_bridge.csv",
+  "sha256": "7c02e9b07c2a8aeed68f054b291661536aed585c80bd48da7828caf5364fa49c",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "ms",
+  "relative_time": true,
+  "slice_style": "shade",
+  "arrange": "grid",
+  "window": [
+   0,
+   0.02
+  ],
+  "boundaries": [
+   0.0,
+   0.01,
+   0.02
+  ],
+  "intervals": [
+   "Positive",
+   "Negative"
+  ],
+  "channels": [
+   {
+    "column": "g1_1",
+    "label": "g1",
+    "unit": "1",
+    "color": "#c8102e"
+   },
+   {
+    "column": "v_out_V",
+    "label": "v_out",
+    "unit": "V",
+    "color": "#2457d6"
+   },
+   {
+    "column": "i_out_A",
+    "label": "i_out",
+    "unit": "A",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "74eb4c316c7ed63dbc967bd2e321a7b4662e71b6885dd51a362bea719831118d",
+  "notes": [
+   {
+    "kind": "text",
+    "channel": "g1_1",
+    "at": [
+     0.013999999999999999,
+     0.65
+    ],
+    "text": "Ideal analytical reference"
+   }
+  ]
+ }
+}

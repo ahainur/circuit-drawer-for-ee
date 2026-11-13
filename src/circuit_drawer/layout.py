@@ -38,6 +38,16 @@ PIN_NAMES: dict[str, tuple[str, ...]] = {
     "port": ("p",),             # terminal: an open circle where a wire ends
 }
 
+# Extra windings of a multi-winding transformer, all on one core: winding k
+# (3..MAX_WINDINGS) has pins wka / wkb, its polarity dot at wka.  A paper's
+# QAB / AQAB / MAB uses four; MAX_WINDINGS bounds the drawn and simulated set.
+MAX_WINDINGS = 6
+EXTRA_WINDINGS = tuple(f"w{k}" for k in range(3, MAX_WINDINGS + 1))
+# Pins a kind may add to its required PIN_NAMES.
+OPTIONAL_PINS: dict[str, tuple[str, ...]] = {
+    "transformer": ("sct",) + tuple(f"{w}{end}" for w in EXTRA_WINDINGS for end in "ab"),
+}
+
 TWO_TERMINAL = {"R", "L", "C", "D", "scr", "V", "vac", "I"}
 MOSFETS = {"nmos", "pmos"}
 SWITCHES = MOSFETS | {"igbt"}
@@ -49,6 +59,17 @@ def branch_pins(kind: str) -> tuple[str, str] | None:
     branch: a terminal has one pin, a transformer has windings."""
     pins = PIN_NAMES.get(kind, ())
     return pins if len(pins) == 2 else None
+
+
+def windings(el: "Element") -> list[tuple[str, str, str]]:
+    """(name, dotted-end pin, other pin) for every winding of a transformer:
+    p, then s (or its centre-tap halves s1 / s2), then any extra w3..w6 in
+    order.  These names are the mode references (T:w3), the electrical
+    branch suffixes and the SPICE current-probe windings."""
+    out = [("p", "p1", "p2")]
+    out += ([("s1", "s1", "sct"), ("s2", "sct", "s2")] if "sct" in el.pins else [("s", "s1", "s2")])
+    out += [(w, f"{w}a", f"{w}b") for w in EXTRA_WINDINGS if f"{w}a" in el.pins or f"{w}b" in el.pins]
+    return out
 
 
 def _pt(value: Any) -> Point:
@@ -143,7 +164,7 @@ class Layout:
     def add(self, id: str, kind: str, label: str | None = None,
             label_pos: str | None = None, **pins_and_opts: Any) -> Element:
         pins = {k: _pt(v) for k, v in pins_and_opts.items()
-                if k in PIN_NAMES.get(kind, ()) or k == "sct"}
+                if k in PIN_NAMES.get(kind, ()) or k in OPTIONAL_PINS.get(kind, ())}
         opts = {k: v for k, v in pins_and_opts.items() if k not in pins}
         el = Element(id, kind, pins, label, label_pos, opts)
         self.elements.append(el)

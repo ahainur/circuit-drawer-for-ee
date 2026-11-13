@@ -1,0 +1,28 @@
+{
+  "ranges": [
+    {
+      "paths": [
+        "simulation.components.L1.value"
+      ],
+      "min": "400u",
+      "max": "600u",
+      "count": 3
+    },
+    {
+      "paths": [
+        "simulation.components.S1.frequency"
+      ],
+      "min": "40k",
+      "max": "60k",
+      "count": 3
+    }
+  ],
+  "voltage": "v_out_V",
+  "target_v": 12,
+  "limits": {
+    "error_pct": 5,
+    "ripple_pct": 1,
+    "overshoot_pct": 75
+  },
+  "power_file": "power-data.json"
+}

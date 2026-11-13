@@ -70,6 +70,9 @@ LABEL_POS = Field("label_pos", "enum", "page side of the label; default above fo
 
 # opts keys of an element, by the kinds they apply to.
 ELEMENT_OPTS: tuple[Field, ...] = (
+    Field("symbol_style", "enum", "drawing preset only; ic uses a zigzag resistor and simplified MOSFETs "
+          "with an open PMOS gate circle; physical body diodes remain and are shown when conducting in a mode",
+          ("power", "ic"), default="power", kinds=frozenset({"R", "nmos", "pmos"})),
     Field("dash", "enum", "line pattern for an explicitly drawn parasitic R/L/C; drawing only",
           CALLOUT_DASHES, default="solid", kinds=frozenset({"R", "L", "C"})),
     Field("label_offset", "point", "user-dragged label offset [dx, dy] in layout units, "
@@ -137,7 +140,7 @@ def control_appearance_fields() -> dict[str, tuple[Field, ...]]:
     at import time. The same declarations feed the prompt and link validator.
     """
     from .control.model import BLOCK_TYPES, fill_names
-    from .regions import BORDERS, CALLOUT_DASHES, FILLS, INKS
+    from .regions import BORDERS, CALLOUT_DASHES, FILLS, INKS, REGION_BORDER_COLORS
     blocks = frozenset(BLOCK_TYPES)
     return {
         "blocks": (
@@ -159,7 +162,7 @@ def control_appearance_fields() -> dict[str, tuple[Field, ...]]:
                   kinds=frozenset({"region"}), owner="bad-region"),
             Field("border", "enum", "region outline", BORDERS, default="none; transparent: dashed",
                   kinds=frozenset({"region"})),
-            Field("border_color", "fill", "outline colour (none is forbidden)", tuple(v for v in FILLS if v != "none"),
+            Field("border_color", "fill", "palette edge or ink colour (none is forbidden)", REGION_BORDER_COLORS,
                   default="fill; transparent: gray", kinds=frozenset({"region"}), owner="bad-region"))}
 
 
@@ -191,6 +194,13 @@ def element_problems(layout) -> list[tuple[str, str]]:
     sides up directly and would fail on an unknown one.
     """
     out = []
+    from .modes import ModeError, validate_source
+    for mode in layout.modes:
+        if isinstance(mode, dict) and "source" in mode:
+            try:
+                validate_source(mode["source"])
+            except ModeError as exc:
+                out.append(("bad-mode-source", f"{mode.get('name', 'mode')}: {exc}"))
     for el in layout.elements:
         if el.label_pos is not None and (msg := LABEL_POS.problem(el.label_pos)):
             out.append(("bad-option", f"{el.id}: {msg}"))

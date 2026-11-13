@@ -1,0 +1,287 @@
+{
+  "name": "boost_state_plane",
+  "elements": [
+    {
+      "id": "Vin",
+      "kind": "V",
+      "pins": {
+        "a": [
+          0.0,
+          0.0
+        ],
+        "b": [
+          0.0,
+          3.0
+        ]
+      },
+      "label": "$V_\\mathrm{in}$",
+      "label_pos": "left"
+    },
+    {
+      "id": "L1",
+      "kind": "L",
+      "pins": {
+        "a": [
+          0.6,
+          3.0
+        ],
+        "b": [
+          1.9,
+          3.0
+        ]
+      },
+      "label": "$L_1$"
+    },
+    {
+      "id": "D1",
+      "kind": "D",
+      "pins": {
+        "a": [
+          2.6,
+          3.0
+        ],
+        "b": [
+          3.6,
+          3.0
+        ]
+      },
+      "label": "$D_1$"
+    },
+    {
+      "id": "S1",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          2.3,
+          2.1
+        ],
+        "s": [
+          2.3,
+          0.9
+        ]
+      },
+      "label": "$S_1$"
+    },
+    {
+      "id": "Co",
+      "kind": "C",
+      "pins": {
+        "a": [
+          4.2,
+          3.0
+        ],
+        "b": [
+          4.2,
+          0.0
+        ]
+      },
+      "label": "$C_o$",
+      "label_pos": "left"
+    },
+    {
+      "id": "RL",
+      "kind": "R",
+      "pins": {
+        "a": [
+          5.3,
+          3.0
+        ],
+        "b": [
+          5.3,
+          0.0
+        ]
+      },
+      "label": "$R_L$",
+      "label_pos": "left"
+    }
+  ],
+  "wires": [
+    [
+      [
+        0.0,
+        3.0
+      ],
+      [
+        0.6,
+        3.0
+      ]
+    ],
+    [
+      [
+        1.9,
+        3.0
+      ],
+      [
+        2.6,
+        3.0
+      ]
+    ],
+    [
+      [
+        3.6,
+        3.0
+      ],
+      [
+        5.3,
+        3.0
+      ]
+    ],
+    [
+      [
+        2.3,
+        3.0
+      ],
+      [
+        2.3,
+        2.1
+      ]
+    ],
+    [
+      [
+        2.3,
+        0.9
+      ],
+      [
+        2.3,
+        0.0
+      ]
+    ],
+    [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        5.3,
+        0.0
+      ]
+    ]
+  ],
+  "hops": [],
+  "annotations": [
+    {
+      "at": [
+        5.95,
+        1.92
+      ],
+      "text": "$+$"
+    },
+    {
+      "at": [
+        5.95,
+        1.5
+      ],
+      "text": "$v_o$"
+    },
+    {
+      "at": [
+        5.95,
+        1.08
+      ],
+      "text": "$-$"
+    }
+  ],
+  "netlist": {
+    "Vin.b": "IN",
+    "L1.a": "IN",
+    "L1.b": "SW",
+    "D1.a": "SW",
+    "S1.d": "SW",
+    "D1.b": "OUT",
+    "Co.a": "OUT",
+    "RL.a": "OUT",
+    "Vin.a": "GND",
+    "S1.s": "GND",
+    "Co.b": "GND",
+    "RL.b": "GND"
+  },
+  "modes": [
+    {
+      "name": "Inductor charging",
+      "condition": "CCM, positive inductor current, ideal switching",
+      "caption": "$S_1$ on, $D_1$ off",
+      "on": [
+        "S1"
+      ],
+      "loops": [
+        [
+          "Vin",
+          "L1",
+          "S1"
+        ],
+        [
+          "RL",
+          "Co"
+        ]
+      ]
+    },
+    {
+      "name": "Energy transfer",
+      "condition": "CCM, positive inductor current, ideal switching",
+      "caption": "$S_1$ off, $D_1$ conducting",
+      "on": [
+        "D1"
+      ],
+      "loops": [
+        [
+          "Vin",
+          "L1",
+          "D1",
+          "Co|RL"
+        ]
+      ]
+    }
+  ],
+  "waveform": {
+    "version": 1,
+    "source": "waveforms-data/boost_steady_80e16748c524bfbb.csv",
+    "sha256": "80e16748c524bfbbd2b1cfa8f61fd0806fc6eb649f5ae5ed61e3658cde984c24",
+    "time_column": "time_s",
+    "time_unit": "s",
+    "display_unit": "us",
+    "relative_time": true,
+    "slice_style": "shade",
+    "arrange": "stack",
+    "window": [
+      0.07996009999784512,
+      0.07998009999784012
+    ],
+    "boundaries": [
+      0.07996009999784512,
+      0.07997009999784327,
+      0.07998009999784012
+    ],
+    "intervals": [
+      "Inductor charging",
+      "Energy transfer"
+    ],
+    "channels": [
+      {
+        "column": "v_out_V",
+        "label": "v_out",
+        "unit": "V",
+        "color": "#c8102e"
+      },
+      {
+        "column": "i_L_A",
+        "label": "i_L",
+        "unit": "A",
+        "color": "#2457d6"
+      },
+      {
+        "column": "pwm_1",
+        "label": "pwm",
+        "unit": "1",
+        "color": "#17845a"
+      }
+    ],
+    "circuit_signature": "a5379cbafb90b56cc518438baac31de2d5285d4e2c7153aa36e34ea49f35f9aa",
+    "period_column": "pwm_1",
+    "xy": {
+      "x": "v_out_V",
+      "y": "i_L_A",
+      "arrows": true,
+      "color_by_mode": true
+    }
+  }
+}

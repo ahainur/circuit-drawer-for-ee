@@ -218,7 +218,7 @@ def expand(proposal, current, profile, directory=None):
             structure.setdefault("loop", {}).setdefault("tf", {})[block["id"]] = deepcopy(block["tf"])
     # Explicit removals remove their old data references, never arbitrary unknown ids.
     for mapping in (structure.get("loop", {}).get("tf", {}), base.get("code", {}).get("blocks", {}),
-                    base.get("functions", {})):
+                    base.get("functions", {}), base.get("digital", {}).get("adc", {})):
         for bid in removed:
             mapping.pop(bid, None)
     return structure, base
@@ -538,6 +538,7 @@ class ControlWorkflow:
         if self.current is None:
             return "创建控制框图，只输出结构 JSON。需求：\n" + description
         return ("只修改要求涉及的结构，保留其他方块、文字、连接、分区及传递函数参数。"
+                "保留 digital 数字控制设置与 code.fs，保持 ADC 输入名称对应，数字设置可在界面单独修改。"
                 "未要求改配色时保留 fill/border/color/dash；重新布线也要保留连线颜色和线型。省略的字段保留；"
                 "links/regions/inputs/outputs 若提供则完整替换。不要输出坐标或 code。\n要求：" + description +
                 "\n当前结构：\n" + json.dumps(to_structure(self.current, self.profile), ensure_ascii=False))

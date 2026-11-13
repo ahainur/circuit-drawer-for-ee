@@ -1,5 +1,5 @@
 # CSV snapshot hashes in the coordinate table require byte-identical checkouts.
-**/waveforms-data/*.csv -text
+**/waveforms-data/*.csv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 # Native PMSM evidence retains the bytes recorded by its SHA256 on every OS.
 docs/verification/pmsm-native/*.plecs -text
 docs/verification/pmsm-native/*.m -text

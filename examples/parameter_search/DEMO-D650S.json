@@ -1,0 +1,157 @@
+{
+  "format": "powerdesignkit.device/1",
+  "kind": "diode",
+  "technology": "sic",
+  "part": "DEMO-D650S",
+  "manufacturer": "Synthetic Semi",
+  "source": {
+    "file": "（虚构示例，没有对应手册）"
+  },
+  "notes": [
+    "虚构器件，数值只用于演示损耗计算，取典型量级但不对应任何真实型号。"
+  ],
+  "params": {
+    "vrrm": [
+      {
+        "value": 650,
+        "stat": "max",
+        "method": "manual"
+      }
+    ],
+    "if_avg": [
+      {
+        "value": 10,
+        "stat": "max",
+        "method": "manual"
+      }
+    ],
+    "vf": [
+      {
+        "value": 1.5,
+        "stat": "typ",
+        "method": "manual",
+        "cond": {
+          "tj": 25,
+          "if": 10
+        }
+      },
+      {
+        "value": 1.9,
+        "stat": "typ",
+        "method": "manual",
+        "cond": {
+          "tj": 175,
+          "if": 10
+        }
+      }
+    ],
+    "qc": [
+      {
+        "value": 1.5e-08,
+        "stat": "typ",
+        "method": "manual",
+        "cond": {
+          "vr": 400
+        }
+      }
+    ],
+    "rth_jc": [
+      {
+        "value": 1.6,
+        "stat": "max",
+        "method": "manual"
+      }
+    ],
+    "tj_max": [
+      {
+        "value": 175,
+        "stat": "max",
+        "method": "manual"
+      }
+    ]
+  },
+  "curves": {
+    "vf_vs_if": [
+      {
+        "method": "manual",
+        "cond": {
+          "tj": 125
+        },
+        "points": [
+          [
+            0.5,
+            0.95
+          ],
+          [
+            2,
+            1.08
+          ],
+          [
+            5,
+            1.32
+          ],
+          [
+            10,
+            1.72
+          ],
+          [
+            20,
+            2.55
+          ]
+        ]
+      }
+    ],
+    "zth_jc_vs_tp": [
+      {
+        "points": [
+          [
+            1e-05,
+            0.107
+          ],
+          [
+            3e-05,
+            0.197
+          ],
+          [
+            0.0001,
+            0.336
+          ],
+          [
+            0.0003,
+            0.539
+          ],
+          [
+            0.001,
+            0.782
+          ],
+          [
+            0.003,
+            1.1
+          ],
+          [
+            0.01,
+            1.35
+          ],
+          [
+            0.03,
+            1.51
+          ],
+          [
+            0.1,
+            1.6
+          ],
+          [
+            0.3,
+            1.6
+          ],
+          [
+            1.0,
+            1.6
+          ]
+        ],
+        "method": "manual",
+        "note": "示例数据：单脉冲曲线，按虚构的 4 阶 Foster 网络生成"
+      }
+    ]
+  }
+}

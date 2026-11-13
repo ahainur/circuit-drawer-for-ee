@@ -32,6 +32,7 @@ from ..modes import ModeError
 from ..modules import ModuleError
 from ..profiles import PROFILES, get_profile
 from ..validate import check
+from .parameter_search import ParameterSearchJob
 
 STATIC = Path(__file__).with_name("static")
 # Repeated full routing is expensive; bound the optional resize diagnostic.
@@ -125,10 +126,11 @@ def module_devices(layout: Layout, profile: str) -> dict | None:
     return {"devices": devices, "pins": pins}
 
 
-def analyse(layout: Layout, profile: str) -> dict:
+def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
     """Validation report plus every footprint, in layout units, so the page
     draws exactly the boxes the validator checks."""
     prof = get_profile(profile)
+    source_layout = layout
     electrical = layout.extra.get("electrical")
     from ..validate import check_with_assembly
     rep, assembly = check_with_assembly(layout, prof)
@@ -138,7 +140,8 @@ def analyse(layout: Layout, profile: str) -> dict:
                      and check(layout, get_profile("double")).ok)
     module_data = None
     if "modules" in layout.extra:
-        from ..modules import assemble
+        from ..modules import assemble, capacity
+        from ..completeness import INSTANCE_STYLES
         try:
             # the check's own assembly is drawn at the report's scale; build one
             # only when the check could not (it then reports why)
@@ -146,15 +149,9 @@ def analyse(layout: Layout, profile: str) -> dict:
             # The editor edits the source: tell it which drawn wires are the
             # source's own (view index -> source index), which draw a link,
             # where every instance port is, and which parts are placed for it.
-            unused = list(range(len(layout.wires)))
-            root_wires = {}
-            for j, w in enumerate(assembly.view.wires):
-                k = next((k for k in unused if [list(p) for p in layout.wires[k]] == [list(p) for p in w]), None)
-                if k is not None:
-                    unused.remove(k); root_wires[j] = k
             root_decorations = {}
             source_table, view_table = layout.to_dict(), assembly.view.to_dict()
-            for section in ("regions", "blocks", "callouts", "annotations"):
+            for section in ("regions", "blocks", "callouts", "annotations", "glyphs"):
                 source = source_table.get(section, [])
                 unused = list(range(len(source)))
                 mapping = {}
@@ -170,12 +167,21 @@ def analyse(layout: Layout, profile: str) -> dict:
             module_data = {"root_decorations": root_decorations, "view": assembly.view.to_dict(), "instances": assembly.instances,
                            "hidden": assembly.hidden, "collapsed": assembly.collapsed,
                            "frames": assembly.frames, "linked": "links" in layout.extra["modules"],
-                           "partial": assembly.partial,
+                           "partial": assembly.partial, "capacity": capacity(source_layout, prof),
+                           "instance_styles": list(INSTANCE_STYLES),
+                           "ellipsis_markers": assembly.ellipsis_markers,
                            "element_count": sum(e.kind != "port" for e in assembly.full.elements),
                            "link_wires": assembly.link_wires, "ports": assembly.ports,
-                           "root_wires": root_wires, "root_wire_count": len(layout.wires),
+                           "contact_pins": assembly.contact_pins,
+                           "root_wires": assembly.root_wires, "root_wire_count": len(layout.wires),
+                           "root_hops": layout.hops,
                            "unrouted": assembly.unrouted, "origins": assembly.origins,
                            "instance_wires": assembly.instance_wires,
+                           "instance_decorations": assembly.instance_decorations,
+                           "port_owners": assembly.port_owners,
+                           "titles": assembly.titles,
+                           "part_offsets": {p["id"]: p.get("offset", [0, 0])
+                                            for p in layout.extra["modules"].get("parts", [])},
                            "auto_parts": [p.get("id") for p in layout.extra["modules"].get("parts", [])
                                           if isinstance(p, dict)]}
             layout = assembly.view
@@ -189,6 +195,7 @@ def analyse(layout: Layout, profile: str) -> dict:
         except (KeyError, ValueError):
             continue
         g = {"bodies": [_box(b, s) for b in fp.bodies],
+             "leads": [[_pt(a, s), _pt(b, s)] for a, b in fp.leads],
              "labels": [_box(b, s) for b in fp.labels],
              "label_offset": fp.extra.get("label_offset", [0, 0]),
              "side": fp.label_side}
@@ -197,6 +204,8 @@ def analyse(layout: Layout, profile: str) -> dict:
         if "current_arrow" in fp.extra:
             g["current_arrow"] = {k: [_pt(p, s) for p in pts]
                                   for k, pts in fp.extra["current_arrow"].items()}
+        if "resistor_path" in fp.extra:
+            g["resistor_path"] = [_pt(p, s) for p in fp.extra["resistor_path"]]
         if fp.centre:
             g["centre"] = _pt(fp.centre, s)
         if el.kind in SWITCHES and "u" in fp.extra:
@@ -225,6 +234,9 @@ def analyse(layout: Layout, profile: str) -> dict:
         if el.kind == "transformer":
             ex = fp.extra
             g["coils"] = [[_pt(a, s), _pt(b, s)] for a, b in ex["coils"]]
+            g["coil_sides"] = ex["coil_sides"]     # "p": turns face right of the primary axis
+            horizontal = el.pins["p1"][1] == el.pins["p2"][1]
+            g["winding_gap"] = ex["winding_gap"] / (s.x if horizontal else s.y)
             g["dots"] = [_pt(d, s) for d in ex.get("dots", [])]
             g["core_lines"] = [[_pt(a, s), _pt(b, s)] for a, b in ex["core_lines"]]
         if el.kind == "pmsm" and "motor_marks" in fp.extra:
@@ -238,7 +250,42 @@ def analyse(layout: Layout, profile: str) -> dict:
         except KeyError:
             return None  # check() reports the bad side; the page falls back to at
     ann = [ann_box(a) for a in layout.annotations]
+    control_view = None
+    from ..control_view import DISPLAYS, prepare as prepare_control_view, preview as control_preview
+    from ..validate import Issue
+    try:
+        view = prepare_control_view(source_layout, prof, s, base_dir)
+        if view:
+            control_view = {"block": view.block.id, "display": view.display,
+                            "reference": source_layout.extra["closed_loop"]["control"]}
+            if view.display == "expanded":
+                try:
+                    control_view["image"] = control_preview(view, s)
+                except CompileError as exc:
+                    control_view["error"] = str(exc)
+                    rep.issues.append(Issue("control-view-preview", "控制方框展开预览失败：" + str(exc), "warning"))
+    except ValueError as exc:
+        if not any(i.code == "bad-control-view" for i in rep.issues):
+            rep.issues.append(Issue("bad-control-view", str(exc)))
+        if prof.name == "ieee-single":
+            wide = get_profile("double")
+            wide_report = check(source_layout, wide)
+            try:
+                prepare_control_view(source_layout, wide, wide_report.scale, base_dir)
+            except ValueError:
+                passes_double = False
+            else:
+                passes_double = wide_report.ok
     out = rep.to_dict()
+    from ..layout import EXTRA_WINDINGS
+    out["transformer_windings"] = EXTRA_WINDINGS
+    from ..schema import OPTS
+    style_field = OPTS["symbol_style"]
+    out["symbol_styles"] = {"values": style_field.values, "kinds": sorted(style_field.kinds),
+                            "default": style_field.default}
+    out["control_view_options"] = {"displays": DISPLAYS}
+    if control_view:
+        out["control_view"] = control_view
     out["passes_double"] = passes_double
     if module_data is not None:
         out["module_info"] = module_data
@@ -269,7 +316,7 @@ def analyse(layout: Layout, profile: str) -> dict:
                                                        "scale_range": SCALE_RANGE})
     if layout.modes and rep.nets:
         from ..modes import check_modes
-        out["modes"] = check_modes(layout, rep)
+        out["modes"] = check_modes(source_layout, rep, prof, assembly)
     from ..electrical import display, reconcile
     if electrical is not None and not any(i.code == "bad-electrical" for i in rep.issues):
         out["electrical"] = electrical
@@ -291,10 +338,25 @@ def analyse(layout: Layout, profile: str) -> dict:
     out["probe_kinds"] = {"current": CURRENT_PROBE_KINDS, "drive": GATED}
     out["motor_quantities"] = QUANTITIES
     out["probe_limit"] = MAX_PROBES
+    from ..auto_modes import current_refs, source_status
+    out["mode_currents"] = current_refs(assembly.full if assembly else layout)
+    out["auto_mode_status"] = source_status(source_layout, profile, base_dir)
     out.update(geometry=geo, annotations=ann, nets=rep.nets,
                junctions=[list(j) for j in rep.junctions],
                width_cm=round(prof.width_cm, 2))
     return out
+
+
+def _icon_shapes(kind, box):
+    """A pictorial icon's primitives in layout units for the canvas sketch,
+    the same ones the TeX emitter draws (glyphs.icon_shapes); None for no
+    icon or a converter / device mark, which the page sketches itself."""
+    from ..glyphs import ICONS, icon_shapes
+    if kind not in ICONS:
+        return None
+    return [{"kind": p[0], "points": p[1]} if p[0] == "line" else
+            {"kind": "rect", "from": p[1], "to": p[2]} if p[0] == "rect" else
+            {"kind": p[0], "at": p[1], "r": p[2]} for p in icon_shapes(kind, box)]
 
 
 def _region_geometry(layout: Layout, s, prof) -> dict:
@@ -340,7 +402,7 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
     raw_blocks = layout.extra.get("blocks")
     for i, d in enumerate(raw_blocks if isinstance(raw_blocks, list) else []):
         try:
-            b = block_defs.parse_block(d, i)
+            b = block_defs.display_block(block_defs.parse_block(d, i), layout)
         except RegionError:
             block_info.append(None)
             continue
@@ -349,19 +411,29 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
         block_info.append({"rect": [b.x0, b.y0, b.x1, b.y1],
                            "fill": "#%02x%02x%02x" % fill if fill else None,
                            "edge": "#%02x%02x%02x" % block_ink(b.color), "border": b.border,
-                           "text": _box(text, s) if text else None})
-    from ..regions import (BORDERS, CALLOUT_LABEL_POS, FILLS, INKS, PALETTE, REGION_LABEL_POS,
-                           CALLOUT_DASHES, CALLOUT_HEADS, CALLOUT_STYLES, CALLOUT_BORDER_WIDTH,
+                           "text": _box(text, s) if text else None,
+                           "icon": _icon_shapes(b.icon, (b.x0, b.y0, b.x1, b.y1))})
+    from ..regions import (BORDERS, CALLOUT_LABEL_POS, FILLS, INKS, PALETTE, REGION_LABEL_POS, REGION_BORDER_COLORS, canon,
+                           CALLOUT_DASHES, CALLOUT_HEADS, CALLOUT_STYLES, CALLOUT_CORNERS, CALLOUT_BORDER_WIDTH,
                            MAX_BEND, MAX_WAVE_CYCLES, STACK_MAX, WAVE_AMPLITUDE,
                            WAVE_CYCLES, ink_rgb, valid_ink)
-    return {"regions": regions, "callouts": callouts, "blocks": block_info,
-            "block_options": {"fills": list(block_defs.FILLS), "borders": list(block_defs.BORDERS)},
+    from ..glyphs import KINDS as GLYPH_KINDS, glyphs as safe_glyphs
+    glyph_info = [_icon_shapes(g["kind"], (min(g["from"][0], g["to"][0]), min(g["from"][1], g["to"][1]),
+                                           max(g["from"][0], g["to"][0]), max(g["from"][1], g["to"][1])))
+                  for g in safe_glyphs(layout)]
+    return {"regions": regions, "callouts": callouts, "blocks": block_info, "glyph_icons": glyph_info,
+            "glyph_options": list(GLYPH_KINDS),
+            "block_options": {"fills": list(block_defs.FILLS), "borders": list(block_defs.BORDERS),
+                              "icons": list(block_defs.ICONS)},
             "region_options": {"fills": list(FILLS), "borders": list(BORDERS),
+                               "border_colors": list(REGION_BORDER_COLORS),
+                               "border_palette": {k: css_rgb(canon(k), edge=True) for k in REGION_BORDER_COLORS},
                                "palette": {k: css_rgb(k) for k in PALETTE},
                                "label_pos": list(REGION_LABEL_POS),
                                "callout_label_pos": list(CALLOUT_LABEL_POS),
                                "callout_dashes": list(CALLOUT_DASHES), "callout_heads": list(CALLOUT_HEADS),
                                "callout_styles": list(CALLOUT_STYLES),
+                               "callout_corners": list(CALLOUT_CORNERS),
                                "callout_border_width": list(CALLOUT_BORDER_WIDTH),
                                "stack_max": STACK_MAX,
                                "max_bend": MAX_BEND,
@@ -378,17 +450,19 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
 
 
 def preview_png(layout: Layout, profile: str, grid: bool, mode: int | None = None,
-                style: dict | None = None, mono: bool = False) -> str:
+                style: dict | None = None, mono: bool = False, *, base_dir=None) -> str:
     prof = get_profile(profile)
     rep = check(layout, prof)
     paint = None
     if mode is not None:
-        from ..modes import Paint, WireGraph, modes_of, solve
+        from ..modes import Paint, modes_of
+        from ..mode_scene import ModeScene
         st = _style(style)
-        graph = WireGraph(layout)
-        lit = solve(layout, modes_of(layout)[mode], rep, graph, prof, st.arrows)
-        paint = Paint(layout, lit, graph, prof, st)
-    tex = emit(layout, prof, rep, grid=grid, paint=paint, mono=mono)
+        scene = ModeScene(layout, prof, rep)
+        lit = scene.draw(modes_of(layout)[mode], st.arrows)
+        layout, rep = scene.view, scene.view_report
+        paint = Paint(layout, lit, scene.view_graph, prof, st)
+    tex = emit(layout, prof, rep, grid=grid, paint=paint, mono=mono, base_dir=base_dir)
     with tempfile.TemporaryDirectory() as tmp:
         files = build(tex, Path(tmp), "preview", ("png",), png_dpi=300)
         return base64.b64encode(files["png"].read_bytes()).decode()
@@ -412,6 +486,8 @@ def _round(a) -> dict:
 
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+MAX_REFERENCE_IMAGES = 3
+MAX_REFERENCE_DATA_LENGTH = 7_000_000
 
 
 QUICK_ROUTE_BUDGET = 2500   # grid states per link while trying candidate box sizes
@@ -453,10 +529,10 @@ def module_resize_limit(layout: Layout, profile: str, iid: str, step: float) -> 
         with route_budget(QUICK_ROUTE_BUDGET):
             trial = candidate.to_dict()
             try:
-                ports = assemble(candidate, rep.scale, prof).ports
+                ports = assemble(candidate, rep.scale, prof).contact_pins
             except ModuleError:
                 continue
-            _move_port_wires(trial, assembly.ports, ports)
+            _move_port_wires(trial, assembly.contact_pins, ports)
             if not new_edit_errors(rep, check(Layout.from_dict(trial), prof)):
                 return {"size": size, "minimum": True}
     return {"size": {"w": w, "h": h}, "minimum": False}
@@ -464,13 +540,26 @@ def module_resize_limit(layout: Layout, profile: str, iid: str, step: float) -> 
 
 def _images(items) -> list[tuple[str, str]]:
     """Reference figures from the page as data URLs -> (media type, base64)."""
+    if items is None:
+        return []
+    if not isinstance(items, list):
+        raise ValueError("参考图需要使用图片列表。")
+    if len(items) > MAX_REFERENCE_IMAGES:
+        raise ValueError("最多添加 3 张参考图，请先移除一张。")
     out = []
-    for url in items or []:
+    for url in items:
         head, _, data = str(url).partition(",")
         mt = head.removeprefix("data:").removesuffix(";base64")
-        if mt in IMAGE_TYPES and data and len(data) < 7_000_000:
-            out.append((mt, data))
-    return out[:3]
+        if mt not in IMAGE_TYPES or head != f"data:{mt};base64" or not data:
+            raise ValueError("参考图格式无效，请重新添加图片。")
+        if len(data) >= MAX_REFERENCE_DATA_LENGTH:
+            raise ValueError("参考图超过大小限制，请缩小图片后重试。")
+        try:
+            base64.b64decode(data, validate=True)
+        except ValueError as exc:
+            raise ValueError("参考图格式无效，请重新添加图片。") from exc
+        out.append((mt, data))
+    return out
 
 
 class _Rejected(ValueError):
@@ -487,6 +576,10 @@ def _checked(lay: Layout, profile: str, message: str):
 # POST path -> handler method.  PLAIN routes read their own fields and answer
 # for themselves; LAYOUT routes get the posted table and return the answer.
 PLAIN_ROUTES = {
+    "/api/dq-stability-info": "_dq_stability_info",
+    "/api/dq-stability": "_dq_stability",
+    "/api/impedance-ratio-info": "_impedance_ratio_info",
+    "/api/impedance-ratio": "_impedance_ratio",
     "/api/ai-settings": "_set_ai_settings_route",
     "/api/callout-preview": "_callout_preview",
     "/api/directories": "_directories",
@@ -495,10 +588,14 @@ PLAIN_ROUTES = {
     "/api/clarify": "_clarify",
     "/api/match": "_match",
     "/api/from-template": "_from_template",
+    "/api/templates": "_templates",
     "/api/cancel": "_cancel",
 }
 PLAIN_GET_ROUTES = {"/api/ai-settings": "_get_ai_settings"}
 LAYOUT_ROUTES = {
+    "/api/wire-merge": "_wire_merge",
+    "/api/scale-drawing": "_scale_drawing",
+    "/api/symbol-style": "_symbol_style",
     "/api/selection-plan": "_selection_plan",
     "/api/module-library": "_module_library",
     "/api/module-library-save": "_module_library_save",
@@ -511,7 +608,9 @@ LAYOUT_ROUTES = {
     "/api/module-empty": "_module_empty",
     "/api/module-definition": "_module_definition",
     "/api/module-contact": "_module_contact",
+    "/api/module-geometry": "_module_geometry",
     "/api/module-dissolve": "_module_dissolve",
+    "/api/module-part-prepare": "_module_part_prepare",
     "/api/module-add": "_module_add",
     "/api/module-connections": "_module_connections",
     "/api/module-parameters": "_module_parameters",
@@ -521,12 +620,16 @@ LAYOUT_ROUTES = {
     "/api/preview": "_preview",
     "/api/mode": "_mode",
     "/api/mode-edit": "_mode_edit",
+    "/api/auto-modes": "_auto_modes",
+    "/api/auto-modes-apply": "_auto_modes_apply",
     "/api/export": "_export",
     "/api/export-modes": "_export_modes",
     "/api/save-template": "_save_template",
     "/api/module-upgrade": "_module_upgrade",
     "/api/waveform-import": "_waveform_import",
     "/api/waveform-view": "_waveform_view",
+    "/api/waveform-ai": "_waveform_ai",
+    "/api/waveform-ai-preview": "_waveform_ai_preview",
     "/api/waveform-preview": "_waveform_preview",
     "/api/waveform-period": "_waveform_period",
     "/api/waveform-save": "_waveform_save",
@@ -535,8 +638,15 @@ LAYOUT_ROUTES = {
     "/api/emi-info": "_emi_info",
     "/api/emi-prepare": "_emi_prepare",
     "/api/emi-run": "_emi_run",
+    "/api/impedance-info": "_impedance_info",
+    "/api/impedance-run": "_impedance_run",
+    "/api/dq-impedance-info": "_dq_impedance_info",
+    "/api/dq-impedance-run": "_dq_impedance_run",
     "/api/spice-preset": "_spice_preset",
     "/api/spice-recommend": "_spice_recommend",
+    "/api/parameter-search-info": "_parameter_search_info",
+    "/api/parameter-search": "_parameter_search",
+    "/api/parameter-search-apply": "_parameter_search_apply",
     "/api/spice-save": "_spice_save",
     "/api/spice-export": "_spice_export",
     "/api/closed-loop-info": "_closed_loop_info",
@@ -552,7 +662,7 @@ class Job:
     def __init__(self, description: str, profile: str, rounds: int, chat,
                  provider: str | None, model: str | None, kind: str = "draw",
                  structure: str | None = None, images: list | None = None,
-                 current: dict | None = None, workflow=None):
+                 current: dict | None = None, workflow=None, review=False, base_dir=None):
         from ..ai import provider_info
         self.id = uuid.uuid4().hex[:12]
         self.started = time.monotonic()
@@ -567,6 +677,7 @@ class Job:
         self.kind, self.structure, self.images = kind, structure, images or None
         self.base = current
         self.workflow = workflow
+        self.review, self.base_dir, self.activity = review, base_dir, ""
         self.partial = ""               # reply text of the request in flight
         self.stats: list[dict] = []     # timing and tokens, one per request
         self._chat = None
@@ -585,6 +696,8 @@ class Job:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _log(self, msg: str) -> None:
+        if self.review and msg.startswith("出图后自查："):
+            self.activity = msg
         print(f"[生成 {self.id}] {msg}", flush=True)
 
     def _text(self, piece: str) -> None:
@@ -631,7 +744,8 @@ class Job:
                            provider=provider, model=model, log=self._log,
                            on_attempt=self._seen, should_stop=self.cancel.is_set,
                            structure=self.structure, images=self.images,
-                           current=self.base, on_text=self._text, workflow=self.workflow)
+                           current=self.base, on_text=self._text, workflow=self.workflow,
+                           review=self.review, base_dir=self.base_dir)
             best = gen.best
             res = {"ok": gen.ok, "layout": best.to_dict() if best else None,
                    "rounds": [_round(a) for a in gen.attempts],
@@ -666,6 +780,7 @@ class Job:
                 "round": min(self.current, self.rounds_max), "rounds_max": self.rounds_max,
                 "attempts": self.attempts, "result": self.result, "error": self.error,
                 "provider": self.info, "partial": self.partial if self.state == "running" else "",
+                "activity": self.activity if self.state == "running" else "",
                 "stats": list(getattr(self._chat, "stats", None) or [])}
 
 
@@ -699,6 +814,34 @@ class RecommendationJob(Job):
             self.finished = time.monotonic()
 
 
+class AutoModeJob:
+    """A local solver job using the editor's existing polling/cancel routes."""
+    def __init__(self, layout, profile, options, base_dir, out_dir):
+        self.id = uuid.uuid4().hex[:12]
+        self.kind = "auto-modes"
+        self.cancel = threading.Event()
+        self.state, self.result, self.error = "running", None, None
+        self.started = time.monotonic()
+        self.finished = None
+        threading.Thread(target=self._run, args=(layout, profile, options, base_dir, out_dir), daemon=True).start()
+
+    def _run(self, layout, profile, options, base_dir, out_dir):
+        from ..auto_modes import run
+        try:
+            result = run(layout, out_dir=out_dir, options=options, profile=profile, base_dir=base_dir)
+            if self.cancel.is_set():
+                self.state = "cancelled"
+            else:
+                self.result, self.state = result, "done"
+        except Exception as exc:
+            self.error, self.state = str(exc), "error"
+        self.finished = time.monotonic()
+
+    def status(self):
+        return {"id": self.id, "state": self.state, "result": self.result, "error": self.error,
+                "elapsed_s": round((self.finished or time.monotonic()) - self.started)}
+
+
 class Editor:
     def __init__(self, path: Path, profile: str, out_dir: Path, chat_factory=None,
                  provider: str | None = None, model: str | None = None, settings=None):
@@ -706,7 +849,8 @@ class Editor:
         self.chat_factory = chat_factory   # tests inject a scripted model
         self.provider, self.model = provider, model
         self.web_settings = WebSettings(self, settings)
-        self.jobs: dict[str, Job] = {}
+        self.jobs: dict[str, Job | AutoModeJob | ParameterSearchJob] = {}
+        self.parameter_search_lock = threading.Lock()
         from ..waveforms import WaveStore
         self.wave_store = WaveStore(path)
 
@@ -762,11 +906,12 @@ class Editor:
             if modes:
                 from ..pipeline import render_modes
                 results = render_modes(lay, profile, stage, stem, formats,
-                                       _style(req.get("style")), node_labels=bool(req.get("node_labels")))
+                                       _style(req.get("style")), node_labels=bool(req.get("node_labels")),
+                                       base_dir=self.path.parent)
                 sources = [p for r in results for f, p in r.files.items() if f in formats]
                 notes = [n for r in results for n in r.notes]
             else:
-                sources = list(build(emit(lay, prof, rep, mono=bool(req.get("mono")), node_labels=bool(req.get("node_labels"))),
+                sources = list(build(emit(lay, prof, rep, mono=bool(req.get("mono")), node_labels=bool(req.get("node_labels")), base_dir=self.path.parent),
                                      stage, stem, formats).values())
             files = []
             for src in sources:
@@ -808,7 +953,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "index.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/i18n.js", "/i18n-messages.js", "/emi.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/theme-eda.css", "/simulation-recommendations.js", "/ai-settings.js", "/layers.js", "/guides.js"):
+                elif self.path in ("/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js")
                                else "text/css; charset=utf-8")
@@ -873,6 +1018,32 @@ class Editor:
                     self._json({"error": str(exc) if own else f"{type(exc).__name__}: {exc}"}, 400)
 
             # ---- routes without a layout: each answers for itself ----------
+            def _dq_stability_info(self, req: dict) -> None:
+                from ..dq_stability import NOTE, example
+                self._json({"note": NOTE, "examples": [example(), example(6000)],
+                            "description": "输入同一工作点、同一固定 dq 坐标下的 A、B、C、D 实矩阵。每个端口最多八个内部状态，系数可引用 params。",
+                            "labels": ["100 V dq / 1500 W 负载", "100 V dq / 6000 W 负载"]})
+
+            def _dq_stability(self, req: dict) -> None:
+                from ..dq_stability import analyse
+                try:
+                    self._json(analyse(req.get("model")))
+                except (ValueError, ArithmeticError) as exc:
+                    self._json({"error": str(exc)}, 400)
+
+            def _impedance_ratio_info(self, req: dict) -> None:
+                from ..impedance_ratio import NOTE, example
+                self._json({"note": NOTE, "examples": [example(), example(200)],
+                            "description": "输入同一工作点的源阻抗 Zs 与负载导纳 Yl。num、den 按 s 的降幂填写，系数可引用 params。",
+                            "labels": ["48 V 母线 / 60 W 负载", "48 V 母线 / 200 W 负载"]})
+
+            def _impedance_ratio(self, req: dict) -> None:
+                from ..impedance_ratio import analyse
+                try:
+                    self._json(analyse(req.get("model")))
+                except (ValueError, ZeroDivisionError, OverflowError) as exc:
+                    self._json({"error": str(exc)}, 400)
+
             def _callout_preview(self, req: dict) -> None:
                 try:
                     self._json(callout_preview(req))
@@ -903,6 +1074,11 @@ class Editor:
                 self._json({"template": name, "title": t.TITLE if t else None,
                             "profile": getattr(t, "DEFAULT_PROFILE", None)})
 
+            def _templates(self, req: dict) -> None:
+                self._json({"templates": [{"name": name, "title": tpl.TITLE,
+                    "profile": getattr(tpl, "DEFAULT_PROFILE", "ieee-single")}
+                    for name, tpl in sorted(templates.available().items())]})
+
             def _from_template(self, req: dict) -> None:
                 try:
                     from ..pipeline import from_template
@@ -918,9 +1094,18 @@ class Editor:
                 self._json({"cancelled": bool(job)})
 
             # ---- routes on the posted layout: return the JSON answer -------
+            def _wire_merge(self, lay, prof, req):
+                from .wire_merge import merge_overlaps
+                candidate = merge_overlaps(lay, prof)
+                return {"wires": candidate.wires, "report": analyse(candidate, prof, editor.path.parent)}
+
             def _selection_plan(self, lay, prof, req):
-                from .selection import selection_plan
-                return selection_plan(lay, req["ids"], req.get("wires", []))
+                from .selection import source_selection_plan
+                return source_selection_plan(lay, req["ids"], req.get("wires", []), req.get("instances", []), prof)
+
+            def _scale_drawing(self, lay, prof, req):
+                from .scaling import prepare
+                return prepare(lay, req.get("selection"), req["factor"], prof, text=req.get("text", False))
 
             def _module_selection(self, lay, prof, req):
                 from ..module_authoring import inspect_selection
@@ -942,6 +1127,10 @@ class Editor:
             def _module_dissolve(self, lay, prof, req):
                 from ..module_authoring import dissolve
                 return {"layout": dissolve(lay, req["id"], prof).to_dict()}
+
+            def _module_part_prepare(self, lay, prof, req):
+                from ..module_authoring import prepare_part_move
+                return prepare_part_move(lay, req["id"], prof)
 
             # ---- module libraries: bundled modules and the user's own ----
             def _module_library(self, lay, prof, req):
@@ -992,6 +1181,36 @@ class Editor:
                 from ..module_authoring import connect_touching_ports
                 return {"layout": connect_touching_ports(lay, prof, req.get("id")).to_dict()}
 
+            def _module_geometry(self, lay, prof, req):
+                from ..module_authoring import _move_port_wires
+                if req.get("make_space"):
+                    from .module_clearance import expand
+                    source = Layout.from_dict(req["before"])
+                    old = {i["id"]:i.get("display","expanded") for i in source.extra["modules"]["instances"]}
+                    displays = {i["id"]:i.get("display","expanded") for i in lay.extra["modules"]["instances"]
+                                if i.get("display","expanded") != old.get(i["id"])}
+                    candidate = expand(source, displays, prof) if displays else source
+                    raw = candidate.to_dict()
+                    return {"layout":raw,"wires":raw["wires"],"report":analyse(candidate,prof,editor.path.parent)}
+                previous = analyse(Layout.from_dict(req["before"]), prof, editor.path.parent)
+                current = analyse(lay, prof, editor.path.parent)
+                raw = lay.to_dict()
+                _move_port_wires(raw, previous.get("module_info", {}).get("contact_pins", {}),
+                                 current.get("module_info", {}).get("contact_pins", {}))
+                return {"wires": raw["wires"], "report": analyse(Layout.from_dict(raw), prof, editor.path.parent)}
+
+            def _symbol_style(self, lay, prof, req):
+                from ..symbol_styles import apply_style
+                candidate = apply_style(lay, req["style"])
+                raw = candidate.to_dict()
+                if "modules" in raw:
+                    result = self._module_geometry(candidate, prof, {"before": lay.to_dict()})
+                    raw["wires"] = result["wires"]
+                    report = result["report"]
+                else:
+                    report = analyse(candidate, prof, editor.path.parent)
+                return {"layout": raw, "report": report}
+
             def _electrical(self, lay, prof, req):
                 from ..electrical import synchronize, NAME
                 section = synchronize(lay, prof)
@@ -1006,7 +1225,7 @@ class Editor:
                     if name:
                         target["name"] = name
                 lay.extra["electrical"] = section
-                result = analyse(lay, prof)
+                result = analyse(lay, prof, editor.path.parent)
                 bad = [i["message"] for i in result["issues"] if i["code"] == "bad-electrical"]
                 if bad:
                     raise ValueError("；".join(bad))
@@ -1015,7 +1234,7 @@ class Editor:
             def _check(self, lay: Layout, prof: str, req: dict) -> dict:
                 if req.get("sync_electrical") and "electrical" in lay.extra:
                     lay.extra["electrical"] = self._electrical(lay, prof, {})["electrical"]
-                result = analyse(lay, prof)
+                result = analyse(lay, prof, editor.path.parent)
                 if req.get("live_spice"):
                     from ..spice import make_deck
                     try:
@@ -1039,7 +1258,7 @@ class Editor:
                 mode = req.get("mode")
                 return {"png": preview_png(lay, prof, bool(req.get("grid")),
                                            None if mode is None else int(mode),
-                                           req.get("style"), bool(req.get("mono")))}
+                                           req.get("style"), bool(req.get("mono")), base_dir=editor.path.parent)}
 
             def _mode(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..modes import overlay
@@ -1049,15 +1268,64 @@ class Editor:
 
             def _mode_edit(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..modes import Mode, next_state, reverse_loop, set_state, states
+                from ..mode_scene import ModeScene
                 rep = _checked(lay, prof, "校验未通过，先修正标红的问题再改模态")
                 mode = Mode.from_dict(lay.modes[int(req["index"])])
+                scene = ModeScene(lay, get_profile(prof), rep)
                 if req.get("action") == "reverse":
                     mode = reverse_loop(mode, int(req["loop"]))
                 else:
                     el_id = req["id"]
-                    now = states(lay, mode).get(el_id)
-                    mode = set_state(lay, rep, mode, el_id, next_state(lay, el_id, now))
+                    now = states(scene.layout, mode).get(el_id)
+                    mode = set_state(scene.layout, scene.report, mode, el_id, next_state(scene.layout, el_id, now))
                 return {"mode": mode.to_dict()}
+
+            def _auto_modes(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..auto_modes import prepare
+                prepare(lay, req.get("options"), prof, editor.path.parent)
+                if any(j.kind == "auto-modes" and j.state == "running" for j in editor.jobs.values()):
+                    raise ValueError("模态识别仍在运行，请等待本次仿真结束。")
+                job = AutoModeJob(lay, prof, req.get("options"), editor.path.parent, editor.out_dir / "auto-modes")
+                editor.jobs[job.id] = job
+                return job.status()
+
+            def _auto_modes_apply(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..auto_modes import apply
+                job = editor.jobs.get(req.get("id"))
+                if not isinstance(job, AutoModeJob) or job.state != "done" or job.cancel.is_set():
+                    raise ValueError("候选任务已取消或不存在，请重新识别。")
+                updated = apply(lay, job.result, req.get("selection"),
+                                replace_modes=req.get("replace") is True, profile=prof, base_dir=editor.path.parent,
+                                bind_waveform=req.get("waveform") is True, wave_store=self._wave_store())
+                return {"modes": updated.modes, **({"waveform": updated.extra["waveform"]} if req.get("waveform") is True else {})}
+
+            def _parameter_search_info(self, lay, prof, req):
+                from ..parameter_search import Search
+                return Search(lay, profile=prof, base_dir=editor.path.parent).describe()
+
+            def _parameter_search(self, lay, prof, req):
+                from ..parameter_search import Search
+                search = Search(lay, req.get("config"), profile=prof, base_dir=editor.path.parent)
+                with editor.parameter_search_lock:
+                    if any(j.kind == "parameter-search" and j.state == "running" for j in editor.jobs.values()):
+                        raise ValueError("参数搜索仍在运行，请等待结束或先取消。")
+                    job = ParameterSearchJob(search, editor.out_dir / "parameter-search")
+                    editor.jobs[job.id] = job
+                return {**job.status(), "catalog": search.describe()}
+
+            def _parameter_search_apply(self, lay, prof, req):
+                from ..spice import resolved_layout
+                job = editor.jobs.get(req.get("id"))
+                if not isinstance(job, ParameterSearchJob) or job.state != "done" or job.cancel.is_set():
+                    raise ValueError("搜索尚未完成、已取消或不存在，请重新运行。")
+                if prof != job.search.profile:
+                    raise ValueError("图纸比例已改变，请重新搜索。")
+                updated = job.search.apply(lay, job.result, req.get("selected"))
+                proposal = {key: updated.extra[key] for key in ("simulation", "modules") if key in updated.extra}
+                if "modules" in updated.extra:
+                    _, _, assembly = resolved_layout(updated, prof)
+                    proposal["module_values"] = assembly.full.extra["simulation"]["components"]
+                return proposal
 
             def _export(self, lay: Layout, prof: str, req: dict) -> dict:
                 return editor.export(lay, prof, req)
@@ -1089,6 +1357,31 @@ class Editor:
                 return self._wave_store().preview(lay, lay.extra.get("waveform", {}), prof,
                                                  target=req.get("preview_target", "overview"))
 
+            def _waveform_ai(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..ai import provider_info
+                from ..waveform_ai import WaveNoteWorkflow
+                description = req.get("description")
+                if not isinstance(description, str) or not description.strip():
+                    raise ValueError("请填写波形标注需求。")
+                workflow = WaveNoteWorkflow(lay, self._wave_store(), prof, req.get("preview_target", "overview"))
+                chat = editor.chat_factory() if editor.chat_factory else None
+                if chat is None:
+                    problem = provider_info(editor.provider, editor.model).get("problem")
+                    if problem:
+                        raise ValueError(problem)
+                job = RecommendationJob(description.strip(), prof, workflow.max_rounds, chat,
+                                        editor.provider, editor.model, kind="waveform-notes", workflow=workflow)
+                editor.jobs[job.id] = job
+                return job.status()
+
+            def _waveform_ai_preview(self, lay: Layout, prof: str, req: dict) -> dict:
+                identity = req.get("id")
+                job = editor.jobs.get(identity) if isinstance(identity, str) else None
+                if job is None or job.kind != "waveform-notes" or job.state != "done" or not job.result.get("ok"):
+                    raise ValueError("AI 标注尚未完成或已失效，请重新生成。")
+                return job.workflow.preview(lay, self._wave_store(), job.result["proposal"], prof,
+                                            req.get("preview_target", "overview"))
+
             def _waveform_preview(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..waveforms import chart_profile, validate_settings, wave_tex
                 from ..emit import preamble
@@ -1098,7 +1391,13 @@ class Editor:
                 data = self._wave_store().read(cfg)
                 validate_settings(lay, cfg, data)
                 target = chart_profile(cfg, prof, req.get("preview_target", "overview"))
-                tex = preamble(get_profile(target)) + wave_tex(data, cfg, target,
+                renderer = wave_tex
+                if req.get('plot', 'time') == 'xy':
+                    from ..waveform_xy import tex as renderer
+                    target = prof  # XY is a standalone figure, including in a side-by-side time overview.
+                elif req.get('plot', 'time') != 'time':
+                    raise ValueError('波形图类型只能是 time 或 xy。')
+                tex = preamble(get_profile(target)) + renderer(data, cfg, target,
                         [m.get("name") for m in lay.modes]) + "\n\\end{document}\n"
                 with tempfile.TemporaryDirectory() as tmp:
                     svg = build(tex, Path(tmp), "wave-preview", ("svg",))["svg"].read_bytes()
@@ -1121,13 +1420,40 @@ class Editor:
                 stem = re.sub(r"[^\w-]+", "_", editor.path.stem.removesuffix(".layout")).strip("_") or "circuit"
                 result = export_waveforms(lay, self._wave_store(), editor.output_path(req.get("out_dir")),
                                           stem, prof, req.get("formats", ["pdf", "svg", "png"]),
-                                          include_modes=req.get("include_modes", True) is True)
+                                          include_modes=req.get("include_modes", True) is True,
+                                          xy_only=req.get("xy_only", False) is True)
                 return result
 
             def _emi_info(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..emi import INPUTS, FILTER_PARTS, FILTER_INPUTS, REFERENCES, SOURCES, CHANNELS, NOTE
                 return dict(inputs=INPUTS, filter_parts=FILTER_PARTS, filter_inputs=FILTER_INPUTS,
                             references=REFERENCES, sources=SOURCES, channels=CHANNELS, note=NOTE)
+
+            def _impedance_info(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..impedance import INPUTS, NOTE
+                return {"inputs": INPUTS, "note": NOTE}
+
+            def _impedance_run(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..impedance import run
+                return run(lay, editor.output_path(req.get("out_dir")), probe=req.get("probe"),
+                           options=req.get("options"), compare=req.get("compare") is True,
+                           profile=prof, base_dir=editor.path.parent)
+
+            def _dq_impedance_info(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..dq_impedance import INPUTS, NOTE
+                from ..spice import connected_layout
+                power, _ = connected_layout(lay, prof)
+                sources = [e.id for e in power.elements if e.kind in ("V", "vac")]
+                parts = power.extra.get("simulation", {}).get("components", {})
+                return {"inputs": INPUTS, "note": NOTE,
+                        "sources": sources, "defaults": [s for s in sources
+                            if isinstance(parts.get(s, {}).get("wave"), dict) and parts[s]["wave"].get("kind") == "sine"]}
+
+            def _dq_impedance_run(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..dq_impedance import run
+                return run(lay, editor.output_path(req.get("out_dir")), sources=req.get("sources"),
+                           options=req.get("options"), compare=req.get("compare") is True,
+                           profile=prof, base_dir=editor.path.parent)
 
             def _emi_prepare(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..emi import settings, set_parasitic, import_parasitics
@@ -1234,6 +1560,13 @@ class Editor:
                 if not description:
                     self._json({"error": "描述为空"}, 400)
                     return
+                try:
+                    images = _images(req.get("images"))
+                    if not isinstance(req.get("review", False), bool):
+                        raise ValueError("出图后自查选项必须为布尔值")
+                except ValueError as exc:
+                    self._json({"error": str(exc)}, 400)
+                    return
                 chat = editor.chat_factory() if editor.chat_factory else None
                 if chat is None:
                     info = provider_info(editor.provider, editor.model)
@@ -1252,7 +1585,7 @@ class Editor:
                           max(1, min(8, int(req.get("rounds", 4)))), chat,
                           editor.provider, editor.model, kind,
                           (req.get("structure") or "").strip() or None,
-                          _images(req.get("images")), current)
+                          images, current, review=req.get("review", False), base_dir=editor.path.parent)
                 editor.jobs[job.id] = job
                 self._json(job.status())
 

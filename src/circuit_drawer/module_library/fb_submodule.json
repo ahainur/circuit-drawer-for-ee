@@ -1,0 +1,212 @@
+{
+ "title": "FB cell",
+ "symbol": "text",
+ "layout": {
+  "name": "fb_submodule",
+  "elements": [
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.9
+     ],
+     "s": [
+      1.0,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      1.0
+     ],
+     "s": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "S3",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      3.9
+     ],
+     "s": [
+      2.35,
+      2.9
+     ]
+    },
+    "label": "$S_{3}$"
+   },
+   {
+    "id": "S4",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      1.0
+     ],
+     "s": [
+      2.35,
+      0.0
+     ]
+    },
+    "label": "$S_{4}$"
+   },
+   {
+    "id": "Cdc",
+    "kind": "C",
+    "pins": {
+     "a": [
+      0.0,
+      3.9
+     ],
+     "b": [
+      0.0,
+      0.0
+     ]
+    },
+    "label": "$C_{dc}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "Port_A",
+    "kind": "port",
+    "pins": {
+     "p": [
+      4.0,
+      2.5
+     ]
+    },
+    "label": "$A$",
+    "label_pos": "right"
+   },
+   {
+    "id": "Port_B",
+    "kind": "port",
+    "pins": {
+     "p": [
+      4.0,
+      1.2
+     ]
+    },
+    "label": "$B$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     2.35,
+     3.9
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     2.35,
+     0.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.9
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   [
+    [
+     2.35,
+     2.9
+    ],
+    [
+     2.35,
+     1.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     4.0,
+     2.5
+    ]
+   ],
+   [
+    [
+     2.35,
+     1.2
+    ],
+    [
+     4.0,
+     1.2
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.35,
+    2.5
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "S1.d": "DCP",
+   "S3.d": "DCP",
+   "S2.s": "DCN",
+   "S4.s": "DCN",
+   "S1.s": "NA",
+   "S2.d": "NA",
+   "S3.s": "NB",
+   "S4.d": "NB",
+   "Cdc.a": "DCP",
+   "Cdc.b": "DCN",
+   "Port_A.p": "NA",
+   "Port_B.p": "NB"
+  }
+ },
+ "ports": {
+  "A": "Port_A.p",
+  "B": "Port_B.p"
+ },
+ "port_layout": {
+  "A": {
+   "side": "right",
+   "order": 0
+  },
+  "B": {
+   "side": "right",
+   "order": 1
+  }
+ },
+ "defaults": {
+  "Cdc": {
+   "value": "220u",
+   "initial": "48"
+  }
+ }
+}

@@ -7,6 +7,8 @@ splits keep it on the first surviving anchor. Counters never reuse retired IDs.
 from copy import deepcopy
 import re
 
+from .layout import windings
+
 NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,40}\Z")
 
 
@@ -15,7 +17,7 @@ def branch_refs(layout):
         if e.kind == "port":
             continue
         if e.kind == "transformer":
-            for winding in ("p", "s1", "s2") if "sct" in e.pins else ("p", "s"):
+            for winding, *_ in windings(e):
                 yield f"{e.id}:{winding}"
         else:
             yield e.id

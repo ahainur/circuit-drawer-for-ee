@@ -18,9 +18,9 @@ header { background: var(--panel); border-bottom: 1px solid #8c887f; }
 .menu-bar > button { padding: 2px 9px; font-size: 12px; border: 1px solid transparent; background: transparent; }
 .menu-bar > button:hover, .menu-bar > button[aria-expanded="true"] { background: var(--accent); color: #fff; }
 .app-label { font-size: 11px; color: #666; letter-spacing: 0; white-space: nowrap; }
-.app-label::after { content: " 1.6 | 原理图编辑器"; }
-html[lang="zh-TW"] .app-label::after { content: " 1.6 | 電路圖編輯器"; }
-html[lang="en"] .app-label::after { content: " 1.6 | Schematic editor"; }
+.app-label::after { content: " 1.7 | 原理图编辑器"; }
+html[lang="zh-TW"] .app-label::after { content: " 1.7 | 電路圖編輯器"; }
+html[lang="en"] .app-label::after { content: " 1.7 | Schematic editor"; }
 .quick-tools { padding: 3px 4px; min-height: 32px; gap: 4px;
   background: linear-gradient(#f6f5f1, #e4e1da); border-bottom: 1px solid var(--line); }
 .tool-group { padding: 0 5px; border-right: 1px solid var(--line); box-shadow: 1px 0 0 #fff; }
@@ -29,6 +29,9 @@ html[lang="en"] .app-label::after { content: " 1.6 | Schematic editor"; }
   font-size: 12px; gap: 4px; background: transparent; color: var(--ink); }
 .quick-tools button:hover:not(:disabled), .quick-tools button.on { background: #dfe8f5; border-color: #6d8bb8; color: #000; }
 .tool-icon { width: 16px; height: 16px; stroke-width: 1.5; stroke: #1f4e8c; }
+.quick-tools button.primary, .quick-tools button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+.quick-tools button.primary:hover:not(:disabled) { filter: brightness(1.12); }
+.quick-tools button.primary .tool-icon { stroke: currentColor; }
 .document-tabs { background: var(--bg); border-top: 0; padding: 3px 4px 0; }
 .document-tab { min-height: 22px; padding: 2px 10px; background: #fff; border: 1px solid #8c887f;
   border-bottom: 0; box-shadow: none; font-size: 12px; }
@@ -93,6 +96,14 @@ body:has(#world) #canvas { --ink: #1d1d1f; --accent: #2457d6; --bad: #d12f2f; fo
 dialog { background: var(--panel); color: var(--ink); border: 1px solid #6d6a63; box-shadow: 2px 2px 0 #0003; }
 #aiSettingsDialog { border-color: #6d6a63 !important; }
 dialog h3 { color: var(--ink); }
+
+#autoModePanel { width: min(1080px, 84vw); }
+#autoModeSettings input[type="number"] { width: 6em; }
+#autoModeSettings > label { display: inline-block; margin: 4px 12px 4px 0; }
+#amResults { max-height: 48vh; overflow: auto; padding: 0 10px; }
+#amCandidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px 24px; padding-left: 24px; }
+#amCandidates p { margin: 6px 0; }
+#amCandidates input[type="text"], #amCandidates input:not([type]) { max-width: 130px; }
 #issues li { border-radius: 0; border-left: 3px solid var(--bad); }
 #issues li.warning { border-left-color: #b7791f; }
 #issues li.note { border-left-color: #8c887f; }
@@ -113,7 +124,7 @@ body:has(#world) #appearance .row { border-bottom: 1px solid #d3cfc6; padding-bo
 }
 @media (max-width: 760px) {
   .app-label { display: block; margin-left: auto; }
-  html[lang] .app-label::after { content: " 1.6"; }
+  html[lang] .app-label::after { content: " 1.7"; }
   .menu-bar { gap: 0; }
   .menu-bar > button { padding: 2px 6px; }
   body:has(#world) main { grid-template-columns: minmax(0, 1fr);

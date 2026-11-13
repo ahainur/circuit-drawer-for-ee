@@ -1,0 +1,2449 @@
+{
+ "name": "module_llc_partial",
+ "elements": [],
+ "wires": [],
+ "hops": [],
+ "annotations": [],
+ "netlist": {},
+ "modes": [
+  {
+   "name": "Mode 1",
+   "caption": "$t_{0}$--$t_{1}$",
+   "on": [
+    "M1/S1",
+    "M2/S1"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 2",
+   "caption": "$t_{1}$--$t_{2}$",
+   "on": [
+    "M1/S1",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 3",
+   "caption": "$t_{2}$--$t_{3}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 4",
+   "caption": "$t_{3}$--$t_{4}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 5",
+   "caption": "$t_{4}$--$t_{5}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 6",
+   "caption": "$t_{5}$--$t_{6}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 7",
+   "caption": "$t_{6}$--$t_{7}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 8",
+   "caption": "$t_{7}$--$t_{8}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 9",
+   "caption": "$t_{8}$--$t_{9}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 10",
+   "caption": "$t_{9}$--$t_{10}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 11",
+   "caption": "$t_{10}$--$t_{11}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm|M2/T:p",
+     "Vin"
+    ],
+    [
+     "M2/D1",
+     "M2/Co",
+     "M2/D4",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 12",
+   "caption": "$t_{11}$--$t_{12}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M1/D4",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm|M1/T:p",
+     "Vin"
+    ],
+    [
+     "M1/D1",
+     "M1/Co",
+     "M1/D4",
+     "M1/T:s"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 13",
+   "caption": "$t_{12}$--$t_{13}$",
+   "on": [
+    "M1/S1",
+    "M1/D1",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 14",
+   "caption": "$t_{13}$--$t_{14}$",
+   "on": [
+    "M1/S1",
+    "M2/S1",
+    "M2/D4"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 15",
+   "caption": "$t_{14}$--$t_{15}$",
+   "on": [
+    "M1/S1",
+    "M2/S1"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 16",
+   "caption": "$t_{15}$--$t_{16}$",
+   "on": [
+    "M1/S1",
+    "M2/S1"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 17",
+   "caption": "$t_{16}$--$t_{17}$",
+   "on": [
+    "M1/S1",
+    "M2/S1"
+   ],
+   "loops": [
+    [
+     "M1/S1",
+     "M1/Lr",
+     "M1/Cr",
+     "M1/Lm",
+     "Vin"
+    ],
+    [
+     "M2/S1",
+     "M2/Lr",
+     "M2/Cr",
+     "M2/Lm",
+     "Vin"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 18",
+   "caption": "$t_{17}$--$t_{18}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 19",
+   "caption": "$t_{18}$--$t_{19}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 20",
+   "caption": "$t_{19}$--$t_{20}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 21",
+   "caption": "$t_{20}$--$t_{21}$",
+   "on": [
+    "M1/S2",
+    "M2/S2"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 22",
+   "caption": "$t_{21}$--$t_{22}$",
+   "on": [
+    "M1/S2",
+    "M2/S2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 23",
+   "caption": "$t_{22}$--$t_{23}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M2/S2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 24",
+   "caption": "$t_{23}$--$t_{24}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 25",
+   "caption": "$t_{24}$--$t_{25}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 26",
+   "caption": "$t_{25}$--$t_{26}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "arrows": [],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 27",
+   "caption": "$t_{26}$--$t_{27}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 28",
+   "caption": "$t_{27}$--$t_{28}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 29",
+   "caption": "$t_{28}$--$t_{29}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 30",
+   "caption": "$t_{29}$--$t_{30}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 31",
+   "caption": "$t_{30}$--$t_{31}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M1/D3",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm|M1/T:p",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M1/D2",
+     "M1/Co",
+     "M1/D3",
+     "M1/T:s"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 32",
+   "caption": "$t_{31}$--$t_{32}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M2/S2",
+    "M2/D2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm|M2/T:p",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "M2/D2",
+     "M2/Co",
+     "M2/D3",
+     "M2/T:s"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 33",
+   "caption": "$t_{32}$--$t_{33}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M2/S2",
+    "M2/D3"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 34",
+   "caption": "$t_{33}$--$t_{34}$",
+   "on": [
+    "M1/S2",
+    "M1/D2",
+    "M2/S2"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 35",
+   "caption": "$t_{34}$--$t_{35}$",
+   "on": [
+    "M1/S2",
+    "M2/S2"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 36",
+   "caption": "$t_{35}$--$t_{36}$",
+   "on": [
+    "M1/S2",
+    "M2/S2"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 37",
+   "caption": "$t_{36}$--$t_{37}$",
+   "on": [
+    "M1/S2",
+    "M2/S2"
+   ],
+   "loops": [
+    [
+     "M1/S2",
+     "M1/Lm",
+     "M1/Cr",
+     "M1/Lr"
+    ],
+    [
+     "M2/S2",
+     "M2/Lm",
+     "M2/Cr",
+     "M2/Lr"
+    ],
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 38",
+   "caption": "$t_{37}$--$t_{38}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 39",
+   "caption": "$t_{38}$--$t_{39}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  },
+  {
+   "name": "Mode 40",
+   "caption": "$t_{39}$--$t_{40}$",
+   "on": [],
+   "loops": [
+    [
+     "RL",
+     "M2/Co",
+     "M1/Co"
+    ]
+   ],
+   "source": {
+    "kind": "simulation",
+    "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+    "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+    "settings": {
+     "current_floor": 0.001,
+     "current_relative": 0.01,
+     "short_fraction": 0.005,
+     "distinguish": [
+      "M1/Lr",
+      "M1/T:p",
+      "M1/T:s",
+      "M1/Lm",
+      "M2/Lr",
+      "M2/T:p",
+      "M2/T:s",
+      "M2/Lm"
+     ]
+    },
+    "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+   }
+  }
+ ],
+ "modules": {
+  "version": 1,
+  "instances": [
+   {
+    "id": "M1",
+    "definition": "llc_halfbridge",
+    "display": "partial"
+   },
+   {
+    "id": "M2",
+    "definition": "llc_halfbridge",
+    "display": "partial"
+   }
+  ],
+  "links": [
+   [
+    "Vin.b",
+    "M1.P"
+   ],
+   [
+    "Vin.a",
+    "M1.N"
+   ],
+   [
+    "M1.P",
+    "M2.P"
+   ],
+   [
+    "M1.N",
+    "M2.N"
+   ],
+   [
+    "M1.OP",
+    "RL.a"
+   ],
+   [
+    "M1.ON",
+    "M2.OP"
+   ],
+   [
+    "M2.ON",
+    "RL.b"
+   ]
+  ],
+  "parts": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "label": "$V_{in}$"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "label": "$R_L$"
+   }
+  ]
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "48",
+    "wave": {
+     "kind": "step",
+     "initial": "0",
+     "final": "48",
+     "delay": "0",
+     "rise": "2u"
+    }
+   },
+   "RL": {
+    "value": "24"
+   }
+  },
+  "transient": {
+   "step": "200n",
+   "max_step": "100n",
+   "node_capacitance": "1n",
+   "stop": "20m"
+  },
+  "probes": [
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "RL.b"
+   },
+   {
+    "name": "i_in",
+    "kind": "current",
+    "element": "Vin"
+   },
+   {
+    "name": "v_M1",
+    "kind": "voltage",
+    "positive": "M1/Co.a",
+    "negative": "M1/Co.b"
+   },
+   {
+    "name": "i_r_M1",
+    "kind": "current",
+    "element": "M1/Lr"
+   },
+   {
+    "name": "i_m_M1",
+    "kind": "current",
+    "element": "M1/Lm"
+   },
+   {
+    "name": "v_p_M1",
+    "kind": "voltage",
+    "positive": "M1/T.p1",
+    "negative": "M1/T.p2"
+   },
+   {
+    "name": "v_s_M1",
+    "kind": "voltage",
+    "positive": "M1/T.s1",
+    "negative": "M1/T.s2"
+   },
+   {
+    "name": "v_M2",
+    "kind": "voltage",
+    "positive": "M2/Co.a",
+    "negative": "M2/Co.b"
+   },
+   {
+    "name": "i_r_M2",
+    "kind": "current",
+    "element": "M2/Lr"
+   },
+   {
+    "name": "i_m_M2",
+    "kind": "current",
+    "element": "M2/Lm"
+   },
+   {
+    "name": "v_p_M2",
+    "kind": "voltage",
+    "positive": "M2/T.p1",
+    "negative": "M2/T.p2"
+   },
+   {
+    "name": "v_s_M2",
+    "kind": "voltage",
+    "positive": "M2/T.s1",
+    "negative": "M2/T.s2"
+   }
+  ]
+ },
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/module_llc_partial_35a5df7695915bea.csv",
+  "sha256": "35a5df7695915bea0268a02a2aceb615d49ee1289b0aeaff3eba3f706acac559",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "us",
+  "relative_time": true,
+  "window": [
+   0.019980005000000002,
+   0.019990005
+  ],
+  "boundaries": [
+   0.019980005000000002,
+   0.019980038545232566,
+   0.019980038545232795,
+   0.01998003858722183,
+   0.019980038587222075,
+   0.01998240024281574,
+   0.019982400242815786,
+   0.01998244884057202,
+   0.01998244884057207,
+   0.019984690027398038,
+   0.019984690027398045,
+   0.01998469086351711,
+   0.019984690863517125,
+   0.019984690868193968,
+   0.019984690868193985,
+   0.01998477581451081,
+   0.019984775814510837,
+   0.019984805,
+   0.019984959922753922,
+   0.01998499143737211,
+   0.019985005000000004,
+   0.019985038406399227,
+   0.01998503840639924,
+   0.019985038413775198,
+   0.019985038413775212,
+   0.01998740203889958,
+   0.019987402038899628,
+   0.019987450636607403,
+   0.01998745063660745,
+   0.019989689825852548,
+   0.019989689825852554,
+   0.019989690658257085,
+   0.019989690658257207,
+   0.01998969066292715,
+   0.019989690662927273,
+   0.019989775609257916,
+   0.019989775609257944,
+   0.019989805000000003,
+   0.019989960230813647,
+   0.01998999195429661,
+   0.019990005
+  ],
+  "intervals": [
+   "Mode 1",
+   "Mode 2",
+   "Mode 3",
+   "Mode 4",
+   "Mode 5",
+   "Mode 6",
+   "Mode 7",
+   "Mode 8",
+   "Mode 9",
+   "Mode 10",
+   "Mode 11",
+   "Mode 12",
+   "Mode 13",
+   "Mode 14",
+   "Mode 15",
+   "Mode 16",
+   "Mode 17",
+   "Mode 18",
+   "Mode 19",
+   "Mode 20",
+   "Mode 21",
+   "Mode 22",
+   "Mode 23",
+   "Mode 24",
+   "Mode 25",
+   "Mode 26",
+   "Mode 27",
+   "Mode 28",
+   "Mode 29",
+   "Mode 30",
+   "Mode 31",
+   "Mode 32",
+   "Mode 33",
+   "Mode 34",
+   "Mode 35",
+   "Mode 36",
+   "Mode 37",
+   "Mode 38",
+   "Mode 39",
+   "Mode 40"
+  ],
+  "channels": [
+   {
+    "column": "v_out_V",
+    "label": "v_out",
+    "unit": "V",
+    "color": "#c8102e"
+   },
+   {
+    "column": "i_in_A",
+    "label": "i_in",
+    "unit": "A",
+    "color": "#2457d6"
+   },
+   {
+    "column": "v_M1_V",
+    "label": "v_M1",
+    "unit": "V",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "252cad62590847f3b443a714e771079f6d4327e6390234770499a189a0dad7f8",
+  "mode_source": {
+   "kind": "simulation",
+   "signature": "4365a2cf1b5d7f1deef9b57d4022a002b9c532aae8d6f1d9b6e92b8f8f5ce52d",
+   "settings_hash": "ffc9d839155f2187dee8c231a2b0af64d7f7615a1968c49f0a5f97d3d1779a2d",
+   "settings": {
+    "current_floor": 0.001,
+    "current_relative": 0.01,
+    "short_fraction": 0.005,
+    "distinguish": [
+     "M1/Lr",
+     "M1/T:p",
+     "M1/T:s",
+     "M1/Lm",
+     "M2/Lr",
+     "M2/T:p",
+     "M2/T:s",
+     "M2/Lm"
+    ]
+   },
+   "transient_hash": "c4d359b274fc37f50f58cd14c645b6dfde05890c3b88b06ea2b9ebd87b0aa67d"
+  }
+ }
+}

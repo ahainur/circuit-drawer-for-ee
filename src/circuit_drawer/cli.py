@@ -26,7 +26,7 @@ def _formats(text: str) -> tuple[str, ...]:
     return fmts
 
 
-SIMULATION_COMMANDS = ("spice-init", "spice", "simulink", "plecs", "emi")
+SIMULATION_COMMANDS = ("spice-init", "spice", "simulink", "plecs", "psim", "emi", "impedance", "dq-impedance", "parameter-search")
 SIMULATION_PROFILE_HELP = ("column width the drawing is checked at; default ieee-single, or ieee-double "
                            "when only that passes (the exported model is the same at any width)")
 
@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("list", help="list templates and their options")
+    sub.add_parser("blocks", help="list built-in modules, public ports and one-to-one drawing sizes")
 
     si = sub.add_parser("spice-init", help="save example Buck/Boost simulation parameters into a new JSON table")
     si.add_argument("layout")
@@ -94,8 +95,39 @@ def main(argv: list[str] | None = None) -> int:
     em.add_argument("--compare", action="store_true", help="also simulate explicitly bound filter components with proposed values")
     em.add_argument("--ngspice")
 
+    im = sub.add_parser("impedance", help="sweep DC averaged output impedance and compare transient injection")
+    im.add_argument("layout")
+    im.add_argument("--probe", required=True, help="voltage probe across the output port")
+    im.add_argument("--out", "-o", default="out/impedance")
+    im.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
+    im.add_argument("--compare", action="store_true", help="compare three frequencies using time-domain injection")
+    im.add_argument("--ngspice")
+    from .impedance import INPUTS as IMPEDANCE_INPUTS
+    for key, (label, default) in IMPEDANCE_INPUTS.items():
+        im.add_argument("--" + key.replace("_", "-"), default=default, help=label)
+
+    ratio = sub.add_parser("impedance-ratio", help="analyse scalar source/load port models and Nyquist stability")
+    ratio.add_argument("model", help="JSON with source_impedance and load_admittance polynomials")
+    ratio.add_argument("--out", "-o", default="out/impedance-ratio")
+
+    stability = sub.add_parser("dq-stability", help="analyse dq state-space port interconnection and internal poles")
+    stability.add_argument("model", help="JSON with source_impedance and load_admittance state-space matrices")
+    stability.add_argument("--out", "-o", default="out/dq-stability")
+
+    dq = sub.add_parser("dq-impedance", help="identify a dq impedance matrix by two-axis voltage injection")
+    dq.add_argument("layout")
+    dq.add_argument("--sources", nargs=3, required=True, metavar=("A", "B", "C"), help="three grid voltage-source IDs in ABC order")
+    dq.add_argument("--out", "-o", default="out/dq-impedance")
+    dq.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
+    dq.add_argument("--compare", action="store_true", help="repeat three frequencies with half amplitude and time step")
+    dq.add_argument("--ngspice")
+    from .dq_impedance import INPUTS as DQ_INPUTS
+    for key, (label, default) in DQ_INPUTS.items():
+        dq.add_argument("--" + key.replace("_", "-"), default=default, help=label)
+
     for target, description in (("simulink", "MATLAB builder for Simulink + Simscape Foundation"),
-                                ("plecs", "native PLECS Standalone .plecs model")):
+                                ("plecs", "native PLECS Standalone .plecs model"),
+                                ("psim", "Python builder for PSIM 2026+")):
         ex = sub.add_parser(target, help="export a validated table to " + description)
         ex.add_argument("layout", help="JSON table with the existing simulation section")
         ex.add_argument("--out", "-o", default="out/" + target, help="output directory")
@@ -175,11 +207,25 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--mono", action="store_true",
                    help="background regions and callouts in greys (black-and-white print)")
 
+    am = sub.add_parser("modes-from-sim", help="simulate and propose operating modes for confirmation in the editor")
+    am.add_argument("layout", help="coordinate table JSON")
+    am.add_argument("--out", "-o", required=True, help="candidate report and simulation output folder")
+    am.add_argument("--profile", "-p", default="ieee-single")
+    am.add_argument("--ngspice", help="ngspice executable")
+
+    ps = sub.add_parser("parameter-search", help="scan explicit parameter ranges without modifying the drawing")
+    ps.add_argument("layout", help="coordinate table with simulation parameters")
+    ps.add_argument("--config", required=True, help="JSON ranges, output target and limits; power_file is relative to the drawing")
+    ps.add_argument("--out", "-o", default="out/parameter-search", help="parent folder for unique batch results")
+    ps.add_argument("--profile", "-p", default=None, help=SIMULATION_PROFILE_HELP)
+    ps.add_argument("--ngspice", help="ngspice executable")
+
     w = sub.add_parser("waveforms", help="export CSV waveforms and manually bound operating modes")
     w.add_argument("layout", help="JSON table with waveform settings saved by the editor")
     common(w)
     w.set_defaults(formats=("pdf", "svg", "png"))
-    w.add_argument("--wave-only", action="store_true", help="only export the waveform chart")
+    w.add_argument("--wave-only", action="store_true", help="export time/XY figures without circuit modes")
+    w.add_argument("--xy-only", action="store_true", help="only export the configured XY/state-plane plot")
 
     n = sub.add_parser("new", help="describe a topology without a template; a model "
                                    "writes the coordinate table, the validator judges it")
@@ -194,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--model", help="model id (default $CIRCUIT_DRAWER_MODEL; "
                                    "anthropic falls back to claude-opus-5-5)")
     n.add_argument("--edit", action="store_true", help="open the result in the web editor")
+    n.add_argument("--review", action="store_true", help="review the rendered picture and try one connection-preserving layout edit")
     n.add_argument("--plan", action="store_true",
                    help="only print the model's reading of the circuit (parts and "
                         "connections) to check before drawing; -o gets that text")
@@ -215,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     tw.add_argument("--provider", choices=("anthropic", "openai"))
     tw.add_argument("--model")
     tw.add_argument("--edit", action="store_true", help="open the result in the web editor")
+    tw.add_argument("--review", action="store_true", help="review the rendered picture and try one connection-preserving layout edit")
     tw.add_argument("--port", type=int, default=8765)
 
     st = sub.add_parser("save-template", help="save a validated JSON table as a template")
@@ -254,6 +302,50 @@ def main(argv: list[str] | None = None) -> int:
             a.profile = None
         a.profile = a.profile or "ieee-single"
     try:
+        if a.cmd == "parameter-search":
+            from .parameter_search import Search
+            path = Path(a.layout).resolve()
+            config = json.loads(Path(a.config).read_text(encoding="utf-8-sig"))
+            result = Search(Layout.load(path), config, profile=a.profile, base_dir=path.parent).run(a.out, ngspice=a.ngspice)
+            print(f"完成 {len(result['points'])} 组；符合约束 {sum(p['feasible'] for p in result['points'])} 组；Pareto 候选 {result['pareto_ids']}。")
+            print(Path(result['directory']) / 'results.json')
+            return 0 if result['pareto_ids'] else 1
+        if a.cmd == "modes-from-sim":
+            from .auto_modes import run
+            result = run(Layout.load(a.layout), a.out, profile=a.profile, ngspice=a.ngspice,
+                         base_dir=Path(a.layout).resolve().parent)
+            print(result["note"])
+            print(result["reason"] or f"{len(result['candidates'])} 个候选模态，含短区间；请在编辑器确认采用。")
+            for path in result["files"]:
+                print(path)
+            return 0 if result["ready"] else 1
+        if a.cmd in ("impedance-ratio", "dq-stability"):
+            from .impedance_ratio import analyse, export
+            if a.cmd == "dq-stability":
+                from .dq_stability import analyse
+            result = analyse(json.loads(Path(a.model).read_text(encoding="utf-8-sig")))
+            print(result["note"])
+            print(result["verdict"])
+            print(export(result, a.out, prefix=a.cmd))
+            return 0
+        if a.cmd == "dq-impedance":
+            from .dq_impedance import run
+            result = run(Layout.load(a.layout), a.out, sources=a.sources, compare=a.compare,
+                         options={k: getattr(a, k) for k in DQ_INPUTS}, profile=a.profile,
+                         ngspice=a.ngspice, base_dir=Path(a.layout).resolve().parent)
+            print(result["note"])
+            for path in result["files"]:
+                print(path)
+            return 0
+        if a.cmd == "impedance":
+            from .impedance import run
+            result = run(Layout.load(a.layout), a.out, probe=a.probe, compare=a.compare,
+                         options={k: getattr(a, k) for k in IMPEDANCE_INPUTS}, profile=a.profile,
+                         ngspice=a.ngspice, base_dir=Path(a.layout).resolve().parent)
+            print(result["note"])
+            for path in result["files"]:
+                print(path)
+            return 0
         if a.cmd == "emi":
             from .emi import run
             result = run(Layout.load(a.layout), a.out, profile=a.profile, compare=a.compare,
@@ -274,7 +366,7 @@ def main(argv: list[str] | None = None) -> int:
             lay.save(target)
             print(f"示例参数已写入 {target}；请核对数值与工况，再运行 spice")
             return 0
-        if a.cmd in ("simulink", "plecs"):
+        if a.cmd in ("simulink", "plecs", "psim"):
             from .simulation_export import export_simulation
             result = export_simulation(Layout.load(a.layout), a.out,
                                        a.name or Path(a.layout).stem.removesuffix(".layout"),
@@ -297,6 +389,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(note, file=sys.stderr)
             for path in result["files"]:
                 print(path)
+            return 0
+        if a.cmd == "blocks":
+            from .module_store import builtin_blocks
+            print("内置模块：名称 | 说明 | 公开端口 | 1:1 宽 × 高（cm，含标签，双栏默认字号）")
+            for block in builtin_blocks():
+                print(f"{block['name']} | {block['note']} | {', '.join(block['ports'])} | "
+                      f"{block['width']:.2f} × {block['height']:.2f}")
             return 0
         if a.cmd == "list":
             for name, tpl in templates.available().items():
@@ -358,9 +457,24 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "check":
             layout, prof = Layout.load(a.layout), get_profile(a.profile)
             rep = check(layout, prof)
+            from .control_view import prepare as prepare_control_view
+            from .validate import Issue
+            try:
+                prepare_control_view(layout, prof, rep.scale, Path(a.layout).resolve().parent)
+            except ValueError as exc:
+                if not any(i.code == "bad-control-view" for i in rep.issues):
+                    rep.issues.append(Issue("bad-control-view", str(exc)))
             print(json.dumps(rep.to_dict(), indent=1, ensure_ascii=False))
-            if not rep.ok and prof.name == "ieee-single" and check(layout, get_profile("double")).ok:
-                print("提示：这张表单栏校验不通过，但双栏通过；可加 --profile double 重新校验。原图未修改。", file=sys.stderr)
+            if not rep.ok and prof.name == "ieee-single":
+                wide = get_profile("double")
+                wide_report = check(layout, wide)
+                try:
+                    prepare_control_view(layout, wide, wide_report.scale, Path(a.layout).resolve().parent)
+                except ValueError:
+                    pass
+                else:
+                    if wide_report.ok:
+                        print("提示：这张表单栏校验不通过，但双栏通过；可加 --profile double 重新校验。原图未修改。", file=sys.stderr)
             return 0 if rep.ok else 1
         if a.cmd == "waveforms":
             from .waveforms import WaveStore, export_waveforms
@@ -368,17 +482,18 @@ def main(argv: list[str] | None = None) -> int:
             layout = Layout.load(path)
             cfg = layout.extra.get("waveform")
             if not isinstance(cfg, dict) or not cfg.get("source"):
-                raise ValueError("这张表没有已保存的波形数据；请先在编辑器“分析 → 波形与模态”导入 CSV，核对曲线和模态对应关系并保存，再运行 waveforms。")
+                raise ValueError("这张表没有已保存的波形数据；请先在编辑器“模态与波形 → 波形与模态”导入 CSV，核对曲线和模态对应关系并保存，再运行 waveforms。")
             result = export_waveforms(layout, WaveStore(path), Path(a.out),
                                       a.name or path.stem.removesuffix(".layout"), a.profile,
-                                      a.formats, not a.wave_only)
+                                      a.formats, not a.wave_only, xy_only=a.xy_only)
             for file in result["files"]:
                 print(file)
             return 0
         layout = (from_template(a.template, " ".join(a.options)) if a.cmd == "draw"
                   else Layout.load(a.layout))
         name = a.name or (None if a.cmd == "draw" else Path(a.layout).stem.removesuffix(".layout"))
-        res = render(layout, a.profile, a.out, name, a.formats, a.grid, a.mono)
+        res = render(layout, a.profile, a.out, name, a.formats, a.grid, a.mono,
+                     base_dir=None if a.cmd == "draw" else Path(a.layout).resolve().parent)
         for w in res.report.issues:
             print(w, file=sys.stderr)
         for path in res.files.values():
@@ -413,7 +528,7 @@ def _modes(a: argparse.Namespace) -> int:
         modes = [Mode.from_dict(d) for d in raw]
     if a.list:
         if not (modes or layout.modes):
-            print("这张图没有模态；可在编辑器“分析 → 波形与模态”里新增，或用 --modes file.json 给出", file=sys.stderr)
+            print("这张图没有模态；可在编辑器“模态与波形 → 波形与模态”里新增，或用 --modes file.json 给出", file=sys.stderr)
             return 1
         for i, m in enumerate(modes or [Mode.from_dict(d) for d in layout.modes], 1):
             print(f"{i}. {m.name}  {m.caption}" + (f"  [{m.condition}]" if m.condition else ""))
@@ -439,7 +554,7 @@ def _modes(a: argparse.Namespace) -> int:
         if not only or any(not 1 <= n <= count for n in only):
             raise ValueError(f"--only 的编号要在 1～{count} 之间（用 --list 查看全部模态）")
     results = render_modes(layout, a.profile, a.out, a.name, a.formats, style, modes, only,
-                           not a.no_sheet)
+                           not a.no_sheet, base_dir=src.resolve().parent if src.suffix.lower() == ".json" else None)
     print("checked: loop connections and device directions only; bias and operating "
           "conditions are not checked", file=sys.stderr)
     for r in results:
@@ -497,7 +612,7 @@ def _new(a: argparse.Namespace) -> int:
             return 0
         gen = generate(a.description, a.profile, a.rounds, model=a.model,
                        provider=a.provider, structure=structure, images=images or None,
-                       log=lambda m: print(m, file=sys.stderr))
+                       log=lambda m: print(m, file=sys.stderr), review=a.review)
     except ModelError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -543,7 +658,8 @@ def _tweak(a: argparse.Namespace) -> int:
     print(f"模型：{info['provider']} / {info['model']} @ {info['base_url']}", file=sys.stderr)
     try:
         gen = generate(a.instruction, a.profile, a.rounds, model=a.model, provider=a.provider,
-                       current=old.to_dict(), log=lambda m: print(m, file=sys.stderr))
+                       current=old.to_dict(), log=lambda m: print(m, file=sys.stderr),
+                       review=a.review, base_dir=src.resolve().parent)
     except ModelError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -555,6 +671,8 @@ def _tweak(a: argparse.Namespace) -> int:
     print(out)
     note = gen.best_attempt.note if gen.best_attempt else ""
     if note:
+        print(note, file=sys.stderr)
+    for note in gen.notes:
         print(note, file=sys.stderr)
     print("实际改动：", file=sys.stderr)
     for c in changes(old, best):

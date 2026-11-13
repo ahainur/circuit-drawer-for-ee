@@ -1,0 +1,42 @@
+{
+  "format": "circuit-drawer.power-design/1",
+  "source": "Synthetic teaching inputs only, including all device files, magnetic designs, assumed temperatures and auxiliary losses; no real manufacturer part is selected.",
+  "demo": true,
+  "load": "RL",
+  "devices": {
+    "S1": {
+      "file": "DEMO-N100.json",
+      "operating": {
+        "vgs_on": 10,
+        "vgs_off": 0,
+        "rg_on": 2.2,
+        "rg_off": 2.2,
+        "rg_int": 1.5,
+        "tc": 60,
+        "hard_recovery": false
+      }
+    },
+    "D1": {
+      "file": "DEMO-D650S.json",
+      "operating": {
+        "tc": 60,
+        "hard_recovery": true
+      }
+    }
+  },
+  "magnetics": {
+    "L1": [
+      "DEMO-L400.json",
+      "DEMO-L500.json",
+      "DEMO-L600.json"
+    ]
+  },
+  "capacitors": {
+    "Co": {
+      "esr_ohm": 0.02,
+      "source": "Synthetic constant 20 milliohm ESR for this teaching example at 60 Celsius."
+    }
+  },
+  "auxiliary_watts": 0.1,
+  "current_threshold_a": 0.001
+}

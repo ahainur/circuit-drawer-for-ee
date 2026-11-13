@@ -1,4 +1,4 @@
-"""Closed-loop simulation: a control table drives the circuit's PWM switches.
+"""Closed-loop simulation: a control table drives PWM or VCO switches.
 
 The circuit table's ``closed_loop`` section links the two tables::
 
@@ -16,16 +16,18 @@ measured signal, by the name of a ``simulation.probes`` channel.  ``outputs``
 maps a controller output, read as a duty cycle 0..1, onto PWM switches; each
 switch keeps its own frequency, edge times and start delay from
 ``simulation.components`` and its fixed ``duty`` is not used.
+With ``modulation: vco``, the command instead denotes Hz, clamped to explicit
+frequency bounds and integrated into a shared phase for the switch group.
 
-The controller is the control table's own structure and transfer functions,
-simulated as a continuous-time model: each transfer function becomes a cascade
+The default controller uses the control table's structure and transfer functions
+as a continuous-time model: each transfer function becomes a cascade
 of first and second order sections, integrated on 1 F capacitors by
 behavioural current sources, with states scaled by the section's frequency.
 Output limits (``code.blocks.<id>.min / max``) clamp the output; while it is
-clamped, back-calculation pulls the last integrator back so it does not wind up.  Sampling, computation delay
-and fixed-point rounding are not modelled; ``codegen`` covers the discrete
-controller.  Only ngspice built-in B sources are used (no XSPICE), so the deck
-runs on every ngspice build.
+clamped, back-calculation pulls the last integrator back so it does not wind up.
+An optional control-table ``digital`` section selects the shared discrete plan,
+sampled at code.fs with ADC/PWM quantization, delay and finite-word states.
+The ngspice control script updates held sources while preserving circuit state.
 """
 from __future__ import annotations
 
@@ -37,7 +39,9 @@ from typing import Any
 
 KEYS = ("control", "inputs", "outputs", "note")
 INPUT_KEYS = ("probe", "value", "ramp", "filter")
-OUTPUT_KEYS = ("switches", "complement", "dead_time", "model")
+MODULATIONS = ("pwm", "vco")
+VCO_FIELDS = ("frequency_min", "frequency_max")  # Hz, explicit positive ordered limits
+OUTPUT_KEYS = ("switches", "complement", "dead_time", "model", "modulation", *VCO_FIELDS)
 MODELS = ("switching", "average")
 ROOT_ABS = 1e-6            # rad/s: a root this small is s = 0
 DEFAULT_W = 2 * math.pi * 1e3
@@ -45,6 +49,7 @@ DEFAULT_W = 2 * math.pi * 1e3
 # 10-90 % over about 2.2 / SHARPNESS of the carrier's 0..1 swing.
 EDGE_SPAN = 2.2
 MIN_PULSE_EDGES = 5        # a bridge leg's shortest on-time, in switch edge times
+DELAY_MATCH_ULPS = 8       # equivalent SI spellings can round a few float steps apart
 # ngspice's PULSE misreads a zero plateau when rise + fall fill the whole
 # period (it holds the top for half a period instead), so each carrier gets a
 # plateau of this fraction of the period, taken from its slopes.
@@ -64,6 +69,7 @@ class Loop:
     inputs: dict[str, dict]                     # control input -> settings
     outputs: dict[str, dict]                    # control output -> switches, complement, dead_time
     warnings: list[str] = field(default_factory=list)
+    digital: Any = None                         # control.digital.Digital
 
     @property
     def averaged(self) -> dict[str, tuple[str, str]]:
@@ -80,6 +86,16 @@ class Loop:
 def node(signal: str) -> str:
     """The SPICE node of a controller signal; park.d -> cl_park__d."""
     return "cl_" + signal.replace(".", "__")
+
+
+def duty_node(loop: Loop, signal: str) -> str:
+    if not loop.digital:
+        return node(signal)
+    name = node(signal) + "__duty"
+    occupied = {node(bid) for bid in loop.plan.inputs} | {node(st.id) for st in loop.plan.steps}
+    while name in occupied:
+        name += "_"
+    return name
 
 
 def _table(raw: Any, base_dir: str | Path | None) -> dict:
@@ -125,7 +141,7 @@ def describe(control: Any, base_dir: str | Path | None) -> dict:
     """What the editor needs to map a control table onto the circuit."""
     raw, pl, _ = controller(control, base_dir)
     return {"name": str(raw.get("name") or "control"), "title": str(raw.get("title") or ""),
-            "inputs": pl.inputs, "outputs": pl.outputs}
+            "inputs": pl.inputs, "outputs": pl.outputs, "table": raw, "modulations": list(MODULATIONS)}
 
 
 def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dict[str, str],
@@ -180,9 +196,11 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
         what = f"closed_loop.outputs.{bid}"
         if bid not in pl.outputs:
             raise ClosedLoopError(f"{what}：不是控制器的输出；输出为 {pl.outputs}")
-        if not isinstance(cfg, dict) or "switches" not in cfg or set(cfg) - set(OUTPUT_KEYS):
+        if not isinstance(cfg, dict) or "switches" not in cfg:
             raise ClosedLoopError(f"{what}：写成 {{\"switches\": [\"S1\"]}}，桥臂可加 "
                                   f"\"complement\": [\"S2\"] 和 \"dead_time\": 1e-6")
+        if unknown := sorted(set(cfg) - set(OUTPUT_KEYS)):
+            raise ClosedLoopError(f"{what}：未知字段 {unknown}；可用字段 {list(OUTPUT_KEYS)}")
         sws, comp = cfg["switches"], cfg.get("complement", [])
         if not isinstance(sws, list) or not sws or not isinstance(comp, list):
             raise ClosedLoopError(f"{what}.switches 需要至少一个开关元件；complement 是开关列表")
@@ -196,12 +214,24 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
         dead = _num(cfg.get("dead_time", 0), f"{what}.dead_time")
         if dead < 0 or (dead and not comp):
             raise ClosedLoopError(f"{what}.dead_time 须 ≥ 0，且只用于有 complement 的桥臂")
-        model = cfg.get("model", "average" if comp else "switching")
+        modulation = cfg.get("modulation", "pwm")
+        if modulation not in MODULATIONS:
+            raise ClosedLoopError(f"{what}.modulation 须为 {list(MODULATIONS)}")
+        bounds = {}
+        if modulation == "vco":
+            bounds = {k: _num(cfg.get(k), f"{what}.{k}") for k in VCO_FIELDS}
+            if not 0 < bounds['frequency_min'] < bounds['frequency_max']:
+                raise ClosedLoopError(f"{what}：要求 0 < frequency_min < frequency_max，单位 Hz")
+        elif set(cfg).intersection(VCO_FIELDS):
+            raise ClosedLoopError(f"{what}：{', '.join(VCO_FIELDS)} 仅用于 VCO 变频调制")
+        model = cfg.get("model", "average" if comp and modulation == "pwm" else "switching")
+        if modulation == "vco" and model != "switching":
+            raise ClosedLoopError(f"{what}：VCO 变频调制只支持 switching 模型")
         if model not in MODELS or (model == "average" and len(comp) != len(sws)):
             raise ClosedLoopError(f"{what}.model 须为 {list(MODELS)}；average 用于桥臂，"
                                   f"switches 与 complement 一一对应（上管、下管）")
         loop.outputs[bid] = {"switches": list(sws), "complement": list(comp), "dead_time": dead,
-                             "model": model}
+                             "model": model, **({'modulation': modulation, **bounds} if bounds else {})}
 
     for st in pl.steps:
         if st.kind in ("sos", "pi"):
@@ -209,7 +239,18 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
             loop.tf[st.id] = tf.zpk
             if tf.delay:
                 loop.warnings.append(f"{st.id}：传递函数里的延迟 {tf.delay:g} s 未仿真")
-    loop.warnings.append(CONTINUOUS_NOTE)
+    if "digital" in raw:
+        from .control.custom_c import is_step
+        if any(is_step(st) for st in pl.steps):
+            raise ClosedLoopError("C 代码方块使用 code.fs 固定采样；暂不支持 digital 延迟与量化设置")
+        from .control.digital import NOTE, parse, prepare
+        loop.digital = parse(raw["digital"], pl, spec.params)
+        if loop.digital.pwm_bits and any(cfg.get('modulation') == 'vco' for cfg in loop.outputs.values()):
+            raise ClosedLoopError("VCO 的输出单位为 Hz，不能使用占空比 digital.pwm_bits；请移除此设置")
+        loop.plan = prepare(pl, loop.digital)
+        loop.warnings = [NOTE]
+    else:
+        loop.warnings.append(CONTINUOUS_NOTE)
     return loop
 
 
@@ -374,10 +415,11 @@ def _tf_lines(sid: str, zpk, u: str, lo, hi, warnings: list[str]) -> list[str]:
 
 
 def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str, dict]],
-          tr: dict) -> list[str]:
+          tr: dict, *, native=False) -> list[str]:
     """Controller, inputs and modulators; ``switches``: id -> (SPICE name, values)."""
     pl = loop.plan
     out = [f"* Closed loop: controller from control table {json.dumps(loop.name, ensure_ascii=True)}",
+           "* Sampled controller updated by the control script." if loop.digital else
            "* Continuous-time model of the controller; no sampling or quantisation."]
     for bid in pl.inputs:
         cfg = loop.inputs[bid]
@@ -395,8 +437,15 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
         else:
             out.append(f"Vcl_{bid} {node(bid)} 0 DC {_g(cfg['value'])}")
     for st in pl.steps:
+        if loop.digital:
+            out.append(f"V{node(st.id)} {node(st.id)} 0 DC 0")
+            continue
         x = [f"v({node(s)})" for s in st.srcs]
         if st.kind == "fn":
+            if st.data["fn"] == "c":
+                if not native:
+                    raise ClosedLoopError("ngspice 不支持 C 代码方块；请选择 PLECS／Simulink 离散控制器导出")
+                continue  # native validation still checks the remaining controller and modulators
             from .control.functions import expressions
             exprs = expressions(st.data["fn"], dict(zip(st.data["names"], x)), "spice")
             out.append(f"* {st.id}: {st.note}")
@@ -418,24 +467,79 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
         else:                                   # copy, limit
             expr = x[0]
         out.append(f"Bcl_{st.id} cl_{st.id} 0 V = {_clamp(expr, st.lo, st.hi)}")
-    for bid, cfg in loop.outputs.items():
+    for index, (bid, cfg) in enumerate(loop.outputs.items()):
+        duty = duty_node(loop, bid)
+        if loop.digital:
+            out.append(f"V{duty} {duty} 0 DC {_g(cfg.get('frequency_min', 0))}")
+        if cfg.get('modulation') == 'vco':
+            out += vco_lines(index, cfg, switches, duty, tr)
+            continue
         if cfg["model"] == "average":
             # the leg itself is written by spice.make_deck (average_leg);
             # the drive nodes keep drive probes working
             for sw in cfg["switches"]:
                 name = switches[sw][0]
-                out.append(f"Bctl_{name} ctl_{name} 0 V = min(max(v({node(bid)}), 0), 1)")
+                out.append(f"Bctl_{name} ctl_{name} 0 V = min(max(v({duty}), 0), 1)")
             for sw in cfg["complement"]:
                 name = switches[sw][0]
-                out.append(f"Bctl_{name} ctl_{name} 0 V = 1 - min(max(v({node(bid)}), 0), 1)")
+                out.append(f"Bctl_{name} ctl_{name} 0 V = 1 - min(max(v({duty}), 0), 1)")
             continue
         bridge = bool(cfg["complement"])
         for sw in cfg["switches"]:
             name, val = switches[sw]
-            out += modulator(name, val, node(bid), sw, triangle=bridge, dead=cfg["dead_time"])
+            out += modulator(name, val, duty, sw, triangle=bridge, dead=cfg["dead_time"])
         for sw in cfg["complement"]:
             name, val = switches[sw]
-            out += modulator(name, val, node(bid), sw, triangle=True, dead=cfg["dead_time"], low=True)
+            out += modulator(name, val, duty, sw, triangle=True, dead=cfg["dead_time"], low=True)
+    return out
+
+
+def vco_lines(index, cfg, switches, signal, tr):
+    """One integrated phase for the entire group; transport delays only turn-on.
+
+    The matched lossless line has unity gain and a delay in seconds (ngspice
+    manual 6.1). min(raw, delayed) turns off immediately and turns on after
+    dead_time, including frequency steps. A phase offset proportional to the
+    instantaneous frequency would not preserve this time interval.
+    """
+    group = [switches[sw] for sw in cfg['switches'] + cfg['complement']]
+    delay = group[0][1]['delay']
+    if any(abs(val['delay'] - delay) > DELAY_MATCH_ULPS * math.ulp(max(val['delay'], delay)) for _, val in group):
+        raise ClosedLoopError("同一 VCO 输出的所有开关须使用相同 delay，由共享相位产生互补驱动")
+    edge = max(max(val['rise'], val['fall']) for _, val in group)
+    fmin, fmax, dead = cfg['frequency_min'], cfg['frequency_max'], cfg['dead_time']
+    if dead + MIN_PULSE_EDGES * edge >= .5 / fmax:
+        raise ClosedLoopError("VCO：dead_time 和开关边沿过长，最高频率的半周期内没有足够导通时间")
+    if tr['step'] > 1 / fmax / 50 or tr['max_step'] > (.5 / fmax - dead) / 10:
+        raise ClosedLoopError("VCO：时间步长过大；最高频率每周期至少 50 个采样点，导通段至少 10 步")
+    if delay + 1 / fmin > tr['stop']:
+        raise ClosedLoopError("VCO：结束时间须覆盖启动延迟之后至少一个最低频率周期")
+    prefix = f'cd_vco_{index}'
+    freq, phase = prefix + '_frequency', prefix + '_phase'
+    enable = prefix + '_enable'
+    out = [f'* VCO: controller Hz clamped to {_g(fmin)}..{_g(fmax)}, shared phase in cycles',
+           f'B{freq} {freq} 0 V = {_clamp(f"v({signal})", fmin, fmax)}',
+           f'V{enable} {enable} 0 PWL(0 0 ' + (f'{_g(delay)} 0 ' if delay else '') + f'{_g(delay + edge)} 1)',
+           f'C{phase} {phase} 0 {_g(1/fmax)} IC=0', f'R{phase} {phase} 0 1e12',
+           f'B{phase} 0 {phase} I = v({enable})*v({freq})/{_g(fmax)}']
+    wave = f'0.5*(1 + tanh({_g(EDGE_SPAN / (2 * math.pi * edge))}/v({freq})*sin({_g(2 * math.pi)}*v({phase}))))'
+    for polarity, members in (('high', cfg['switches']), ('low', cfg['complement'])):
+        if not members:
+            continue
+        raw = prefix + '_' + polarity
+        expr = wave if polarity == 'high' else f'1 - ({wave})'
+        out.append(f'B{raw} {raw} 0 V = v({enable})*({expr})')
+        drive = f'v({raw})'
+        if dead:
+            delayed = raw + '_delayed'
+            out += [f'T{raw} {raw} 0 {delayed} 0 Z0=1 TD={_g(dead)} IC=0,0,0,0',
+                    f'R{delayed} {delayed} 0 1']
+            # Delay-line interpolation can undershoot at a sharp edge; a
+            # normalized gate must never produce negative conductance.
+            drive = f'min(v({raw}), max(0, v({delayed})))'
+        for sw in members:
+            name = switches[sw][0]
+            out.append(f'Bctl_{name} ctl_{name} 0 V = {drive}')
     return out
 
 

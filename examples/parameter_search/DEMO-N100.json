@@ -1,0 +1,495 @@
+{
+  "format": "powerdesignkit.device/1",
+  "kind": "mosfet",
+  "technology": "si",
+  "part": "DEMO-N100",
+  "manufacturer": "Synthetic Semi",
+  "source": {
+    "file": "DEMO-N100.pdf",
+    "sha256": "9e4cbbbbe38bd3c745858b1897510743ad0c8be309fddb0105c784cce9864651",
+    "pages": 3
+  },
+  "params": {
+    "vds_max": [
+      {
+        "value": 100.0,
+        "stat": "min",
+        "page": 2,
+        "printed": "100 V",
+        "quote": "V(BR)DSS Drain-to-Source Breakdown Voltage 100 ––– ––– V VGS = 0V, ID = 250µA",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vgs": 0.0
+        }
+      }
+    ],
+    "vgs_max": [
+      {
+        "value": 20.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "20 V",
+        "quote": "VGS Gate-to-Source Voltage ± 20 V",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致"
+      }
+    ],
+    "rds_on": [
+      {
+        "value": 0.037,
+        "stat": "typ",
+        "page": 2,
+        "printed": "37 mΩ",
+        "quote": "RDS(on) Static Drain-to-Source On-Resistance ––– 37 44 mΩ VGS = 10V, ID = 16A",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vgs": 10.0,
+          "id": 16.0
+        }
+      },
+      {
+        "value": 0.044,
+        "stat": "max",
+        "page": 2,
+        "printed": "44 mΩ",
+        "quote": "RDS(on) Static Drain-to-Source On-Resistance ––– 37 44 mΩ VGS = 10V, ID = 16A",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vgs": 10.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "qg": [
+      {
+        "value": 4.7000000000000004e-08,
+        "stat": "typ",
+        "page": 2,
+        "printed": "47 nC",
+        "quote": "Qg Total Gate Charge ––– 47 71 nC ID = 16A, VDS = 80V, VGS = 10V",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 80.0,
+          "vgs": 10.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "qgs": [
+      {
+        "value": 1e-08,
+        "stat": "typ",
+        "page": 2,
+        "printed": "10 nC",
+        "quote": "Qgs Gate-to-Source Charge ––– 10 15 nC ID = 16A, VDS = 80V",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 80.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "qgd": [
+      {
+        "value": 1.8000000000000002e-08,
+        "stat": "typ",
+        "page": 2,
+        "printed": "18 nC",
+        "quote": "Qgd Gate-to-Drain (\"Miller\") Charge ––– 18 27 nC ID = 16A, VDS = 80V",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 80.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "ciss": [
+      {
+        "value": 1.96e-09,
+        "stat": "typ",
+        "page": 2,
+        "printed": "1960 pF",
+        "quote": "Ciss Input Capacitance ––– 1960 ––– pF VGS = 0V, VDS = 25V",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 25.0,
+          "f": 1000000.0
+        }
+      }
+    ],
+    "coss": [
+      {
+        "value": 2.5e-10,
+        "stat": "typ",
+        "page": 2,
+        "printed": "250 pF",
+        "quote": "Coss Output Capacitance ––– 250 ––– pF f = 1.0MHz",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 25.0,
+          "f": 1000000.0
+        }
+      }
+    ],
+    "crss": [
+      {
+        "value": 4e-11,
+        "stat": "typ",
+        "page": 2,
+        "printed": "40 pF",
+        "quote": "Crss Reverse Transfer Capacitance ––– 40 ––– pF",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "vds": 25.0,
+          "f": 1000000.0
+        }
+      }
+    ],
+    "qrr": [
+      {
+        "value": 5.05e-07,
+        "stat": "typ",
+        "page": 2,
+        "printed": "505 nC",
+        "quote": "Qrr Reverse Recovery Charge ––– 505 760 nC di/dt = 100A/µs",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致",
+        "cond": {
+          "di_dt": 100000000.0,
+          "if": 16.0
+        }
+      }
+    ],
+    "rth_jc": [
+      {
+        "value": 1.15,
+        "stat": "max",
+        "page": 1,
+        "printed": "1.15 °C/W",
+        "quote": "RthJC Junction-to-Case ––– 1.15 °C/W",
+        "method": "ai",
+        "source_check": "found",
+        "note": "表格规则读取一致"
+      }
+    ],
+    "id_cont": [
+      {
+        "value": 33.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "33 A",
+        "quote": "ID @ TC = 25°C Continuous Drain Current, VGS @ 10V 33 A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "vgs": 10.0,
+          "tc": 25.0
+        }
+      }
+    ],
+    "id_pulse": [
+      {
+        "value": 110.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "110 A",
+        "quote": "IDM Pulsed Drain Current 110 A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充"
+      }
+    ],
+    "pd": [
+      {
+        "value": 130.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "130 W",
+        "quote": "PD @TC = 25°C Power Dissipation 130 W",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "tc": 25.0
+        }
+      }
+    ],
+    "tj_max": [
+      {
+        "value": 175.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "175 °C",
+        "quote": "TJ max Operating Junction Temperature 175 °C",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充"
+      }
+    ],
+    "rth_ja": [
+      {
+        "value": 62.0,
+        "stat": "max",
+        "page": 1,
+        "printed": "62 °C/W",
+        "quote": "RthJA Junction-to-Ambient ––– 62 °C/W",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充"
+      }
+    ],
+    "vgs_th": [
+      {
+        "value": 2.0,
+        "stat": "min",
+        "page": 2,
+        "printed": "2 V",
+        "quote": "VGS(th) Gate Threshold Voltage 2.0 ––– 4.0 V VDS = VGS, ID = 250µA",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "id": 0.00025
+        }
+      },
+      {
+        "value": 4.0,
+        "stat": "max",
+        "page": 2,
+        "printed": "4 V",
+        "quote": "VGS(th) Gate Threshold Voltage 2.0 ––– 4.0 V VDS = VGS, ID = 250µA",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "id": 0.00025
+        }
+      }
+    ],
+    "gfs": [
+      {
+        "value": 21.0,
+        "stat": "min",
+        "page": 2,
+        "printed": "21 S",
+        "quote": "gfs Forward Transconductance 21 ––– ––– S VDS = 50V, ID = 16A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "vds": 50.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "td_on": [
+      {
+        "value": 1.1000000000000001e-08,
+        "stat": "typ",
+        "page": 2,
+        "printed": "11 ns",
+        "quote": "td(on) Turn-On Delay Time ––– 11 ––– ns VDD = 50V, ID = 16A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "vds": 50.0,
+          "id": 16.0
+        }
+      }
+    ],
+    "tr": [
+      {
+        "value": 3.5e-08,
+        "stat": "typ",
+        "page": 2,
+        "printed": "35 ns",
+        "quote": "tr Rise Time ––– 35 ––– ns RG = 5.1Ω",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "rg": 5.1
+        }
+      }
+    ],
+    "vsd": [
+      {
+        "value": 1.2,
+        "stat": "max",
+        "page": 2,
+        "printed": "1.2 V",
+        "quote": "VSD Diode Forward Voltage ––– ––– 1.2 V TJ = 25°C, IS = 16A, VGS = 0V",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "vgs": 0.0,
+          "is": 16.0,
+          "tj": 25.0
+        }
+      }
+    ],
+    "trr": [
+      {
+        "value": 1.1500000000000001e-07,
+        "stat": "typ",
+        "page": 2,
+        "printed": "115 ns",
+        "quote": "trr Reverse Recovery Time ––– 115 170 ns TJ = 25°C, IF = 16A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "if": 16.0,
+          "tj": 25.0
+        }
+      },
+      {
+        "value": 1.7000000000000001e-07,
+        "stat": "max",
+        "page": 2,
+        "printed": "170 ns",
+        "quote": "trr Reverse Recovery Time ––– 115 170 ns TJ = 25°C, IF = 16A",
+        "method": "rules",
+        "source_check": "found",
+        "note": "AI 未报告，由表格规则补充",
+        "cond": {
+          "if": 16.0,
+          "tj": 25.0
+        }
+      }
+    ]
+  },
+  "curves": {
+    "rds_on_norm_vs_tj": [
+      {
+        "points": [
+          [
+            -50.0,
+            0.75
+          ],
+          [
+            25.0,
+            1.0
+          ],
+          [
+            175.0,
+            2.0
+          ]
+        ],
+        "page": 3,
+        "method": "ai",
+        "note": "从曲线图读取，精度约为一个网格的几分之一",
+        "cond": {
+          "vgs": 10.0
+        }
+      }
+    ],
+    "coss_vs_vds": [
+      {
+        "points": [
+          [
+            1.0,
+            2e-09
+          ],
+          [
+            5.0,
+            9e-10
+          ],
+          [
+            25.0,
+            2.6e-10
+          ],
+          [
+            50.0,
+            1.7e-10
+          ],
+          [
+            100.0,
+            1.1e-10
+          ]
+        ],
+        "page": 3,
+        "method": "ai",
+        "note": "从曲线图读取，精度约为一个网格的几分之一"
+      }
+    ],
+    "zth_jc_vs_tp": [
+      {
+        "points": [
+          [
+            1e-05,
+            0.0513
+          ],
+          [
+            3e-05,
+            0.115
+          ],
+          [
+            0.0001,
+            0.218
+          ],
+          [
+            0.0003,
+            0.365
+          ],
+          [
+            0.001,
+            0.561
+          ],
+          [
+            0.003,
+            0.787
+          ],
+          [
+            0.01,
+            0.972
+          ],
+          [
+            0.03,
+            1.09
+          ],
+          [
+            0.1,
+            1.15
+          ],
+          [
+            0.3,
+            1.15
+          ],
+          [
+            1.0,
+            1.15
+          ]
+        ],
+        "method": "manual",
+        "note": "示例数据：单脉冲曲线，按虚构的 4 阶 Foster 网络生成"
+      }
+    ]
+  },
+  "notes": [
+    "示例文件：手册和数值都是虚构的，用来演示格式。曲线点为演示数据。"
+  ]
+}

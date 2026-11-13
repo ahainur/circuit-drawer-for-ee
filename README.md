@@ -2,31 +2,31 @@
 
 [简体中文](README.zh-CN.md) | English
 
-Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink and PLECS.
+Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink, PLECS and open-loop PSIM models.
 
 <p align="center">
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.6.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.6.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for Windows — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.6.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit_drawer_for_ee-1.6.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v1.6.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.6.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for Windows — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.7.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
 All four buttons download the same **universal Python package (`.whl`, Python 3.10+)**. See [installation](#installation) below. macOS and Linux currently have preview support.
 
-[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.6.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-trial-1.6.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-manuals-1.6.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.6.0/circuit-drawer-public-source-1.6.0.zip)
+[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.7.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-trial-1.7.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-manuals-1.7.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-public-source-1.7.0.zip)
 
 ![Full-bridge LLC converter, IEEE single column](docs/images/manual/example-llc-fullbridge.png)
 
 ## Highlights
 
-1、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, and a native PLECS Standalone model.
+1、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, a native PLECS Standalone model, and a Python builder for open-loop PSIM models. VCO control exports to PLECS and Simulink preserve frequency limits, continuous phase and dead time.
 
 2、**Paper-ready by default.** Figures fit IEEE single (8.79 cm) or double (17.99 cm) columns with 8 pt Times text. Symbol sizes stay fixed; only the spacing between parts is scaled, so you insert the PDF at 100 % and the text matches your captions.
 
-3、**No automatic layout, strict checking.** Every pin and every wire corner comes from a template or from you. The checker rejects slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and any difference between the drawing and its netlist, and tells you where and why.
+3、**Explicit coordinates, strict checking.** Every pin and every wire corner comes from a template or from you. Explicitly expanding a module can make room for its contents. The checker rejects slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and any difference between the drawing and its netlist, and tells you where and why.
 
-4、**Web editor.** Drag parts from a categorised library, draw wires, select with a box, edit groups, use context menus, undo and redo, nudge with the arrow keys, and see every problem the moment it appears.
+4、**Web editor.** Move parts, wires and modules as one selection; rotate selected ordinary parts and wires in either direction; merge overlapping wires and keep wire hops at their crossings. Box selection, context menus, undo/redo, arrow-key nudging and drawing scaling share the existing checks.
 
 5、**Modules.** Define a converter cell once, drag it from the library into the canvas, and connect its ports with ordinary wires. Instances can be folded into boxes with IEC symbols. Folding changes the picture only; simulation always uses the full circuit.
 
@@ -59,7 +59,7 @@ Download the wheel using a button above, then open a terminal in its download fo
 On Windows:
 
 ```powershell
-python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
 On macOS or Linux, install it in a virtual environment:
@@ -67,7 +67,7 @@ On macOS or Linux, install it in a virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
 Keep this environment active when running the commands below. On Debian or Ubuntu, install `python3-venv` if the `venv` module is missing.
@@ -92,6 +92,7 @@ Optional components:
 | ngspice | Running simulations and getting CSV results |
 | MATLAB, Simulink and Simscape | Running the exported Simulink model; PMSM and Clarke/Park blocks also need Simscape Electrical |
 | PLECS Standalone | Opening the exported `.plecs` model |
+| PSIM 2026 and its official Python API | Building and running the exported open-loop PSIM model; [supported models and steps](docs/PSIM_EXPORT.md) |
 | Python package `anthropic` | The AI assistant with an Anthropic-compatible interface (`python -m pip install "anthropic>=2.3"`) |
 
 Drawing, editing, checking, exporting TeX and exporting simulation models need none of these. See the [user manual](docs/USER_MANUAL.en.md#2-installation-and-startup) for step-by-step instructions on each platform.
@@ -133,10 +134,11 @@ In the editor, drag parts and wires, watch the status bar for problems, then use
 | Step and pulse marks next to sources | Web editor, part properties |
 | Reusable modules, folding, module library | Web editor, **Modules (subsystems)** group of the parts library |
 | Operating-mode figures | **Modes** tab, or `circuit-drawer modes` |
-| Waveforms bound to modes | **Analysis → Waveforms and modes…**, or `circuit-drawer waveforms` |
-| ngspice simulation | **Analysis → SPICE simulation…**, or `circuit-drawer spice` |
-| Conducted EMI engineering estimates and filter comparison | **Analysis → Conducted EMI estimate…**; start with the `buck_emi` template |
-| Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | **Analysis → SPICE simulation…**, or `circuit-drawer simulink` / `circuit-drawer plecs` |
+| Waveforms bound to modes | **Modes and waveforms → Waveforms and modes…**, or `circuit-drawer waveforms` |
+| ngspice simulation | **Simulation → SPICE simulation…**, or `circuit-drawer spice` |
+| Conducted EMI engineering estimates and filter comparison | **Experimental → Conducted EMI estimate…**; start with the `buck_emi` template |
+| Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | **Simulation → Export to Simulink… / Export to PLECS…**, or `circuit-drawer simulink` / `circuit-drawer plecs` |
+| Open-loop PSIM models | **Simulation → Export to PSIM…**, or `circuit-drawer psim`; run the generated Python builder with the official PSIM API |
 | Control diagrams, loop analysis, C code | `circuit-drawer-control` |
 | New topology from a description, or a one-sentence change | **AI** menu, or `circuit-drawer new` / `circuit-drawer tweak` |
 | Save a checked table as your own template | `circuit-drawer save-template` |

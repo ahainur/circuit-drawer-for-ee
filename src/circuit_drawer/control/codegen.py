@@ -123,7 +123,7 @@ def parse_code(raw: Any, dia, env: dict[str, float]) -> tuple[dict | None, list[
     out["name"] = name
     for key in ("external", "outputs"):
         v = raw.get(key) or []
-        if not isinstance(v, list) or any(x not in signals for x in v):
+        if not isinstance(v, list) or any(x not in signals or (key == "outputs" and x in fns) for x in v):
             errors.append(f"code.{key} must list blocks in the drawing (a function block's "
                           f"output as block.output)")
             v = []
@@ -195,7 +195,9 @@ def plan(rep) -> Plan:
     inputs += [b for b in dia.blocks if b.id in external and
                any(src == b.id for c in code_ids for _, src in reads(c))]
     inputs = [b if isinstance(b, str) else b.id for b in inputs]
-    outputs = cfg["outputs"] or _default_outputs(rep, net, spec, code_ids, external)
+    outputs = cfg["outputs"] or _default_outputs(rep, net, spec, code_ids, external, fns)
+    if any(fn.kind == "c" for fn in fns.values()) and cfg["arith"] != "double":
+        raise CodeError("C 代码方块要求 code.arith = double")
     if fns and pl_arith_fixed(cfg):
         raise CodeError(f"function blocks {sorted(fns)} need floating point: set code.arith "
                         f"to \"float\" or \"double\"")
@@ -208,6 +210,8 @@ def plan(rep) -> Plan:
         if bid in inputs:
             continue
         if bid in fns:
+            if fns[bid].kind == "c" and cfg["blocks"].get(bid):
+                raise CodeError(f"{bid}：请在 C 代码内设置限幅和下一拍状态，不能使用 code.blocks")
             steps[bid] = _fn_step(fns[bid], KINDS[fns[bid].kind], reads(bid))
             continue
         steps[bid] = _step(blocks[bid], reads(bid), spec.tf.get(bid), cfg, pl)
@@ -230,18 +234,19 @@ def _fn_step(fn, kind, ins: list[tuple[str, str]]) -> Step:
     """One function block: its inputs in the kind's order, one value per output."""
     given = {}
     for name, src in ins:
-        if name not in kind.inputs:
+        if name not in fn.ins:
             raise CodeError(f"{fn.block}: a line ends at port {name.lstrip('?')} that is not "
                             f"one of its inputs {list(fn.ins)}")
         if name in given:
             raise CodeError(f"{fn.block}: two lines feed its input {name}")
         given[name] = src
-    names = [n for n in kind.inputs if n in fn.ins]
+    names = list(fn.ins)
     missing = [n for n in names if n not in given]
     if missing:
         raise CodeError(f"{fn.block}: nothing drives its inputs {missing}")
     return Step(fn.block, "fn", [given[n] for n in names],
-                data={"fn": fn.kind, "names": names, "outs": [fn.signal(o) for o in fn.outs]},
+                data={"fn": fn.kind, "names": names, "outs": [fn.signal(o) for o in fn.outs],
+                      **({"c": fn.c} if fn.c is not None else {})},
                 note=f"{fn.kind}: {kind.doc}")
 
 
@@ -254,14 +259,15 @@ def cid(signal: str) -> str:
     return signal.replace(".", "_")
 
 
-def _default_outputs(rep, net, spec, code_ids, external) -> list[str]:
+def _default_outputs(rep, net, spec, code_ids, external, fns) -> list[str]:
     outs = [p.src for p in spec.plant if _owner(p.src) in code_ids]
     outs += [src for b in external for _, src in net.inputs.get(b, []) if _owner(src) in code_ids]
     if not outs:
         g = rep.geometry
         for lk, path in zip(rep.diagram.links, g.paths):
             if lk.open and path and lk.start.block in code_ids:
-                outs.append(lk.start.block)
+                fn = fns.get(lk.start.block)
+                outs.append(fn.output_at(lk.start.port, lk.start.offset) if fn else lk.start.block)
     return list(dict.fromkeys(outs))
 
 
@@ -366,7 +372,10 @@ def _needed(pl: Plan, outputs: list[str]) -> set[str]:
 
 
 # ---- reference simulation (double precision) ------------------------------------
-def simulate(pl: Plan, inputs: dict[str, list[float]]) -> dict[str, list[float]]:
+def simulate(pl: Plan, inputs: dict[str, list[float]], *, quantizer=None) -> dict[str, list[float]]:
+    from .custom_c import is_step
+    if any(is_step(st) for st in pl.steps):
+        raise CodeError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
     n = len(next(iter(inputs.values()))) if inputs else 0
     state: dict[str, Any] = {}
     out: dict[str, list[float]] = {o: [] for o in pl.outputs}
@@ -380,9 +389,9 @@ def simulate(pl: Plan, inputs: dict[str, list[float]]) -> dict[str, list[float]]
                 v.update({f"{st.id}.{k}": res[k] for k in res})
                 continue
             if st.delay:
-                state[st.id + "#z"] = _run(st, v, state)
+                state[st.id + "#z"] = _run(st, v, state, quantizer)
                 continue
-            v[st.id] = _run(st, v, state)
+            v[st.id] = _run(st, v, state, quantizer)
         for o in pl.outputs:
             out[o].append(v[o])
     return out
@@ -396,35 +405,42 @@ def _clamp(x: float, lo, hi) -> float:
     return x
 
 
-def _run(st: Step, v: dict, state: dict) -> float:
+def _run(st: Step, v: dict, state: dict, quantizer=None) -> float:
+    def rounded(value):
+        return quantizer(value) if quantizer else value
+
+    def limited(value):
+        return rounded(_clamp(value, st.lo, st.hi))
+
     x = [v[s] for s in st.srcs]
     if st.kind == "sum":
-        return _clamp(sum(g * a for g, a in zip(st.signs, x)), st.lo, st.hi)
+        return limited(sum(g * a for g, a in zip(st.signs, x)))
     if st.kind == "copy":
-        return x[0]
+        return rounded(x[0])
     if st.kind == "mul":
-        return _clamp(math.prod(x), st.lo, st.hi)
+        return limited(math.prod(x))
     if st.kind == "div":
         den = math.prod(x[1:])
-        return _clamp(x[0] / den if den else 0.0, st.lo, st.hi)
+        return limited(x[0] / den if den else 0.0)
     if st.kind == "limit":
-        return _clamp(x[0], st.lo, st.hi)
+        return limited(x[0])
     if st.kind == "gain":
-        return _clamp(st.data["k"] * x[0], st.lo, st.hi)
+        return limited(st.data["k"] * x[0])
     if st.kind == "pi":
         s = state.setdefault(st.id, {"i": 0.0, "e1": 0.0})
         d = st.data
-        s["i"] = _clamp(s["i"] + d["c0"] * x[0] + d["c1"] * s["e1"], st.lo, st.hi)
+        s["i"] = limited(s["i"] + d["c0"] * x[0] + d["c1"] * s["e1"])
         s["e1"] = x[0]
-        return _clamp(d["kp"] * x[0] + s["i"], st.lo, st.hi)
+        return limited(d["kp"] * x[0] + s["i"])
     secs = st.data["sos"].sections
     s = state.setdefault(st.id, [[0.0] * 4 for _ in secs])
-    u = x[0] * st.data["sos"].gain
+    u = rounded(x[0] * st.data["sos"].gain)
     for i, (sec, w) in enumerate(zip(secs, s)):
         y = (sec.b[0] * u + sec.b[1] * w[0] + sec.b[2] * w[1]
              - sec.a[1] * w[2] - sec.a[2] * w[3])
         if i == len(secs) - 1:
             y = _clamp(y, st.lo, st.hi)
+        y = rounded(y)
         w[1], w[0], w[3], w[2] = w[0], u, w[2], y
         u = y
     return u
@@ -476,6 +492,10 @@ def emit_c(pl: Plan) -> dict[str, str]:
     h += ["typedef struct {"] + [f"    {t} {cid(o)};" for o in pl.outputs] + [f"}} {n}_out_t;", ""]
     state = []
     for st in pl.steps:
+        if st.kind == "fn" and st.data["fn"] == "c":
+            names = st.data["c"]["states"]
+            if names:
+                state += ["    struct {"] + [f"        double {name};" for name in names] + [f"    }} {st.id};"]
         if st.kind == "pi":
             state.append(f"    cg_pi{sfx}_t {st.id};")
         elif st.kind == "sos":
@@ -508,7 +528,10 @@ def emit_c(pl: Plan) -> dict[str, str]:
                              for sec in secs)
             c += [f"/* {what}.  Per section b0 b1 b2 a1 a2 */",
                   f"static const {t} {st.id.upper()}_C[{len(secs)}][5] = {{{rows}}};", ""]
-    c += [f"void {n}_init({n}_t *s)", "{", "    memset(s, 0, sizeof *s);", "}", "",
+    initial = [f"    s->{st.id}.{name} = {_f(value)};"
+               for st in pl.steps if st.kind == "fn" and st.data["fn"] == "c"
+               for name, value in st.data["c"]["states"].items()]
+    c += [f"void {n}_init({n}_t *s)", "{", "    memset(s, 0, sizeof *s);", *initial, "}", "",
           f"void {n}_step({n}_t *s, const {n}_in_t *in, {n}_out_t *out)", "{"]
     if not state:
         c.append("    (void)s;")
@@ -520,6 +543,14 @@ def emit_c(pl: Plan) -> dict[str, str]:
     for st in pl.steps:
         x = [ref[src] for src in st.srcs]
         if st.kind == "fn":
+            if st.data["fn"] == "c":
+                from .custom_c import statements
+                outputs = {out.split('.',1)[1]:cid(out) for out in st.data['outs']}
+                old = {key:f's->{st.id}.{key}' for key in st.data['c']['states']}
+                c += [f"    double {value};" for value in outputs.values()]
+                c.append(statements(st.data['c'],dict(zip(st.data['names'],x)),outputs,old,old))
+                ref.update({out:cid(out) for out in st.data['outs']})
+                continue
             from .functions import expressions
             c.append(f"    /* {st.id}: {st.note} */")
             exprs = expressions(st.data["fn"], dict(zip(st.data["names"], x)),
@@ -622,6 +653,8 @@ def report(pl: Plan) -> dict[str, Any]:
             d["k"] = st.data["k"]
         if st.kind == "fn":
             d.update(fn=st.data["fn"], outputs=st.data["outs"])
+            if st.data["fn"] == "c":
+                d.update(c=st.data["c"])
         if st.kind == "pi":
             d.update({k: st.data[k] for k in ("kp", "c0", "c1", "method")})
         if st.kind == "sos":
@@ -659,6 +692,8 @@ def write_code(raw: dict, out_dir, with_harness: bool = False) -> dict[str, Any]
     if not rep.ok:
         raise Rejected(rep)
     pl = plan(rep)
+    if "digital" in raw:
+        pl.warnings.append("digital 的 ADC、PWM、延迟调度和有限字长仿真设置需要在目标硬件另行实现；本次 C 代码使用 code 段的算术格式")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     files = emit_c(pl)

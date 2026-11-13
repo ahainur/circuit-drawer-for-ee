@@ -2,7 +2,7 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | [繁體中文](USER_MANUAL.zh-TW.md) | English
 
-This manual covers Circuit Drawer for EE 1.6.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 1.7.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
 Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
 
@@ -103,10 +103,10 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 ### 2.2 Installing the program
 
-Option 1: download the wheel `circuit_drawer_for_ee-1.6.0-py3-none-any.whl` from the [GitHub Releases](https://github.com/ahainur/circuit-drawer-for-ee/releases) page and run, in the folder that contains it:
+Option 1: download the wheel `circuit_drawer_for_ee-1.7.0-py3-none-any.whl` from the [GitHub Releases](https://github.com/ahainur/circuit-drawer-for-ee/releases) page and run, in the folder that contains it:
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.6.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
 Option 2: install directly from the repository:
@@ -259,6 +259,8 @@ circuit-drawer draw dab output=source currents -o figs --name dab_fig -f pdf,png
 | `vienna_rectifier` (`维也纳`, `vienna`, ...) | Textbook three-phase Vienna PFC | `switch` | Single | None |
 | `buck` (`降压变换器`, ...) | Buck with freewheeling diode | `switch=drawn/mosfet/igbt` | Single | 2 CCM |
 | `buck_emi` (`传导EMI`, `EMI Buck`) | Buck, two LISNs, chassis parasitics and filter | Edit electrical values in the SPICE window | Double | None |
+| `buck_impedance` | Buck averaged output impedance | AC sweep, transient injection, Bode/Nyquist | Double | None |
+| `grid_dq_impedance` | Grid-connected inverter dq impedance | Two-axis injection, full matrix, amplitude/step comparison | Double | None |
 | `boost` (`升压变换器`, ...) | Boost with output diode | `switch=drawn/mosfet/igbt` | Single | 2 CCM |
 | `llc_halfbridge` (`半桥llc`, ...) | Half bridge, Cr–Lr, Lm, centre-tapped rectifier | `switch=drawn/mosfet/igbt` | Single | None |
 | `cllc` (`clllc`, ...) | Two full bridges, series LC on both sides, Lm | `switch=drawn/mosfet/igbt` | Double | None |
@@ -272,6 +274,18 @@ circuit-drawer draw dab output=source currents -o figs --name dab_fig -f pdf,png
 2、The output of `circuit-drawer list` is the authoritative list and includes templates you saved yourself.
 
 3、For templates without built-in modes, define your own in the editor or in the JSON; see [chapter 15](#15-operating-mode-figures).
+
+4、There are 31 basic topologies plus seven analysis/digital-control variants. The 17 additions cover synchronous Buck/Boost, inverting and two-/four-switch buck-boost, Ćuk/SEPIC/Zeta, interleaved Buck/Boost, two-switch forward, phase-shift full bridge, single-phase half-/full-bridge inverters, single-/three-phase diode bridges and a three-phase thyristor bridge. **File → Open example**, the empty-canvas button, the launcher and `circuit-drawer list` share the same registry. Loading a template is undoable and selects its default column width.
+
+5、Each addition includes modes and defaults to double column. Open the matching JSON in the [companion examples](../examples/power_topologies/README.md) for key waveforms bound to those intervals; copy its `waveforms-data` folder too. Charts say **Ideal analytical reference** and use the stated ideal operating conditions. Recalculate after changing parameters, modulation or connections. The examples document reverse channel conduction, forward reset, full-bridge zero-voltage intervals and rectifier commutation assumptions.
+
+6、Open **Three-phase MMC (two cells per arm)** for six arms, twelve half-bridge cells, six arm inductors and a floating star load. Select a cell and press Enter to edit its internal circuit; cancel to return to the parent. Definitions are stored in the drawing and ordinary wires remain editable. Use **View → Scale circuit…** to resize it. This is a topology drawing: component values, modulation, capacitor balancing and simulation settings must be provided separately.
+
+![Editable three-phase MMC](images/manual/en/mmc-three-phase.png)
+
+![Complete template list](images/manual/en/power-templates.png)
+
+![Ćuk reference waveforms and mode intervals](images/manual/en/power-templates-waveforms.png)
 
 ### 3.3 Export the table, then edit it
 
@@ -311,21 +325,21 @@ Use the **文 / A** selector at the top right to change the interface language i
 
 ### 4.1 Layout
 
-1、**Menu bar** (first row): 文件 (File), 编辑 (Edit), 视图 (View), 插入 (Insert), AI, 分析 (Analysis), 帮助 (Help). Shortcuts are shown on the right of menu items.
+1、**Menu bar** (first row): 文件 (File), 编辑 (Edit), 视图 (View), 插入 (Insert), 仿真 (Simulation), 模态与波形 (Modes and waveforms), AI, 帮助 (Help), in the order of the work: draw, simulate, modes and waveforms, export. Shortcuts are shown on the right of menu items; an item with › opens a submenu.
 
-2、**Toolbar** (second row): 保存 (Save), 导出 (Export), 撤销 (Undo), 重做 (Redo), 删除 (Delete), 导线 (Wire), 适应 (Fit), 预览 (Preview), 波形与模态 (Waveforms and modes), AI 修改 (AI edit). Unavailable buttons are greyed out. While a module definition is being edited, **设置端口并保存…** (Set ports and save…) and **取消编辑定义** (Cancel definition editing) appear here.
+2、**Toolbar** (second row), in six groups (file, edit, draw, view, simulation, AI): 保存 (Save), 导出 (Export), 撤销 (Undo), 重做 (Redo), 删除 (Delete), 导线 (Wire), 文字 (Text), 适应 (Fit), 预览 (Preview), **仿真 (Simulation)**, 识别模态 (Identify modes), 波形与模态 (Waveforms and modes), AI 修改 (AI edit). The highlighted Simulation button opens the SPICE simulation window; Identify modes opens **Identify modes from simulation**. Unavailable buttons are greyed out. While a module definition is being edited, **设置端口并保存…** (Set ports and save…) and **取消编辑定义** (Cancel definition editing) appear here.
 
 3、**File tab:** shows the current file name; hover to see the full path. A dot before the name means there are unsaved changes.
 
 4、**Parts library** (left): a categorised list that can be searched, clicked or dragged onto the canvas; see [chapter 5](#5-parts-library-and-parts).
 
-5、**Canvas** (centre): the light dot grid matches the 0.05 snap step. Scroll to zoom; drag with the middle button, or hold Space and drag with the left button, to pan. **视图 → 显示画布坐标刻度** (View > Show canvas coordinate ruler) shows coordinate ticks.
+5、**Canvas** (centre): the light dot grid matches the 0.05 snap step. Scroll to zoom; drag with the middle button, or hold Space and drag with the left button, to pan. **视图 → 坐标刻度** (View > Coordinates) shows coordinate ticks.
 
 6、**Information panel** (right): four tabs.
 
 | Tab | Content |
 | --- | --- |
-| 属性 (Properties) | Settings of the selected object; opens automatically when you select a part, wire, text, region, block, arrow or module. **图纸比例** (Drawing scale) below shows the current scale |
+| 属性 (Properties) | Settings of the selected object; opens automatically when you select a part, wire, text, region, block, function mark, arrow or module. **图纸比例** (Drawing scale) below shows the current scale |
 | 网表 (Netlist) | Net names, pins and branch numbers; expand **SPICE 网表** (SPICE netlist) to see the netlist that would be exported now |
 | 问题 (Issues) | Checker results and fix buttons; the number on the tab is the issue count |
 | 模态 (Modes) | Switching, editing and exporting mode figures |
@@ -336,17 +350,25 @@ Use the **文 / A** selector at the top right to change the interface language i
 
 9、Scroll the parts library and information panel to see additional entries and properties. Successful saves and errors are also shown briefly in a corner of the canvas.
 
+10、**Three levels of hints**: a status line says only the current state or next step; hovering over a button or field shows a short explanation; rules, scope and modelling assumptions sit behind the **?** beside a heading, opened on demand. A wrong entry gets a red note right below the field saying what is wrong and how to fix it, for example `2M` in a SPICE value: “M means milli; write Meg for mega”. The mode panel, SPICE simulation, Identify modes from simulation, the analyses under Experimental (EMI, impedance, stability) and AI connection settings all follow this format.
+
 ### 4.2 Menus
 
 | Menu | Items |
 | --- | --- |
-| 文件 (File) | 保存 (Save), 另存为… (Save As), 存为模板… (Save as template), 存为模块… (Save as module), 导出电路图… (Export circuit figure), 导出全部模态… (Export all modes) |
-| 编辑 (Edit) | 撤销 (Undo), 重做 (Redo), 剪切 (Cut), 复制 (Copy), 粘贴 (Paste), 创建副本 (Duplicate), 旋转 90° (Rotate 90°), 镜像 / 反向 (Mirror / reverse), 增大符号 (Enlarge symbol), 缩小符号 (Shrink symbol), 删除所选 (Delete selection), 同类对象图层 (Layer among objects of the same kind: raise, lower, bring to front, send to back); with modules also 编辑选中模块定义 (Edit selected module definition) and 解散选中实例为普通元件 (Dissolve selected instance), and for old-style module tables 模块定义… (Module definitions) and 转换为端口连接 (Convert to port links) |
-| 视图 (View) | 适应窗口 (Fit), 放大 (Zoom in), 缩小 (Zoom out), 模块显示 (Module display, submenu), 显示节点/支路标号 (Show node and branch labels), 显示画布坐标刻度 (Show canvas ruler), 实时网表面板 (Live netlist panel), 全图器件模型… (Device models for the whole drawing), 栏宽 (Column width), 预览带坐标网 (Grid in preview), 色块灰度 (Grey regions), 真实预览 (True preview) |
-| 插入 (Insert) | 画导线 (Draw wire), 画区域 (Draw region), 画方框 (Draw block), 画箭头 (Draw arrow), 添加模块… (Add module), 阶跃 / 脉冲标记 (Step / pulse mark), 导线交叉 (Wire crossing mode), 元件库 (all parts) |
-| AI | AI 接口设置… (AI interface settings), 描述新拓扑… (Describe a new topology), AI 修改当前图… (AI edit of the current figure) |
-| 分析 (Analysis) | 波形与模态… (Waveforms and modes), SPICE 仿真… (SPICE simulation), 传导 EMI 估算… (Conducted EMI estimate), 以当前连接更新网表 (Update netlist from current connections), 上一个模态 / 下一个模态 (Previous / next mode), 模态真实预览 (True preview of mode) |
-| 帮助 (Help) | 用户指南 (User guide), 提示词说明 (Prompt guide), 关于… (About), 操作与快捷键… (Actions and shortcuts) |
+| 文件 (File) | 保存 (Save), 另存为… (Save As) — 存为模板… (Save as template), 存为模块… (Save as module) — 图纸栏宽 (Figure column width) — 导出 › (Export: circuit figure, all mode figures, ngspice netlist, Simulink model, PLECS model, PSIM model) |
+| 编辑 (Edit) | 撤销 (Undo), 重做 (Redo) — 剪切 (Cut), 复制 (Copy), 粘贴 (Paste), 创建副本 (Duplicate), 删除所选 (Delete selection) — 顺时针旋转 90° (Rotate clockwise 90°), 逆时针旋转 90° (Rotate counterclockwise 90°), 镜像 / 反向 (Mirror / reverse), 增大符号 (Enlarge symbol), 缩小符号 (Shrink symbol), 同类对象图层 › (Layer among objects of the same kind: raise, lower, bring to front, send to back) — 按图更新网表 (Update netlist from drawing), Merge overlapping wires — with modules also 编辑选中模块定义 (Edit selected module definition) and 解散选中实例为普通元件 (Dissolve selected instance), and for old-style module tables 模块定义… (Module definitions) and 转换为端口连接 (Convert to port links) |
+| 视图 (View) | 适应窗口 (Fit), 放大 (Zoom in), 缩小 (Zoom out), 模块显示 › (Module display) — 画布上显示 (Show on canvas): 节点/支路标号 (Node / branch labels), 坐标刻度 (Coordinates), 实时网表面板 (Live netlist panel) — 预览设置 (Preview options): 带坐标网 (With grid), 色块灰度 (Grey regions), then 真实预览 (Rendered preview) |
+| 插入 (Insert) | 画导线 (Draw wire), 导线交叉 (Wire crossing mode) — 元件 › (Components, grouped as passive, semiconductors, sources, magnetics and machines, connections), 添加模块… (Add module) — 标注 › (Annotations: add text, draw region, draw block, draw arrow, draw signal arrow, draw function mark, step / pulse mark) |
+| 仿真 (Simulation) | SPICE simulation…, Device models… — Export ngspice netlist…, Export to Simulink…, Export to PLECS…, Export to PSIM… |
+| 模态与波形 (Modes and waveforms) | 从仿真识别模态… (Identify modes from simulation) — 上一个模态 / 下一个模态 (Previous / next mode), 在图上改模态 (Edit modes on canvas), 复制为新模态 (Duplicate as new mode), 模态真实预览 (Rendered mode preview) — 波形与模态… (Waveforms and modes), 导出全部模态图… (Export all mode figures) |
+| AI | 描述新拓扑… (Describe a new topology), AI 修改当前图… (AI edit of the current figure) — AI 接口设置… (AI interface settings) |
+| 实验功能 (Experimental) | Conducted EMI estimate…, Output impedance…, dq impedance matrix…, Source/load stability…, dq interconnection stability… — Parameter range search… |
+| 帮助 (Help) | 用户指南 (User guide), 提示词说明 (Prompt guide), 操作与快捷键… (Actions and shortcuts) — 关于… (About) |
+
+![Experimental tools in the circuit editor](images/manual/en/experimental-circuit.png)
+
+In the table, “—” marks a separator. Exports to Simulink, PLECS, PSIM and ngspice share the SPICE simulation parameters, so these entries open the SPICE simulation window and point at the matching export button.
 
 Menus can be operated with the arrow keys and Enter, and closed with Esc or by clicking the canvas. The user guide and prompt guide in the Help menu open the project's online documentation in a new browser tab and need a network connection.
 
@@ -356,11 +378,11 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 
    **文件 → 另存为…** (File > Save As) creates a file beside the original and switches to it; later saves write to the new file. It adds `.json`, replaces spaces and punctuation with underscores, and adds `_2`, `_3`, etc. if the name exists. Cancelling before submission writes nothing; closing after submission lets the save finish. Edits made while waiting stay unsaved. Finish or cancel module-definition editing before using Save As for the whole project.
 
-2、**预览** (Preview, the true preview) runs LaTeX to show the final result. **视图 → 预览带坐标网** (View > Grid in preview) decides whether the preview overlays the coordinate grid for reference.
+2、**预览** (Preview, the true preview) runs LaTeX to show the final result. **视图 → 带坐标网** (View > With grid) decides whether the preview overlays the coordinate grid for reference.
 
 3、**导出** (Export): see [chapter 21](#21-export-formats-latex-and-word). Exported figures never contain the grid, and export is only possible when the checker passes.
 
-4、**Column width:** **视图 → 栏宽** (View > Column width) switches between IEEE single and double column. The JSON does not store the width, so choose it again when you reopen a large circuit, or add `-p double` on the command line.
+4、**Column width:** **文件 → 图纸栏宽** (File > Figure column width) switches between IEEE single and double column. The JSON does not store the width, so choose it again when you reopen a large circuit, or add `-p double` on the command line.
 
 ---
 
@@ -385,7 +407,7 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 | 稳压管 (Zener diode) | `D` with `opts.zener: true` | As diode | Drawn as a Zener; simulation needs breakdown parameters |
 | 晶闸管 (thyristor) | `scr` | `a` (anode), `b` (cathode) | Horizontal or vertical only; the gate lead is drawn on the left of a→b, `F` moves it to the right; the gate is driven by the simulation trigger pulse and is not a pin |
 | MOSFET | `nmos` | `d`, `s` | Body diode by default (`opts.diode: false` removes it) |
-| P-channel MOSFET | `pmos` | `d`, `s` | Source-up symbol with a gate dot; body diode d→s; logical PWM 1 = on. Set its parameters in Analysis → SPICE simulation. |
+| P-channel MOSFET | `pmos` | `d`, `s` | Source-up symbol with a gate dot; body diode d→s; logical PWM 1 = on. Set its parameters in Simulation → SPICE simulation. |
 | IGBT | `igbt` | `c`, `e` | Anti-parallel diode by default |
 | 电压源 (voltage source) | `V` | `a` (−), `b` (+) | DC voltage source |
 | 交流电源 (AC source) | `vac` | `a` (reference), `b` | Sinusoidal source |
@@ -399,6 +421,16 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 
 There is no separate card for a centre-tapped transformer: copy one from a template such as `llc_fullbridge`, or add an `sct` pin to the transformer in the table (see [Appendix A](#appendix-a-coordinate-table-format)).
 
+Multi-winding transformer (QAB, AQAB and other multiport converters): select the transformer and, in the properties row "Multi-winding", click "Add on primary side" or "Add on secondary side". Another winding (w3–w6, at most 6 windings) appears on the same core, dotted at its a end; wire it to its bridge and enter its turns ratio `ratio_w3` etc. under "SPICE simulation…". "Remove winding w…" removes the highest numbered extra winding, including its pin declarations, measurements and turns ratio. Wires stay in place and the edit can be undone. First update any mode, feedback or reference-ground setting that uses this winding. Example: `examples/multiwinding/qab_multiwinding.json`.
+
+![Multi-winding transformer and properties](images/manual/en/multiwinding.png)
+
+System-diagram icons (battery / storage, PV panel, server rack, grid, square-wave source, DC capacitor, and the DC/DC, DC/AC converter boxes): draw a box with "Insert → Draw box" and pick one under "Icon" in the properties. With an icon, the box text is printed under the box as a caption. Icons are drawing only and take no part in connections or simulation. Example: `examples/system_icons/dc_bus_system.json`.
+
+Icons move with the box and stay centered with their proportions preserved during resizing. Add standalone icons with "Insert → Function mark". A box referencing a control table shows the actual control diagram when expanded and its selected icon when collapsed.
+
+![System diagram icons and properties](images/manual/en/system-icons.png)
+
 ---
 
 ## 6. Part properties
@@ -409,9 +441,11 @@ Select a part and the **属性** (Properties) tab shows its settings. Different 
 
 ### 6.1 Action buttons
 
-**旋转 90°** (Rotate 90°), **反向** (Reverse; shown as **镜像（门极换边）**, Mirror, gate to the other side, for MOSFETs and IGBTs, and absent for transformers) and **复制** (Duplicate) are the same as the keys `R`, `F` and `Ctrl+D`.
+**Rotate clockwise 90°**, **Rotate counterclockwise 90°**, **Reverse** (shown as **Mirror, gate to the other side** for MOSFETs and IGBTs, and absent for transformers) and **Duplicate** correspond to `R`, `Shift+R`, `F` and `Ctrl+D`.
 
-1、`R` rotates by 90°. Transformers can be rotated too; the ratio text stays upright.
+1、`R` rotates clockwise by 90°; `Shift+R` rotates counterclockwise by 90°. Transformers can be rotated too; the ratio text stays upright.
+
+![Clockwise and counterclockwise rotation commands](images/manual/rotation-directions.en.png)
 
 2、`F` mirrors: switches and thyristors move the gate to the other side; other two-terminal parts are reversed. Transformers cannot be mirrored. Note that reversing a two-terminal part only changes the drawing (`opts.invert`) and does not swap its pins, so the simulation ignores it; to really reverse a part, swap the coordinates of its two pins.
 
@@ -424,6 +458,30 @@ Select a part and the **属性** (Properties) tab shows its settings. Different 
 3、`+` / `-` (or **编辑 → 增大符号 / 缩小符号**, Edit > Enlarge / Shrink symbol) scale while keeping the current aspect ratio; **恢复默认尺寸** (Reset size) goes back to 1.
 
 4、Size changes only the symbol. Pins, wires and the netlist stay the same; checking and export use the new size.
+
+### 6.2a Symbol style
+
+1、Select a resistor or MOSFET and choose Power electronics or Analog IC (Razavi) in its properties. To change the drawing, choose View → Symbol style preset → Apply to current drawing. One undo restores it; save to persist the change.
+
+2、IC style uses zigzag resistors and simplified MOSFETs with an open PMOS gate circle. Physical body diodes remain in simulation and appear in conducting modes. This does not change device parameters or add a gate terminal.
+
+3、The preset includes module internals and automatic external parts. Required library definitions are copied into this drawing; the shared library stays unchanged. New parts use the default style; apply the preset again if needed. Example: [analog_ic.json](../examples/styles/analog_ic.json).
+
+![Symbol style preset](images/manual/en/analog-ic-style.png)
+
+### 6.2b Scale a circuit
+
+1、Select a circuit group by dragging a selection rectangle or Shift+clicking, then right-click → Scale circuit…. Alternatively choose View → Scale circuit… and select Entire circuit.
+
+2、Enter a factor: `0.8` reduces it to 80% of its current size; `1.2` enlarges it to 120%. Component bodies, pins, wires and spacing change together. Scale font sizes too is selected by default; clear it to keep fonts unchanged. Line widths stay unchanged.
+
+3、Choose Preview resize, inspect the actual rendered result, then Apply to current drawing. Unselected ordinary parts stay in place and external wires retain their connections. Modules keep their hierarchy and electrical parameters while their full and partial drawings and boxes resize. Scaling only some instances creates a separate project definition; the shared library stays unchanged.
+
+4、One undo/redo covers the operation; save to persist it. The paper conversion stays fixed so automatic column fitting cannot cancel the resize. Restore automatic fitting changes the paper conversion, not the authored coordinates; use undo to restore those. Sizes that are too small, exceed the column width, collide or change connections cannot be applied. Adjust the factor or include more of the circuit. Example: [boost_scaled.json](../examples/styles/boost_scaled.json).
+
+5、A frame referencing a control table continues to fit that table inside the frame; its internal font sizes do not follow circuit resizing. Collapse the control frame first if you need a uniformly scaled appearance. An expanded controller that no longer fits is rejected by the preview. The referenced table and control parameters stay unchanged.
+
+![Scale a circuit](images/manual/en/circuit-uniform-scale.png)
 
 ### 6.3 Label, text size and position
 
@@ -462,11 +520,11 @@ Resistors, inductors and capacitors also offer solid, dashed and dotted symbol l
 
 ### 6.7 Current arrows
 
-The editor has no separate field for current arrows. For a two-terminal part, write `"opts": {"current": "$i_L$"}` in the JSON to draw an arrow on its lead; current arrows on wires are free text entries with an `arrow` field (see [Appendix A](#appendix-a-coordinate-table-format)). You can also ask the AI edit to add them.
+Select a two-terminal part, such as an inductor or resistor, and enter `$i_L$` in **Current arrow label**. View the arrow on its lead in the rendered preview or exported figure. Clear the field to remove it. The value is saved in `opts.current`. Independent arrows on wires use annotations with an `arrow` field, described in Appendix A.
 
 ### 6.8 Simulation parameters
 
-Electrical values are not in the Properties tab but in **分析 → SPICE 仿真…** (Analysis > SPICE simulation); see [chapter 17](#17-spice-simulation). Right-clicking a part and choosing **仿真参数…** (Simulation parameters) jumps straight to its row. Labels on the drawing are only text; the program never derives values from them.
+Electrical values are not in the Properties tab but in **仿真 → SPICE 仿真…** (Simulation > SPICE simulation); see [chapter 17](#17-spice-simulation). Right-clicking a part and choosing **仿真参数…** (Simulation parameters) jumps straight to its row. Labels on the drawing are only text; the program never derives values from them.
 
 ---
 
@@ -477,6 +535,14 @@ Electrical values are not in the Properties tab but in **分析 → SPICE 仿真
 1、Click **导线** (Wire) on the toolbar or **插入 → 画导线** (Insert > Draw wire), then click each corner on the canvas. Double-click or press `Enter` to finish, `Esc` to cancel.
 
 2、Every segment must be horizontal or vertical. Start at a pin and end at a pin or on another wire.
+
+3、Click a pin to start drawing. Move near a target pin or module port to show a green triangle, then click beside it to connect precisely and finish the wire. Click empty space to add intermediate bends. Hold `Alt` to suspend port snapping.
+
+4、Physical wire contacts appear green. Connected endpoints also appear green when the wire is selected. The Issues tab reports shorts, open circuits and other drawing problems.
+
+![Connection triangle near a target port](images/manual/en/module-port-snap.png)
+
+![Green endpoints after connecting](images/manual/en/module-port-connected.png)
 
 ### 7.2 Editing existing wires
 
@@ -494,7 +560,9 @@ Electrical values are not in the Properties tab but in **分析 → SPICE 仿真
 
 6、**Overlapping wires:** clicking the same spot again cycles through overlapping wires. The selected wire is blue even if it has an error.
 
-7、**Exact duplicates:** when two wires have identical points (also in reverse order), the Properties and Issues tabs offer a delete button. Partial overlaps are only located, never deleted automatically.
+7、**Merge overlapping wires:** use the button beside an overlap issue, the Edit menu, the wire context menu or Properties. This removes repeated coverage from exactly collinear horizontal or vertical ordinary wires in the current drawing, including partial overlaps, while preserving junctions and insulated crossings. Undo in one step; Save keeps the result on reopening. Nearby parallel wires stay separate. Open a module definition to merge its internal wires. If connections would change or new conflicts would appear, the original drawing is kept. Free ends revealed by removing duplicates still require attention. The original button for deleting one exact duplicate remains available.
+
+![One-click merge beside an overlap issue](images/manual/wire-merge.en.png)
 
 8、Hovering over a point shows `wire[n] 点 m` (wire n, point m), counted from 0 in the same order as the JSON.
 
@@ -502,15 +570,19 @@ Electrical values are not in the Properties tab but in **分析 → SPICE 仿真
 
 1、Where two wires cross, draw either a hop (a semicircle, not connected) or a junction (a solid dot, connected). **插入 → 导线交叉** (Insert > Wire crossing) sets which one new wires use.
 
-2、Afterwards, click the semicircle or dot at a crossing to switch it in the Properties tab; a hop can also be deleted on its own. Hops left dangling after a wire is moved are removed automatically.
+2、Click a semicircle or dot, or select a wire and use its Crossing rows in Properties to switch between a hop and a junction. The context menu also offers this action. An unmarked-crossing issue has direct repair buttons, including for ordinary external wires in drawings with modules. Open a module definition to edit its internal crossings.
 
-3、A T-joint (a wire end on another wire) counts as connected and gets a dot automatically; three or more segments meeting at a point also get a dot. A wire ending in the middle of a part's lead is an error.
+3、When you drag a wire, nudge it with the arrow keys or edit its coordinates, existing hops follow the actual intersections during the edit. A hop is removed when its two wires no longer cross. Undo restores the previous state; Save keeps the result on reopening.
+
+![Crossing repair actions in a modular drawing](images/manual/wire-crossing.en.png)
+
+4、A T-joint (a wire end on another wire) counts as connected and gets a dot automatically; three or more segments meeting at a point also get a dot. A wire ending in the middle of a part's lead is an error.
 
 ### 7.4 Net names, node and branch labels
 
 ![Node labels and netlist](images/manual/en/netlist-panel.png)
 
-1、**视图 → 显示节点/支路标号** (View > Show node and branch labels) shows net names (N1, N2, ... or your own names) on a light background and grey branch numbers B1, B2, .... Turning it on the first time assigns fixed numbers; moving, adding or deleting other parts later does not renumber existing ones, and turning the display off does not erase them.
+1、**视图 → 节点/支路标号** (View > Node / branch labels) shows net names (N1, N2, ... or your own names) on a light background and grey branch numbers B1, B2, .... Turning it on the first time assigns fixed numbers; moving, adding or deleting other parts later does not renumber existing ones, and turning the display off does not erase them.
 
 2、**Naming a net:** select a wire and type a name such as OP or SW under **网络名** (Net name); leave it empty to return to automatic numbering. Names are 1–41 ASCII letters, digits or underscores, start with a letter, and are unique across the drawing ignoring case.
 
@@ -522,7 +594,7 @@ Electrical values are not in the Properties tab but in **分析 → SPICE 仿真
 
 ### 7.5 Updating the netlist from the current connections
 
-The table's `netlist` records which pins should be connected; the checker compares the connections found in the geometry with it pair by pair. If you changed the wiring on purpose (for example moved a diode to the return line), use **分析 → 以当前连接更新网表** (Analysis > Update netlist from current connections) to make the current geometry the new netlist; otherwise the checker reports a netlist mismatch. Do not use it to hide a wrong connection.
+The table's `netlist` records which pins should be connected; the checker compares the connections found in the geometry with it pair by pair. If you changed the wiring on purpose (for example moved a diode to the return line), use **编辑 → 按图更新网表** (Edit > Update netlist from drawing) to make the current geometry the new netlist; otherwise the checker reports a netlist mismatch. Do not use it to hide a wrong connection.
 
 ---
 
@@ -532,13 +604,13 @@ The table's `netlist` records which pins should be connected; the checker compar
 
 ### 8.1 Selecting
 
-1、**Click** a part, wire, text, region, block, arrow or module. Click an empty spot to clear the selection.
+1、**Click** a part, wire, text, region, block, function mark, arrow or module. Click an empty spot to clear the selection.
 
-2、**Box selection:** drag from an empty spot or an unselected region to select top-level parts, wires, free text, regions, blocks and arrows. All pins, wire vertices or annotation bounds must lie inside the rectangle. Ctrl+A selects these six object types.
+2、**Box selection:** drag from an empty spot or an unselected region to select top-level parts, wires, free text, regions, blocks, function marks and arrows. All pins, wire vertices or annotation bounds must lie inside the rectangle. Ctrl+A selects these seven object types.
 
-3、**Adding:** hold Shift while box-selecting to add; Shift-click toggles any of these objects. Module instances remain individually editable; standalone waveform marks are outside mixed selection.
+3、**Adding:** hold Shift while box-selecting to add; Shift-click toggles objects. Module instances can move together with components, wires and annotations. Their internals stay intact and external wires follow. A selection containing modules supports movement; use the individual actions to copy or delete modules. Standalone waveform marks are outside mixed selection.
 
-4、While drawing wires, regions, blocks or arrows, or placing a module, the left button belongs to that tool and box selection is suspended; press `Esc` to leave the tool.
+4、While adding text or drawing wires, regions, blocks, function marks or arrows, or placing a module, the left button belongs to that tool and box selection is suspended; press `Esc` to leave the tool.
 
 ### 8.2 Panning and zooming
 
@@ -587,7 +659,8 @@ Right-clicking a part selects it first; right-clicking a group that is already s
 | Item | Action |
 | --- | --- |
 | 剪切, 复制, 粘贴, 创建副本, 删除 (Cut, Copy, Paste, Duplicate, Delete) | Same as the shortcuts, applied to the selection |
-| 旋转 90°, 镜像 / 反向 (Rotate 90°, Mirror / reverse) | Single part only |
+| Rotate clockwise / counterclockwise 90° | One part or selected parts and wires; R / Shift+R rotate the group about its centre while retaining external contacts. One undo step. Deselect modules and annotations first |
+| 镜像 / 反向 (Mirror / reverse) | Single part only |
 | 编辑标签… (Edit label) | Puts the cursor in the label field of the Properties tab |
 | 仿真参数… (Simulation parameters) | Opens the SPICE window, scrolls to and highlights this part's row |
 | 测两端电压, 测电流, 测驱动 (Measure voltage, current, drive) | Adds a supported measurement channel and opens the SPICE window for confirmation; unavailable types explain why |
@@ -601,6 +674,7 @@ Right-clicking a part selects it first; right-clicking a group that is already s
 | 删除折点 (Delete corner) | Deletes an inner corner (not an end point) |
 | 在此处拆成两条 (Split here) | Splits at the pointer in one undo step; not possible at a hop |
 | 和首尾相接的导线合成一条 (Merge with the wire that continues it) | When several wires qualify, a submenu lists their numbers |
+| Merge overlapping wires | Removes repeated collinear coverage from ordinary wires in this drawing, checks connections, and supports one-step undo |
 | 删除这条线 (Delete this wire) | Deletes the whole wire |
 | 测对地电压 (Measure voltage to ground) | Adds a channel for the connected node; set a reference ground first |
 
@@ -617,14 +691,14 @@ If a whole wire is selected but no corner or segment of it, the arrow keys only 
 | 粘贴到这里 (Paste here) | Centres the copy on the pointer and snaps it to the grid; greyed out when the clipboard is empty |
 | 在这里插入 › (Insert here) | Places a part or module at the pointer |
 | 画区域, 画方框, 画箭头 (Draw region, block, arrow) | Starts the drawing tool |
-| 全选顶层对象 (Select all top-level objects) | Selects parts, wires, text, regions, blocks and arrows |
+| 全选顶层对象 (Select all top-level objects) | Selects parts, wires, text, regions, blocks, function marks and arrows |
 | 适应窗口 (Fit) | Fits the drawing to the canvas |
 
 **新建空子系统** (New empty subsystem) places an empty module that you can build up in its internal canvas.
 
 ### 9.4 Module instances
 
-Right-clicking a module instance or a part inside it offers: 编辑模块定义 (Edit module definition), 实例参数… (Instance parameters), 端口连接… (Port links), 展开 / 折叠 (Expand / fold), 解散为普通元件 (Dissolve into ordinary parts), 存进我的模块库… (Save to my module library), and 从库更新 (Update from library) when the library has a newer version. See [chapter 14](#14-modules).
+Right-clicking a module instance or a part inside it offers: 编辑模块定义 (Edit module definition), 实例参数… (Instance parameters), 展开 / 折叠 (Expand / fold), 解散为普通元件 (Dissolve into ordinary parts), 存进我的模块库… (Save to my module library), and 从库更新 (Update from library) when the library has a newer version. See [chapter 14](#14-modules).
 
 ### 9.5 Regions, blocks and arrows
 
@@ -650,7 +724,7 @@ A copy of a region that fits its members automatically still follows the origina
 
 ### 10.2 Nudging with the arrow keys
 
-1、Select one part, free text, fixed-boundary region, block, arrow, step / pulse mark or module instance and press an arrow key to move it by one grid step (0.05 layout units); hold Shift to move 10 steps (0.5). Connected wires follow by the same rules as when dragging; modules keep their port links.
+1、Select one part, free text, fixed-boundary region, block, function mark, arrow, step / pulse mark or module instance and press an arrow key to move it by one grid step (0.05 layout units); hold Shift to move 10 steps (0.5). Connected wires follow by the same rules as when dragging; modules keep their port links.
 
 2、Wires: with a corner selected, the arrow keys move the corner; with a segment selected, only movement perpendicular to the segment is allowed and the ends stay put.
 
@@ -702,12 +776,12 @@ Whether the bias is sensible, whether currents really flow in the drawn directio
 | Pins too close for the symbol | `too-short` | Drag the small blue square on a pin to lengthen the part, or reduce the length factor |
 | Symbols overlap | `body-overlap` | Move one part by 0.1–0.2, or shrink the symbols |
 | Wire crosses a symbol | `line-through-body` | Add corners so the wire goes around the part |
-| Wires on top of each other / parallel wires too close | `collinear-overlap` / `too-close` | Delete the duplicate wire; keep parallel wires at least 0.18 cm apart |
+| Wires on top of each other / parallel wires too close | `collinear-overlap` / `too-close` | Use Merge overlapping wires for collinear overlaps; keep parallel wires at least 0.18 cm apart |
 | Unmarked crossing | `unmarked-crossing` | Click **加跨线** (Add hop); if the wires should connect, change the crossing to a junction |
 | Wire touches a lead | `touches-lead` | Move the wire end onto the pin |
 | Open pin | `open-pin` | Connect a wire; for a terminal that really needs no connection, tick **故意悬空（NoConn）** |
 | Dangling wire | `dangling-wire` | Connect the end to a pin or another wire, or delete the segment |
-| Missing / unwanted connection | `netlist-open` / `netlist-short` | First decide whether it is a mistake; if you changed the wiring on purpose, use **分析 → 以当前连接更新网表** |
+| Missing / unwanted connection | `netlist-open` / `netlist-short` | First decide whether it is a mistake; if you changed the wiring on purpose, use **编辑 → 按图更新网表** |
 | Text on symbol / on wire / overlapping | `text-on-symbol` / `text-on-line` / `text-overlap` | Change the label position, move the part by 0.1–0.2, or reduce the text size |
 | Subscript without braces (warning) | `subscript-braces` | Click **改成带花括号的写法**; `$V_in$` becomes `$V_{in}$` |
 | Does not fit the column | `too-cramped` | Switch to double column, or tighten the spacing and shrink symbols |
@@ -748,7 +822,7 @@ All of these are drawing aids. They take no part in connections or the netlist.
 
 ### 12.1 Regions (coloured backgrounds and dashed frames)
 
-1、**Drawing:** **插入 → 画区域** (Insert > Draw region), then drag a rectangle. Click to select it, drag to move it, drag a corner to resize.
+1、Choose **Insert → Annotations → Draw region** and drag a rectangle. Select it to move or resize it. New regions remember the previous fill, border style and border colour. **White fill, black border** applies that preset. The browser remembers these settings.
 
 2、**Properties:** fill (green, blue, orange, red, purple, yellow, cyan-green, grey, a custom `#rrggbb`, or none), border (none, solid, dashed, dotted), border colour, label and its position (below, above, left, right, inside at the top) and label size. Custom colours that are too dark are lightened automatically so black lines and text stay legible.
 
@@ -764,7 +838,7 @@ All of these are drawing aids. They take no part in connections or the netlist.
 
 ### 12.2 Blocks (control part)
 
-1、**插入 → 画方框** (Insert > Draw block), then drag a rectangle. On the right you can set the text (LaTeX allowed, for example `$f_r$ calculation`), fill (white, none, a palette colour), border (solid, dashed, dotted), colour, text size, and the lower-left and upper-right corners.
+1、**插入 → 标注 → 画方框** (Insert > Annotations > Draw block), then drag a rectangle. On the right you can set the text (LaTeX allowed, for example `$f_r$ calculation`), fill (white, none, a palette colour), border (solid, dashed, dotted), colour, text size, and the lower-left and upper-right corners.
 
 2、Draw signal lines between blocks with **画箭头** (Draw arrow), using the thin arrow style in black.
 
@@ -778,7 +852,11 @@ All of these are drawing aids. They take no part in connections or the netlist.
 
 ![Block arrow properties](images/manual/en/arrow-properties.png)
 
-1、**插入 → 画箭头** (Insert > Draw arrow), then drag from the start to the tip. There are three styles: block arrow (filled, used to point at zoomed details), thin arrow / arc / polyline, and wavy indicator arrow.
+1、Choose **Insert → Annotations → Draw arrow** and drag from the start to the tip. Available styles are block, thin line / arc / polyline, and wave. New arrows remember the previous style, with block as the initial style.
+
+1a、Choose **Insert → Annotations → Draw signal arrow** for a thin line. Click the start and each corner, then click the endpoint again or press Enter to finish. Shift constrains the next segment horizontally or vertically. Esc cancels. Dragging from start to end creates a straight line.
+
+1b、While drawing or dragging endpoints and corners, labelled guides snap near horizontal, vertical, parallel or perpendicular alignment with existing arrow or wire segments. Hold Alt to bypass guide snapping. Choose **Sharp / Rounded** under **Corners** in Properties. New arrows remember the choice. Rounded corners shrink for short segments and appear in saved drawings, previews and exports.
 
 2、**Thin arrows:** drag the middle handle to bend the arrow (or type −120 to 120 in **弯曲（度）**, Bend in degrees); **恢复直线** (Straighten) removes the bend. Corners can be added, dragged and deleted to route long arrows. Line style (solid, dashed, dotted), arrowhead position (end, start, both, none) and an isolation mark (two short bars, with adjustable position along the line) are available.
 
@@ -802,7 +880,7 @@ Examples: `examples/arrows/paper_arrows.json`, `examples/regions/buck_arrow_styl
 
 1、Right-click a region, block or arrow and choose **上移一层** (Raise), **下移一层** (Lower), **置顶** (Bring to front) or **置底** (Send to back); or select it and use **编辑 → 同类对象图层** (Edit > Layer among objects of the same kind). Shortcuts: `Ctrl+]` raise, `Ctrl+[` lower, with Shift for front and back.
 
-2、Order changes only among objects of the same kind. The fixed order between kinds is: regions → ordinary block arrows → blocks → wires → parts → text and standalone marks → thin and wavy arrows; block arrows with "draw above the circuit" ticked are on top.
+2、Order changes only among objects of the same kind. The fixed order between kinds is: regions → ordinary block arrows → blocks → wires → parts → text and standalone marks → function marks → thin and wavy arrows; block arrows with "draw above the circuit" ticked are on top.
 
 3、**置顶** does not turn an ordinary block arrow into a foreground arrow. Changes can be undone and are kept when saved. Example: `examples/regions/layer_order.json`.
 
@@ -810,15 +888,29 @@ Examples: `examples/arrows/paper_arrows.json`, `examples/regions/buck_arrow_styl
 
 1、**Source waveforms:** select a voltage or current source and choose a rising step, falling step or pulse under **源旁波形** (Source waveform). Position (opposite the label, left, right, above, below) and size (0.5–2) can be changed. The source keeps its polarity or current arrow.
 
-2、**Standalone marks:** **插入 → 阶跃 / 脉冲标记** (Insert > Step / pulse mark) places a figure symbol without electrical pins. It can be dragged, recoloured, resized, deleted and undone.
+2、**Standalone marks:** **插入 → 标注 → 阶跃 / 脉冲标记** (Insert > Annotations > Step / pulse mark) places a figure symbol without electrical pins. It can be dragged, recoloured, resized, deleted and undone.
 
-3、These are graphics only. The real excitation values and times are entered in **分析 → SPICE 仿真…**; changing the drawing never changes the simulation parameters, and vice versa. Example: `examples/source_waves.json`.
+3、These are graphics only. The real excitation values and times are entered in **仿真 → SPICE 仿真…**; changing the drawing never changes the simulation parameters, and vice versa. Example: `examples/source_waves.json`.
 
 ![Source waveforms and standalone marks](images/manual/example-source-waves.png)
 
 ### 12.6 Black-and-white printing
 
 **视图 → 色块灰度** (View > Grey regions; `--mono` on the command line) replaces region and arrow colours by distinguishable greys. Part colours print black in black-and-white output.
+
+### 12.7 Free text, function marks and terminals
+
+1、Choose **Insert → Annotations → Add text**, click a position and enter text such as `$i_x$`, `$v_{mv,dc}$`, `O'` or `$\vdots$`. Select the text to change its content, font size, colour or position. Undo and save/reopen are supported.
+
+2、Choose **Insert → Annotations → Draw function mark** and drag its bounds inside an existing box. Select AC/DC, DC/DC, DC/AC, MOSFET, IGBT or diode in **Icon**. These marks are saved in `glyphs` and support moving, resizing, copying and deleting.
+
+3、Select a terminal and tick **Hide terminal circle (at a box edge)** to set `opts.bare`.
+
+4、Region border colours accept ink names such as `black`. With `fill: none` on the front region, unspecified back panels use white. This default also applies to saved drawings. Use `stack.fills` to specify individual panel colours.
+
+![Insert text and function marks](images/manual/en/drawing-tools.png)
+
+Open [drawing_marks.json](../examples/editor/drawing_marks.json) for an example.
 
 ---
 
@@ -840,6 +932,8 @@ Papers often mark a device and its currents and voltages in magenta or blue.
 
 ## 14. Modules
 
+The SST examples include an input-series, output-parallel two-stage circuit and a single-stage circuit with SM cells and a resonant IDC. Double-click blocks to inspect their components. The vertical SM chain uses side ports. PDF/PNG figures, details generated from the same definitions and a separate DAB startup example are included. Whole-system simulation requires power-stage values and control parameters. Drag external capacitors, sources or loads to adjust their position relative to module ports. Each expanded or collapsed view applies the saved offset to its own port positions. Edit horizontal and vertical offsets or labels in Properties. Arrow keys, undo, redo and save/reopen are supported. [SST example instructions](../examples/sst/README.md#english)
+
 Modules let you define a repeated converter cell once and place it several times. All instances share one definition; per-instance parameter differences are stored separately. Folding changes only the picture; simulation always expands every real part.
 
 ![Module instance, module library and context menu](images/manual/en/module-context-menu.png)
@@ -848,7 +942,7 @@ Modules let you define a repeated converter cell once and place it several times
 
 The 模块（子系统） (Modules) group at the bottom of the parts library has three sections:
 
-1、**内置** (Built-in): Buck, Boost, DAB and LLC half bridge, shipped with the program. Ports are `P` and `N` on the left, `OP` and `ON` on the right.
+1、**Built-in**: 13 modules, including Buck, Boost, DAB, LLC, MOSFET/IGBT half bridges, a MOSFET full bridge, NPC leg, LLC tank, diode full-bridge/center-tapped rectifiers, and half-/full-bridge submodules. Hover over an entry for its ports: a half bridge exposes P/N/O, NPC exposes P/M/N/O, and center-tapped rectifier ports C and ON share the same net.
 
 2、**我的模块库** (My module library): modules you saved, usable from any circuit file. They are stored in `~/.circuit_drawer/templates/modules/` (or the `modules` folder under `CIRCUIT_DRAWER_TEMPLATES`), one JSON per module. Right-click an entry to delete it.
 
@@ -856,23 +950,41 @@ The 模块（子系统） (Modules) group at the bottom of the parts library has
 
 **插入 → 添加模块…** (Insert > Add module) lists the same three sections.
 
+4、Run `circuit-drawer blocks` for library names, ports and one-to-one drawing sizes including labels. Specify device models and gate timing before simulation; the new tank and submodule capacitor parameters are demonstration values. Open the [two-LLC IPOS example](../examples/modules/llc_ipos_blocks.json) to switch between collapsed, expanded and partial views. Its top-level file contains only library references and external port connections.
+
+![Module building-block library](images/manual/en/module-building-blocks.png)
+
+1. Drag with the left mouse button on blank canvas, or Shift-click to select at least three module instances. Right-click **Omit middle instances** to keep the first and last along the main arrangement direction and show ⋮ or ⋯ between them. Package ordinary components as modules first, and deselect ordinary components, wires and shapes from a mixed selection.
+
+2. Right-click either end instance or the dots and choose **Restore all instances**. Omission and restoration each undo in one step. Hidden instances remain in the complete checks and simulation; external taps keep their actual instance terminals. Example: [four-cell bridge arm](../examples/modules/mmc_arm_ellipsis.json).
+
+3. The module JSON dialog and crowded-drawing advice show a **Size budget**, including labels and regions in the expanded drawing and estimated horizontal counts for single and double columns. Actual wiring still needs validation. Column width does not set a page-height limit, so vertical counts have no fixed maximum.
+
+![Right-click selected instances to omit their middle](images/manual/en/module-ellipsis-select.png)
+
+![Omitted instances and restore action](images/manual/en/module-ellipsis-omitted.png)
+
 ### 14.2 Placing and connecting
 
 1、Drag a library module onto the canvas and release to place it. Clicking a library entry instead shows a dashed placement preview; click the canvas to place it.
 
-2、Use **Wire** to connect module ports to component pins or other module ports. You may draw wires first, place the module first, or leave a wire unfinished and add a component later. Placement does not open a port-by-port connection dialog.
+2、Click a port to begin a wire, then click the green triangle near another port to connect. The **Wire** toolbar button also supports point-by-point drawing. You may draw wires first, place the module first, or add components later.
 
-3、These are ordinary canvas wires: move their corners or segments, split them, or delete them. Connected endpoints follow ports when a module moves, expands, folds, or changes box size or title; other corners are retained where possible.
+3、While dragging a module, its body, labels, pins and connected wires move together. Press Esc to cancel the drag; connections are checked on release. You can move the corners or segments of ordinary canvas wires, split them, or delete them. Connected endpoints follow ports when a module moves, expands, folds, or changes box size or title. Other corners are retained where possible. When a port lead collides with a nearby wire during movement, the editor tries adjusting its bends into available gaps while preserving existing branch junctions and wire hops.
 
-4、Unconnected pins remain listed in **Issues**. After completing new wiring, review the connections and use **Record new pins from current connections** when prompted. For an intentional change to existing connections, use **Update netlist from current connections** after reviewing it. A wire hop remains insulated.
+4、Unconnected pins remain listed in **Issues**. After completing new wiring, review the connections and use **Record new pins from current connections** when prompted. For an intentional change to existing connections, use **Update netlist from drawing** after reviewing it. A wire hop remains insulated.
 
 5、Placing a library module copies its definition into the drawing. Repeated instances reuse that definition, and the saved file carries the actual circuit to another computer.
 
-6、Legacy `modules.links` connections remain editable through **Port connections…**, with automatic or custom routes. Edit ordinary wires on the canvas. See [the ordinary module-wiring example](../examples/editor/module_wiring.json).
+6、Select legacy `modules.links` wires on the canvas to drag their routes or delete them. The connection properties include **Restore automatic routing**. Saving preserves their named references. Draw new connections with the canvas wire tool. See [the ordinary module-wiring example](../examples/editor/module_wiring.json).
 
 ### 14.3 Expanding, folding and appearance
 
 1、**Double-click** an instance, or right-click and choose **展开 / 折叠** (Expand / fold), to cycle through "expanded → folded into a box → partly folded (where supported)". The **视图 → 模块显示** (View > Module display) submenu selects instances and expands or folds all of them.
+
+1a、Expansion measures symbols, labels and wires and makes space when needed, moving surrounding objects and stretching external wires while preserving definitions, parameters and the complete electrical connections. Properties, Expand All and double-click use the same operation. Undo restores the previous layout in one step; only Save writes the file. Folding retains the added space. If space cannot be made without new conflicts, the original drawing is kept with an explanation. If only the fixed column width is exceeded, adjust circuit scaling or restore automatic paper scaling before export.
+
+![Space around the expanded module, bus and inductor](images/manual/module-expand-clearance.en.png)
 
 2、**Partly folded:** currently only the LLC half bridge supports it; the switching half bridge and the rectifier bridge each shrink into a small box with a device symbol, while the resonant tank and the transformer are still drawn.
 
@@ -880,7 +992,7 @@ The 模块（子系统） (Modules) group at the bottom of the parts library has
 
 4、**Symbol in the box:** IEC 60617 converter symbols `dcdc`, `acdc`, `dcac`, device symbols `mosfet`, `igbt`, `diode`, or just the name, `text`.
 
-5、**Folded box appearance:** with an instance selected, the Properties tab sets the title text, fill, border style and border colour; they apply only when folded.
+5、Select an instance to set its folded title, fill, border style and colour. Clear **Title text** to hide the title, or drag the title to position it independently. Its offset follows the module and supports undo, saving and reopening.
 
 6、**Group display:** tick other instances of the same definition to draw only this instance, with the others shown as offset panels behind it; the simulation still includes them.
 
@@ -898,7 +1010,7 @@ The 模块（子系统） (Modules) group at the bottom of the parts library has
 
 4、**Instance parameters…** changes only this instance. Untick an override to restore the shared default. Only parameters declared editable in the definition can differ per instance.
 
-5、**Port connections…** manages named connections. Edit ordinary canvas wires on the canvas; deliberately empty ports are marked unconnected.
+5、**Dissolve into ordinary parts** returns the internal components to the current canvas. You can finish configuring newly added components after dissolving. Fill in their required values in the simulation dialog before running or exporting a simulation model.
 
 ### 14.5 Saving existing circuitry as a module
 
@@ -916,7 +1028,7 @@ The 模块（子系统） (Modules) group at the bottom of the parts library has
 
 6、Click **保存并原地替换** (Save and replace in place). The selection becomes one instance; part IDs and probes stay the same, and the SPICE netlist before and after is line-for-line identical. Any electrical change makes the operation fail.
 
-7、Existing modes are stored in the project and restored when the last instance is dissolved. Modes across ports are not edited while modules are in use.
+7、Encapsulation and dissolving update the device references in current modes, which stay editable. Modes archived by older versions are restored after the last instance is dissolved only when there are no current modes.
 
 ### 14.6 Library versions, dissolving and limits
 
@@ -926,9 +1038,17 @@ The 模块（子系统） (Modules) group at the bottom of the parts library has
 
 3、**解散为普通元件** (Dissolve into ordinary parts) expands this instance into ordinary parts; other instances and the library entry remain.
 
-4、Currently there is one level of modules only: no modules inside modules, no mode highlighting across modules, and no dragging of individual parts inside an instance (the whole instance can be dragged).
+4、Modes can cross module ports; reference internal devices as M/S1 or M/T:p. Modules still have one level. Edit internal part positions in the definition, or drag the whole instance.
 
 5、Examples: `examples/modules/library_boost_buck.json` (built-in Boost and Buck in cascade), `examples/modules/boost_parallel_authored.json` (two Boosts in parallel), `examples/modules/llc_ipos.json`, `examples/modules/dab_ipos.json`, `examples/modules/llc_partial.json`.
+
+
+
+1、**Module modes:** open the [parallel Boost example](../examples/auto_modes/module_boost_bound.json) and select a mode in the Modes sidebar. Expanded instances show their conducting parts and wires. A highlighted folded box means an internal part participates in the mode; external wires follow the actual loop. Group frames summarize hidden members while visible devices retain their own instance states.
+
+2、Expand an instance, enable **Edit modes on canvas**, and click a switch or diode to change its state, or an arrow to reverse its loop. Partial blocks map hidden devices through their port networks; expand the instance when that mapping is ambiguous. Canvas, compiled preview and exports use the same result. Identify again when the simulation source is out of date. Wires follow the pointer during dragging; mode highlighting returns when the new position is accepted.
+
+![Mode across module ports](images/manual/en/module-modes.png)
 
 ### 14.7 Starting with an empty subsystem
 
@@ -957,6 +1077,8 @@ One base drawing, one figure per operating mode: conducting parts and the wires 
 4、**模态真实预览** (True preview of mode) shows the LaTeX result; **导出全部模态** (Export all modes) writes every mode and an overview sheet in one go. Tick **黑白打印样式（黑色粗线 + 灰色虚线）** (black-and-white style: bold black lines and grey dashed lines) for a monochrome version.
 
 5、Modes refer to part IDs, so they follow the base drawing when you move parts or reroute wires. If a deleted part or changed wiring breaks a mode, the Modes tab lists **模态 N 已失效** (mode N is invalid) with the reason; click it to jump there.
+
+6、The **?** beside the 模态图 (Operating modes) heading holds what a mode consists of, what is checked, the rules for editing on the drawing and the JSON syntax; click it to read. The small tag before the operating condition shows where the mode came from: 仿真 (Simulation) for **从仿真识别模态** (Identify modes from simulation), 手写 (Manual) for modes written by hand or edited on the drawing. Only loop connectivity and device conduction direction are checked, not whether bias and operating conditions allow the mode.
 
 ### 15.2 Command line
 
@@ -1017,6 +1139,30 @@ The program checks loop connectivity (names exist, neighbouring branches share a
 
 ---
 
+### 15.5 Identifying modes from simulation
+
+1、Configure device values, PWM and transient settings in **Simulation → SPICE simulation…**. Open the **Modes** sidebar and choose **Identify modes from simulation…**. Supported ordinary and modular circuits use fixed-frequency open-loop ideal MOS switches, forward diodes, RLC components and ideal transformers. Examples cover Buck/Boost CCM and DCM, three LLC frequency conditions and DAB. Phase soft-start must finish before the analysis window.
+
+2、Click **Simulate and identify**. Recognition checks phase-matched inductor, winding and internal magnetizing currents, capacitor voltages, state order and boundaries over the final eight complete cycles. A drift message calls for a longer run or a review of initial conditions. The current threshold is the greater of the absolute floor and the configured fraction of peak current. Selected inductor and winding currents distinguish positive, negative and near-zero states. Winding p runs p1→p2, s runs s1→s2, and center-tap halves s1 and s2 run s1→sct and sct→s2.
+
+3、Each candidate shows intervals, duration, switch states, branch currents and comparisons with existing modes. **Preview conducting paths** compiles the actual mode figure. Short commutation and threshold intervals remain available for individual selection. An all-devices-off DCM candidate can still show the capacitor supplying the load. If an inductor or winding current opposes the drawn loop direction, the candidate hides direction arrows and identifies the conflicting branches. Review the measured currents before adjusting the mode manually.
+
+4、Select candidates, edit names and captions, choose **Append** or **Replace existing modes**, then click **Apply selected modes**. Names must be unique. Select **Apply this run's waveform and interval bindings too** to use the same run's CSV, complete period boundaries and confirmed mode names. **Preview waveform and boundaries** shows the result before applying. Intervals for unchecked candidates remain unbound. Modes and waveform settings are applied and undone together; **Save** writes the file. An existing waveform is kept by default. Explicitly enabling replacement replaces its settings and annotations. Without replacing the waveform, append modes to preserve its existing references.
+
+4a、Changes to the circuit, device models or simulation settings leave a persistent notice at the top, and the mode source reads **Simulation (out of date)**. Previous results remain available for comparison. **Identify again…** restores the original recognition settings; run again, review and confirm. Undoing parameter changes restores the corresponding source status. Bind every interval before exporting the combined overview, and regenerate outdated waveforms or bound simulation modes first.
+
+5、The four Buck/Boost examples in `examples/auto_modes` run for 80 ms. DCM examples specify capacitor initial voltages of 14.8 V for Buck and 67 V for Boost. Run `circuit-drawer modes-from-sim examples/auto_modes/buck_ccm.json -o output/modes` to export candidate JSON, the original user-probe CSV, a hidden-probe window, netlist and simulation log in a separate run subfolder.
+
+6、The four files in `trial/cases` retain the twenty handwritten modes and include 25 ms simulations with a 100 ns maximum step. LLC uses 80, 100 and 130 kHz with a 100 kHz tank resonance and a 12 Ω load. DAB uses 50 kHz, a 30° phase shift, a 7.2 Ω load and a 47 Ω / 2.2 nF series RC across each switch. All four cases use 48 V input, 200 ns dead time and 1 nF numerical node capacitance. Review the complete period, current zero crossings and short commutation intervals against the handwritten conducting sets and directions. If a candidate reports current outside the drawn closed loops, check the measured currents and the model capacitance or snubber branches.
+
+![Simulation-derived mode candidates](images/manual/en/auto-modes.png)
+
+7、Crowded boundary labels use ranges such as t0–t8. Every boundary and interval remains intact. Open `examples/auto_modes/buck_bound.json` for a confirmed, bound example.
+
+![Waveform and boundaries](images/manual/en/auto-mode-waveform.png)
+
+![Simulation source notice](images/manual/en/simulation-stale.png)
+
 ## 16. Waveforms and modes
 
 This feature lines up simulated or measured waveforms with mode figures: t0, t1, ... mark the waveform, and each interval is bound to one mode.
@@ -1029,7 +1175,7 @@ This feature lines up simulated or measured waveforms with mode figures: t0, t1,
 circuit-drawer edit examples/waveforms/boost.json
 ```
 
-Click **波形与模态** (Waveforms and modes) on the toolbar, or **分析 → 波形与模态…**. The example already has two intervals bound, and no simulator is needed. Click `t0→t1` and the base drawing above switches to the inductor-charging mode; click `t1→t2` for the energy-transfer mode.
+Click **波形与模态** (Waveforms and modes) on the toolbar, or **模态与波形 → 波形与模态…**. The example already has two intervals bound, and no simulator is needed. Click `t0→t1` and the base drawing above switches to the inductor-charging mode; click `t1→t2` for the energy-transfer mode.
 
 ### 16.2 Importing a CSV file
 
@@ -1040,6 +1186,8 @@ Click **波形与模态** (Waveforms and modes) on the toolbar, or **分析 → 
 3、Under **通道、标签和单位** (Channels, labels and units), choose 1–6 curves to show and set their labels and units. Use English maths labels such as `i_L` or `v_out`; subscripts are typeset automatically.
 
 4、Imported CSV files are copied into a `waveforms-data/` folder next to the JSON, with a content hash in the file name. Share the JSON together with that folder. The JSON stores only the path, channels and intervals, not the samples.
+
+4a、Set matching **Y-axis group** values for channels with the same units, then apply. Curves share their actual value range and a wrapping colour legend; **Separate Y axis** restores separate rows. Units must match exactly; no automatic conversion or normalization is applied. Grouping supports undo and survives saving and reopening.
 
 ### 16.3 Choosing the time window and boundaries
 
@@ -1062,6 +1210,28 @@ Click **波形与模态** (Waveforms and modes) on the toolbar, or **分析 → 
 4、**标注属性** (Annotation properties) sets colour, text size (5–20 pt), line width (0.1–2 pt), circle radius (0.02–0.3 cm) and text offset; click **应用属性** (Apply). With an annotation selected, the arrow keys move it by 0.01 cm, Shift plus arrow keys by 0.1 cm.
 
 5、The panel keeps the paper aspect ratio. **纸面尺寸** (Paper size) switches between **总览中的波形** (waveform in the overview) and **独立波形图** (standalone waveform figure); **查看比例** (View scale) only changes the on-screen magnification. Use **真实出图预览** (True output preview) to check the final maths rendering.
+
+6、Click **AI annotations…** and enter “Mark the i_L peak with $I_{L,\max}$ and add an arrow on the rising ramp of the first interval labeled $V_{in}/L$.” The program calculates candidate points from the current CSV, selected channels and time intervals, then uses your current AI settings to generate annotations. Review the preview and click **Apply annotations** to append them. One undo removes the whole batch. **Save mode mapping** writes the result to the file.
+
+7、The AI receives a candidate-point summary containing interval boundaries, extrema, zero crossings and the midpoint and slope of the longest continuous rising/falling ramp. Each interval supplies up to eight zero-crossing candidates. The total annotation limit is 40. Regenerate after changing channels, intervals or annotations. Labels use English or mathematical notation and can be adjusted in **Annotation properties**.
+
+![Waveform AI annotation preview](images/manual/en/waveform-ai.png)
+
+8、**Interval dimension** draws a horizontal span: drag from its start to its end and enter a label such as `$D T_s$`. Drag either endpoint to change the span, or move the entire dimension without changing its duration. Short spans place the arrows outside. Text, line width, offsets, deletion and undo use the existing annotation controls. AI dimensions take both times from real candidates on the same channel.
+
+9、Open `examples/waveforms/interleaved_axes.json` for overlaid inductor currents and an interval dimension. Its CSV is an ideal analytical reference, not a new switching simulation or measurement.
+
+![Shared axes and interval dimensions](images/manual/en/waveform-overlays.png)
+
+### 16.4a XY / state plane
+
+1、Click **XY / state plane…** and select the X- and Y-axis channels. Each point pairs values at the same time, using the waveform panel's window and boundaries. Arrows show increasing time; filled and open circles mark the start and end. Unbound intervals are grey. Direction arrows and mode colouring are optional; values and units are unchanged.
+
+2、Previewing does not change the drawing. **Apply to current drawing** supports undo; **Save mode mapping** writes the settings to the file. Export adds an `_xy` figure, or choose **Export XY plot only**. **Remove XY plot** keeps time waveforms and CSV data. XY always uses the standalone paper width; time-domain annotations are not projected onto it.
+
+3、`examples/waveforms/boost_state_plane.json` reuses the existing Boost simulation CSV. The plot does not infer stability, force the trajectory to close or normalize the values.
+
+![XY and state plane](images/manual/en/waveform-state-plane.png)
 
 ### 16.5 Export
 
@@ -1113,7 +1283,7 @@ circuit-drawer waveforms examples/waveforms/boost_side.json -p double -o out/boo
 
 ### 17.2 The window
 
-**分析 → SPICE 仿真…** opens the **SPICE 参数与导出** (SPICE parameters and export) window:
+**仿真 → SPICE 仿真…** opens the **SPICE 参数与导出** (SPICE parameters and export) window:
 
 1、**载入 Buck 示例参数（含多相交错）/ 载入 Boost 示例参数** (Load Buck example parameters, including interleaved / Load Boost example parameters): checks the topology and fills in example values. For an interleaved Buck, each phase runs at 50 kHz with duty 0.5, and phase k starts k/N periods later. Only the form changes; **保存参数** (Save parameters) writes the circuit file.
 
@@ -1202,9 +1372,21 @@ Expand **推荐仿真参数…** in the SPICE window:
 
 7、Try `examples/modules/boost_parallel_authored.json` with “Change only module M's L1 to 600u; keep all other parameters.” For `examples/closed_loop/buck_vmode.json`, try “Change only the Type III fi to 14000 Hz.” Review the proposal and short simulation, then apply and save. Existing loop-model analysis is shown for controllers; verify that its plant model matches the power stage. Short checks do not prove steady state or discrete-time stability.
 
+### 17.6.1 Parameter range search
+
+![Parameter ranges and Pareto comparison](images/manual/en/parameter-search.png)
+
+1、Choose **Experimental → Parameter range search…**, or expand the same section while editing SPICE parameters, and load the adjustable parameters. Enter minimum, maximum, point count and linear or logarithmic spacing. Ctrl-select multiple parameters in one row to change synchronized switch frequencies together. Separate rows form all combinations, up to 32 cases. Modules only change editable instance values.
+
+2、Choose an output voltage channel and a nonzero DC target. Set the output error limit and optional ripple and startup overshoot limits. Each case runs the full transient and checks repeatability over the final eight complete cycles. Ripple uses the final complete cycle; overshoot covers the entire run. Percentages use the absolute target voltage.
+
+3、Without loss data, compare ripple and overshoot. With validated powerdesignkit device, magnetic and auxiliary loss data, compare estimated efficiency and magnetic envelope volume. Blue points are Pareto candidates; the table retains failures and constraint violations. Volume covers only the magnetic components. Efficiency is a separate datasheet-model estimate, not a hardware measurement.
+
+4、Select a point, then **Apply selected parameters to dialog**. Review before saving or exporting; applying alone does not write the drawing. Changes to the drawing, dialog, search settings or data files require a new search. Closing the dialog requests cancellation. Start with `examples/parameter_search/buck.json`; all device, magnetic and loss data in this example are synthetic demonstrations. The optional powerdesignkit installation must include magnetic evaluation and device snapshots. The [format and CLI reference](PARAMETER_SEARCH.md) describes data requirements and limits.
+
 ### 17.7 Device models for the whole drawing
 
-**视图 → 全图器件模型…** (View > Device models for the whole drawing) chooses simulation models for all parts at once; the drawing does not change:
+**仿真 → 全图器件模型…** (Simulation > Device models for the whole drawing) chooses simulation models for all parts at once; the drawing does not change:
 
 | Category | Models | Parameters |
 | --- | --- | --- |
@@ -1217,13 +1399,13 @@ Fill in the parameters and click **应用到全图** (Apply to the whole drawing
 
 ### 17.8 Limits
 
-All models are simplified: no reverse recovery, magnetic saturation, temperature effects, tail current or vendor subcircuits. The `.cir` file uses ngspice control syntax and is not guaranteed to work with other SPICE programs. Do not use the results for device loss, efficiency or ZVS conclusions.
+All models are simplified: no reverse recovery, magnetic saturation, temperature effects, tail current or vendor subcircuits. The `.cir` file uses ngspice control syntax and is not guaranteed to work with other SPICE programs. Standalone SPICE waveforms do not include datasheet loss models and cannot establish hardware loss, efficiency or ZVS. Parameter search estimates require separate, explicit loss and magnetic data.
 
 ### 17.9 Conducted EMI estimate
 
 ![Conducted EMI settings](images/manual/en/emi-settings.png)
 
-Start from the `buck_emi` template or [the Buck LISN example](../examples/emi/buck_lisn.json). The drawing must explicitly include both supply-line LISNs, their 50 Ω receiver ports and the chassis return. In **Analysis → SPICE simulation…**, set the supply and sampling parameters; then open **Analysis → Conducted EMI estimate…**.
+Start from the `buck_emi` template or [the Buck LISN example](../examples/emi/buck_lisn.json). The drawing must explicitly include both supply-line LISNs, their 50 Ω receiver ports and the chassis return. In **Simulation → SPICE simulation…**, set the supply and sampling parameters; then open **Experimental → Conducted EMI estimate…**.
 
 Select the positive and negative LISN voltage channels and an analysis window. **Run current parameters** runs ngspice and displays each line and its common-mode / differential-mode spectrum. The parasitic-capacitance section supports a geometry estimate or measured / Q3D CSV input. **Estimate filter and rerun comparison** changes the selected filter components in a candidate and reruns ngspice; review the comparison before explicitly applying it. Applying can be undone.
 
@@ -1251,6 +1433,127 @@ Command line: `circuit-drawer emi examples/emi/buck_lisn.json -p double --compar
 
 ---
 
+### 17.11 Buck output impedance
+
+![Buck Bode / Nyquist](images/manual/en/impedance.png)
+
+1、Load `buck_impedance` or open `examples/impedance/buck_output.json`. The example uses a 12 V input, a 3.3 V output, a synchronous averaged bridge and an embedded PI controller. Select `v_out` under **Experimental → Output impedance…**.
+
+2、Defaults are 10 Hz–10 kHz, a 10 mA peak current and 200 ms settling time. **Sweep and compare time-domain injection** measures sinusoidal-current responses at up to three frequencies. Increase settling time or check the controller parameters if the operating point drifts. **Consistent** means complex-impedance error ≤2% and adjacent whole-cycle window drift ≤1%. Repeat with a smaller injection amplitude to check small-signal behaviour.
+
+3、The definition is `Zout = −ΔV/ΔI`, with current flowing from the positive to the negative measurement terminal. The drawn load participates in the calculation. Bode magnitude uses dBΩ, and Nyquist shows the positive-frequency complex impedance locus. Source/load stability assessment additionally requires the appropriate impedance ratio and open-loop pole information.
+
+4、Use DC RLC circuits, explicit `average` bridge pairs and frequencies at or below one tenth of the lowest switching frequency. Sources use fixed `dc` values. Controller references use the final value of startup ramps. Each run saves settings, CSV, SVG, JSON, the source snapshot and original simulation files in a separate directory. Download the plot and data from the dialog.
+
+```sh
+circuit-drawer impedance examples/impedance/buck_output.json --probe v_out --compare -o out/impedance
+```
+
+### 17.12 Grid-connected inverter dq impedance matrix
+
+![dq impedance matrix](images/manual/en/dq-impedance.png)
+
+1、Load `grid_dq_impedance` or open `examples/impedance/grid_dq.json`, then open **Experimental → dq impedance matrix…**. Select `Va`, `Vb`, `Vc` in A, B, C order. The example contains a 300 V DC link, a 50 Hz three-phase grid, a PLL and dq current PI controllers with references id=10 A and iq=0 A.
+
+2、Each frequency runs a baseline and independent d-axis and q-axis voltage perturbations. Baseline-subtracted phasors determine the full 2×2 admittance matrix, whose inverse gives impedance. Frequencies are perturbation frequencies in the dq frame. The measurement frame rotates at the fixed grid frequency, with its d axis defined by the phase-A source reference. The original controller's PLL dynamics participate in the calculation. Current flows from the converter to the grid, with `ΔVdq = −Zdq·ΔIdq`.
+
+3、Defaults are 10 Hz–1 kHz with 3 points per decade, giving 7 frequencies, a 2 V peak injection, 300 ms settling time and a maximum step of 20 μs. Gear second-order integration uses a step additionally bounded by the grid and perturbation frequencies. More frequencies require more simulations. Reopen the dialog to view a completed result after closing it.
+
+4、**Sweep and compare half amplitude and step** repeats the first, middle and last frequencies. **Consistent** requires every matrix entry to differ by at most 2% and adjacent whole-cycle windows to drift by at most 1%. Near-zero entries use 0.1% of the matrix norm as the denominator floor. Reduce amplitude and step further to check convergence. Increase settling time or check the PLL and current loops if the operating point fluctuates.
+
+5、Use balanced ABC positive-sequence sine sources with equal frequency and amplitude, a shared negative neutral, and zero `offset` and `delay`. The circuit uses RLC filters and `average` bridge legs. Other independent sources use fixed `dc` values. The maximum analysis frequency is one tenth of the lowest switching frequency. Peak injection voltage is limited to 5% of the grid phase-voltage peak.
+
+6、**Matrix entry** selects `Zdd`, `Zdq`, `Zqd` or `Zqq`, with voltage axes in rows and current axes in columns. CSV contains real and imaginary parts of all four impedance and admittance entries. Four SVG files show Bode plots and positive-frequency Nyquist loci. JSON records settings, operating points, window drift and comparisons. Each result directory also contains the drawing and controller snapshot, netlists and original waveforms. Stability assessment additionally requires the interconnected system's impedance-ratio matrix and open-loop pole information.
+
+```sh
+circuit-drawer dq-impedance examples/impedance/grid_dq.json --sources Va Vb Vc --compare -o out/dq-impedance
+```
+
+### 17.13 DC source/load stability
+
+![Source/load stability](images/manual/en/impedance-ratio.png)
+
+1、Open **Experimental → Source/load stability…**, select a 48 V bus example, click **Load example**, then **Calculate impedance ratio and poles**. Use **Open model JSON** to load a separate port-model file. Edit its parameters and calculate again. This file supplies source impedance `Zs` and load admittance `Yl`. The canvas remains available for drawing.
+
+2、Current enters the load. Define `Δv = −Zs·Δi` at the source and `Δi = Yl·Δv` at the load. Both models must use the same operating point and port boundary. Assign each capacitor and control loop to its corresponding subsystem once. The impedance ratio is `Tm = Zs·Yl = Zs/Zl`, with characteristic polynomial `Ds·Dl + Ns·Nl`. Source impedance uses Ω, load admittance uses S, and the ratio is dimensionless.
+
+| Field | Input |
+| --- | --- |
+| `params` | Optional numbers or formulas, referencing previously defined parameters in insertion order |
+| `source_impedance` | Source `num` and `den` coefficient arrays, in descending powers of s |
+| `load_admittance` | Load `num` and `den` coefficient arrays, in descending powers of s |
+| `freq` | Positive increasing display limits in Hz, default `[1, 10000]`, at most six decades |
+| `points` | Points per decade, default 80, integer 5–200 |
+
+3、Each port accepts a real-coefficient, continuous-time proper rational model of up to order eight. Numerator order is at most denominator order. Coefficients can use formulas such as `"L*C"` and `"-P/V^2"`. Supplied common polynomial factors are retained, including their internal modes in the pole count. Stability conclusions cover dynamics expressed in these models. Pure delays, discrete control and dq matrix interconnections require their corresponding model methods.
+
+4、The dialog shows open-loop right-half-plane poles `P`, clockwise encirclements `N` and closed-loop right-half-plane poles `Z`, checking `Z=P+N`. A complete right-shifted contour is bounded using the model roots and progressively subdivided. Its winding is independent of the display band. Solid and dashed curves show positive and negative frequencies in that band, with a red cross at −1. **Sampled minimum |1+Tm| in the band** covers the displayed sample points only. Inspect the pole table for marginal or numerical-boundary results. Repeated roots with insufficient pole precision, failed numerical solutions and inconsistent winding checks return an error.
+
+5、The example uses `Zs=(R+sL)/(LCs²+RCs+1)` and `Yl=−P/V²`, with 48 V, 0.2 Ω, 2 mH and 470 μF. V is the bus operating voltage, with the ideal source set to `E=V+RP/V`. Closed-loop poles are approximately `−22.2961 ± j1028.4901 rad/s` at 60 W and `+42.3463 ± j1021.5514 rad/s` at 200 W. Both editable files are available as the [60 W example](../examples/impedance/source_load_stable.json) and [200 W example](../examples/impedance/source_load_unstable.json).
+
+6、Download `model.json` for the input, `result.json` for evaluated coefficients, poles, winding and frequency responses, CSV for complex data and SVG for plots. Each CLI run writes a separate directory. Existing Buck and dq sweeps can help check port models. A complete stability assessment also depends on the modeled internal dynamics and open-loop pole information.
+
+```sh
+circuit-drawer impedance-ratio examples/impedance/source_load_stable.json -o out/impedance-ratio
+```
+
+### 17.14 dq interconnection stability
+
+![dq interconnection stability](images/manual/en/dq-stability.png)
+
+1、Open **Experimental → dq interconnection stability…**, load the 1500 W or 6000 W example, then click **Calculate impedance ratio and poles**. **Open model JSON** accepts separate source impedance `Zs` and load admittance `Yl` models at one operating point in one fixed dq frame. Voltage and current components follow d, q order. Matrix rows specify output axes and columns specify input axes.
+
+2、Each port uses continuous-time state equations `dx/dt=A·x+B·u`, `y=C·x+D·u`, giving `C·(sI−A)⁻¹·B+D`. At the source, `u=Δi` and `y=−Δv`. At the load, `u=Δv` and `y=Δi`. Positive current enters the load. Both models must share axis directions, angular reference, nominal frequency, units and power normalization. Assign each controller and line to its corresponding port once. Include PLL, control-loop and frequency-variation effects in the supplied state models.
+
+| Field | Input |
+| --- | --- |
+| `params` | Optional numbers or formulas, referencing previously defined parameters in insertion order |
+| `source_impedance`, `load_admittance` | Each contains real matrices `A`, `B`, `C`, `D` for its port |
+| `A`, `B`, `C`, `D` | Each port has n=0–8 states, with dimensions n×n, n×2, 2×n, 2×2 respectively. Entries can reference params |
+| Static port | `A=[]`, `B=[]`, `C=[[],[]]`, with its response supplied by the 2×2 D matrix |
+| `freq`, `points` | Positive increasing display limits in Hz, default `[1,10000]`, at most six decades. Points per decade default to 80, integer 5–200 |
+
+3、The complete impedance-ratio matrix is `T=Zs·Yl`. Generalized Nyquist counts clockwise encirclements N of the origin by `det(I+T)`, retains every internal state of both ports, and checks `Z=P+N` using open-loop RHP pole count P and closed-loop RHP pole count Z. Winding uses a complete right-shifted contour bounded by the model poles. Result JSON contains the closed-loop state matrix and both pole lists, including internal modes hidden in the port response.
+
+4、**Plot** selects `det(I+T)`, `Tdd`, `Tdq`, `Tqd` or `Tqq`. The determinant plot marks the origin with a red cross. Solid and dashed curves show positive and negative frequencies in the display band. Each T entry shows its positive-frequency response. **Sampled minimum |det(I+T)| in the band** describes the sampled points only. Closed-loop poles on or near the imaginary axis give a marginal result. Nearly singular `I+Ds·Dl`, insufficient pole precision, or inconsistent winding and internal pole counts produce a calculation error.
+
+5、The example combines a synchronous-frame RLC source and an ideal constant-power load at 50 Hz, with `R=0.2 Ω`, `L=2 mH`, `Cbus=470 μF`. It uses an amplitude-invariant dq transform and operating point `vd=100 V`, `vq=0`. The 100 V value is phase-voltage peak, P is total three-phase active power, and Q=0. Load admittance is `diag(−G,+G)`, where `G=2P/(3V²)`. The 1500 W model is asymptotically stable. The 6000 W model has two RHP poles. Editable models are available as the [1500 W example](../examples/impedance/dq_source_load_stable.json) and [6000 W example](../examples/impedance/dq_source_load_unstable.json).
+
+6、Download `model.json` for input, `result.json` for evaluated matrices, internal poles, contour and complex responses, CSV for all four entries of Zs, Yl, T and the determinant, and five SVG files for the determinant and T entries. Existing dq sweep data can help compare model frequency responses. This analysis requires a complete state-space model supplied separately.
+
+```sh
+circuit-drawer dq-stability examples/impedance/dq_source_load_stable.json -o out/dq-stability
+```
+
+### 17.15 Droop, virtual synchronous machine and parallel operation
+
+![Parallel-source power and frequency response](images/manual/en/grid-forming.png)
+
+1. On an empty canvas, click **Open example** and choose the droop, VSM or parallel case. You can also open `examples/grid_forming/gfm_droop.json`, `gfm_vsm.json` or `gfm_parallel.json`. Run through **Simulation → SPICE simulation**. An additional balanced resistor bank connects at 0.5 s and disconnects at 1.1 s.
+
+2. Run the companion commands below, import the generated CSV in the waveform editor, and select `u1_P_W`, `u2_P_W`, `u1_f_Hz` and `u2_f_Hz` in the channel settings. P/Q are converter-terminal three-phase powers, f is controller frequency, and E is phase peak voltage. The script also saves an editable `control.json`. In the loaded display window, power is about 921 W and 1846 W, with frequency near 49.707 Hz.
+
+```sh
+python examples/grid_forming/run.py --case parallel --out out/grid-forming
+circuit-drawer-control edit out/grid-forming/parallel/control.json
+```
+
+3. The cases use continuous primary frequency control, Q/V droop, ideal inner voltage tracking and average bridge legs. Proportional output impedances and droop settings give approximately 1:2 sharing with a load-dependent frequency offset. Droop power filtering has a 0.03 s time constant. VSM M/D is 0.16 s. Current limiting, inner-loop bandwidth, switching ripple and hardware protection require corresponding models.
+
+4. The `gfm_sync` control template provides relative-angle analysis with fixed voltage magnitudes, equal equilibrium angles and a quasi-steady RL network. Load it and open loop analysis for the Bode plot and poles. Default operating-point parameters are E=98 V and Rload=5 Ω. Poles and margins cover this reduced model. Full-system analysis also requires voltage/reactive dynamics, electromagnetic line states and the common-angle mode. [Parameters, equations and three-language case guide](../examples/grid_forming/README.md)
+
+### 17.16 Digital control delay and quantization
+
+![Digital sampling and quantization settings](images/manual/en/digital-control.png)
+
+1. Load `buck_digital` and expand digital settings under closed-loop control in **Simulation → SPICE simulation**. The control editor has the same settings in loop analysis. Click **Apply digital settings** to update the Bode plot and poles. Changes support undo and save/reopen.
+
+2. Enter ADC ranges in physical input units. PWM bits determine duty resolution. Computation delay uses whole samples. Specify word length and fractional bits together, or leave both empty for double-precision states. States start at zero, with the first update at Ts.
+
+3. The example uses 1 MHz sampling and PWM, a 12-bit ADC, 14-bit PWM and 24-bit states. Compare delays of 0, 1 and 3 samples, then 8-bit PWM. The transient export includes per-sample CSV and reports possible quantization limit cycles when the tail repeats.
+
+4. Linear analysis uses a zero-order-held plant and quantized coefficients, with poles tested against the unit circle. Sampled simulation supports scalar controllers. Native Simulink/PLECS quantization models remain a future integration. The GaN application example uses ideal switches with finite on-resistance, with device losses requiring a device-specific model. [Parameters, rounding rules and commands](../examples/digital_control/README.md#five-english-guide)
+
 ## 18. Simulink and PLECS export, closed-loop control
 
 The same circuit and simulation parameters can be exported as Simulink and PLECS models. The export carries the real wiring, part values, PWM and probes, and lays the model out like the original drawing.
@@ -1259,9 +1562,9 @@ The same circuit and simulation parameters can be exported as Simulink and PLECS
 
 ### 18.1 Exporting from the editor
 
-1、Open **分析 → SPICE 仿真…**, check the parameters, reference ground and probes, and choose the output folder.
+1、Open **仿真 → SPICE 仿真…**, check the parameters, reference ground and probes, and choose the output folder.
 
-2、Expand **Simulink / PLECS 导出说明与近似设置** (Simulink / PLECS export notes and approximation settings): diode linearisation reference current (default 1 A), series resistance of PLECS numerical stabilising capacitors (default 1 mΩ), and closed-loop controller mode (continuous or discrete). These affect only this export and are not stored in the circuit's simulation parameters.
+2、Expand **外部仿真导出说明与近似设置** (External simulation export notes and approximations): diode linearisation reference current (default 1 A), series resistance of PLECS numerical stabilising capacitors (default 1 mΩ), and closed-loop controller mode (continuous or discrete). These affect only this export and are not stored in the circuit's simulation parameters.
 
 3、Click **导出 Simulink** (Export Simulink) or **导出 PLECS 独立版** (Export PLECS Standalone). The buttons save the window's simulation parameters first; if checking fails, nothing is saved or written.
 
@@ -1300,13 +1603,21 @@ circuit-drawer plecs examples/spice/buck.json -o out/plecs
 
 3、Model names start with `cd_`; file names with spaces, Chinese characters or excessive length are converted to safe names.
 
+### 18.3a PSIM
+
+1、Choose **Simulation → Export to PSIM…**, check the parameters and click **Export PSIM**. The equivalent command is `circuit-drawer psim examples/spice/buck.json -o out/psim`. This produces a Python builder, a manifest and notes. Running the builder requires PSIM 2026 and its official Python API.
+
+2、Run `python out/psim/build_cd_buck.py --psim-home "PSIM installation folder"` to create `.psimsch`; add `--run` to simulate natively and save measured CSV. Existing models or results block replacement unless you explicitly pass `--overwrite`. Temporary files stay under the output folder.
+
+3、Supports open-loop RLC, diodes, resistive switches, sources and ideal multi-winding transformers. Closed-loop control, collapsed subsystems, IGBT models, thyristors and PMSM are rejected with a reason, preserving the original drawing. Net labels retain the checked connections; CSV uses the requested output interval. See [PSIM export](PSIM_EXPORT.md) for approximations and limits.
+
 ### 18.4 Differences from ngspice
 
 1、**Diodes:** both targets use piecewise-linear diodes, taking the tangent at 27 °C and a reference current I0 (default 1 A; `--diode-current 2` on the command line uses 2 A). This is not identical to ngspice's exponential model. The reverse branch of a Zener diode uses the device's own test current Izt.
 
 2、**Numerical stabilising capacitors:** PLECS puts a resistor in series with each one (default 1 mΩ, changed with `--numerical-resistance 2m`) to remove the conflict between ideal voltage sources and capacitor states.
 
-3、**An input capacitor directly across an ideal voltage source:** PLECS cannot treat it as an independent state, and the export reports why. In **视图 → 全图器件模型…**, set capacitors to "with parasitics" and enter a real ESR, then export again. Note that this applies to every capacitor in the drawing and also changes the SPICE results.
+3、**An input capacitor directly across an ideal voltage source:** PLECS cannot treat it as an independent state, and the export reports why. In **仿真 → 全图器件模型…**, set capacitors to "with parasitics" and enter a real ESR, then export again. Note that this applies to every capacitor in the drawing and also changes the SPICE results.
 
 4、A global Level 1 MOSFET model requires explicit consent to a resistive-switch approximation. In the export settings, select **Approximate LEVEL=1 switches using on-resistance**, or pass `--approximate-mosfet` on the command line. The exported model uses each switch's Ron/Roff and logical PWM. Confirm again when reopening the window; the original SPICE model is preserved.
 
@@ -1322,7 +1633,17 @@ A control diagram table can be connected to the circuit: ngspice then runs the c
 
 2、Choose a source for each controller input: a probe, or a constant (with an optional soft-start time; 0 means a step).
 
-3、Tick the switches each output drives. Outputs are duty cycles from 0 to 1, and each switch can be driven by one output only.
+3、Select the switches and modulation for each output. PWM uses duty from 0 to 1; VCO uses Hz and requires minimum and maximum frequency. Edit the complementary group’s dead time in seconds. Each switch can be driven by one output only.
+
+3a、Open [llc_vco.json](../examples/closed_loop/llc_vco.json) with its control table in the same folder. Complementary groups share continuous phase and the same delay; their nominal frequency/duty fields are unused. Run ngspice or export to Simulink/PLECS with a continuous or discrete controller: phase remains continuous and dead time stays in seconds. Native models use ideal edges. Tables with digital delay or quantization still require ngspice; disable PWM quantization for VCO. The example draws capacitor series resistor Rc explicitly and specifies numerical node capacitance; compare waveforms again after changing these values or the step size.
+
+![LLC frequency settings](images/manual/en/vco-settings.png)
+
+3b、To show the same controller in the circuit drawing, draw a frame using **Insert → Annotations → Draw block**, select it, and choose **Reference closed-loop controller** in Properties. **Controller display** switches between a label and the expanded diagram. Drag the corners to make room before expanding; the diagram keeps the printed font size. Moving, folding and unlinking the frame preserve the controller and its simulation bindings.
+
+3c、Open [buck_control_view.json](../examples/closed_loop/buck_control_view.json) with `buck_vmode.control.json` beside it. Both simulation and drawing read that file. After editing the control table, check again or reload the page; keep both files together when copying the circuit. Expanded previews use the local LaTeX renderer. A missing file or a diagram that does not fit blocks figure export and preserves existing output files.
+
+![Referenced controller properties](images/manual/en/control-reference.png)
 
 4、The corresponding JSON:
 
@@ -1337,7 +1658,7 @@ A control diagram table can be connected to the circuit: ngspice then runs the c
 
 5、A bridge leg is written as `{"switches": ["S1"], "complement": ["S2"], "dead_time": "1u", "model": "average"}`: `complement` is the lower switch, `dead_time` the dead time, and `model` is `average` (switching-period average, the default) or `switching` (individual switching). Probe inputs may add `filter` (first-order filter time constant in seconds). Outputs of function blocks are written `block.output`, for example `sv.da`.
 
-6、In ngspice the controller is simulated in continuous time, without sampling, computation delay or fixed-point rounding; transfer functions with an integrator and an output limit get anti-windup automatically. A single switch uses trailing-edge PWM.
+6. ngspice defaults to a continuous controller, with anti-windup for transfer functions having an integrator and output limits. Digital settings enable sampled updates, whole-sample delay and quantization as described in section 17.16. A single switch uses trailing-edge PWM.
 
 7、Exports offer two controller modes: `continuous` (default, comparable with ngspice) and `discrete` (using the control table's `code.fs` and discretisation method, matching the generated C code). Choose it in the export settings or with `--control discrete`. `average` bridge legs are exported to Simulink / PLECS as individually switched legs.
 
@@ -1384,7 +1705,7 @@ The editor uses port 8766 and draws at IEEE double-column width by default.
 
 ### 19.2 Interface
 
-1、Menu bar: 文件 (File: Save, Export, New from selected template, Save whole diagram as template, Save selected blocks as snippet), 编辑 (Edit: Undo, Redo, Cut, Copy, Paste, Delete selection, Add L-shaped corner to link), 视图 (View: Fit, Snap step, LaTeX preview), 插入 (Insert: block, limiter, reference tag, measurement tag, summing point, multiply point, divide point, A/B switch, text, background panel, blue dashed frame, link, insert selected snippet), AI (AI interface settings, Describe a new diagram, AI edit of the current diagram), 分析 (Analysis: Loop analysis), 帮助 (Help).
+1、Menu bar: 文件 (File: Save, Export, New from selected template, Save whole diagram as template, Save selected blocks as snippet), 编辑 (Edit: Undo, Redo, Cut, Copy, Paste, Delete selection, Add L-shaped corner to link), 视图 (View: Fit, Snap step, LaTeX preview), 插入 (Insert: block, limiter, reference tag, measurement tag, summing point, multiply point, divide point, A/B switch, text, background panel, blue dashed frame, link, insert selected snippet), AI (AI interface settings, Describe a new diagram, AI edit of the current diagram), 实验功能 (Experimental: Loop analysis), 帮助 (Help).
 
 2、Toolbar: 保存 (Save), 撤销 (Undo), 重做 (Redo), ＋ 添加… (Add), 连线 (Link), 删除 (Delete), 适应窗口 (Fit), LaTeX 预览 (LaTeX preview), AI 修改… (AI edit), 导出… (Export).
 
@@ -1414,11 +1735,13 @@ The editor uses port 8766 and draws at IEEE double-column width by default.
 
 ### 19.5 Loop analysis and compensator design
 
+![Experimental menu in the control editor](images/manual/en/experimental-control.png)
+
 ![Loop analysis](images/manual/en/control-loop-analysis.png)
 
 1、Give the blocks transfer functions (the table's `loop` section) and state how the power stage outside the diagram connects the output back to the measurement tags; the open-loop gain, margins and closed-loop response are then computed from the drawing. The structure comes from the drawn links.
 
-2、**分析 → 环路分析** (Analysis > Loop analysis) draws the Bode plot and lists the crossover frequency, phase margin, gain margin and closed-loop poles; tick **黑白** (black and white) if needed, and **导出 Bode 图（单栏 PDF+PNG）** exports the plot.
+2、**实验功能 → 环路分析** (Experimental > Loop analysis) draws the Bode plot and lists the crossover frequency, phase margin, gain margin and closed-loop poles; tick **黑白** (black and white) if needed, and **导出 Bode 图（单栏 PDF+PNG）** exports the plot.
 
 3、**补偿器设计（k 因子法）** (Compensator design, k-factor method): choose the compensator block and type (automatic, I, II, III), enter the crossover frequency and phase margin, click **计算** (Calculate), and when satisfied **写入表** (Write to table), which can be undone.
 
@@ -1451,6 +1774,18 @@ circuit-drawer-control code buck_vmode --fs 200k --q 20 --harness   # also a PC 
 ### 19.7 Function blocks
 
 Clarke, inverse Clarke, Park, inverse Park, SVPWM and angle wrapping are declared in the table's `functions` section and used in code generation and closed-loop simulation (floating-point arithmetic required). Their outputs are written `block.output`, for example `sv.da`. Loop analysis is linear and stops at function blocks, saying why. When the controller contains an internal loop (such as a PLL), set `code.blocks.<integrator>.delay` to 1 to break the algebraic loop.
+
+### 19.7a C code blocks
+
+![C code block settings](images/manual/en/custom-c.png)
+
+1、Select an ordinary control block and click **Set C code…**. Map input/output variable names to existing ports using JSON (for example `{"u":"w"}` and `{"y":"e"}`), then enter initial states and C statements. Inputs and old states are read-only. Assign outputs and use `next_stateName` to update states. Apply creates one undo step; Save writes the file. Converting a block or renaming an output on the same port updates the controller's code output selection. Reselect the corresponding output in the circuit's closed-loop settings.
+
+2、The whole controller uses the fixed sample rate `code.fs` and double arithmetic. Applying replaces this block's transfer function and block limits; implement limits in the code. Use pure calculations and explicit state, without static state, external side effects or early return. The editor checks fields and wiring; the target compiler checks C syntax. Loading, editing and drawing do not execute C.
+
+3、Reference the same control table from the circuit and select **Discrete** when exporting to PLECS or Simulink. PLECS uses C-Script; Simulink uses C Function with Unit Delay state storage. Generated C source is also available; call step once per control period. Custom C is not supported by ngspice, Python waveform evaluation, Bode analysis or digital delay/quantization.
+
+4、Open [buck_c_mpc.json](../examples/closed_loop/buck_c_mpc.json) with its [control table](../examples/closed_loop/buck_c_mpc.control.json) in the same folder. It samples at 100 kHz and compares duty candidates over an eight-sample horizon. Output is about 5.08–5.09 V during a 12→9 V supply change; the simplified model has a steady-state error. Check the explicit algorithm constants when changing L, C, load or sample rate. This is a demonstration, not a tuned hardware controller.
 
 ### 19.8 Figures
 
@@ -1540,7 +1875,9 @@ If only `OPENAI_API_KEY` is set and there is no Anthropic key, the OpenAI-compat
 
 5、**直接生成** (Generate now): progress shows the round number, elapsed time, each round's problems and the model's notes, and can be cancelled at any time; the terminal that started the editor prints the same progress.
 
-6、**Reference images:** up to 3 PNG, JPG or WebP images can be attached for the model to follow their layout; the model must support image input.
+6、Paste reference images with **Ctrl+V** (**⌘V** on macOS), drop PNG, JPG or WebP files into the dialog, or click **Choose images…**. Each AI dialog holds up to 3 images. Use **Remove image** below a thumbnail to delete it. Large images are resized proportionally to a maximum edge of 2048 pixels. Images that remain too large or cannot be read show an error. Plain text can be pasted as usual. The model must support image input.
+
+6a、Closing, switching and reopening dialogs within the same page preserves the selected images. Adding or removing an image invalidates the previous structure. Request a new structure or generate directly.
 
 7、**Rounds:** "最多 N 轮" (at most N rounds) accepts 1–8. For complex topologies (a dozen switches or more), name the exact variant, check the structure first, switch to double column, and allow 6–8 rounds. If the description mentions three-phase or multilevel circuits, the dialog suggests switching to double column first.
 
@@ -1557,6 +1894,18 @@ If only `OPENAI_API_KEY` is set and there is no Anthropic key, the OpenAI-compat
 3、The result first appears as a candidate with a list of actual changes; it does not replace the current drawing automatically. Download the candidate, or review it and choose **Confirm, apply and save as…**. Manual edits made while waiting are preserved; applying after the drawing has changed requires confirmation. Adoption can be undone and the original file is retained.
 
 4、With node and branch labels enabled, you can refer to net names and branch numbers, for example "add a 10 Ω resistor between A and B, left of C1". If the project has its own modules, the model receives the module library, so you can say "reuse the project's Boost module, two instances with inputs and outputs in parallel".
+
+5、The circuit **AI edit of the current figure** dialog provides the same reference-image area. Attach a screenshot of the desired layout or labels together with your editing instructions.
+
+### 20.5a Review the rendered drawing
+
+![Review the rendered drawing](images/manual/en/ai-visual-review.png)
+
+1、Both circuit AI dialogs offer **Review rendered drawing**, off by default. After the drawing passes validation at the chosen column width, the program sends its rendered image and coordinate table to the configured model to look for detouring wires, uneven repeated structures and crowded labels. Include your priorities and any positions that must stay fixed in the original request.
+
+2、Specific findings allow at most one further edit. It is kept only if validation passes and the complete pin connections, devices and simulation parameters remain unchanged, including hidden modules. Otherwise the original candidate and findings are retained. Review the final candidate before adopting it.
+
+3、Review adds rendering and model-request time. Missing LaTeX, unsupported image input or request failure keeps the original drawing and reports why. Switch to double columns first if the single-column check fails. This checks layout, does not run a simulation and may miss drawing problems. Add `--review` to CLI `new` or `tweak` to enable it.
 
 ### 20.6 AI in the control diagram editor
 
@@ -1662,7 +2011,7 @@ When any text in a figure contains Chinese, `CJKutf8` (with the Song typeface) i
 
 4、If `check` fails at single-column width but passes at double-column width, stderr suggests `--profile double`. The JSON report and failure exit code remain unchanged; the drawing is never changed automatically.
 
-5、Before `waveforms`, import CSV through **分析 → 波形与模态**, check the curve and mode bindings, and save the table.
+5、Before `waveforms`, import CSV through **模态与波形 → 波形与模态**, check the curve and mode bindings, and save the table.
 
 6、`new --image` identifies PNG, JPEG, GIF and WebP by the file header rather than the extension. Image and `--structure` read errors are reported before template matching or API-key checks. Structure files must be UTF-8 text. Header detection identifies the format; the model service still checks image completeness.
 
@@ -1680,9 +2029,14 @@ When any text in a figure contains Chinese, `CJKutf8` (with the Song typeface) i
 | `waveforms x.json` | Export waveforms and modes | `--wave-only`, plus the drawing options |
 | `spice x.json` | Export SPICE, optionally run | `-o`, `--name`, `-p`, `--run`, `--ngspice` |
 | `emi x.json` | Conducted EMI estimate and filter comparison | `-o`, `-p`, `--compare`, `--ngspice` |
+| `impedance x.json` | Buck averaged output impedance | `--probe`、`--f-min`、`--f-max`、`--points`、`--amplitude`、`--settle`、`--compare`、`-o` |
+| `dq-impedance x.json` | Grid-connected inverter dq impedance | `--sources A B C`、`--f-min`、`--f-max`、`--points`、`--amplitude`、`--settle`、`--max-step`、`--compare`、`-o` |
+| `impedance-ratio model.json` | DC source/load impedance ratio and stability | `-o` |
+| `dq-stability model.json` | dq matrix interconnection stability | `-o` |
 | `spice-init x.json --preset buck/boost -o y.json` | Write example simulation parameters | `--force`, `-p` |
 | `simulink x.json` | Export a Simulink build script | `-o`, `--name`, `-p`, `--diode-current`, `--control continuous/discrete`, `--approximate-mosfet` |
 | `plecs x.json` | Export a PLECS Standalone model | As above, plus `--numerical-resistance` |
+| `psim x.json` | Export a PSIM 2026 open-loop model builder | `-o`, `--name`, `-p`, `--diode-current`, `--approximate-mosfet` |
 | `new "description" -o x.json` | Generate a new topology with AI | `-p`, `--rounds`, `--provider`, `--model`, `--edit`, `--plan`, `--image`, `--anyway`, `--structure`, `--port` |
 | `tweak x.json "change"` | Change an existing table with AI | `-o`, `-p`, `--rounds`, `--provider`, `--model`, `--edit`, `--port` |
 | `save-template x.json name` | Save as a template | `--title`, `--alias` (repeatable), `-p`, `--dir`, `--force` |
@@ -1723,6 +2077,7 @@ res = render(lay, "ieee-single", out_dir="figs")   # raises LayoutRejected if th
 | Variable | Meaning | Default |
 | --- | --- | --- |
 | `CIRCUIT_DRAWER_NGSPICE` | ngspice executable | `ngspice_con` or `ngspice` on PATH |
+| `PSIM_HOME` | PSIM installation directory used by the exported builder | None; the builder also accepts `--psim-home` |
 | `CIRCUIT_DRAWER_TEMPLATES` | User template folder (`modules/` inside it is your module library, `control/` holds control diagram templates) | `~/.circuit_drawer/templates/` |
 | `CIRCUIT_DRAWER_PROVIDER` | AI interface type: `anthropic` or `openai` | `anthropic`; `openai` when only `OPENAI_API_KEY` is set |
 | `CIRCUIT_DRAWER_MODEL` | Model ID | `claude-opus-5-5` for Anthropic-compatible interfaces |
@@ -1761,10 +2116,10 @@ Poppler's `pdftocairo` is missing; install it and add its `bin` folder to PATH.
 `CJKutf8` is missing. MiKTeX installs it automatically; on Ubuntu install `latex-cjk-chinese`.
 
 **7. The drawing does not fit a single column (`too-cramped`).**
-Switch to double column (`-p double` or **视图 → 栏宽**). Full-bridge-rectifier LLCs, three-phase and multilevel circuits usually need double column.
+Switch to double column (`-p double` or **文件 → 图纸栏宽**). Full-bridge-rectifier LLCs, three-phase and multilevel circuits usually need double column.
 
 **8. A large circuit turns red when reopened.**
-The JSON does not store the column width, so it opens at single column. Use `circuit-drawer edit x.json -p double`, or switch in **视图 → 栏宽**.
+The JSON does not store the column width, so it opens at single column. Use `circuit-drawer edit x.json -p double`, or switch in **文件 → 图纸栏宽**.
 
 **9. Port 8765 is in use.**
 Start with another port, for example `--port 8766`. The launcher picks a free port automatically.
@@ -1819,7 +2174,7 @@ It opens the project's online documentation in the browser and needs a network c
 
 | Action | Key or mouse |
 | --- | --- |
-| Rotate selected part by 90° (transformers included) | `R` |
+| Rotate selected parts clockwise / counterclockwise by 90° (transformers included) | `R` / `Shift+R` |
 | Mirror switches and thyristors / reverse two-terminal parts | `F` |
 | Enlarge / shrink symbol keeping its aspect ratio | `+` (or `=`) / `-` (or `_`) |
 | Cut / copy / paste / duplicate | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` / `Ctrl+D` |

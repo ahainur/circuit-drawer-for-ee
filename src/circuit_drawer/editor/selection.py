@@ -8,6 +8,59 @@ from ..modes import WireGraph, _k
 from ..modules import _on
 
 
+def contact_graph(source, assembly, ids, owners):
+    """Expose public module contacts to the ordinary selection wire graph."""
+    from ..layout import Layout
+    graph = Layout.from_dict(source.to_dict())
+    graph.extra.pop("modules", None)
+    moving, used = list(ids), {e.id for e in graph.elements}
+    for i, (ref, pos) in enumerate(assembly.contact_pins.items()):
+        name = f"__contact_{i}"
+        while name in used:
+            name += "_"
+        used.add(name)
+        graph.add(name, "port", p=pos)
+        if ref.rpartition(".")[0] in owners:
+            moving.append(name)
+    return graph, moving
+
+
+def source_selection_plan(source, ids, wires=(), instances=(), profile="double"):
+    from ..profiles import get_profile
+    from ..validate import check_with_assembly
+    spec = source.extra.get("modules")
+    if not spec:
+        if instances:
+            raise ValueError("所选模块已不存在，请重新选择")
+        return selection_plan(source, ids, wires)
+    if not isinstance(instances, (list, tuple)) or any(not isinstance(i, str) for i in instances):
+        raise ValueError("模块选区须使用实例 ID 列表")
+    if set(ids) - {e.id for e in source.elements}:
+        raise ValueError("请选择当前图中的普通元件；模块内部元件请进入定义后编辑")
+    chosen = set(instances)
+    if chosen - {i["id"] for i in spec["instances"]}:
+        raise ValueError("所选模块已不存在，请重新选择")
+    report, assembly = check_with_assembly(source, get_profile(profile))
+    if not assembly:
+        raise ValueError("；".join(i.message for i in report.errors))
+    for inst in spec["instances"]:
+        if inst["id"] in chosen:
+            chosen.update(inst.get("group", {}).get("members", []))
+    # Automatically placed external parts follow only when all their anchors do.
+    parts = set()
+    for part in spec.get("parts", []):
+        peers = [b.rpartition(".")[0] for pair in spec.get("links", [])
+                 for a, b in (pair, pair[::-1]) if a.rpartition(".")[0] == part["id"]]
+        if peers and all(p in chosen or p in ids for p in peers):
+            parts.add(part["id"])
+    graph, moving = contact_graph(source, assembly, ids, chosen | parts)
+    plan = selection_plan(graph, moving, wires)
+    plan.update(origins=assembly.origins, instances=sorted(chosen), parts=sorted(parts),
+                routes={key: route for key, route in spec.get("routes", {}).items()
+                        if all(ref.rpartition(".")[0] in chosen | parts | set(ids) for ref in key.split("|"))})
+    return plan
+
+
 def _include_parallel_paths(graph, internal):
     """Include every path through a wire cycle traversed by the selected tree.
 

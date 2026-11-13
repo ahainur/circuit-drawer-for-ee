@@ -1,0 +1,45 @@
+{
+ "kind": "control",
+ "name": "gfm_sync",
+ "title": "两机相角同步小信号模型",
+ "profile": "ieee-double",
+ "regions": [],
+ "texts": [],
+ "blocks": [
+  {"id":"ref","type":"tag","style":"ref","at":[0.5,0],"size":[1.0,0.6],"text":"$r$"},
+  {"id":"error","type":"sum","at":[2,0],"signs":{"w":"+","s":"-"}},
+  {"id":"g1","type":"block","at":[4,0.9],"size":[2.2,0.8],"text":"$\\frac{m_p}{1+\\tau_p s}$"},
+  {"id":"g2","type":"block","at":[4,-0.9],"size":[2.2,0.8],"text":"$\\frac{1}{M_2s+D_2}$"},
+  {"id":"sum","type":"sum","at":[6,0],"signs":{"n":"+","s":"+"}},
+  {"id":"angle","type":"block","at":[7.5,0],"size":[1,0.8],"text":"$1/s$"},
+  {"id":"network","type":"block","at":[5,-2.3],"size":[1.2,0.7],"text":"$K$"}
+ ],
+ "links": [
+  {"from":"ref.e","to":"error.w"},
+  {"from":"error.e","via":[[2.6,0],[2.6,0.9]],"to":"g1.w"},
+  {"from":[2.6,0],"via":[[2.6,-0.9]],"to":"g2.w"},
+  {"from":"g1.e","via":[[6,0.9]],"to":"sum.n"},
+  {"from":"g2.e","via":[[6,-0.9]],"to":"sum.s"},
+  {"from":"sum.e","to":"angle.w"},
+  {"from":"angle.e","to":[10.8,0],"open":true,"label":"$\\Delta\\theta_1-\\Delta\\theta_2$","label_at":0.65},
+  {"from":[8.5,0],"via":[[8.5,-2.3]],"to":"network.e"},
+  {"from":"network.w","via":[[2,-2.3]],"to":"error.s"}
+ ],
+ "loop": {
+  "params": {"E":98,"f0":50,"L1":0.005,"L2":0.0025,"R1":0.5,"R2":0.25,"Rload":5,
+             "mp":0.002,"tau_p":0.03,"M2":160,"D2":1000,
+             "X1":"2*pi*f0*L1","X2":"2*pi*f0*L2",
+             "a":"R1+R2+(R1*R2-X1*X2)/Rload","b":"X1+X2+(R1*X2+R2*X1)/Rload",
+             "K":"1.5*E^2*b/(a^2+b^2)"},
+  "tf": {
+   "g1":{"num":["mp"],"den":["tau_p",1]},
+   "g2":{"num":[1],"den":["M2","D2"]},
+   "angle":{"num":[1],"den":[1,0]},
+   "network":{"gain":"K"}
+  },
+  "breaks":[{"at":"angle","label":"$T_{\\theta}(s)$"}],
+  "closed":[{"from":"ref","to":"angle","label":"$\\Delta\\theta/r$"}],
+  "freq":[0.01,1000],
+  "note":"Reduced relative-angle model at equal angles and fixed E. Quasi-steady balanced RL network with a resistive load. Includes P/f dynamics, excludes voltage/reactive dynamics, line electromagnetic states and the common-angle zero mode. E is the internal phase peak voltage. Re-evaluate K at the operating point."
+ }
+}

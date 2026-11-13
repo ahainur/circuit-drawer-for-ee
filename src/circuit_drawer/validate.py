@@ -16,8 +16,10 @@ from .geometry import (WINDING_GAP, BODY_FRAC, symbol_kind, EPS, MIN_LEAD, SW_HA
                        COIL_HALF_W, CORE_GAP, Scale, annotation_box, axis_sizes,
                        footprint, is_diagonal, scaled, transformer_frame, unscaled,
                        callout_box, callout_gap, callout_label_box, callout_shape, region_label_box,
-                       region_rect, block_rect, block_text_box, isolation_bars, isolation_gap)
-from .layout import PIN_NAMES, SWITCHES, TWO_TERMINAL, Layout, Point
+                       region_rect, block_rect, block_text_box, isolation_bars, isolation_gap,
+                       text_clearance)
+from .layout import (EXTRA_WINDINGS, MAX_WINDINGS, OPTIONAL_PINS, PIN_NAMES, SWITCHES, TWO_TERMINAL,
+                     Layout, Point, windings)
 from .profiles import Profile
 from .regions import ink_problems, problems as region_problems, safe_regions
 from .schema import element_problems
@@ -28,7 +30,6 @@ from .geometry import wave_symbol
 
 BODY_CLEARANCE = 0.06    # cm between two symbol bodies
 PARALLEL_MIN = 0.18      # cm between two parallel lines that run side by side
-TEXT_CLEARANCE = 0.06
 
 
 @dataclass
@@ -167,7 +168,13 @@ def footprints(layout: Layout, s: Scale, prof: Profile) -> dict[str, Footprint]:
 def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Report:
     rep = Report(scale=s)
     add = rep.issues.append
-    if not (layout.elements or layout.wires or layout.annotations or layout.extra.get("wave_symbols")):
+    from .control_view import problems as control_view_problems
+    for message in control_view_problems(layout):
+        add(Issue("bad-control-view", message))
+    # a system block diagram (boxes with icons, no parts) is a drawing too;
+    # plain boxes alone are not (a control table also has "blocks")
+    if not (layout.elements or layout.wires or layout.annotations or layout.extra.get("wave_symbols")
+            or any(b.icon for b in safe_blocks(layout))):
         add(Issue("empty-drawing", "Add components or describe a new topology before exporting."))
         return rep
 
@@ -184,6 +191,16 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
             schema_ok = False
             continue
         missing = [p for p in need if p not in el.pins]
+        if el.kind == "transformer":
+            # an extra winding needs both ends; any other pin name is a typo
+            missing += [f"{w}{end}" for w in EXTRA_WINDINGS for end in "ab"
+                        if f"{w}a" in el.pins or f"{w}b" in el.pins
+                        if f"{w}{end}" not in el.pins]
+            stray = sorted(set(el.pins) - set(need) - set(OPTIONAL_PINS["transformer"]))
+            if stray:
+                add(Issue("unknown-pin", f"{el.id} (transformer) has unknown pins {stray}; "
+                          f"extra windings are w3a/w3b .. w{MAX_WINDINGS}a/w{MAX_WINDINGS}b"))
+                schema_ok = False
         if missing:
             add(Issue("missing-pin", f"{el.id} ({el.kind}) lacks pins {missing}"))
             schema_ok = False
@@ -275,6 +292,29 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                               f"{min_two / along:.2f} units"))
                 if P[u][1] < P[v][1]:
                     add(Issue("bad-order", f"{el.id}: pin {u} must precede {v} along the winding axis"))
+            # extra windings: on the primary or the secondary axis, either
+            # way round (the dot marks wka), long enough, and not overlapping
+            # another winding on the same axis
+            spans = {"p": [("p", P["p2"][1], P["p1"][1])], "s": [("s", P[sec[-1]][1], P["s1"][1])]}
+            for name, a, b in windings(el):
+                if name not in EXTRA_WINDINGS:
+                    continue
+                xa, xb = P[a][0], P[b][0]
+                side = "p" if abs(xa - xp) < EPS else "s" if abs(xa - xs) < EPS else None
+                if side is None or abs(xb - xa) > EPS:
+                    add(Issue("not-orthogonal", f"{el.id}: winding {name} ({a}-{b}) must lie on the "
+                              f"primary axis (with p1-p2) or the secondary axis (with s1-s2)"))
+                    continue
+                if abs(P[a][1] - P[b][1]) < min_two - EPS:
+                    add(Issue("too-short", f"{el.id}: winding {a}-{b} shorter than "
+                              f"{min_two / along:.2f} units"))
+                lo_w, hi_w = sorted((P[a][1], P[b][1]))
+                for other, o0, o1 in spans[side]:
+                    if lo_w < o1 + EPS and o0 < hi_w + EPS:     # touching ends would join them
+                        add(Issue("winding-overlap", f"{el.id}: winding {name} overlaps winding "
+                                  f"{other} on the same axis; move {a}/{b} along the axis so the "
+                                  f"two coils sit one after the other, with a gap between their ends"))
+                spans[side].append((name, lo_w, hi_w))
 
     # ---- 2. wires ---------------------------------------------------------
     segs: list[Seg] = []
@@ -411,7 +451,8 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                 add(Issue("shorted-pins", f"{el.id}.{u} and {el.id}.{v} coincide"))
 
     # incidence count at each point, to find dangling ends and junction dots
-    degree: dict[tuple[float, float], int] = {}
+    # Zero-length port symbols also need the incidence of a wire through them.
+    degree: dict[tuple[float, float], int] = {_key(p): 0 for p in pin_at.values()}
     for g in segs:
         for p in (g.p, g.q):
             degree[_key(p)] = degree.get(_key(p), 0) + 1
@@ -425,10 +466,13 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
             degree[k] = degree.get(k, 0) + 1
     nc = layout.extra.get("no_connect", [])
     nc = {p for p in nc if isinstance(p, str)} if isinstance(nc, list) else set()
+    # A pin in an explicit module-compiler connection is joined even with no
+    # wire drawn to it (a folded instance's port, see Assembly.sheets).
+    joined = {ref for refs in connections if len(refs) > 1 for ref in refs}
     for ref, p in pin_at.items():
         if ref in nc and degree.get(_key(p), 0) >= 2:
             add(Issue("bad-no-connect", f"{ref}: NoConn 只允许用于悬空引脚，请移除标记或断开连接"))
-        if degree.get(_key(p), 0) < 2 and ref not in nc:
+        if ref not in joined and degree.get(_key(p), 0) < 2 and ref not in nc:
             add(Issue("open-pin", f"{ref} at {_fmt(p, s)} is not connected"))
     for pt, g in endpoints:
         # an end on a lead is already reported as touches-lead
@@ -441,6 +485,9 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     # Only the module compiler supplies these explicit, labelled port joins.
     # Ordinary JSON net names never imply a physical connection by themselves.
     for refs in connections:
+        # A compiler-provided join may end in an omitted module. Its complete
+        # circuit is checked separately; never join across the omitted device.
+        refs = [ref for ref in refs if ref in pin_at]
         if refs:
             for ref in refs[1:]:
                 uf.union(_key(pin_at[refs[0]]), _key(pin_at[ref]))
@@ -501,12 +548,12 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     _check_blocks(blocks, callouts, bodies, segs, s, prof, add)
 
     # ---- 8. text --------------------------------------------------------
-    texts: list[tuple[str, Box]] = []
+    texts: list[tuple[str, Box, float]] = []
     for el in layout.elements:
-        texts += [(f"label of {el.id}", b) for b in fps[el.id].labels]
+        texts += [(f"label of {el.id}", b, text_clearance(el.opts.get("label_size"), prof)) for b in fps[el.id].labels]
     for r in regions:
         if (box := region_label_box(r, s, prof)) is not None:
-            texts.append((f"label of {r.name}", box))
+            texts.append((f"label of {r.name}", box, text_clearance(r.size, prof)))
     callout_lines = []
     for c in callouts:
         if (box := callout_label_box(c, s, prof)) is not None:
@@ -515,7 +562,7 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                            for p in (scaled(c.start, s), scaled(c.end, s))):
                 add(Issue("inline-label-end", f"label of {c.name} covers an arrow endpoint; "
                           "lengthen the arrow, shorten the text or move label_at toward the middle"))
-            texts.append((f"label of {c.name}", box))
+            texts.append((f"label of {c.name}", box, text_clearance(c.size, prof)))
             mark = isolation_gap(c, s)
             if mark is not None and gap is not None and mark.overlaps(gap):
                 add(Issue("isolation-on-label", f"the isolation mark of {c.name} sits on its "
@@ -523,9 +570,9 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
         callout_lines += [(c.name, p, q) for p, q in _outline(c, s)]
     for b in blocks:
         if (box := block_text_box(b, s, prof)) is not None:
-            texts.append((f"text of {b.name}", box))
+            texts.append((f"text of {b.name}", box, text_clearance(b.size, prof)))
     for a in layout.annotations:
-        texts.append((f"text {a.text!r}", annotation_box(a, s, prof)))
+        texts.append((f"text {a.text!r}", annotation_box(a, s, prof), text_clearance(a.size, prof)))
         if ARROW_TEXT.fullmatch(a.text.strip()):
             add(Issue("arrow-as-text", f"text {a.text!r} draws an arrow out of a symbol; "
                       f"use a callout (\"callouts\": [{{\"from\": ..., \"to\": ...}}])"))
@@ -536,13 +583,13 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     from .geometry import electrical_labels
     if not any(i.code == "bad-electrical" for i in rep.issues):
         for label in electrical_labels(layout, s, prof):
-            texts.append((f"{label.kind} label {label.text} ({label.ref})", label.box))
+            texts.append((f"{label.kind} label {label.text} ({label.ref})", label.box, text_clearance(label.font_pt, prof)))
             if label.blocked:
                 add(Issue("electrical-label-space", f"{label.ref}: no clear space for {label.text}; "
                           "move nearby elements/text or shorten the network name in the editor"))
-    for name, box in texts:
+    for name, box, clearance in texts:
         for eid, b in bodies:
-            if box.overlaps(b, TEXT_CLEARANCE) and not name.endswith(f"of {eid}"):
+            if box.overlaps(b, clearance) and not name.endswith(f"of {eid}"):
                 add(Issue("text-on-symbol", f"{name} overlaps the symbol of {eid}"))
         for g in segs:
             if box.hits_segment(g.p, g.q):
@@ -556,8 +603,8 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
         for owner in dict.fromkeys(o for o, p, q in callout_lines
                                    if o not in allowed and box.hits_segment(p, q) and name != f"label of {o}"):
             add(Issue("text-on-callout", f"{name} is covered by {owner}"))
-    for (na, ba), (nb, bb) in combinations(texts, 2):
-        if ba.overlaps(bb, TEXT_CLEARANCE):
+    for (na, ba, ca), (nb, bb, cb) in combinations(texts, 2):
+        if ba.overlaps(bb, max(ca, cb)):
             add(Issue("text-overlap", f"{na} overlaps {nb}"))
 
     return rep
@@ -609,7 +656,7 @@ def _check_blocks(blocks, callouts, bodies, segs, s: Scale, prof: Profile, add) 
     running through it."""
     rects = [(b, block_rect(b, s)) for b in blocks]
     for b, r in rects:
-        if (t := block_text_box(b, s, prof)) is not None and (
+        if (t := block_text_box(b, s, prof)) is not None and not b.icon and (
                 t.x1 - t.x0 + 2 * BLOCK_TEXT_PAD > r.x1 - r.x0 + EPS
                 or t.y1 - t.y0 + 2 * BLOCK_TEXT_PAD > r.y1 - r.y0 + EPS):
             add(Issue("block-text-overflow", f"the text of {b.name} does not fit its box; "
@@ -779,6 +826,10 @@ def extent(layout: Layout, s: Scale, prof: Profile) -> Box:
     for c in callouts:
         boxes += [b for b in (callout_box(c, s), callout_label_box(c, s, prof)) if b is not None]
     boxes += [block_rect(b, s) for b in safe_blocks(layout)]
+    from .glyphs import glyphs
+    for glyph in glyphs(layout):
+        a, b = scaled(glyph["from"], s), scaled(glyph["to"], s)
+        boxes.append(Box(min(a[0],b[0]),min(a[1],b[1]),max(a[0],b[0]),max(a[1],b[1])))
     return Box(min(b.x0 for b in boxes), min(b.y0 for b in boxes),
                max(b.x1 for b in boxes), max(b.y1 for b in boxes))
 
@@ -871,6 +922,14 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
     also needs the drawn view does not assemble the table a second time."""
     # Report schema mistakes before fitting the scale: measuring a label
     # looks its side up directly and would fail on a misspelt one.
+    from .drawing_scale import read as drawing_scale, width_issue
+    try:
+        requested = drawing_scale(layout)
+    except ValueError as exc:
+        return Report(scale or Scale(1, 1), [Issue("bad-drawing-scale", str(exc))]), None
+    locked = scale is None and requested is not None
+    if locked:
+        scale = requested
     early = element_problems(layout)
     if early:
         return Report(scale or Scale(1, 1), [Issue(code, msg) for code, msg in early]), None
@@ -878,11 +937,19 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
         from .modules import checked
         try:
             assembly, _, report = checked(layout, prof, scale)
+            if locked and assembly is not None:
+                issue = width_issue(assembly.view, report.scale, prof)
+                if issue:
+                    report.issues.append(issue)
             return report, assembly
         except (ValueError, TypeError, KeyError) as exc:
             return Report(scale or Scale(1, 1), [Issue("bad-module", str(exc))]), None
     s = fit_scale(layout, prof, connections=connections) if scale is None else scale
     rep = validate(layout, s, prof, connections=connections)
+    if locked:
+        issue = width_issue(layout, s, prof)
+        if issue:
+            rep.issues.append(issue)
     if s.x < prof.min_scale:
         rep.issues.append(Issue("too-cramped", f"the circuit only fits "
                                 f"{prof.name} at scale {s.x:.2f} < {prof.min_scale}; "

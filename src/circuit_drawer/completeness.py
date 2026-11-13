@@ -11,10 +11,12 @@ from collections import Counter
 
 from .layout import Layout
 
+INSTANCE_STYLES = ("stack", "ellipsis")
+
 
 def inspect_stacks(layout: Layout, *, resolved_instances=()) -> dict:
     usage = layout.extra.get("stack_usage", {})
-    issues = []
+    issues, style_issues = [], []
     if not isinstance(usage, dict):
         issues.append("stack_usage 必须是按区域 ID 索引的对象")
         usage = {}
@@ -48,25 +50,32 @@ def inspect_stacks(layout: Layout, *, resolved_instances=()) -> dict:
         if not isinstance(spec, dict) or spec.get("purpose") not in ("decoration", "instances"):
             continue
         purpose = spec["purpose"]
-        allowed = {"purpose"} | ({"instances"} if purpose == "instances" else set())
+        allowed = {"purpose"} | ({"instances", "style"} if purpose == "instances" else set())
         if set(spec) - allowed:
-            issues.append(f"{name} 的用途含未知字段：{sorted(set(spec) - allowed)}")
+            target = style_issues if "style" in set(spec) - allowed else issues
+            target.append(f"{name} 的用途含未知字段：{sorted(set(spec) - allowed)}")
         if purpose == "decoration":
             continue
+        style = spec.get("style", "stack")
+        if style not in INSTANCE_STYLES:
+            style_issues.append(f"{name} 的 style 只接受 {' / '.join(INSTANCE_STYLES)}")
         names = spec.get("instances")
         if (not isinstance(names, list) or not names
                 or not all(isinstance(n, str) and n.strip() == n and n for n in names)
                 or len(names) != len(set(names))):
             issues.append(f"{name} 必须列出不重复、非空的实例 ID（包含前面板），例如 A、B、C")
             continue
+        if style == "ellipsis" and len(names) < 3:
+            style_issues.append(f"{name} 的 ellipsis 至少需要三个真实实例")
         st = region.get("stack")
         count = st.get("count", 2) if isinstance(st, dict) else None
-        if has_stack and type(count) is int and len(names) != count + 1:
+        if style == "stack" and has_stack and type(count) is int and len(names) != count + 1:
             issues.append(f"{name} 连同前面板共表示 {count + 1} 份电路，但仅声明 {len(names)} 个实例")
         missing = [n for n in names if n not in known]
         if missing:
             issues.append(f"{name} 代表的电路未完整定义／展开，缺少实例：{'、'.join(missing)}。不能按完整电路导出 SPICE；仅有实例名称不等于真实器件和连接。")
-    return {"ok": not issues, "issues": issues, "stacks": stacks,
+    return {"ok": not (issues or style_issues), "issues": issues + style_issues,
+            "style_issues": style_issues, "stacks": stacks,
             "element_count": len(layout.elements)}
 
 

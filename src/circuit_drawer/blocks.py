@@ -9,6 +9,13 @@ Blocks never touch connectivity: they have no pins and no netlist entries.
 
     {"id": "pwm", "from": [x0, y0], "to": [x1, y1], "text": "PWM"}
 
+A block may carry an ``icon``: a converter mark (``dcac`` draws the
+DC/AC box of a system diagram), a device mark, or a pictorial icon such as
+``battery``, ``pv`` or ``rack`` (glyphs.py).  With an icon the text becomes
+a caption under the box ("BESS", "Rack").
+
+    {"id": "bess", "from": [0, 0], "to": [1, 1], "icon": "battery", "text": "BESS"}
+
 Like regions, blocks are stored as a plain top-level list (``Layout.extra``)
 and the corners stay exactly as written.
 """
@@ -16,9 +23,10 @@ and the corners stay exactly as written.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
+from .glyphs import KINDS as GLYPH_KINDS
 from .layout import Layout
 from .regions import INKS, PALETTE, RegionError, _point, canon, ink_canon, valid_color, valid_ink
 
@@ -26,7 +34,9 @@ from .regions import INKS, PALETTE, RegionError, _point, canon, ink_canon, valid
 # "none" leaves only the outline; palette tints as for regions.
 FILLS = ("white", "none") + tuple(PALETTE)
 BORDERS = ("solid", "dashed", "dotted")
-KEYS = ("id", "from", "to", "text", "fill", "border", "color", "size")
+KEYS = ("id", "from", "to", "text", "fill", "border", "color", "size", "icon")
+ICONS = GLYPH_KINDS      # every glyph mark, converters and devices included
+CAPTION_GAP = 0.08       # printed cm between an icon block's box and its caption
 MIN_SIDE = 0.2           # layout units: a smaller box cannot hold a word
 TEXT_PAD = 0.06          # printed cm of clear space between the text and each edge
 
@@ -48,6 +58,7 @@ class Block:
     color: str = "black"      # ink of the outline and the text
     size: float | None = None
     name: str = "block"
+    icon: str | None = None   # a glyph mark drawn in the box; the text then sits under it
 
 
 def parse_block(d: Any, i: int) -> Block:
@@ -86,8 +97,11 @@ def parse_block(d: Any, i: int) -> Block:
     if size is not None and (isinstance(size, bool) or not isinstance(size, (int, float))
                              or not math.isfinite(size)):
         raise BlockError(f"{name}: size must be a font size in pt")
+    icon = d.get("icon")
+    if icon is not None and icon not in ICONS:
+        raise BlockError(f"{name}: icon must be one of {list(ICONS)}")
     return Block(bid.strip(), x0, y0, x1, y1, text, fill, border, color,
-                 float(size) if size is not None else None, name)
+                 float(size) if size is not None else None, name, icon)
 
 
 def _items(layout: Layout) -> list:
@@ -126,10 +140,18 @@ def safe_blocks(layout: Layout) -> list[Block]:
         return out
     for i, d in enumerate(items):
         try:
-            out.append(parse_block(d, i))
+            out.append(display_block(parse_block(d, i), layout))
         except BlockError:
             pass
     return out
+
+
+def display_block(block: Block, layout: Layout) -> Block:
+    """Expanded controller ink replaces the caption without editing its source."""
+    view = layout.extra.get("control_view")
+    if isinstance(view, dict) and view.get("block") == block.id and view.get("display") == "expanded":
+        return replace(block, text="")
+    return block
 
 
 def fill_rgb(b: Block, mono: bool = False) -> tuple[int, int, int] | None:

@@ -1,0 +1,331 @@
+{
+ "name": "boost_scaled",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.525,
+     0.361
+    ],
+    "b": [
+     0.525,
+     2.761
+    ]
+   },
+   "label": "$V_\\mathrm{in}$",
+   "label_pos": "left",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     1.005,
+     2.761
+    ],
+    "b": [
+     2.045,
+     2.761
+    ]
+   },
+   "label": "$L_1$",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.605,
+     2.761
+    ],
+    "b": [
+     3.405,
+     2.761
+    ]
+   },
+   "label": "$D_1$",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.365,
+     2.041
+    ],
+    "s": [
+     2.365,
+     1.081
+    ]
+   },
+   "label": "$S_1$",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     3.885,
+     2.761
+    ],
+    "b": [
+     3.885,
+     0.361
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     4.765,
+     2.761
+    ],
+    "b": [
+     4.765,
+     0.361
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "left",
+   "opts": {
+    "scale_length": 0.8,
+    "scale_width": 0.8,
+    "label_size": 6.4
+   }
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.525,
+    2.761
+   ],
+   [
+    1.005,
+    2.761
+   ]
+  ],
+  [
+   [
+    2.045,
+    2.761
+   ],
+   [
+    2.605,
+    2.761
+   ]
+  ],
+  [
+   [
+    3.405,
+    2.761
+   ],
+   [
+    4.765,
+    2.761
+   ]
+  ],
+  [
+   [
+    2.365,
+    2.761
+   ],
+   [
+    2.365,
+    2.041
+   ]
+  ],
+  [
+   [
+    2.365,
+    1.081
+   ],
+   [
+    2.365,
+    0.361
+   ]
+  ],
+  [
+   [
+    0.525,
+    0.361
+   ],
+   [
+    4.765,
+    0.361
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    5.285,
+    1.897
+   ],
+   "text": "$+$",
+   "size": 6.4
+  },
+  {
+   "at": [
+    5.285,
+    1.561
+   ],
+   "text": "$v_o$",
+   "size": 6.4
+  },
+  {
+   "at": [
+    5.285,
+    1.225
+   ],
+   "text": "$-$",
+   "size": 6.4
+  }
+ ],
+ "netlist": {
+  "Vin.b": "IN",
+  "L1.a": "IN",
+  "L1.b": "SW",
+  "D1.a": "SW",
+  "S1.d": "SW",
+  "D1.b": "OUT",
+  "Co.a": "OUT",
+  "RL.a": "OUT",
+  "Vin.a": "GND",
+  "S1.s": "GND",
+  "Co.b": "GND",
+  "RL.b": "GND"
+ },
+ "modes": [
+  {
+   "name": "Inductor charging",
+   "condition": "CCM, positive inductor current, ideal switching",
+   "caption": "$S_1$ on, $D_1$ off",
+   "on": [
+    "S1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "L1",
+     "S1"
+    ],
+    [
+     "RL",
+     "Co"
+    ]
+   ]
+  },
+  {
+   "name": "Energy transfer",
+   "condition": "CCM, positive inductor current, ideal switching",
+   "caption": "$S_1$ off, $D_1$ conducting",
+   "on": [
+    "D1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "L1",
+     "D1",
+     "Co|RL"
+    ]
+   ]
+  }
+ ],
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Vin": {
+    "dc": "24"
+   },
+   "L1": {
+    "value": "500u",
+    "initial": "0"
+   },
+   "D1": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "S1": {
+    "ron": "0.01",
+    "roff": "1G",
+    "frequency": "50k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "10n",
+    "fall": "10n",
+    "model": "ideal_switch"
+   },
+   "Co": {
+    "value": "220u",
+    "initial": "0"
+   },
+   "RL": {
+    "value": "30"
+   }
+  },
+  "transient": {
+   "step": "200n",
+   "stop": "80m",
+   "max_step": "200n"
+  },
+  "probes": [
+   {
+    "name": "v_out",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "Vin.a"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "L1"
+   },
+   {
+    "name": "pwm",
+    "kind": "drive",
+    "element": "S1"
+   }
+  ]
+ },
+ "drawing_scale": [
+  1.0,
+  1.0
+ ]
+}

@@ -3,7 +3,7 @@
 function layerSelection() {
   if (!layout || !selected || wireDraft || boxDraft) return null;
   const {type, index} = selected;
-  if (!['regions', 'blocks', 'callouts'].includes(type)) return null;
+  if (!['regions', 'blocks', 'callouts', 'glyphs'].includes(type)) return null;
   const items = layout[type], item = items?.[index];
   if (!item) return null;
   const band = type === 'callouts' ? calloutLayer(item) : type;

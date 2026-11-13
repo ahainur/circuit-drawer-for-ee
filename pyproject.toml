@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "circuit-drawer-for-ee"
-version = "1.6.0"
+version = "1.7.0"
 description = "Paper-ready power electronics circuit figures (CircuitikZ) from hand-placed, validated coordinates"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "ahainur"}]
-keywords = ["power electronics", "circuitikz", "schematic", "ngspice", "simulink", "plecs"]
+keywords = ["power electronics", "circuitikz", "schematic", "ngspice", "simulink", "plecs", "psim"]
 dependencies = []
 
 [project.urls]

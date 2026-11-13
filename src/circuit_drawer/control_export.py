@@ -263,6 +263,8 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
     fixed value."""
     if mode not in MODES:
         raise ClosedLoopError(f"闭环控制器导出模式须为 {list(MODES)}，不是 {mode!r}")
+    if loop.digital:
+        raise ClosedLoopError("digital 的逐拍量化模型请使用 ngspice 导出。Simulink/PLECS 的当前原生控制方块尚未实现该舍入与延迟模型")
     pl = loop.plan
     panel = Panel(mode, pl.ts if mode == "discrete" else None)
     b = _Builder(panel)
@@ -293,6 +295,15 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
     for st in pl.steps:
         x = [sig[s] for s in st.srcs]
         if st.kind == "fn":
+            if st.data["fn"] == "c":
+                if mode != "discrete":
+                    raise ClosedLoopError("C 代码方块需要离散控制器导出；请选择 discrete，采样率使用 code.fs")
+                name = b.add("c",st.id,{**st.data,"ts":pl.ts},len(x),len(st.data["outs"]),st.id)
+                for i, source in enumerate(x,1):
+                    b.link(source,(name,i))
+                for i, signal in enumerate(st.data["outs"],1):
+                    sig[signal] = (name,i)
+                continue
             outs = _function(b, st, dict(zip(st.data["names"], x)))
             for signal in st.data["outs"]:
                 sig[signal] = outs[signal.split(".", 1)[1]]
@@ -323,6 +334,9 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
         sig[st.id] = port
     for bid, cfg in loop.outputs.items():
         duty = sig[bid]
+        if cfg.get("modulation") == "vco":
+            _vco(b, panel, bid, cfg, switches, duty)
+            continue
         bridge = bool(cfg["complement"])
         if cfg["model"] == "average":
             panel.warnings.append(f"{bid}：桥臂 {cfg['switches'] + cfg['complement']} 的 average 模型在原生库里没有对应方块，"
@@ -373,6 +387,39 @@ def _sos(b: _Builder, st, loop: Loop, mode: str, src: tuple[str, int], warnings:
     return b.limited(port, st.lo, st.hi, st.id)
 
 
+def _vco(b: _Builder, panel: Panel, out: str, cfg: dict,
+         switches: dict[str, tuple[str, dict]], command: tuple[str, int]) -> None:
+    """One continuously integrated phase per output, including sampled control.
+
+    Delaying turn-on (min of each raw pulse and its time-delayed copy) keeps
+    dead time in seconds when the command changes partway through a cycle.
+    The complete SPICE validation has already checked group delays and timing.
+    """
+    frequency = b.limited(command, cfg["frequency_min"], cfg["frequency_max"], f"{out}_frequency")
+    if panel.mode == "discrete":
+        frequency = b.one("dtf", f"{out}_frequency_hold", frequency,
+                          {"num": [1.0], "den": [1.0], "ts": panel.ts})
+    delay = switches[cfg["switches"][0]][1]["delay"]
+    enable = (b.add("step", f"{out}_enable", {"time": delay}, 0, 1), 1)
+    rate = b.many("product", f"{out}_rate", [frequency, enable], {"ops": "**"})
+    phase = b.one("tf", f"{out}_phase", rate, {"num": [1.0], "den": [1.0, 0.0]})
+    wave = b.one("fcn", f"{out}_wave", phase, {"expr": f"sin({TWO_PI!r}*{{u1}})", "n": 1})
+    zero = b.const(0.0)
+    for suffix, group, inputs in (("high", cfg["switches"], [wave, zero]),
+                                   ("low", cfg["complement"], [zero, wave])):
+        if not group:
+            continue
+        raw = b.many("compare", f"{out}_{suffix}_raw", inputs)
+        gate = b.many("product", f"{out}_{suffix}_enabled", [raw, enable], {"ops": "**"})
+        if cfg["dead_time"]:
+            delayed = b.one("pulse_delay", f"{out}_{suffix}_delay", gate, {"seconds": cfg["dead_time"]})
+            gate = b.many("minmax", f"{out}_{suffix}_gate", [gate, delayed], {"op": "min"})
+        for sw in group:
+            panel.exports[switches[sw][0]] = gate
+    panel.warnings.append(f"{out}：VCO 使用 Hz 限幅、共享连续相位和秒死区；原生开关采用理想边沿，"
+                          "与 ngspice 的有限 rise/fall 边沿存在差别。")
+
+
 def _modulator(b: _Builder, panel: Panel, sw: str, drive: tuple[str, dict], duty: tuple[str, int], out: str,
                triangle: bool, dead: float, low: bool) -> None:
     """PWM of one switch from the controller's duty (0..1), as closed_loop.modulator."""
@@ -414,7 +461,8 @@ def _layout(panel: Panel) -> None:
     for blk in panel.blocks:
         col = depth[blk.name]
         row = rows.get(col, 0)
-        rows[col] = row + 1
+        # Simulink keeps custom C state in separate delays below the C Function.
+        rows[col] = row + 1 + (len(blk.params['c']['states']) if blk.kind == 'c' else 0)
         blk.pos = (col * COLUMN, row * ROW)
     panel.size = ((max(depth.values(), default=0) + 1) * COLUMN, max(rows.values(), default=0) * ROW)
 

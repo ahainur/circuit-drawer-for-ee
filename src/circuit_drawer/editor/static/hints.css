@@ -1,0 +1,16 @@
+/* Shared by the circuit and control editors. */
+/* Hint levels: a one-line status, a tooltip, and a "?" opened on demand. */
+.help-row { position: relative; display: flex; align-items: center; gap: 6px; }
+.help-row > h3, .help-row > b, .help-row > label { margin: 0; }
+.help-row > h3 { flex: 1; }
+.help-tip { display: inline-block; flex: none; }
+.help-tip > summary { list-style: none; display: inline-grid; place-items: center; width: 16px; height: 16px;
+  border: 1px solid currentColor; border-radius: 50%; color: var(--muted); font: 600 11px/1 system-ui, sans-serif; cursor: pointer; }
+.help-tip > summary::-webkit-details-marker { display: none; }
+.help-tip[open] > summary, .help-tip > summary:hover { color: var(--accent); }
+.help-tip > .help-body { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-width: 560px;
+  padding: 8px 10px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 4px 14px #0002;
+  color: var(--ink); font-size: 12px; font-weight: normal; line-height: 1.55; white-space: normal; }
+.help-body ol { margin: 0; padding-left: 18px; }
+.help-body li + li { margin-top: 4px; }
+.field-error { display: block; margin-top: 2px; color: var(--bad); font-size: 12px; }

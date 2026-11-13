@@ -1,0 +1,445 @@
+{
+ "template": {
+  "name": "phase_shift_full_bridge",
+  "title": "Phase-shift full-bridge converter",
+  "aliases": [
+   "phase-shift full bridge",
+   "PSFB",
+   "移相全桥",
+   "移相全桥变换器"
+  ],
+  "description": "Ideal primary phase shift, center-tapped diode rectification and output inductor. Zero-voltage intervals retained; not a ZVS commutation model.",
+  "default_profile": "ieee-double",
+  "references": [
+   "https://www.ti.com/lit/eb/slyu036a/slyu036a.pdf"
+  ]
+ },
+ "layout": {
+  "name": "phase_shift_full_bridge",
+  "elements": [
+   {
+    "id": "Vin",
+    "kind": "V",
+    "pins": {
+     "a": [
+      0.0,
+      0.0
+     ],
+     "b": [
+      0.0,
+      3.9
+     ]
+    },
+    "label": "$V_{in}$",
+    "label_pos": "left"
+   },
+   {
+    "id": "S1",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      3.9
+     ],
+     "s": [
+      1.0,
+      2.9
+     ]
+    },
+    "label": "$S_{1}$"
+   },
+   {
+    "id": "S2",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      1.0,
+      1.0
+     ],
+     "s": [
+      1.0,
+      0.0
+     ]
+    },
+    "label": "$S_{2}$"
+   },
+   {
+    "id": "S3",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      3.9
+     ],
+     "s": [
+      2.35,
+      2.9
+     ]
+    },
+    "label": "$S_{3}$"
+   },
+   {
+    "id": "S4",
+    "kind": "nmos",
+    "pins": {
+     "d": [
+      2.35,
+      1.0
+     ],
+     "s": [
+      2.35,
+      0.0
+     ]
+    },
+    "label": "$S_{4}$"
+   },
+   {
+    "id": "T",
+    "kind": "transformer",
+    "pins": {
+     "p1": [
+      4.2,
+      2.5
+     ],
+     "p2": [
+      4.2,
+      1.2
+     ],
+     "s1": [
+      5.0,
+      3.1
+     ],
+     "sct": [
+      5.0,
+      1.85
+     ],
+     "s2": [
+      5.0,
+      0.6
+     ]
+    },
+    "opts": {
+     "ratio": "$1:1:1$"
+    }
+   },
+   {
+    "id": "D1",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.0,
+      3.1
+     ],
+     "b": [
+      6.2,
+      3.1
+     ]
+    },
+    "label": "$D_1$"
+   },
+   {
+    "id": "D2",
+    "kind": "D",
+    "pins": {
+     "a": [
+      5.0,
+      0.6
+     ],
+     "b": [
+      6.2,
+      0.6
+     ]
+    },
+    "label": "$D_2$",
+    "label_pos": "below"
+   },
+   {
+    "id": "Lo",
+    "kind": "L",
+    "pins": {
+     "a": [
+      7.2,
+      3.1
+     ],
+     "b": [
+      8.4,
+      3.1
+     ]
+    },
+    "label": "$L_o$"
+   },
+   {
+    "id": "Co",
+    "kind": "C",
+    "pins": {
+     "a": [
+      9.0,
+      3.1
+     ],
+     "b": [
+      9.0,
+      1.85
+     ]
+    },
+    "label": "$C_o$",
+    "label_pos": "left"
+   },
+   {
+    "id": "RL",
+    "kind": "R",
+    "pins": {
+     "a": [
+      10.2,
+      3.1
+     ],
+     "b": [
+      10.2,
+      1.85
+     ]
+    },
+    "label": "$R_L$",
+    "label_pos": "right"
+   }
+  ],
+  "wires": [
+   [
+    [
+     0.0,
+     3.9
+    ],
+    [
+     2.35,
+     3.9
+    ]
+   ],
+   [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     2.35,
+     0.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.9
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   [
+    [
+     2.35,
+     2.9
+    ],
+    [
+     2.35,
+     1.0
+    ]
+   ],
+   [
+    [
+     1.0,
+     2.5
+    ],
+    [
+     4.2,
+     2.5
+    ]
+   ],
+   [
+    [
+     2.35,
+     1.2
+    ],
+    [
+     4.2,
+     1.2
+    ]
+   ],
+   [
+    [
+     6.2,
+     3.1
+    ],
+    [
+     7.2,
+     3.1
+    ]
+   ],
+   [
+    [
+     6.2,
+     0.6
+    ],
+    [
+     6.7,
+     0.6
+    ],
+    [
+     6.7,
+     3.1
+    ]
+   ],
+   [
+    [
+     5.0,
+     1.85
+    ],
+    [
+     10.2,
+     1.85
+    ]
+   ],
+   [
+    [
+     8.4,
+     3.1
+    ],
+    [
+     10.2,
+     3.1
+    ]
+   ]
+  ],
+  "hops": [
+   [
+    2.35,
+    2.5
+   ],
+   [
+    6.7,
+    1.85
+   ]
+  ],
+  "annotations": [],
+  "netlist": {
+   "Vin.b": "DCP",
+   "S1.d": "DCP",
+   "S3.d": "DCP",
+   "Vin.a": "DCN",
+   "S2.s": "DCN",
+   "S4.s": "DCN",
+   "S1.s": "NA",
+   "S2.d": "NA",
+   "S3.s": "NB",
+   "S4.d": "NB",
+   "T.p1": "NA",
+   "T.p2": "NB",
+   "T.s1": "SEC1",
+   "T.s2": "SEC2",
+   "T.sct": "ON",
+   "D1.a": "SEC1",
+   "D1.b": "RECT",
+   "D2.a": "SEC2",
+   "D2.b": "RECT",
+   "Lo.a": "RECT",
+   "Lo.b": "OUT",
+   "Co.a": "OUT",
+   "Co.b": "ON",
+   "RL.a": "OUT",
+   "RL.b": "ON"
+  },
+  "modes": [
+   {
+    "name": "Positive transfer",
+    "on": [
+     "S1",
+     "S4",
+     "D1"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S1",
+      "T:p",
+      "S4"
+     ],
+     [
+      "T:s1",
+      "D1",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Positive transfer",
+    "condition": "Ideal phase-shift bridge, output CCM; effective duty 0.6; leakage, dead time and ZVS transitions omitted"
+   },
+   {
+    "name": "Lower zero",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "T:s1",
+      "D1",
+      "Lo",
+      "Co|RL"
+     ],
+     [
+      "T:s2",
+      "D2",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Lower pair gated; ideal primary current is zero",
+    "condition": "Ideal phase-shift bridge, output CCM; effective duty 0.6; leakage, dead time and ZVS transitions omitted"
+   },
+   {
+    "name": "Negative transfer",
+    "on": [
+     "S2",
+     "S3",
+     "D2"
+    ],
+    "loops": [
+     [
+      "Vin",
+      "S3",
+      "T:p",
+      "S2"
+     ],
+     [
+      "T:s2",
+      "D2",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Negative transfer",
+    "condition": "Ideal phase-shift bridge, output CCM; effective duty 0.6; leakage, dead time and ZVS transitions omitted"
+   },
+   {
+    "name": "Upper zero",
+    "on": [
+     "D1",
+     "D2"
+    ],
+    "loops": [
+     [
+      "T:s1",
+      "D1",
+      "Lo",
+      "Co|RL"
+     ],
+     [
+      "T:s2",
+      "D2",
+      "Lo",
+      "Co|RL"
+     ]
+    ],
+    "caption": "Upper pair gated; ideal primary current is zero",
+    "condition": "Ideal phase-shift bridge, output CCM; effective duty 0.6; leakage, dead time and ZVS transitions omitted"
+   }
+  ]
+ }
+}

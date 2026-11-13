@@ -97,17 +97,47 @@ function drawCanvasGrid(root) {
 
 async function openExamplePicker() {
   showDialog('打开示例', '<p>载入已有手画模板，先查看，再按需保存。</p><div class="example-list" id="exampleChoices"></div><p id="exampleError" role="status"></p>');
-  for (const [name, title] of [['buck','Buck 降压'], ['boost','Boost 升压'], ['flyback','反激']]) {
-    const button = document.createElement('button'); button.textContent = title; button.dataset.example = name;
+  const choices = document.getElementById('exampleChoices'), errorLine = document.getElementById('exampleError');
+  const titles = {
+    'Buck converter (diode freewheel)':'Buck 降压', 'Boost converter (diode rectifier)':'Boost 升压',
+    'Flyback converter':'反激', 'Bidirectional CLLC / CLLLC (explicit Lm)':'双向 CLLC／CLLLC（含励磁电感）',
+    'Ćuk converter':'Ćuk 变换器', 'Dual active bridge converter':'双有源桥 DAB',
+    'Multi-module DAB, outputs in series (coloured module regions)':'多模块 DAB 输出串联',
+    'Four-switch buck-boost':'四开关升降压', 'Two-phase interleaved boost':'两相交错 Boost',
+    'Two-phase interleaved buck':'两相交错 Buck', 'Inverting buck-boost':'反相升降压',
+    'Half-bridge LLC (center-tapped rectifier)':'半桥 LLC（中心抽头整流）',
+    'Full-bridge LLC resonant converter':'全桥 LLC 谐振变换器',
+    'Two half-bridge LLC modules, input parallel, output series (coloured module regions)':'双模块 LLC 输入并联输出串联',
+    'Three-phase three-level diode-clamped NPC inverter':'三相三电平 NPC 逆变器',
+    'Phase-shift full-bridge converter':'移相全桥变换器', 'SEPIC converter':'SEPIC 变换器',
+    'Single-phase diode bridge':'单相二极管桥', 'Single-phase full-bridge inverter':'单相全桥逆变器',
+    'Single-phase half-bridge inverter':'单相半桥逆变器', 'Synchronous Boost':'同步 Boost',
+    'Synchronous Buck':'同步 Buck', 'Three-phase diode bridge':'三相二极管桥',
+    'Three-phase two-level voltage-source inverter':'三相两电平电压源逆变器',
+    'Three-phase thyristor bridge':'三相晶闸管桥', 'Two-switch buck-boost':'双开关升降压',
+    'Two-switch forward converter':'双管正激变换器', 'Zeta converter':'Zeta 变换器',
+    'Z-source three-phase inverter':'Z 源三相逆变器', 'Three-phase Vienna rectifier':'三相 Vienna 整流器'
+  };
+  let data;
+  try { data = await api('/api/templates', {}); }
+  catch (error) { errorLine.textContent = error.message; return; }
+  if (!choices.isConnected || !document.getElementById('dlg').open) return;
+  for (const {name, title, profile: templateProfile} of data.templates) {
+    const button = document.createElement('button'); button.textContent = titles[title] || title;
+    button.dataset.example = name; button.title = name;
     button.onclick = async () => {
-      button.disabled = true;
+      const before = JSON.stringify(layout);
+      choices.querySelectorAll('button').forEach(b => b.disabled = true);
       try {
         const result = await api('/api/from-template', {name});
+        if (!choices.isConnected || !document.getElementById('dlg').open || JSON.stringify(layout) !== before) return;
+        profile = templateProfile;
+        document.getElementById('profile').value = profile;
         useLayout(result.layout); document.getElementById('dlg').close();
-      } catch (error) { document.getElementById('exampleError').textContent = error.message; }
-      finally { button.disabled = false; }
+      } catch (error) { errorLine.textContent = error.message; }
+      finally { choices.querySelectorAll('button').forEach(b => b.disabled = false); }
     };
-    document.getElementById('exampleChoices').append(button);
+    choices.append(button);
   }
 }
 
@@ -123,6 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
     fit:'M8 3H3v5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5 M8 8h8v8H8z',
     preview:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 0-6 0 3 3 0 1 0 6 0',
     wave:'M3 4v16h18 M5 13l4-6 5 10 4-7 3 3',
+    text:'M5 5V3h14v2 M12 3v18 M9 21h6',
+    run:'M7 4l13 8-13 8z',
+    modes:'M4 7h11 M12 4l3 3-3 3 M20 17H9 M12 14l-3 3 3 3',
     ai:'M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z M20 2v4 M18 4h4'
   };
   document.querySelectorAll('[data-icon]').forEach(button => {
@@ -136,6 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = button.querySelector('kbd')?.textContent;
     const action = [...button.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => cdI18n.sourceText(n)).join('').trim();
     button.title = action + (key ? ` (${key})` : '');
+  });
+  // Mode menu entries act on the mode page; show it so the change is visible.
+  document.querySelectorAll('[data-sidebar-page]').forEach(item => {
+    item.addEventListener('click', () => showSidebar(item.dataset.sidebarPage));
   });
   document.querySelectorAll('[data-sidebar]').forEach(tab => {
     tab.onclick = () => showSidebar(tab.dataset.sidebar);

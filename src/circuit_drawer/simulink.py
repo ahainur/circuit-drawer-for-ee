@@ -10,6 +10,7 @@ from .spice import SpiceError
 # this target-specific regularization; never silently use library defaults.
 MIN_CONDUCTANCE = 1e-12
 MIN_FORWARD_DROP = 1e-12
+DEAD_TIME_STEPS = 20   # resolve the shortest VCO dead time with at least 20 integration steps
 BLOCK = 40             # px placement rectangle; native port leads may extend beyond it
 # Simulink's Orientation names where a block faces: its left (LConn) ports sit
 # on the opposite side.  The layout's direction names where terminal 1 (LConn)
@@ -29,6 +30,7 @@ ORIENTATION = {'right': 'left', 'left': 'right', 'up': 'down', 'down': 'up'}
 # the blocks as saved by MATLAB R2024b; Simulink numbers
 # Inport and Outport separately.
 CONTROL = {
+    'c': ('simulink/User-Defined Functions/C Function', (100, 70)),
     'input': ('simulink/Signal Routing/From', (60, 30)),
     'const': ('simulink/Sources/Constant', (50, 30)),
     'sum': ('simulink/Math Operations/Sum', (40, 40)),
@@ -40,6 +42,7 @@ CONTROL = {
     'dpi': ('simulink/Continuous/PID Controller', (70, 50)),      # TimeDomain Discrete-time
     'sat': ('simulink/Discontinuities/Saturation', (50, 40)),
     'delay': ('simulink/Discrete/Unit Delay', (50, 40)),
+    'pulse_delay': ('simulink/Continuous/Transport Delay', (70, 40)),
     'carrier': ('simulink/Sources/Repeating Sequence', (60, 40)),
     'compare': ('simulink/Logic and Bit Operations/Relational Operator', (40, 50)),
     'step': ('simulink/Sources/Step', (50, 40)),
@@ -66,12 +69,17 @@ def emit(circuit, name):
         circuit.notes.append('PMSM 使用 Simscape Electrical 蓝库原生 PMSM（额外需要 Simscape Electrical），'
                              '采用 expanded 三相端口、关闭零序以保留浮中性点、d 轴对齐 a 相；'
                              '机械速度和电角由轴传感器取得，dq 电流由相电流按等幅值 Park 计算。')
-    q = lambda value: "'" + str(value).replace("'", "''") + "'"
+    q = _quoted
     def num(value):
         if not math.isfinite(value):
             raise SpiceError('Simulink 参数超出有限数值范围')
         return f'{value:.17g}'
     tr = circuit.transient
+    panel = getattr(circuit, 'panel', None)
+    delays = [b.params['seconds'] for b in panel.blocks if b.kind == 'pulse_delay'] if panel else []
+    if delays and tr['max_step'] > min(delays) / DEAD_TIME_STEPS:
+        tr['max_step'] = min(delays) / DEAD_TIME_STEPS
+        circuit.notes.append(f"Simulink：为解析 VCO 秒死区，最大积分步长收紧为 {tr['max_step']:g} s；原 JSON 未修改。")
     lines = [f'function model = build_{name}(overwrite)',
              '% Generated from checked Circuit Drawer JSON. See the adjacent README/manifest.',
              '% Requires MATLAB, Simulink and Simscape Foundation Library (R2024b+).',
@@ -172,7 +180,6 @@ def emit(circuit, name):
 
     # Reserve source/derivative pairs near their device, outside the original
     # wires and helper footprints. A collapsed instance owns its top-level drive.
-    panel = getattr(circuit, 'panel', None)
     generators = [s for s in circuit.signals if s.kind != 'control']
     occupied = list(layout.occupied) + panel_rects
     for s in generators:
@@ -720,6 +727,13 @@ def emit(circuit, name):
     return '\n'.join(lines) + '\n'
 
 
+def _quoted(value):
+    parts = re.split(r'([\r\n])',str(value))
+    literals = ['char(10)' if part=='\n' else 'char(13)' if part=='\r'
+                else "'"+part.replace("'","''")+"'" for part in parts]
+    return literals[0] if len(literals)==1 else '['+' '.join(literals)+']'
+
+
 def _ident(name):
     """A module instance id as a MATLAB identifier part."""
     return re.sub(r'[^A-Za-z0-9_]', '_', name)
@@ -738,6 +752,7 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
     panel: a From for every circuit signal it reads (its Goto sits beside),
     one block per control_export block, Terminators on outputs the table
     does not use, and the links between ports."""
+    from .control_export import ROW
     if panel.kinds() & {'abc2dq', 'dq2abc'}:
         lines.append("load_system('eeTransforms');  % Simscape Electrical: Park transforms")
     if 'dpi' in panel.kinds():
@@ -783,6 +798,8 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
             params = {'UpperLimit': inf(p['hi'], 1), 'LowerLimit': inf(p['lo'], -1)}
         elif b.kind == 'delay':
             params = {'SampleTime': p['ts']}
+        elif b.kind == 'pulse_delay':
+            params = {'DelayTime': p['seconds'], 'InitialOutput': 0}
         elif b.kind == 'carrier':
             period = 1 / p['f']
             if p['shape'] == 'saw':
@@ -805,7 +822,31 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
         elif b.kind == 'fcn':
             u = {f'u{i}': ('u' if b.inputs == 1 else f'u({i})') for i in range(1, b.inputs + 1)}
             params = {'Expr': p['expr'].format(**u)}
+        elif b.kind == 'c':
+            params = {'SampleTime':p['ts']}
         h = add(path, b.name, (x, y), params, size=size)
+        if b.kind == 'c':
+            from .control.custom_c import statements
+            inputs = {key:f'cd_in{i}' for i,key in enumerate(p['names'])}
+            output_values = {key.split('.',1)[1]:f'cd_out{i}' for i,key in enumerate(p['outs'])}
+            states = {key:f'cd_state{i}' for i,key in enumerate(p['c']['states'])}
+            next_states = {key:f'cd_next{i}' for i,key in enumerate(p['c']['states'])}
+            handle = f"[model '/{b.name}']"
+            lines += [f"cd_spec=get_param({handle},'SymbolSpec');",
+                      "while ~isempty(cd_spec.Symbols), deleteSymbol(cd_spec,cd_spec.Symbols(1).Name); end"]
+            for scope, values in [('Input',inputs),('Output',output_values),('Input',states),('Output',next_states)]:
+                for symbol in values.values():
+                    lines.append(f"cd_symbol=addSymbol(cd_spec,'{symbol}'); cd_symbol.Scope='{scope}'; cd_symbol.Type='double'; cd_symbol.Size='1';")
+            # Algebraic solvers may call OutputCode repeatedly at one sample.
+            # Unit Delay commits each explicit state once, outside that function.
+            body = statements(p['c'],inputs,output_values,states,next_states)
+            lines += [f"set_param({handle},'OutputCode',{_quoted(body)});",
+                      f"{h}=get_param({handle},'PortHandles');"]
+            for i, (key, initial) in enumerate(p['c']['states'].items()):
+                delay = add('simulink/Discrete/Unit Delay',f'{b.name}_state{i}',(x,y+ROW*(i+1)),
+                            {'InitialCondition':initial,'SampleTime':p['ts']},size=(40,30))
+                connect(f'{h}.Outport({b.outputs+i+1})',delay+'.Inport(1)')
+                connect(delay+'.Outport(1)',f'{h}.Inport({b.inputs+i+1})')
         if b.kind == 'compare':
             # the native Relational Operator only outputs boolean (R2024b rejects
             # 'double'); the converter and a Product with the Step want double

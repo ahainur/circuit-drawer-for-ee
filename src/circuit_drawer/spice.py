@@ -19,11 +19,13 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from .layout import Layout
+from .layout import EXTRA_WINDINGS, Layout, windings
 from .pipeline import LayoutRejected
 from .profiles import get_profile
 from .validate import check
@@ -35,9 +37,17 @@ class SpiceError(ValueError):
     pass
 
 
+class SpiceCancelled(SpiceError):
+    pass
+
+
+# A batch cancellation reaches the active engine within a quarter second.
+PROCESS_CANCEL_POLL = .25
+
+
 # A drawing (from a template, the AI or by hand) has no simulation section
 # until its values are filled in; say where, not which keys are missing.
-NO_SIMULATION = ("还没有仿真参数。打开“分析 → SPICE 仿真…”，填写元件值、参考地、仿真时间和测量通道，"
+NO_SIMULATION = ("还没有仿真参数。打开“仿真 → SPICE 仿真…”，填写元件值、参考地、仿真时间和测量通道，"
                  "填好后这里显示完整网表。")
 
 
@@ -111,7 +121,11 @@ OPTIONAL_FIELDS = {
     "V": [("series_resistance", "内阻：串在 + 端 b 的电阻 (Ω，0 不建模)", "0"),
           ("series_inductance", "内感：串在 + 端 b 的电感 (H，0 不建模)", "0")],
     "transformer": [("magnetizing_inductance", "励磁电感 Lm，折算到原边、并在原边 (H，0 不建模)", "0"),
-                    ("leakage_inductance", "漏感，折算到原边、串在 p1 (H，0 不建模)", "0")],
+                    ("leakage_inductance", "漏感，折算到原边、串在 p1 (H，0 不建模)", "0"),
+                    # one turns ratio per extra winding of a multi-winding
+                    # transformer; required (never defaulted) when it is drawn
+                    *[(f"ratio_{w}", f"{w} 绕组匝比 N{w[1:]}/Np（{w}a 端为同名端；图中有 {w} 绕组时必填）", "1")
+                      for w in EXTRA_WINDINGS]],
     "nmos": [("snubber_resistance", "跨开关串联 RC：电阻 (Ω，R/C 同时为 0 禁用)", "0"),
              ("snubber_capacitance", "跨开关串联 RC：电容 (F)", "0"),
              ("phase_shift", "附加移相 (°，正值滞后，−180 至 180)", "0"),
@@ -163,7 +177,7 @@ LIMIT_NOTE = ("简化模型：MOSFET 符号导出为 PWM 理想开关和通用�
               "晶闸管为门极脉冲触发、正向导通（Vf + Ron）、电流将要反向时关断的简化模型；维持 / 擎住电流和关断时间 tq 是可选的简化判据，不含 dv/dt 误触发；"
               "PMSM 为三线星形、正弦磁链、恒定 Ld/Lq 和恒定负载转矩的 dq 机电动态模型，"
               "电角度以 rad 表示、机械转速以 rad/s 表示；不含铁耗、磁饱和和齿槽转矩；"
-              "数值稳定电容不是器件寄生模型；不包含反向恢复和磁饱和；闭环控制只在填写 closed_loop 时生成连续时间控制器模型；不能用于器件损耗结论。"
+              "数值稳定电容不是器件寄生模型；不包含反向恢复和磁饱和；闭环控制按控制表配置使用连续模型或逐拍数字模型；不能用于器件损耗结论。"
               "校验只检查连接、几何与参数格式，不证明工况正确。")
 
 
@@ -194,12 +208,12 @@ def _keys(obj, required, optional=(), label="simulation"):
 
 
 _DRAWING_ONLY = frozenset({
-    "bad-region", "bad-color", "bad-annotation", "bad-glyph", "bad-block",
+    "bad-region", "bad-color", "bad-annotation", "bad-glyph", "bad-block", "bad-control-view",
     "text-on-symbol", "text-on-line", "text-on-block", "text-on-callout", "text-overlap",
     "region-cuts-symbol", "callout-on-symbol", "callout-through-block",
     "block-on-symbol", "line-through-block", "block-overlap", "block-text-overflow",
     "inline-label-end", "isolation-on-label", "arrow-as-text", "arrow-off-wire",
-    "electrical-label-space", "too-cramped",
+    "electrical-label-space", "too-cramped", "bad-drawing-scale", "drawing-scale-width",
 })
 
 
@@ -225,6 +239,9 @@ def _checked_for_simulation(layout, profile, report=None, *, connections=()):
         from .regions import RegionError, parse_callout, parse_region
         drawing = deepcopy(layout)
         drawing.annotations = []
+        drawing.extra.pop("control_view", None)
+        if any(i.code == "bad-drawing-scale" for i in rep.issues):
+            drawing.extra.pop("drawing_scale", None)
         # Retain valid regions/arrows so detail-wired is still checked, even
         # when a different decoration had a syntax/colour error.
         for key, parse in (("callouts", lambda d, i: parse_callout(d, i)),
@@ -260,7 +277,7 @@ def _connections(layout: Layout, profile: str, report=None):
         listed = lambda refs: "、".join(refs[:8]) + (f" 等 {len(refs)} 个" if len(refs) > 8 else "")
         raise SpiceError("SPICE 导出需要完整网表" + (f"：缺少 {listed(missing)}" if missing else "")
                          + (f"；多出已不存在的 {listed(extra)}" if extra else "")
-                         + "。请先核对连接，再用“分析 → 以当前连接更新网表”更新")
+                         + "。请先核对连接，再用“编辑 → 按图更新网表”更新")
     unsupported = [f"{e.id} ({e.kind})" for e in layout.elements if e.kind not in FIELDS and e.kind != "port"]
     if unsupported:
         raise SpiceError("第一版尚不支持这些器件：" + ", ".join(unsupported))
@@ -356,6 +373,10 @@ class Deck:
     stop: float
     notes: list[str] = field(default_factory=list)
     dv_dt_limits: dict[str, float] = field(default_factory=dict)
+    pin_nodes: dict[str, str] = field(default_factory=dict)
+    element_names: dict[str, str] = field(default_factory=dict)
+    digital_loop: Any = None
+    probe_expressions: dict[str, str] = field(default_factory=dict)
 
 
 def source_excitation(cfg: dict, label: str, tr: dict) -> str:
@@ -566,6 +587,10 @@ def _transformer_lines(e, cfg, val, name, node):
     branches = [("secondary", "s1", "s2", gain)]
     if "sct" in e.pins:
         branches = [("upper", "s1", "sct", gain / 2), ("lower", "sct", "s2", gain / 2)]
+    # extra windings: Vw = n_w/Np * Vp with the dot at wka, whatever the
+    # secondary polarity; together the F sources give Np*Ip + sum(N*I) = 0
+    extras = extra_ratios(e, cfg, val)
+    branches += [(w, f"{w}a", f"{w}b", ratio) for w, ratio in extras]
     for winding, a, b, ratio in branches:
         internal, sense = f"cd_{name}_{winding}", f"V{winding}_{name}"
         lines += [f"{sense} {n(a)} {internal} 0",
@@ -575,7 +600,27 @@ def _transformer_lines(e, cfg, val, name, node):
     if ref != n('p2'):
         lines += [f"* {name}: explicit numerical common-mode reference (not an isolation model)",
                   f"Rref_{name} {ref} {n('p2')} {val['reference_resistance']:.15g}"]
+    for w, _ in extras:
+        if n(f"{w}b") not in (n('p2'), ref):
+            lines.append(f"Rref{w}_{name} {n(f'{w}b')} {n('p2')} {val['reference_resistance']:.15g}")
     return lines
+
+
+def extra_ratios(e, cfg, val) -> list[tuple[str, float]]:
+    """(winding, N_w/Np) for each extra winding drawn on transformer e.
+    A drawn winding needs its ratio written out: a silent 1:1 would hide a
+    missing design value."""
+    out = []
+    for w, *_ in windings(e):
+        if w not in EXTRA_WINDINGS:
+            continue
+        key = f"ratio_{w}"
+        if key not in cfg:
+            raise SpiceError(f"{e.id}: 图中画了 {w} 绕组，请在仿真参数里填写 {key}（N{w[1:]}/Np）")
+        if val[key] <= 0:
+            raise SpiceError(f"{e.id}.{key} 必须大于 0")
+        out.append((w, val[key]))
+    return out
 
 
 def _pmsm_lines(name: str, pins: dict[str, str], val: dict[str, float]) -> list[str]:
@@ -664,9 +709,14 @@ def _module_simulation_source(layout):
     from .regions import RegionError, parse_callout, parse_region
     from .schema import element_problems
     raw = deepcopy(layout.to_dict())
+    # A paper conversion is irrelevant to the electrical assembly. Keep the
+    # authored coordinates and all model data, including malformed connections.
+    raw.pop("drawing_scale", None)
     def clean(value):
         if not isinstance(value, dict):
             return  # the assembler reports malformed definitions itself
+        if value is raw:
+            value.pop("control_view", None)
         for key, parse in (("callouts", parse_callout), ("blocks", parse_block),
                            ("regions", lambda d, i: parse_region(d, i, schema_only=True))):
             if key not in value:
@@ -712,7 +762,7 @@ def resolved_layout(layout: Layout, profile="ieee-single"):
         visible_report = _simulation_report(visible_report)
         if not visible_report.ok:
             raise LayoutRejected(visible_report)
-        rep = _checked_for_simulation(assembly.full, get_profile(profile), rep, connections=assembly.links)
+        rep = _checked_for_simulation(assembly.sheets, get_profile(profile), rep, connections=assembly.sheet_links)
         from .module_authoring import spice_identity
         layout, rep = spice_identity(layout, assembly.full, rep)
     rep = _connections(layout, profile, rep)
@@ -720,15 +770,39 @@ def resolved_layout(layout: Layout, profile="ieee-single"):
 
 
 def circuit_deck(layout: Layout, profile="ieee-single") -> Deck:
-    """The power circuit alone, without closed_loop: for checks that compare or
-    validate the circuit and do not know where the control table lives."""
-    if "closed_loop" in layout.extra:
+    """Validate circuit edits, including self-contained inline controllers.
+
+    External control paths are handled by callers that know the source folder.
+    Inline controllers retain their actual bridge model during edit validation.
+    """
+    closed = layout.extra.get("closed_loop")
+    if isinstance(closed, dict) and isinstance(closed.get("control"), str):
         layout = Layout.from_dict({k: v for k, v in layout.to_dict().items() if k != "closed_loop"})
     return make_deck(layout, profile)
 
 
+def check_pwm_timing(label: str, values: dict, transient: dict) -> None:
+    """Resolution required whenever a backend actually emits carrier edges."""
+    period = 1 / values['frequency']
+    width = values['duty'] * period - (values['rise'] + values['fall']) / 2
+    if (transient['step'] > period / 50
+            or transient['max_step'] > min(width, period * (1-values['duty'])) / 10):
+        raise SpiceError(f"{label}: 时间步长过大；每周期至少 50 个采样点，导通/关断段至少 10 步")
+    if values['delay'] + period > transient['stop']:
+        raise SpiceError(f"{label}: 结束时间须覆盖启动延迟之后至少一个周期")
+
+
 def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
     """``base_dir``: where a closed_loop.control path is read from (the circuit file's folder)."""
+    return _make_deck(layout, profile, base_dir)
+
+
+def native_metadata(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
+    """The same electrical/timing checks, without an executable ngspice deck."""
+    return _make_deck(layout, profile, base_dir, native=True)
+
+
+def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
     closed = layout.extra.get("closed_loop")
     layout, rep = connected_layout(layout, profile)
     # Terminals name nodes; they have no SPICE device or independent parameters.
@@ -868,7 +942,7 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
             if cfg["model"] != "generic_diode":
                 raise SpiceError(f"{e.id}: 仅支持 generic_diode 模型")
             if e.opts.get("zener") and not val["breakdown_voltage"]:
-                raise SpiceError(f"{e.id}: 已画成稳压管，请在“分析 → SPICE 仿真…”填写大于 0 的 "
+                raise SpiceError(f"{e.id}: 已画成稳压管，请在“仿真 → SPICE 仿真…”填写大于 0 的 "
                                  "breakdown_voltage（击穿电压 Vz）；图标不会自动生成击穿参数")
             breakdown = ""
             if val["breakdown_voltage"]:
@@ -887,9 +961,11 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
             model = {"igbt": "simplified_igbt", "scr": "simplified_thyristor"}.get(e.kind, "ideal_switch")
             if cfg["model"] != model:
                 raise SpiceError(f"{e.id}: {e.kind} 仅支持 {model} 模型")
-            period = 1 / val["frequency"]
+            is_vco = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'vco'
+            timing = {**val, 'frequency': loop.outputs[loop.driven[e.id]]['frequency_max'], 'duty': .5} if is_vco else val
+            period = 1 / timing["frequency"]
             # Duty is measured between the 50% rising/falling threshold crossings.
-            width = val["duty"] * period - (val["rise"] + val["fall"]) / 2
+            width = timing["duty"] * period - (val["rise"] + val["fall"]) / 2
             if not 0 < val["duty"] < 1:
                 raise SpiceError(f"{e.id}: 占空比 {val['duty']:g} 超出范围，应大于 0、小于 1")
             if val["ron"] >= val["roff"]:
@@ -897,10 +973,11 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
             if not (width > 0 and width + val["rise"] + val["fall"] < period):
                 raise SpiceError(f"{e.id}: 上升 / 下降时间（{val['rise']:g} s / {val['fall']:g} s）相对开关周期 "
                                  f"{period:g} s 和占空比 {val['duty']:g} 过长，导通或关断段放不下")
-            if tr["step"] > period / 50 or tr["max_step"] > min(width, period * (1-val["duty"])) / 10:
-                raise SpiceError(f"{e.id}: 时间步长过大；每周期至少 50 个采样点，导通/关断段至少 10 步")
-            if val["delay"] + period > tr["stop"]:
-                raise SpiceError(f"{e.id}: 结束时间须覆盖启动延迟之后至少一个周期")
+            is_averaged = loop and any(e.id in (upper, lower) for upper, (lower, _) in loop.averaged.items())
+            # An averaged leg has no carrier edges to sample. Physical switches
+            # (including independent load switches) still need PWM resolution.
+            if not is_averaged and not is_vco:
+                check_pwm_timing(e.id, val, tr)
             if e.kind == "scr":
                 if loop and e.id in loop.driven:
                     raise SpiceError(f"{e.id}: 晶闸管暂不支持闭环驱动；用 delay 设触发时刻，phase_ramp 做触发角软启动")
@@ -936,8 +1013,8 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                         if node(f"{e.id}.{pins[1]}") != node(f"{lower}.{lpins[0]}"):
                             raise SpiceError(f"{e.id} / {lower}: 不是同一桥臂（上管的 {pins[1]} 须接下管的 "
                                              f"{lpins[0]}），不能按 average 模型仿真")
-                        from .closed_loop import average_leg, node as loop_node
-                        lines.extend(average_leg(name, loop_node(out), n(pins[0]), n(pins[1]),
+                        from .closed_loop import average_leg, duty_node
+                        lines.extend(average_leg(name, duty_node(loop, out), n(pins[0]), n(pins[1]),
                                                  node(f"{lower}.{lpins[1]}")))
                     continue
             else:
@@ -956,7 +1033,7 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                 # A closed-loop drive is a smooth compare (closed_loop.modulator)
                 # without solver breakpoints: the channel then follows it
                 # continuously instead of switching at a threshold.
-                on = (f"v(ctl_{name})" if e.id in driven else f"(v(ctl_{name}) > 0.5 ? 1 : 0)")
+                on = (f"min(max(v(ctl_{name}), 0), 1)" if e.id in driven else f"(v(ctl_{name}) > 0.5 ? 1 : 0)")
                 lines += [f"* {name}: forward-only channel; separate e-to-c diode; finite bidirectional leakage",
                           f"Vsense_{name} {n('c')} {collector} 0",
                           f"Bchannel_{name} {collector} {emitter} I = {vce}/{s('roff')} + "
@@ -966,9 +1043,13 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                 a, b = emitter, collector
             elif e.id in driven:
                 vds = f"v({n('d')},{n('s')})"
+                # A solver iterate or delayed edge can undershoot zero. Keep
+                # the normalized gate inside physical conductance bounds;
+                # Ron/Roff can differ by eleven orders of magnitude.
+                on = f"min(max(v(ctl_{name}), 0), 1)"
                 lines += [f"* {name}: conductance follows the closed-loop drive (0..1) continuously",
-                          f"Bsw_{name} {n('d')} {n('s')} I = {vds}*({1 / val['ron']:.15g}*v(ctl_{name}) + "
-                          f"{1 / val['roff']:.15g}*(1 - v(ctl_{name})))"]
+                          f"Bsw_{name} {n('d')} {n('s')} I = {vds}*({1 / val['ron']:.15g}*({on}) + "
+                          f"{1 / val['roff']:.15g}*(1 - ({on})))"]
                 a, b = n('s'), n('d')
             else:
                 lines += [f"{name} {n('d')} {n('s')} ctl_{name} 0 ms_{name}",
@@ -1038,7 +1119,8 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
                 # ngspice resolves i(D...) when a controller senses the diode.
                 diode_feedback[label] = f"i({names[e.id]})"
             if e.kind == "transformer":
-                accepted = ("primary", "upper", "lower") if "sct" in e.pins else ("primary", "secondary")
+                accepted = (("primary", "upper", "lower") if "sct" in e.pins else ("primary", "secondary")) \
+                    + tuple(w for w, *_ in windings(e) if w in EXTRA_WINDINGS)
                 if probe["winding"] not in accepted:
                     raise SpiceError(f"{label}.winding 必须为 {accepted}")
                 part = "p" if probe["winding"] == "primary" else probe["winding"]
@@ -1053,7 +1135,10 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
         columns.append(f"{label}_{unit}")
     if loop:
         from .closed_loop import lines as loop_lines
-        lines += loop_lines(loop, {**exprs, **diode_feedback}, driven, tr)
+        try:
+            lines += loop_lines(loop, {**exprs, **diode_feedback}, driven, tr, native=native)
+        except ClosedLoopError as exc:
+            raise SpiceError(str(exc)) from None
     if diode_currents:
         # Save device currents before transient analysis, without adding a
         # sensing source or changing decks that have no diode current probes.
@@ -1063,11 +1148,20 @@ def make_deck(layout: Layout, profile="ieee-single", base_dir=None) -> Deck:
     ratings_output = (["set wr_singlescale", "set wr_vecnames", "set numdgt=15",
                        *dvdt_commands, "wrdata thyristor_dvdt.dat " + " ".join(dvdt_vectors)]
                       if dvdt_limits else [])
+    run_commands = ["run"]
+    if loop and loop.digital:
+        from .digital_spice import commands as digital_commands
+        try:
+            run_commands = digital_commands(loop, tr["stop"])
+        except ValueError as exc:
+            raise SpiceError(str(exc)) from None
     lines += [f".tran {tr['step']:.15g} {tr['stop']:.15g} 0 {tr['max_step']:.15g} uic",
               ".options reltol=1e-5 abstol=1e-9 vntol=1e-6", ".control", "set noaskquit",
-              "run", *ratings_output, "linearize", *commands, "set wr_singlescale", "set wr_vecnames",
+              *run_commands, *ratings_output, "linearize", *commands, "set wr_singlescale", "set wr_vecnames",
               "set numdgt=15", "wrdata waveforms.dat " + " ".join(vectors), "quit", ".endc", ".end"]
-    return Deck("\n".join(lines) + "\n", columns, tr["step"], tr["stop"], loop.warnings if loop else [], dvdt_limits)
+    return Deck("" if native else "\n".join(lines) + "\n", columns, tr["step"], tr["stop"], loop.warnings if loop else [],
+                dvdt_limits, {ref: node(ref) for ref in rep.nets}, names, loop if loop and loop.digital else None,
+                dict(zip(columns[1:], exprs.values())))
 
 
 def executable(value=None) -> str | None:
@@ -1083,7 +1177,7 @@ def _convergence_hint(deck: Deck, log: str) -> str:
         return ""
     text = "\n提示：积分步长过小通常来自浮空节点或开关不连续。先核对初始条件、电源上升沿和 PWM 启动延迟"
     if "MOS(LEVEL=1 " in deck.text:
-        text += ("。检测到 LEVEL=1 MOSFET，请在“分析 → SPICE 仿真…”的对应开关参数中，"
+        text += ("。检测到 LEVEL=1 MOSFET，请在“仿真 → SPICE 仿真…”的对应开关参数中，"
                  "核对“输出电容 Coss / Coes”（output_capacitance），按实际器件在工作电压下的参数填写并比较波形；"
                  "线性 Coss 会改变换流过程，演示值见 examples/spice/buck_level1.json")
     if "Cnum_" not in deck.text:
@@ -1091,18 +1185,64 @@ def _convergence_hint(deck: Deck, log: str) -> str:
     return text + "。详见使用说明书 SPICE 仿真一章的收敛建议。"
 
 
-def _simulate(deck: Deck, engine: str, stage: Path, timeout: float) -> None:
+def _run_process(args, cwd, timeout, should_stop=None):
+    options = dict(cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if should_stop is None:
+        return subprocess.run(args, timeout=timeout, **options)
+    if should_stop():
+        raise SpiceCancelled("已取消，未启动仿真。")
+    with subprocess.Popen(args, **options) as process:
+        deadline = time.monotonic() + timeout
+        try:
+            while True:
+                if should_stop():
+                    raise SpiceCancelled("已取消，当前仿真已停止。")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(args, timeout)
+                try:
+                    # Poll cancellation at most four times a second; normal
+                    # exports still use their original single blocking wait.
+                    output, _ = process.communicate(timeout=min(PROCESS_CANCEL_POLL, remaining))
+                    return subprocess.CompletedProcess(args, process.returncode, output)
+                except subprocess.TimeoutExpired:
+                    continue
+        except BaseException as exc:
+            if process.poll() is None:
+                process.kill()
+            output, _ = process.communicate()
+            if isinstance(exc, (SpiceCancelled, subprocess.TimeoutExpired)):
+                exc.output = output
+            raise
+
+
+def run_deck(deck: Deck, engine: str, stage: Path, timeout: float, *, should_stop=None) -> None:
     (stage / "circuit.cir").write_text(deck.text, encoding="ascii")
     try:
-        proc = subprocess.run([engine, "-n", "-b", "circuit.cir"], cwd=stage,
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except subprocess.TimeoutExpired as exc:
+        proc = _run_process([engine, "-n", "-b", "circuit.cir"], stage, timeout, should_stop)
+    except (subprocess.TimeoutExpired, SpiceCancelled) as exc:
+        (stage / "simulation.log").write_text((getattr(exc, "output", None) or b"").decode("utf-8", errors="replace"), encoding="utf-8")
+        if isinstance(exc, SpiceCancelled):
+            raise
         raise SpiceError(f"ngspice 超过 {timeout:g} 秒，已停止；请缩短仿真时间") from exc
     log = proc.stdout.decode("utf-8", errors="replace")
     (stage / "simulation.log").write_text(log, encoding="utf-8")
-    if proc.returncode or re.search(r"(?im)^\s*(?:error\b|fatal\b)|timestep too small|simulation interrupted", log):
+    checked_log = log
+    if deck.digital_loop and "CD_DIGITAL_COMPLETE" in log:
+        # The controller deliberately pauses at each sample. Actual solver
+        # errors and the complete output time range are still checked.
+        checked_log = re.sub(r"(?im)^(?:run )?simulation interrupted\s*$", "", log)
+    if proc.returncode or re.search(r"(?im)^\s*(?:error\b|fatal\b|syntax error\b)|timestep too small|simulation interrupted", checked_log):
         raise SpiceError("ngspice 仿真失败：\n" + log[-3500:] + _convergence_hint(deck, log))
+
+
+def _simulate(deck: Deck, engine: str, stage: Path, timeout: float, *, should_stop=None) -> None:
+    if should_stop is None:
+        run_deck(deck, engine, stage, timeout)
+    else:
+        run_deck(deck, engine, stage, timeout, should_stop=should_stop)
+    log = (stage / "simulation.log").read_text(encoding="utf-8")
     raw = stage / "waveforms.dat"
     if not raw.exists():
         raise SpiceError("ngspice 未生成波形：\n" + log[-3500:])
@@ -1205,10 +1345,19 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
         (stage / "circuit.cir").write_text(deck.text, encoding="ascii")
         sources = {"cir": stage / "circuit.cir"}
         rating_checks = []
+        digital_result = None
         if run:
             _simulate(deck, engine, stage, timeout)
             sources.update(csv=stage / "waveforms.csv", log=stage / "simulation.log")
             rating_checks = _check_dvdt(deck, stage)
+            if deck.digital_loop:
+                from .digital_spice import inspect
+                try:
+                    digital_result = inspect(deck.digital_loop, deck.stop, stage)
+                except ValueError as exc:
+                    raise SpiceError(str(exc)) from None
+                (stage / "digital.json").write_text(json.dumps(digital_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                sources.update({"digital.csv": stage / "digital.csv", "digital.json": stage / "digital.json"})
             if rating_checks:
                 ratings = stage / "ratings.json"
                 ratings.write_text(json.dumps({"sampling": "adaptive_solver_points", "checks": rating_checks},
@@ -1221,5 +1370,6 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
             shutil.copyfile(source, target)
             files.append(str(target))
     return {"files": files, "out_dir": str(destination), "columns": deck.columns,
-            "ran": bool(run), "notes": [LIMIT_NOTE, *deck.notes, *[r["message"] for r in rating_checks]],
-            "rating_checks": rating_checks}
+            "ran": bool(run), "notes": [LIMIT_NOTE, *deck.notes, *[r["message"] for r in rating_checks],
+                                       *(digital_result["messages"] if digital_result else [])],
+            "rating_checks": rating_checks, **({"digital": digital_result} if digital_result else {})}

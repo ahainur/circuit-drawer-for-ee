@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from .layout import PIN_NAMES, Element, Point, SWITCHES, TWO_TERMINAL
+from .layout import PIN_NAMES, Element, Point, SWITCHES, TWO_TERMINAL, windings
 from .profiles import Profile
 
 EPS = 1e-4
@@ -41,6 +41,10 @@ BODY_FRAC = {"R": 0.8, "L": 0.9, "C": 0.35, "D": 0.5, "scr": 1.0, "V": 0.6, "vac
 
 HALF_HEIGHT["zener"] = HALF_HEIGHT["D"]
 BODY_FRAC["zener"] = BODY_FRAC["D"]
+# CircuitikZ's American resistor: width .8 and total height .3 of the
+# default .75 cm bipole. Keep the electrical kind R and the existing pins.
+HALF_HEIGHT["R_ic"], BODY_FRAC["R_ic"] = .1125, .8
+RESISTOR_ZIGS = 3
 # CircuitikZ emptyzdiode: cathode hook returns by 0.4 * half the triangle
 # width, inside the ordinary diode body (pgfcircbipoles.tex, 2026/05/24).
 ZENER_HOOK_FRAC = 0.2
@@ -48,9 +52,16 @@ ZENER_HOOK_FRAC = 0.2
 
 def symbol_kind(el: Element) -> str:
     """Drawing variants keep their electrical kind and pin convention."""
+    if el.kind == "R" and el.opts.get("symbol_style") == "ic":
+        return "R_ic"
     if el.kind == "V" and el.opts.get("battery"):
         return "battery"
     return "zener" if el.kind == "D" and el.opts.get("zener") else el.kind
+
+
+def body_diode_visible(el: Element, conducting: bool = False) -> bool:
+    """A visual preset never removes a physical diode or its active mode path."""
+    return el.opts.get("diode", True) is not False and (el.opts.get("symbol_style") != "ic" or conducting)
 # The CircuitikZ thyristor (Ty) is a diode with a gate lead that leaves the
 # cathode bar diagonally and turns up at the end of the symbol, on the left of
 # the anode -> cathode path (the right with opts.mirror). Measured from
@@ -82,6 +93,10 @@ class Box:
     y0: float
     x1: float
     y1: float
+
+    def contains(self, point: Point) -> bool:
+        """Include the border, for marks that occupy a complete module frame."""
+        return self.x0 - EPS <= point[0] <= self.x1 + EPS and self.y0 - EPS <= point[1] <= self.y1 + EPS
 
     def overlaps(self, other: "Box", clearance: float = 0.0) -> bool:
         if isinstance(other, DiagBox):
@@ -207,6 +222,10 @@ def has_wide(text: str | None) -> bool:
 
 def text_size(tex: str, font_pt: float = 8.0) -> tuple[float, float]:
     """Rough width/height in cm of a short math label such as ``$L_{m}$``."""
+    if tex in (r"$\vdots$", r"$\cdots$"):
+        # Conservative 8 pt math-glyph bounds, including breathing room.
+        width, height = (0.23, 0.40) if tex == r"$\vdots$" else (0.45, 0.30)
+        return width * font_pt / 8, height * font_pt / 8
     s = tex.replace("$", "")
     s = _CMD.sub(lambda m: m.group(2), s)
     s = re.sub(r"\\[a-zA-Z]+", "x", s)          # \sigma, \alpha -> one glyph
@@ -295,6 +314,7 @@ def _side_for(a: Point, b: Point, pos: str) -> str:
 
 SIZE_RANGE = (0.5, 2.0)
 FONT_RANGE = (5.0, 14.0)    # pt
+TEXT_CLEARANCE = 0.06      # cm at 8 pt, proportional like text_size's bounds
 
 
 def font_of(value, prof: Profile) -> float:
@@ -304,6 +324,10 @@ def font_of(value, prof: Profile) -> float:
         return min(max(float(value), FONT_RANGE[0]), FONT_RANGE[1]) if value else prof.font_pt
     except (TypeError, ValueError):
         return prof.font_pt
+
+
+def text_clearance(value, prof: Profile) -> float:
+    return TEXT_CLEARANCE * font_of(value, prof) / 8
 
 
 def _size(value, default: float = 1.0) -> float:
@@ -354,6 +378,23 @@ def footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
 def _base_footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
     if el.kind in TWO_TERMINAL:
         fp = _two_terminal(el, s, prof)
+        if symbol_kind(el) == "R_ic" and fp.bodies:
+            a, b = scaled(el.pins["a"], s), scaled(el.pins["b"], s)
+            length, width = axis_sizes(el)
+            span = prof.bipole_len * BODY_FRAC["R_ic"] * length
+            half = HALF_HEIGHT["R_ic"] * width
+            distance = math.dist(a, b)
+            if distance <= EPS:
+                return fp
+            u = ((b[0]-a[0])/distance, (b[1]-a[1])/distance)
+            c = ((a[0]+b[0])/2, (a[1]+b[1])/2)
+            def at(x, y):
+                return (c[0]+x*u[0]-y*u[1], c[1]+x*u[1]+y*u[0])
+            # Six alternating peaks with a half-step at each end, as in
+            # CircuitikZ's three-zig resistor; all rotations share this path.
+            peaks = [at(-span/2+(2*i+1)*span/(4*RESISTOR_ZIGS), (-1)**i*half)
+                     for i in range(2*RESISTOR_ZIGS)]
+            fp.extra["resistor_path"] = [a, at(-span/2, 0), *peaks, at(span/2, 0), b]
         if symbol_kind(el) == "zener":
             fp.extra["zener_hook"] = ZENER_HOOK_FRAC
         _source_wave(el, fp)
@@ -527,6 +568,8 @@ def _switch(el: Element, s: Scale, prof: Profile) -> Footprint:
     frame = switch_frame(el) or ((0.0, 1.0), (1.0, 0.0))
     u, side = frame
     fp.extra.update(u=u, side=side)
+    # Keep the physical diode's envelope for every MOS style: a conducting
+    # diode is visible in a mode, with no scale or label jump when switching views.
     # local box: SW_RIGHT towards the label side, SW_LEFT towards the gate
     xs = [cx + side[0] * a + u[0] * b for a in (-SW_LEFT * kw, SW_RIGHT * kw)
           for b in (-SW_HALF_H * kl, SW_HALF_H * kl)]
@@ -630,20 +673,42 @@ def transformer_frame(el: Element, s: Scale):
     return u, v, local
 
 
+def extra_windings(el: Element, P: dict) -> list[tuple[str, str, str, str]]:
+    """(name, top pin, bottom pin, column) of each complete extra winding
+    w3..w6 in a transformer's local frame; column is "p" when it shares the
+    primary's axis, else "s".  The validator rejects a winding that lies on
+    neither axis, so the column here is only a drawing hint."""
+    out = []
+    for name, a, b in windings(el)[2 if "sct" not in el.pins else 3:]:
+        if a not in P or b not in P:
+            continue                   # the validator reports the half winding
+        top, bot = (a, b) if P[a][1] >= P[b][1] else (b, a)
+        side = "p" if abs(P[a][0] - P["p1"][0]) <= abs(P[a][0] - P["s1"][0]) else "s"
+        out.append((name, top, bot, side))
+    return out
+
+
 def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
     """Windings are drawn on their pins, so a vertical wire leaving a pin
     never jogs; the validator keeps the primary-secondary gap within
-    WINDING_GAP so the core does not drift away from the coils."""
+    WINDING_GAP so the core does not drift away from the coils.  Extra
+    windings w3..w6 stand on the primary or the secondary axis and share
+    the one core, which spans every winding."""
     u, v, P = transformer_frame(el, s)
     xcp, xcs = P["p1"][0], P["s1"][0]
     xm = (xcp + xcs) / 2
     sec_names = ["s1"] + (["sct"] if "sct" in P else []) + ["s2"]
     pri = [P["p1"], P["p2"]]
     sec = [P[k] for k in sec_names]
-    coils = [(pri[0], pri[1])] + list(zip(sec, sec[1:]))
+    extras = extra_windings(el, P)
+    coils = [(pri[0], pri[1])] + list(zip(sec, sec[1:])) + [(P[t], P[b]) for _, t, b, _ in extras]
+    # which side of the core each coil faces, in coil order (editor and emitter)
+    sides = ["p"] + ["s"] * (len(sec) - 1) + [side for *_, side in extras]
     fp = Footprint(leads=list(coils))
     length, width = axis_sizes(el)
     L = prof.bipole_len * BODY_FRAC["L"] * length
+    # A newly added coil leaves two minimum leads between adjacent windings.
+    fp.extra["winding_gap"] = 2 * MIN_LEAD * length
     for a, b in coils:
         fp.bodies.append(centred(a[0], (a[1] + b[1]) / 2, 2 * COIL_HALF_W * width, L))
     ys = [p[1] for p in P.values()]
@@ -652,13 +717,15 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
     core = Box(xm - core_gap - 0.02, y0, xm + core_gap + 0.02, y1)
     fp.bodies.append(core)
     # every point in extra is turned back to world coordinates below
-    fp.extra.update(coils=coils, pri=pri, sec=sec)
+    fp.extra.update(coils=coils, pri=pri, sec=sec, coil_sides=sides,
+                    extra_coils=[(name, P[t], P[b], side) for name, t, b, side in extras])
     # core: false draws a coupled inductor, two windings without core lines;
     # the core box stays so nothing is routed between the windings
     fp.extra["core_lines"] = ([((xm + dx, y0), (xm + dx, y1)) for dx in (-core_gap, core_gap)]
                               if el.opts.get("core", True) is not False else [])
     # polarity dots: "same" puts both at the top of their winding, "opposite"
-    # (flyback) puts the secondary one at the bottom of its last coil
+    # (flyback) puts the secondary one at the bottom of its last coil; an
+    # extra winding's dot is always at its wka end, on the outer side
     dots = el.opts.get("dots", "same")
     if dots is True:
         dots = "same"
@@ -670,6 +737,11 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
             sy = (sec[0][1] + sec[1][1]) / 2 + DOT_LIFT * length
         fp.extra["dots"] = [(xcp - DOT_OFFSET * width, pc + DOT_LIFT * length),
                             (xcs + DOT_OFFSET * width, sy)]
+        for name, t, b, side in extras:
+            mid = (P[t][1] + P[b][1]) / 2
+            lift = DOT_LIFT * length if t == f"{name}a" else -DOT_LIFT * length
+            x = P[t][0] + (-DOT_OFFSET if side == "p" else DOT_OFFSET) * width
+            fp.extra["dots"].append((x, mid + lift))
         fp.labels += [centred(x, y, 0.09, 0.09) for x, y in fp.extra["dots"]]
     ratio = el.opts.get("ratio")
     if ratio:
@@ -695,6 +767,7 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
             fp.extra[key] = [world(p) for p in fp.extra[key]]
     for key in ("coils", "core_lines"):
         fp.extra[key] = [(world(a), world(b)) for a, b in fp.extra[key]]
+    fp.extra["extra_coils"] = [(n, world(a), world(b), side) for n, a, b, side in fp.extra["extra_coils"]]
     if "ratio_at" in fp.extra:
         fp.extra["ratio_at"] = world(fp.extra["ratio_at"])
     if el.label:
@@ -713,6 +786,20 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
 
 
 ARROW_GAP = 0.1   # cm between a current arrow and its label
+
+
+def module_ellipsis(first, last, scale):
+    """Text and midpoint of the clear gap between two module frames (layout units)."""
+    vertical = max(first[1] - last[3], last[1] - first[3]) * scale.y
+    horizontal = max(first[0] - last[2], last[0] - first[2]) * scale.x
+    if max(vertical, horizontal) <= 0:
+        raise ValueError("省略显示的首尾外框之间需要留出间隔")
+    if vertical >= horizontal:
+        low, high = sorted((first, last), key=lambda f: f[1])
+        at = [(first[0] + first[2] + last[0] + last[2]) / 4, (low[3] + high[1]) / 2]
+        return at, r"$\vdots$"
+    left, right = sorted((first, last), key=lambda f: f[0])
+    return [(left[2] + right[0]) / 2, (first[1] + first[3] + last[1] + last[3]) / 4], r"$\cdots$"
 
 
 def annotation_box(ann, s: Scale, prof: Profile) -> Box:
@@ -789,12 +876,23 @@ def block_rect(b, s: Scale) -> Box:
     return Box(b.x0 * s.x, b.y0 * s.y, b.x1 * s.x, b.y1 * s.y)
 
 
+def control_view_origin(b, s: Scale, content: Box) -> Point:
+    """Translation in printed cm; the referenced table's coordinates stay intact."""
+    frame = block_rect(b, s)
+    return ((frame.x0 + frame.x1 - content.x0 - content.x1) / 2,
+            (frame.y0 + frame.y1 - content.y0 - content.y1) / 2)
+
+
 def block_text_box(b, s: Scale, prof: Profile) -> Box | None:
-    """The block's text, centred in the box (cm)."""
+    """The block's text, centred in the box (cm), or under it when the
+    block carries an icon."""
     if not b.text:
         return None
     w, h = text_size(b.text, font_of(b.size, prof))
     r = block_rect(b, s)
+    if getattr(b, "icon", None):
+        from .blocks import CAPTION_GAP      # an icon fills the box: caption underneath
+        return centred((r.x0 + r.x1) / 2, r.y0 - CAPTION_GAP - h / 2, w, h)
     return centred((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2, w, h)
 
 
@@ -816,6 +914,9 @@ def callout_shape(c, s: Scale) -> list[Point]:
         if c.bend:
             curve = callout_curve(c, s)
             return [_bezier_at(curve, i/BEND_SAMPLES) for i in range(BEND_SAMPLES+1)]
+        if c.corner == "round" and c.via:
+            return [a, *(_bezier_at(curve, i/BEND_SAMPLES)
+                         for curve in callout_paths(c, s) for i in range(1, BEND_SAMPLES+1))]
         return [a, *(scaled(p, s) for p in c.via), b]
     L = math.dist(a, b)
     u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
@@ -963,8 +1064,36 @@ def callout_paths(c, s: Scale) -> list[tuple[Point, Point, Point, Point]]:
     if c.bend:
         return [callout_curve(c, s)]
     pts = [scaled(c.start, s), *(scaled(p, s) for p in c.via), scaled(c.end, s)]
-    return [(a, ((2*a[0]+b[0])/3, (2*a[1]+b[1])/3),
-             ((a[0]+2*b[0])/3, (a[1]+2*b[1])/3), b) for a, b in zip(pts, pts[1:])]
+
+    def straight(a, b):
+        return (a, ((2*a[0]+b[0])/3, (2*a[1]+b[1])/3),
+                ((a[0]+2*b[0])/3, (a[1]+2*b[1])/3), b)
+
+    if c.corner != "round":
+        return [straight(a, b) for a, b in zip(pts, pts[1:])]
+    from .regions import CALLOUT_CORNER_CUT
+    paths = []
+    start = pts[0]
+    for a, vertex, b in zip(pts, pts[1:], pts[2:]):
+        before, after = math.dist(a, vertex), math.dist(vertex, b)
+        u = ((vertex[0]-a[0])/before, (vertex[1]-a[1])/before)
+        v = ((b[0]-vertex[0])/after, (b[1]-vertex[1])/after)
+        if abs(u[0]*v[1] - u[1]*v[0]) < 1e-9:
+            paths.append(straight(start, vertex))
+            start = vertex
+            continue
+        # Half-length caps keep neighbouring rounds from overlapping on short legs.
+        cut = min(CALLOUT_CORNER_CUT, before/2, after/2)
+        entry = (vertex[0]-cut*u[0], vertex[1]-cut*u[1])
+        exit = (vertex[0]+cut*v[0], vertex[1]+cut*v[1])
+        if math.dist(start, entry) > 1e-9:
+            paths.append(straight(start, entry))
+        # Quadratic corner expressed as a cubic, tangent to both adjoining legs.
+        controls = [tuple((p[j]+2*vertex[j])/3 for j in (0, 1)) for p in (entry, exit)]
+        paths.append((entry, *controls, exit))
+        start = exit
+    paths.append(straight(start, pts[-1]))
+    return paths
 
 
 def callout_gap(c, s: Scale, prof: Profile) -> Box | None:

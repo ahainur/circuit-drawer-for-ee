@@ -1,0 +1,279 @@
+{
+ "name": "synchronous_buck",
+ "elements": [
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     0.0
+    ],
+    "b": [
+     0.0,
+     3.0
+    ]
+   },
+   "label": "$V_\\mathrm{in}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     1.0,
+     3.0
+    ],
+    "s": [
+     2.2,
+     3.0
+    ]
+   },
+   "label": "$S_1$",
+   "label_pos": "below"
+  },
+  {
+   "id": "S2",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     2.5,
+     2.0
+    ],
+    "s": [
+     2.5,
+     0.0
+    ]
+   },
+   "label": "$S_2$",
+   "label_pos": "left"
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     2.8,
+     3.0
+    ],
+    "b": [
+     4.0,
+     3.0
+    ]
+   },
+   "label": "$L_1$"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     4.3,
+     3.0
+    ],
+    "b": [
+     4.3,
+     0.0
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "left"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     5.4,
+     3.0
+    ],
+    "b": [
+     5.4,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "left"
+  }
+ ],
+ "wires": [
+  [
+   [
+    0.0,
+    3.0
+   ],
+   [
+    1.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.2,
+    3.0
+   ],
+   [
+    2.8,
+    3.0
+   ]
+  ],
+  [
+   [
+    2.5,
+    2.0
+   ],
+   [
+    2.5,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    3.0
+   ],
+   [
+    5.4,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    5.4,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [
+  {
+   "at": [
+    6.05,
+    1.92
+   ],
+   "text": "$+$"
+  },
+  {
+   "at": [
+    6.05,
+    1.5
+   ],
+   "text": "$v_o$"
+  },
+  {
+   "at": [
+    6.05,
+    1.08
+   ],
+   "text": "$-$"
+  }
+ ],
+ "netlist": {
+  "Vin.b": "IN",
+  "S1.d": "IN",
+  "S1.s": "SW",
+  "L1.a": "SW",
+  "L1.b": "OUT",
+  "Co.a": "OUT",
+  "RL.a": "OUT",
+  "Vin.a": "GND",
+  "Co.b": "GND",
+  "RL.b": "GND",
+  "S2.d": "SW",
+  "S2.s": "GND"
+ },
+ "modes": [
+  {
+   "name": "Switch on",
+   "condition": "Ideal synchronous MOSFET CCM; no dead time; reverse channel conduction",
+   "caption": "$S_1$ on, $S_2$ off",
+   "on": [
+    "S1"
+   ],
+   "loops": [
+    [
+     "Vin",
+     "S1",
+     "L1",
+     "Co|RL"
+    ]
+   ]
+  },
+  {
+   "name": "Freewheel",
+   "condition": "Ideal synchronous MOSFET CCM; no dead time; reverse channel conduction",
+   "caption": "$S_1$ off, $S_2$ freewheeling",
+   "on": [
+    "S2"
+   ],
+   "loops": [
+    [
+     "S2",
+     "L1",
+     "Co|RL"
+    ]
+   ]
+  }
+ ],
+ "waveform": {
+  "version": 1,
+  "source": "waveforms-data/synchronous_buck.csv",
+  "sha256": "585116a9b3ff520d9c1cbfd75c6c624193f3a0d27daa2d310dcdffcb5c005098",
+  "time_column": "time_s",
+  "time_unit": "s",
+  "display_unit": "us",
+  "relative_time": true,
+  "slice_style": "shade",
+  "arrange": "grid",
+  "window": [
+   0,
+   2e-05
+  ],
+  "boundaries": [
+   0.0,
+   8.000000000000001e-06,
+   2e-05
+  ],
+  "intervals": [
+   "Switch on",
+   "Freewheel"
+  ],
+  "channels": [
+   {
+    "column": "g1_1",
+    "label": "g1",
+    "unit": "1",
+    "color": "#c8102e"
+   },
+   {
+    "column": "v_L1_V",
+    "label": "v_L1",
+    "unit": "V",
+    "color": "#2457d6"
+   },
+   {
+    "column": "i_L1_A",
+    "label": "i_L1",
+    "unit": "A",
+    "color": "#17845a"
+   }
+  ],
+  "circuit_signature": "cd179887b7fc2dbbce3f85d18ca6702f5187ebeee7cba99f0080f719221cbdd0",
+  "notes": [
+   {
+    "kind": "text",
+    "channel": "g1_1",
+    "at": [
+     1.4e-05,
+     0.65
+    ],
+    "text": "Ideal analytical reference"
+   }
+  ]
+ }
+}

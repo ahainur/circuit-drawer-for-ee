@@ -5,6 +5,8 @@
 Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink, PLECS and open-loop PSIM models.
 
 <p align="center">
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/CircuitDrawer-Setup-1.7.0.exe"><img alt="Download Windows installer — Offline setup v1.7.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v1.7.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
+  <br>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>

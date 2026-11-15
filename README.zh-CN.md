@@ -5,6 +5,8 @@
 Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直接放进论文的电力电子 CircuiTikZ 电路图，并把同一张表导出为 ngspice、Simulink、PLECS 及 PSIM 开环仿真模型。
 
 <p align="center">
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/CircuitDrawer-Setup-1.7.0.exe"><img alt="下载 Windows 一键安装包 — 离线安装程序 v1.7.0" src="https://img.shields.io/badge/Windows%20%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85-v1.7.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
+  <br>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>

@@ -136,10 +136,12 @@ def _prepare(layout, options=None, profile="ieee-single", base_dir=None, *, purp
     if not scene.report.ok:
         raise AutoModeError("图纸校验未通过，请先修正问题栏后预览模态。")
     switches = [e for e in layout.elements if e.kind in {"nmos", "pmos"}]
+    sim = layout.extra["simulation"]
+    if any("g" in e.pins and sim["components"][e.id].get("gate_drive", "external") == "external" for e in switches):
+        raise AutoModeError(f"{purpose}需要已声明周期的内部 PWM 驱动；外部栅极电路请先通过瞬态波形核对周期和状态。")
     inductors = current_refs(layout)
     if not switches or not inductors:
         raise AutoModeError(f"{purpose}需要至少一个 PWM 开关和一个电感或变压器。")
-    sim = layout.extra["simulation"]
     frequencies = [number(sim["components"][e.id]["frequency"], e.id) for e in switches]
     if any(not math.isclose(f, frequencies[0], rel_tol=1e-9) for f in frequencies):
         raise AutoModeError(f"当前{purpose}要求所有开关使用相同频率。")
@@ -181,7 +183,8 @@ def _instrument(layout, deck, aliases=None, *, extra_vectors=None):
         name = deck.element_names[aliases.get(e.id, e.id)]
         if e.kind in {"nmos", "pmos"}:
             vectors[f"gate:{e.id}"] = f"v(ctl_{name})"
-            device(f"current:{e.id}", f"@{name.lower()}[i]")
+            channel = f"bsw_{name.lower()}" if "g" in e.pins else name.lower()
+            device(f"current:{e.id}", f"@{channel}[i]")
             if e.opts.get("diode", True) is not False:
                 device(f"body:{e.id}", f"@dbody_{name.lower()}[id]")
         elif e.kind == "D":

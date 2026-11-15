@@ -437,6 +437,7 @@ def emit(circuit, name, numerical_resistance):
 
     def drives(sheet, mine):
         """Each gate / source input reads its tag from a From block beside it."""
+        readings(sheet, [(p.name, 'gate_' + p.name) for p in mine if p.role == 'gate_sensor'])
         for p in mine:
             if p.kind not in (*GATED, 'V', 'I'):
                 continue
@@ -444,7 +445,22 @@ def emit(circuit, name, numerical_resistance):
             port = 3 if p.kind in ('V', 'I') else 3
             near, way = sheet.beside(p.name, 2, 40)
             sheet.block('From', 'get_' + p.name, {'Tag': tag, 'Visibility': 1}, near, back[way], show=False)
-            sheet.signal_wire('get_' + p.name, 1, p.name, port)
+            if 'gain' in p.params:
+                source, source_port = 'get_' + p.name, 1
+                command = next(s for s in circuit.signals if s.name == p.params['signal'])
+                if command.kind == 'control':
+                    edge_pos = nearby(near, (50, 40), sheet.occupied)
+                    sheet.block('RateLimiter', 'edges_' + p.name,
+                                {'RisingRateLimit': 1/command.params['rise'], 'FallingRateLimit': -1/command.params['fall'],
+                                 'SampleTimeMode': 2}, edge_pos, show=False)
+                    sheet.signal_wire(source, source_port, 'edges_' + p.name, 1)
+                    source, source_port = 'edges_' + p.name, 2
+                gain_pos = nearby(near, (50, 40), sheet.occupied)
+                sheet.block('Gain', 'gain_' + p.name, {'K': p.params['gain'], 'Multiplication': 1}, gain_pos, show=False)
+                sheet.signal_wire(source, source_port, 'gain_' + p.name, 1)
+                sheet.signal_wire('gain_' + p.name, 2, p.name, port)
+            else:
+                sheet.signal_wire('get_' + p.name, 1, p.name, port)
 
     def readings(sheet, sensors):
         """Each sensor (name, tag) sends its reading by tag."""
@@ -566,7 +582,11 @@ def emit(circuit, name, numerical_resistance):
         cx, cy = nearby(anchor, (width, ROW * max(1, len(latches))), occupied)
         pos = (cx - width // 2 + 120, cy)
         v = s.params
-        if s.kind == 'dc':
+        if s.kind == 'gate':
+            top.block('From', s.name + '_voltage', {'Tag': 'gate_' + v['sensor'], 'Visibility': 1}, (pos[0] - 80, pos[1]), show=False)
+            top.block('ConstantRelationalOperator', s.name, {'Operator': 6, 'Threshold': v['threshold']}, pos)
+            top.signal_wire(s.name + '_voltage', 1, s.name, 1)
+        elif s.kind == 'dc':
             top.block('Constant', s.name, {'Value': v['dc']}, pos)
         elif s.kind == 'pwl':
             vector = lambda values: '[' + ' '.join(numeric(x) for x in values) + ']'
@@ -582,7 +602,7 @@ def emit(circuit, name, numerical_resistance):
                           f"max(u[1]-{v['delay']:.17g},0)+{v['phase']:.17g}*pi/180)")
             top.block('Function', s.name, {'f(u)': expression}, pos)
         out = 1 if s.kind == 'dc' else 2
-        if s.kind != 'dc':
+        if s.kind not in ('dc', 'gate'):
             # Read the common clock locally, without a wire across the power stage.
             clock_name = 'time_' + s.name
             top.block('From', clock_name, {'Tag': 'cd_time', 'Visibility': 1}, (pos[0] - 80, pos[1]), show=False)

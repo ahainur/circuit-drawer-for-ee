@@ -1497,7 +1497,11 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
         if actual_ids & ids:
             raise ModuleError(f"实例 {name} 展开后的器件 ID 与顶层重复")
         actual_ids.update(ids)
-        values.update({prefix + k: v for k, v in _merge(defaults, diff).items()})
+        for local_id, parameters in _merge(defaults, diff).items():
+            driver_source = parameters.get("gate_source") if isinstance(parameters, dict) else None
+            if isinstance(driver_source, str) and driver_source and any(e.id == driver_source for e in original.elements):
+                parameters = {**parameters, "gate_source": prefix + driver_source}
+            values[prefix + local_id] = parameters
         shapes[name] = _Shape(views[0], views[1] if len(views) > 1 else None, prefix, mapped,
                               ports, faces, at, display, title, symbol, size, port_layout, style,
                               tuple(inst.get("unconnected", [])))

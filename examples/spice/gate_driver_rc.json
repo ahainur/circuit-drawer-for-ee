@@ -1,0 +1,232 @@
+{
+ "name": "gate_driver_rc",
+ "elements": [
+  {
+   "id": "Q1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     7.0,
+     2.0
+    ],
+    "s": [
+     7.0,
+     0.0
+    ],
+    "g": [
+     6.0,
+     1.0
+    ]
+   },
+   "label": "Q1",
+   "opts": {
+    "mirror": false,
+    "diode": false
+   }
+  },
+  {
+   "id": "Vin",
+   "kind": "V",
+   "pins": {
+    "a": [
+     10.0,
+     0.0
+    ],
+    "b": [
+     10.0,
+     4.0
+    ]
+   },
+   "label": "Vin"
+  },
+  {
+   "id": "Rload",
+   "kind": "R",
+   "pins": {
+    "a": [
+     10.0,
+     4.0
+    ],
+    "b": [
+     7.0,
+     4.0
+    ]
+   },
+   "label": "Rload"
+  },
+  {
+   "id": "Vg",
+   "kind": "V",
+   "pins": {
+    "a": [
+     0.0,
+     -2.0
+    ],
+    "b": [
+     0.0,
+     1.0
+    ]
+   },
+   "label": "Vg"
+  },
+  {
+   "id": "Rg",
+   "kind": "R",
+   "pins": {
+    "a": [
+     2.0,
+     1.0
+    ],
+    "b": [
+     4.0,
+     1.0
+    ]
+   },
+   "label": "Rg"
+  }
+ ],
+ "wires": [
+  [
+   [
+    7.0,
+    4.0
+   ],
+   [
+    7.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    2.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    1.0
+   ],
+   [
+    6.0,
+    1.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    -2.0
+   ],
+   [
+    7.0,
+    -2.0
+   ],
+   [
+    7.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    7.0,
+    -2.0
+   ],
+   [
+    10.0,
+    -2.0
+   ],
+   [
+    10.0,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [],
+ "annotations": [],
+ "netlist": {
+  "Vin.b": "P",
+  "Rload.a": "P",
+  "Rload.b": "D",
+  "Q1.d": "D",
+  "Q1.g": "G",
+  "Rg.b": "G",
+  "Vg.b": "DRIVER",
+  "Rg.a": "DRIVER",
+  "Vin.a": "N",
+  "Vg.a": "N",
+  "Q1.s": "N"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "Vin.a",
+  "components": {
+   "Q1": {
+    "model": "ideal_switch",
+    "ron": "0.1",
+    "roff": "1G",
+    "frequency": "1k",
+    "duty": "0.5",
+    "delay": "100u",
+    "rise": "1u",
+    "fall": "1u",
+    "gate_capacitance": "1u",
+    "gate_drive": "external"
+   },
+   "Vin": {
+    "dc": "12"
+   },
+   "Rload": {
+    "value": "10"
+   },
+   "Vg": {
+    "dc": "0",
+    "wave": {
+     "kind": "pulse",
+     "initial": "0",
+     "final": "10",
+     "delay": "100u",
+     "rise": "1u",
+     "fall": "1u",
+     "width": "499u",
+     "period": "1m"
+    }
+   },
+   "Rg": {
+    "value": "100"
+   }
+  },
+  "transient": {
+   "step": "500n",
+   "max_step": "500n",
+   "stop": "1.2m"
+  },
+  "probes": [
+   {
+    "name": "v_gate",
+    "kind": "voltage",
+    "positive": "Q1.g",
+    "negative": "Q1.s"
+   },
+   {
+    "name": "v_switch",
+    "kind": "voltage",
+    "positive": "Q1.d",
+    "negative": "Q1.s"
+   },
+   {
+    "name": "i_gate",
+    "kind": "current",
+    "element": "Vg"
+   },
+   {
+    "name": "gate",
+    "kind": "drive",
+    "element": "Q1"
+   }
+  ]
+ }
+}

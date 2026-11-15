@@ -2,7 +2,7 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | 繁體中文 | [English](USER_MANUAL.en.md)
 
-本書對應 Circuit Drawer for EE 1.7.0。先讀第一、二章完成安裝，再按需要查閱後面的章節。命令、選單名和欄位名都按程式中的原樣書寫。
+本書對應 Circuit Drawer for EE 1.8.0。先讀第一、二章完成安裝，再按需要查閱後面的章節。命令、選單名和欄位名都按程式中的原樣書寫。
 
 ## 目錄
 
@@ -105,7 +105,7 @@ Circuit Drawer 是給電力電子論文和報告畫電路圖的工具。你在�
 
 #### 64 位 Windows 10 和 11 安裝包
 
-1、下載並雙擊 `CircuitDrawer-Setup-1.7.0.exe`，選擇安裝語言，按照精靈完成目前使用者安裝。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下載並雙擊 `CircuitDrawer-Setup-1.8.0.exe`，選擇安裝語言，按照精靈完成目前使用者安裝。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、安裝目錄使用 ASCII 字元，允許空格。圖紙路徑、匯出路徑和 Windows 使用者名稱可包含中文。
 
@@ -114,17 +114,17 @@ Circuit Drawer 是給電力電子論文和報告畫電路圖的工具。你在�
 4、安裝包尚未簽署數位簽章，Windows 可能顯示「未知的發行者」或「Windows 已保護您的電腦」。核對來源和 SHA256 後，可在提供該選項的畫面選擇「其他資訊 → 仍要執行」。在 PowerShell 執行下列命令，與同一發佈頁 `SHA256SUMS.txt` 中的對應項目比較。
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
 ```
 
 5、升級或解除安裝前先儲存圖紙，關閉啟動器和正在執行的 Circuit Drawer 命令列工作。升級時執行新版安裝程式。解除安裝入口位於 Windows「設定 → 應用程式 → Circuit Drawer」，使用者圖紙及設定會保留。圖紙請儲存到自己的文件目錄。
 
 #### 開發者、macOS 和 Linux 的 Python 安裝方式
 
-1、下載 wheel 檔案 `circuit_drawer_for_ee-1.7.0-py3-none-any.whl`，在檔案所在目錄執行下列命令。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下載 wheel 檔案 `circuit_drawer_for_ee-1.8.0-py3-none-any.whl`，在檔案所在目錄執行下列命令。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
 ```
 
 2、也可以執行下列命令，從倉庫安裝。
@@ -426,9 +426,9 @@ circuit-drawer draw 四开关升降压 switch=igbt
 | 二極體 | `D` | `a`（陽極）、`b`（陰極） | 通用二極體 |
 | 穩壓管 | `D`，`opts.zener: true` | 同二極體 | 畫成穩壓管符號；模擬需另填擊穿參數 |
 | 閘流體 | `scr` | `a`（陽極）、`b`（陰極） | 只能水平或豎直；門極引線畫在 a→b 的左側，`F` 鍵換到右側；門極由模擬觸發脈衝驅動，不是引腳 |
-| MOSFET | `nmos` | `d`、`s` | 預設帶體二極體（`opts.diode: false` 去掉） |
-| P 溝 MOSFET | `pmos` | `d`、`s` | 源極在上、門極帶點；體二極體 d→s；邏輯 PWM 1 為導通。在“模擬 → SPICE 模擬…”填寫參數。 |
-| IGBT | `igbt` | `c`、`e` | 預設帶反並聯二極體 |
+| MOSFET | `nmos` | `d`、`s`，可選 `g` | 預設帶體二極體（`opts.diode: false` 去掉） |
+| P 溝 MOSFET | `pmos` | `d`、`s`，可選 `g` | 源極在上、門極帶點；體二極體 d→s；邏輯 PWM 1 為導通。在“模擬 → SPICE 模擬…”填寫參數。 |
+| IGBT | `igbt` | `c`、`e`，可選 `g` | 預設帶反並聯二極體 |
 | 電壓源 | `V` | `a`（負）、`b`（正） | 直流電壓源 |
 | 交流電源 | `vac` | `a`（參考端）、`b` | 正弦交流源 |
 | 三相電源 | 三個 `vac` | 每個 `a`、`b` | 一次放好星形連線的三個交流源和中性線，標籤為 v_a、v_b、v_c |
@@ -1572,6 +1572,16 @@ circuit-drawer-control edit out/grid-forming/parallel/control.json
 
 4、Bode 計算使用零階保持功率級與量化係數，極點按單位圓判斷。逐拍模擬支援純量控制器，Simulink／PLECS 原生量化模型仍待接入。GaN 範例使用理想開關與有限導通電阻近似，器件損耗需要具體模型。[參數、量化規則與操作命令](../examples/digital_control/README.md#四繁體說明)
 
+### 17、可接線閘極與外置驅動
+
+1、選取 MOSFET 或 IGBT，在屬性中勾選「可接線閘極 g」，再把驅動電壓源、電阻與導線接到 g。在「模擬 → SPICE 模擬…」中選擇外部接線驅動，填寫驅動源的脈衝波形及 R/C 數值。範例 `examples/spice/gate_driver_rc.json` 可直接開啟。
+
+2、新增電壓量測通道，選擇 g 與源極 s（IGBT 為射極 e），即可查看實際 Vgs／Vge。PMOS 依 −Vgs 判定導通。內部 PWM 或閉迴路也可選擇圖中的 V 驅動源，V 的 a 端接 s／e，b 端經閘極電阻接 g。已綁定內部驅動的 V 源使用 DC 設定。
+
+3、內部驅動振幅預設 10 V，簡化通道臨界值預設 3 V，均可在模擬設定中修改。Cgs／Cge 與 Cgd／Cgc 為線性電容，預設 0，填寫目標元件與工作條件對應的數值。ngspice 與 Simulink 的簡化通道在臨界值附近採用 10 mV 數值平滑，PLECS／PSIM 使用理想臨界值，暫態細節會有差異。
+
+4、外部驅動支援暫態模擬。自動模態辨識與參數範圍搜尋要求已宣告週期的內部定頻 PWM。使用實際閘極時，閉迴路輸出選擇 switching 模型。
+
 ## 十八、Simulink 與 PLECS 匯出及閉環控制
 
 同一份電路和模擬參數也能匯出為 Simulink 和 PLECS 模型。程式帶走實際接線、元件參數、PWM 和測量通道，並按原圖排版。
@@ -2299,10 +2309,10 @@ JSON 不記錄欄寬，預設按單欄開啟。用 `circuit-drawer edit x.json -
 | `current_side` | 二端元件 | `^`、`_`（`^`） | 箭頭文字在 a→b 行進方向的左側或右側 |
 | `invert` | 二端元件 | `true`/`false` | 只把符號反向畫，模擬不讀 |
 | `wave`、`wave_pos`、`wave_scale` | `V`、`I` | `step-up`、`step-down`、`pulse`；`auto`、`left`、`right`、`above`、`below`；0.5–2 | 源旁小波形 |
-| `mirror` | `nmos`、`pmos`、`igbt`、`scr` | `true`/`false` | 門極換到另一側 |
+| `mirror` | `nmos`、`pmos`、`igbt`、`scr` |`true`/`false`，可選 `g` | 門極換到另一側 |
 | `battery` | `V` | `true`/`false` | 畫成電池 |
 | `zener` | `D` | `true`/`false` | 畫成穩壓管 |
-| `diode` | `nmos`、`pmos`、`igbt` | `true`/`false`（`true`） | 體二極體 / 反並聯二極體，`false` 時繪圖和模擬都去掉 |
+| `diode` | `nmos`、`pmos`、`igbt` |`true`/`false`（`true`），可選 `g` | 體二極體 / 反並聯二極體，`false` 時繪圖和模擬都去掉 |
 | `ratio` | `transformer` | 文字，如 `"$1:n$"` | 變比文字，只用於顯示 |
 | `dots` | `transformer` | `same`、`opposite`、`false`（`same`） | 同名端，須與模擬極性一致 |
 | `core` | `transformer` | `true`/`false`（`true`） | `false` 畫成耦合電感 |

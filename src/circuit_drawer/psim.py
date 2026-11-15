@@ -73,7 +73,7 @@ def describe(circuit, name):
     if unsupported:
         raise SpiceError('PSIM 暂不支持这些器件模型：'+', '.join(unsupported)+'；不会忽略或替换它们')
     signals={s.name:s for s in circuit.signals}
-    if any(s.kind not in ('dc','sine','pwl') for s in signals.values()):
+    if any(s.kind not in ('dc','sine','pwl','gate') for s in signals.values()):
         raise SpiceError('PSIM 仅支持直流、正弦和已检查的分段线性驱动')
     parts=deepcopy(circuit.parts)
     for p in list(parts):
@@ -126,15 +126,43 @@ def describe(circuit, name):
         elif p.kind=='T':
             params.update(Np__primary_=1,Ns__secondary_=abs(v['ratio']))
         elif p.kind in ('V','I'):
-            s=signals[v['signal']]
+            s=deepcopy(signals[v['signal']])
+            if 'gain' in v:
+                s.points=[(t,y*v['gain']) for t,y in s.points]
+                for key in ('dc','offset','amplitude'):
+                    if key in s.params:
+                        s.params[key]*=v['gain']
             kind,source=_source(s,p.kind)
             params.update(source)
         if p.kind=='S':
             gate=tuple(a+b for a,b in zip(spot.pos,gate_side(p,spot.direction)))
             xy.append(gate)
-            edges=_edges(signals[v['signal']].points,stop) or [stop*2,stop*3]
+            signal=signals[v['signal']]
             params['Initial_Position']=0
-            if edges:
+            if signal.kind=='gate':
+                sensor=next(q for q in parts if q.name==signal.params['sensor'])
+                x,y=layout.box[2]+400,100+240*list(signals).index(signal.name)
+                add('VSEN','sense_'+p.name,PORTS=ports([(x,y-10),(x,y+10),(x+50,y)]),Gain=1)
+                label(sensor.nodes[0],(x,y-10))
+                label(sensor.nodes[1],(x,y+10))
+                add('VDC','threshold_'+p.name,PORTS=ports([(x+100,y+60),(x+100,y+110)]),Amplitude=signal.params['threshold'])
+                add('Ground','threshold_ground_'+p.name,PORTS=ports([(x+100,y+110)]))
+                add('VSEN','threshold_sense_'+p.name,PORTS=ports([(x+150,y+70),(x+150,y+90),(x+200,y+80)]),Gain=1)
+                add('WIRE','',X1=x+100,Y1=y+60,X2=x+150,Y2=y+60)
+                add('WIRE','',X1=x+150,Y1=y+60,X2=x+150,Y2=y+70)
+                add('WIRE','',X1=x+100,Y1=y+110,X2=x+150,Y2=y+110)
+                add('WIRE','',X1=x+150,Y1=y+110,X2=x+150,Y2=y+90)
+                add('COMP','compare_'+p.name,PORTS=ports([(x+240,y),(x+240,y+20),(x+290,y+10)]),Vupper=1,Vlower=0)
+                add('WIRE','',X1=x+50,Y1=y,X2=x+240,Y2=y)
+                add('WIRE','',X1=x+200,Y1=y+80,X2=x+240,Y2=y+80)
+                add('WIRE','',X1=x+240,Y1=y+80,X2=x+240,Y2=y+20)
+                add('ONCTRL','gate_'+p.name,PORTS=ports([(x+290,y+10),(x+290,y-20)]))
+                add('LABEL','gate_'+p.name,PORTS=ports([(x+290,y-20)]))
+                add('LABEL','gate_'+p.name,PORTS=ports([gate]))
+                add('VP','gate_probe_'+p.name,PORTS=ports([(x+290,y+10)]))
+                channels[signal.name]='gate_probe_'+p.name
+            else:
+                edges=_edges(signal.points,stop) or [stop*2,stop*3]
                 add('GATING','gate_'+p.name,PORTS=ports([gate]),DIRECTION=angle,Frequency=0,
                     No__of_Points=len(edges),Switching_Points=','.join(format(t,'.17g') for t in edges))
         params['PORTS']=ports(xy)

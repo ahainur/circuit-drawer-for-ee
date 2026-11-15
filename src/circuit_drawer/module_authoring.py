@@ -354,6 +354,9 @@ def spice_identity(source, flat, report):
             for e in flat.elements for p in e.pins}
     sim = flat.extra.get("simulation", {})
     sim["components"] = {aliases.get(k, k): v for k, v in sim.get("components", {}).items()}
+    for cfg in sim["components"].values():
+        if isinstance(cfg, dict) and isinstance(cfg.get("gate_source"), str):
+            cfg["gate_source"] = aliases.get(cfg["gate_source"], cfg["gate_source"])
     sim["ground"] = ref(sim.get("ground", ""))
     for p in sim.get("probes", []):
         for key in ("positive", "negative"):

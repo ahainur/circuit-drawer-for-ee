@@ -2,7 +2,7 @@
 
 简体中文 | [繁體中文](USER_MANUAL.zh-TW.md) | [English](USER_MANUAL.en.md)
 
-本书对应 Circuit Drawer for EE 1.7.0。先读第一、二章完成安装，再按需要查阅后面的章节。命令、菜单名和字段名都按程序中的原样书写。
+本书对应 Circuit Drawer for EE 1.8.0。先读第一、二章完成安装，再按需要查阅后面的章节。命令、菜单名和字段名都按程序中的原样书写。
 
 ## 目录
 
@@ -105,7 +105,7 @@ Circuit Drawer 是给电力电子论文和报告画电路图的工具。你在�
 
 #### 64 位 Windows 10 和 11 安装包
 
-1、下载并双击 `CircuitDrawer-Setup-1.7.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下载并双击 `CircuitDrawer-Setup-1.8.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、安装目录使用 ASCII 字符，允许空格。图纸路径、导出路径和 Windows 用户名可包含中文。
 
@@ -114,17 +114,17 @@ Circuit Drawer 是给电力电子论文和报告画电路图的工具。你在�
 4、安装包尚未签名，Windows 可能显示“未知发布者”或“Windows 已保护你的电脑”。核对来源和 SHA256 后，可在提供该选项的界面选择“更多信息 → 仍要运行”。在 PowerShell 执行下面的命令，与同一发布页 `SHA256SUMS.txt` 中的对应条目比较。
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
 ```
 
 5、升级或卸载前先保存图纸，关闭启动器和正在运行的 Circuit Drawer 命令行任务。升级时运行新版安装程序。卸载入口位于 Windows“设置 → 应用 → Circuit Drawer”，用户图纸及设置会保留。图纸请保存到自己的文档目录。
 
 #### 开发者、macOS 和 Linux 的 Python 安装方式
 
-1、下载 wheel 文件 `circuit_drawer_for_ee-1.7.0-py3-none-any.whl`，在文件所在目录执行下面的命令。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下载 wheel 文件 `circuit_drawer_for_ee-1.8.0-py3-none-any.whl`，在文件所在目录执行下面的命令。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
 ```
 
 2、也可以执行下面的命令，从仓库安装。
@@ -426,9 +426,9 @@ circuit-drawer draw 四开关升降压 switch=igbt
 | 二极管 | `D` | `a`（阳极）、`b`（阴极） | 通用二极管 |
 | 稳压管 | `D`，`opts.zener: true` | 同二极管 | 画成稳压管符号；仿真需另填击穿参数 |
 | 晶闸管 | `scr` | `a`（阳极）、`b`（阴极） | 只能水平或竖直；门极引线画在 a→b 的左侧，`F` 键换到右侧；门极由仿真触发脉冲驱动，不是引脚 |
-| MOSFET | `nmos` | `d`、`s` | 默认带体二极管（`opts.diode: false` 去掉） |
-| P 沟 MOSFET | `pmos` | `d`、`s` | 源极在上、门极带点；体二极管 d→s；逻辑 PWM 1 为导通。在“仿真 → SPICE 仿真…”填写参数。 |
-| IGBT | `igbt` | `c`、`e` | 默认带反并联二极管 |
+| MOSFET | `nmos` | `d`、`s`，可选 `g` | 默认带体二极管（`opts.diode: false` 去掉） |
+| P 沟 MOSFET | `pmos` | `d`、`s`，可选 `g` | 源极在上、门极带点；体二极管 d→s；逻辑 PWM 1 为导通。在“仿真 → SPICE 仿真…”填写参数。 |
+| IGBT | `igbt` | `c`、`e`，可选 `g` | 默认带反并联二极管 |
 | 电压源 | `V` | `a`（负）、`b`（正） | 直流电压源 |
 | 交流电源 | `vac` | `a`（参考端）、`b` | 正弦交流源 |
 | 三相电源 | 三个 `vac` | 每个 `a`、`b` | 一次放好星形连接的三个交流源和中性线，标签为 v_a、v_b、v_c |
@@ -1572,6 +1572,16 @@ circuit-drawer-control edit out/grid-forming/parallel/control.json
 
 4、Bode 计算使用零阶保持功率级与量化系数，极点按单位圆判断。逐拍仿真支持标量控制器，Simulink／PLECS 原生量化模型仍待接入。GaN 示例使用理想开关与有限导通电阻近似，器件损耗需要具体模型。[参数、量化规则与操作命令](../examples/digital_control/README.md)
 
+### 17、可接线栅极与外置驱动
+
+1、选中 MOSFET 或 IGBT，在属性中勾选“可接线栅极 g”，再把驱动电压源、电阻和导线接到 g。在“仿真 → SPICE 仿真…”中选择“外部接线驱动”，填写驱动源的脉冲波形及 R/C 数值。示例 `examples/spice/gate_driver_rc.json` 可直接打开。
+
+2、添加电压测量通道，选择 g 与源极 s（IGBT 为发射极 e），即可查看实际 Vgs／Vge。PMOS 按 −Vgs 判断导通。内部 PWM 或闭环也可选择图中的 V 驱动源，V 的 a 端接 s／e，b 端经栅极电阻接 g。已绑定内部驱动的 V 源使用 DC 设置。
+
+3、内部驱动幅值默认 10 V，简化通道阈值默认 3 V，均可在仿真设置中修改。Cgs／Cge 和 Cgd／Cgc 为线性电容，默认 0，填写目标器件与工况对应的数值。ngspice 与 Simulink 的简化通道在阈值附近采用 10 mV 数值平滑，PLECS／PSIM 使用理想阈值，瞬态细节会有差异。
+
+4、外部驱动支持瞬态仿真。自动模态识别和参数范围搜索要求已声明周期的内部定频 PWM。使用实际栅极时，闭环输出选择 switching 模型。
+
 ## 十八、Simulink 与 PLECS 导出及闭环控制
 
 同一份电路和仿真参数也能导出为 Simulink 和 PLECS 模型。程序带走实际接线、元件参数、PWM 和测量通道，并按原图排版。
@@ -2299,10 +2309,10 @@ JSON 不记录栏宽，默认按单栏打开。用 `circuit-drawer edit x.json -
 | `current_side` | 二端元件 | `^`、`_`（`^`） | 箭头文字在 a→b 行进方向的左侧或右侧 |
 | `invert` | 二端元件 | `true`/`false` | 只把符号反向画，仿真不读 |
 | `wave`、`wave_pos`、`wave_scale` | `V`、`I` | `step-up`、`step-down`、`pulse`；`auto`、`left`、`right`、`above`、`below`；0.5–2 | 源旁小波形 |
-| `mirror` | `nmos`、`pmos`、`igbt`、`scr` | `true`/`false` | 门极换到另一侧 |
+| `mirror` | `nmos`、`pmos`、`igbt`、`scr` |`true`/`false`，可选 `g` | 门极换到另一侧 |
 | `battery` | `V` | `true`/`false` | 画成电池 |
 | `zener` | `D` | `true`/`false` | 画成稳压管 |
-| `diode` | `nmos`、`pmos`、`igbt` | `true`/`false`（`true`） | 体二极管 / 反并联二极管，`false` 时绘图和仿真都去掉 |
+| `diode` | `nmos`、`pmos`、`igbt` |`true`/`false`（`true`），可选 `g` | 体二极管 / 反并联二极管，`false` 时绘图和仿真都去掉 |
 | `ratio` | `transformer` | 文字，如 `"$1:n$"` | 变比文字，只用于显示 |
 | `dots` | `transformer` | `same`、`opposite`、`false`（`same`） | 同名端，须与仿真极性一致 |
 | `core` | `transformer` | `true`/`false`（`true`） | `false` 画成耦合电感 |

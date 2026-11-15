@@ -396,7 +396,7 @@ def check(raw: Any, prof: Profile) -> Report:
                       f"{prof.width_cm:.2f} cm column; the fixed-size symbols and text "
                       f"do not shrink, so move blocks closer")
     _connections(dia, g, errors, warnings)
-    _overlaps(dia, g, errors, warnings)
+    _overlaps(dia, g, prof, errors, warnings)
     _fit_text(dia, g, prof, errors)
     _regions(dia, g, errors, warnings)
     if isinstance(raw, dict) and "loop" in raw:
@@ -512,7 +512,7 @@ def _seg_cm(path, s):
     return [((a[0] * s, a[1] * s), (b[0] * s, b[1] * s)) for a, b in zip(path, path[1:])]
 
 
-def _overlaps(dia: Diagram, g: Geometry, errors: list[str], warnings: list[str]) -> None:
+def _overlaps(dia: Diagram, g: Geometry, prof: Profile, errors: list[str], warnings: list[str]) -> None:
     ids = list(g.bodies)
     for i, a in enumerate(ids):
         for b in ids[i + 1:]:
@@ -530,7 +530,11 @@ def _overlaps(dia: Diagram, g: Geometry, errors: list[str], warnings: list[str])
         for nb, sb in segs[i + 1:]:
             if any(_collinear(p, q) for p in sa for q in sb):
                 errors.append(f"{na} and {nb} run on top of each other; move one aside")
-    texts = g.labels
+    texts = list(g.labels)
+    for region in dia.regions:
+        box = region_label_box(region, g.scale, prof)
+        if box is not None:
+            texts.append(Label(box, region.label, font_of(region.size, prof), region.name))
     for lb in texts:
         own = lb.owner.split()[0]
         for bid, body in g.bodies.items():

@@ -34,3 +34,7 @@ docs/verification/level1-buck-convergence/README.md linguist-generated=false
 docs/verification/level1-buck-convergence/recompute.py linguist-generated=false
 docs/verification/level1-buck-convergence/* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 docs/verification/level1-buck-convergence/*.log -whitespace
+
+# Runtime notices and file indexes are copied and verified byte for byte.
+packaging/windows/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+packaging/windows/licenses/** -whitespace

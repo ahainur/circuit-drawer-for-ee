@@ -76,6 +76,7 @@ LABEL_GAP = 0.08         # gap between a symbol body and its label
 # Other transistor scales multiply these by sw_k(profile).
 SW_HALF_SPAN = 0.371
 SW_LEFT, SW_RIGHT, SW_HALF_H = 0.50, 0.30, 0.37
+SW_GATE = 0.472  # CircuitikZ G anchor at transistors/scale=0.9, in cm.
 SW_LABEL_DX = 0.33
 # CircuitikZ PMOS gate dot: nodes width (.04) times bipoles/length, unscaled.
 PMOS_DOT_RADIUS = 0.04
@@ -568,6 +569,12 @@ def _switch(el: Element, s: Scale, prof: Profile) -> Footprint:
     frame = switch_frame(el) or ((0.0, 1.0), (1.0, 0.0))
     u, side = frame
     fp.extra.update(u=u, side=side)
+    gate_anchor = (cx - side[0] * SW_GATE * kw, cy - side[1] * SW_GATE * kw)
+    fp.extra["gate_anchor"] = gate_anchor
+    fp.extra["gate_pin"] = (cx - side[0] * (SW_LEFT * kw + 0.25),
+                            cy - side[1] * (SW_LEFT * kw + 0.25))
+    if "g" in el.pins:
+        fp.leads.append((scaled(el.pins["g"], s), gate_anchor))
     # Keep the physical diode's envelope for every MOS style: a conducting
     # diode is visible in a mode, with no scale or label jump when switching views.
     # local box: SW_RIGHT towards the label side, SW_LEFT towards the gate

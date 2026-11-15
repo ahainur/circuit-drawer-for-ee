@@ -209,6 +209,8 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
         if fp.centre:
             g["centre"] = _pt(fp.centre, s)
         if el.kind in SWITCHES and "u" in fp.extra:
+            g["gate_anchor"] = _pt(fp.extra["gate_anchor"], s)
+            g["gate_pin"] = _pt(fp.extra["gate_pin"], s)
             from ..geometry import PMOS_DOT_RADIUS, SW_HALF_H, SW_LEFT, SW_RIGHT, axis_sizes, sw_k
             length, width = axis_sizes(el)
             u, kl, kw = fp.extra["u"], sw_k(prof) * length, sw_k(prof) * width
@@ -733,7 +735,7 @@ class Job:
             if self.kind == "plan":
                 self._log("等待模型列出它理解的结构…")
                 text = plan(description, profile, self._chat_for("plan"), model, provider,
-                            self.images, on_text=self._text, log=self._log)
+                            self.images, on_text=self._text, log=self._log, should_stop=self.cancel.is_set)
                 if self.cancel.is_set():
                     raise Cancelled("已取消")
                 self.state, self.result = "done", {"plan": text}
@@ -1474,12 +1476,13 @@ class Editor:
                            base_dir=editor.path.parent)
 
             def _spice_info(self, lay: Layout, prof: str, req: dict) -> dict:
-                from ..spice import FIELDS, OPTIONAL_FIELDS, TRANSIENT_FIELDS, SOURCE_WAVE_FIELDS, LIMIT_NOTE, executable
+                from ..spice import FIELDS, OPTIONAL_FIELDS, TRANSIENT_FIELDS, SOURCE_WAVE_FIELDS, LIMIT_NOTE, PWM_FIELDS, GATE_DRIVES, executable
                 from ..spice_recommend import INPUTS
                 from ..pmsm import QUANTITIES
                 from ..completeness import simulation_completeness
                 return {"fields": FIELDS, "optional_fields": OPTIONAL_FIELDS, "transient_fields": TRANSIENT_FIELDS,
                         "source_wave_fields": SOURCE_WAVE_FIELDS, "motor_quantities": QUANTITIES,
+                        "pwm_fields": PWM_FIELDS, "gate_drives": GATE_DRIVES,
                         "completeness": simulation_completeness(lay),
                         "available": executable() is not None, "note": LIMIT_NOTE, "recommendation_inputs": INPUTS,
                         **({"module": module_devices(lay, prof)} if "modules" in lay.extra else {})}

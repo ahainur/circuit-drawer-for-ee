@@ -1,21 +1,19 @@
-## Windows 离线安装包
+# Circuit Drawer 1.8.0
 
-1、64 位 Windows 10／11 用户双击安装包并按向导完成安装，从桌面或开始菜单打开 Circuit Drawer。安装包包含 Python、TinyTeX、Poppler、ngspice 和 AI 依赖，绘图、出图及 ngspice 仿真可离线完成。安装包约 68.06 MiB，安装后文件约占 184.23 MiB。[下载 Windows 安装包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/CircuitDrawer-Setup-1.7.0.exe)
+## 本版更新
 
-2、安装界面提供简体中文和英文，支持当前用户安装、升级、卸载及第三方许可证查看。安装目录使用 ASCII 字符并支持空格，图纸与导出目录可使用中文。升级和卸载会提示先关闭运行中的程序，并保留用户图纸及设置。
+1、MOSFET／IGBT 支持可接线栅极、外置驱动、栅极电阻和电容，以及实际 Vgs／Vge 仿真。内部 PWM／闭环可绑定图中的驱动电压源。在元件属性中启用“可接线栅极 g”，再在仿真窗口配置驱动，或打开 `examples/spice/gate_driver_rc.json` 开始使用。
 
-3、新增程序图标，小尺寸使用闪电 L，较大尺寸使用完整 LEE。启动器、编辑器标签页、安装程序和快捷方式使用同一套定稿图标。
+2、改善 AI 控制框图的多行文字、独立输出文字更新、输出走线和分区标题避让。适应窗口包含边缘文字，结构规划检查器件引脚，接口返回空正文时给出明确提示。
 
-4、安装包尚未签名。Windows 提示“未知发布者”时，先核对下载来源与随附件提供的 `SHA256SUMS.txt`，再按安装说明继续。[安装、升级与卸载说明](https://github.com/ahainur/circuit-drawer-for-ee/blob/main/docs/WINDOWS_LAUNCHER.md)
+3、栅极电容采用线性近似。ngspice／Simulink 简化通道在阈值附近采用数值平滑，PLECS／PSIM 使用理想阈值。参数与适用范围见三语手册的电气栅极章节。
 
-## 本版绘图与仿真功能
+## 下载与升级
 
-1、绘图操作改进：模块展开自适应留空，元件、导线和模块可混合多选移动，普通元件与导线支持整组顺／逆时针旋转。重叠导线可合并，跨线标记随实际交点移动，支持撤销和保存重开。
+1、64 位 Windows 10／11 用户下载 `CircuitDrawer-Setup-1.8.0.exe`。保存图纸并关闭正在运行的 Circuit Drawer 后，运行新版安装程序完成升级，用户图纸与设置会保留。[下载 Windows 离线安装包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/CircuitDrawer-Setup-1.8.0.exe)
 
-2、增加整体缩放、模拟 IC 风格、多绕组变压器、系统图标、三相 MMC 及更多基础拓扑和模块。波形支持同轴多曲线、区间尺寸线、XY 轨迹和模态叠加。
+2、安装包包含 Python、TinyTeX、Poppler、ngspice 和 AI 依赖，绘图、出图及 ngspice 仿真支持离线使用。安装目录使用 ASCII 字符，可含空格。图纸、导出目录与 Windows 用户名支持中文。[安装、升级与卸载说明](https://github.com/ahainur/circuit-drawer-for-ee/blob/main/docs/WINDOWS_LAUNCHER.md)
 
-3、VCO 变频闭环可导出到 PLECS／Simulink；PSIM 增加开环电路导出，通过已安装并许可的 PSIM 生成原生模型。EMI、阻抗、稳定性、参数范围搜索和环路分析集中到“实验功能”，原有数据与导出继续可用。
+3、安装包尚未数字签名。Windows 提示“未知发布者”时，核对官方下载来源及 `SHA256SUMS.txt` 中的校验值，再按安装说明继续。
 
-4、首次使用可下载 [试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-trial-1.7.0.zip)，解压后阅读 `START_HERE.md`。已有 Python 3.10+ 可下载 [通用安装包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl)，用 `python -m pip install --upgrade circuit_drawer_for_ee-1.7.0-py3-none-any.whl` 安装。PDF／SVG／PNG 出图所需依赖见 [安装说明](https://github.com/ahainur/circuit-drawer-for-ee#installation)。
-
-5、[三语离线手册](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-manuals-1.7.0.zip) 包含简体、繁體、English 和界面截图，解压后打开 `index.html`。另提供源码 ZIP 与 `SHA256SUMS.txt`；已有 JSON 可继续打开。
+4、Python 3.10+ 用户可安装通用 wheel。另提供同版源码、可编辑示例试用包和三语离线手册，下载后分别阅读 `START_HERE.md` 或打开 `index.html`。[查看全部附件](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.8.0)

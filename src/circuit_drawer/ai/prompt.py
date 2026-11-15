@@ -427,6 +427,22 @@ Element kinds and pins:
   x OR y, in either order: rotating 90/180/270 degrees is supported. Keep
   the electrical d/s assignment when rotating. opts.mirror mirrors the gate
   side; opts.diode=false removes the body diode. Typical pin spacing is 1.0.
+  Optional g is an electrical gate pin for nmos/pmos/igbt. Put it on the gate
+  side, aligned with the body's centre, with at least 0.06 cm visible lead.
+  Example: {"kind":"nmos","id":"Q1","pins":{"d":[3,2],"s":[3,0],"g":[2,1]}}.
+  Wire g to the explicit driver circuit. With g, simulation defaults to
+  gate_drive="external" and senses Vgs/Vge (PMOS senses -Vgs). A voltage probe
+  between g and s/e measures the actual voltage. gate_threshold (default 3 V)
+  controls the simplified channel; LEVEL=1 uses model_mapping.switch.vto/KP.
+  gate_capacitance and miller_capacitance are explicit linear Cgs/Cge and
+  Cgd/Cgc in F, default 0. Use documented/user values, never infer device charge.
+  gate_drive="internal" uses existing PWM/closed_loop, gate_voltage is its
+  positive amplitude (default 10 V, automatically negative for PMOS).
+  Optional gate_source="Vg" binds a drawn V source to that drive, allowing a
+  series gate resistor. Vg.a must connect to s/e; Vg has DC excitation and no
+  wave. Without gate_source, the drive connects directly between g and s/e.
+  External mode cannot also bind a closed_loop output. Physical gates require
+  switching mode. Omitting g retains the existing normalized PWM model.
 - pmos: P-channel MOSFET, d = drain, s = source; native symbol source-up,
   gate marked by a dot. Body diode conducts d->s (NMOS s->d). High-side PMOS
   source connects to the positive supply, drain to the load. Rotation/mirror
@@ -915,6 +931,7 @@ Parts/pins:
 - vac: sinusoidal voltage source, a = reference, voltage b-a. I: current a -> b.
 - nmos/pmos: d=drain, s=source; body diode s->d/d->s respectively.
   igbt: c,e; forward c->e, diode e->c. Diodes included unless disabled.
+  可选 g 为可接线栅极。外置驱动写明 g 与 s/e 参考端、栅极电阻和电容。
 - Source peak/frequency/phase and IGBT physical model values are separate SPICE
   settings, not inferred from labels or source symbols. Preserve user values.
 - Zener: D with opts.zener; reverse current b->a. Preserve explicit ratings;
@@ -928,10 +945,10 @@ Rules:
 - Name parts the usual way (Vin, S1.., D1.., L1, Lr, Cr, Co, RL) and nodes with short
   names (P, N, A, B, Vo...).  Pins that are electrically the same node share a name.
 - List each part and all pin nodes once.
+  括号内写实际类型，如 Q1（nmos）：d→P，s→A。
 - Include sct for a centre-tapped transformer. Its turns text is not a simulation
   value; do not invent magnetising/leakage values or numerical solver parameters.
-- When the circuit is built from repeated modules (multi-module converters, MMC
-  phases or arms), group the list by module: a line 【模块 k：<name>】 before its parts.
+- Repeated modules (e.g. MMC arms): list parts under 【模块 k：<name>】.
   When stacked panels stand for identical copies (e.g. "后面叠两层表示 b、c 相"),
   for a drawing-only request identify the visible copy and the omitted copies.
   For real instances/full simulation list the shared definition's devices and
@@ -1136,6 +1153,7 @@ def tweak_message(instruction: str, table: dict, errors: list[str] | None = None
             "- Keep the name and the same validator rules as always.\n"
             "- Preserve opts.label_offset unless the user asks to move/reset that label; never move pins to satisfy a label-only request.\n"
             "- Preserve nmos/pmos channel type, d/s electrical pins and body-diode direction unless explicitly asked to replace that device; a P-channel high-side switch has source at the positive supply.\n"
+            "- Preserve optional g connections, gate_drive/gate_source and gate_voltage/gate_threshold/gate_capacitance/miller_capacitance during drawing edits. Renaming a V driver also updates gate_source.\n"
             "- Keep opts.zener and breakdown_voltage/breakdown_current/zener_resistance unchanged unless explicitly asked to edit that diode or its ratings.\n"
             "- Preserve pmsm phase order, motor parameters, motor probe quantity and closed_loop feedback bindings; rotating the symbol must not exchange phases or reset initial_angle/initial_speed.\n"
             "- Keep control_view tied to the same closed_loop.control. Preserve its block ID when moving or restyling; do not duplicate the source table or reinterpret signal callouts as electrical wires.\n"
@@ -1172,7 +1190,7 @@ HINTS = {
     "drawing-scale-width": "The explicit paper scale exceeds the requested column width. Reduce the whole drawing, choose a wider profile, or restore automatic fitting if requested; preserve all devices and connections.",
     "bad-mode-source": "Restore the original program-generated modes.source with kind=simulation, signature and settings_hash. Preserve optional settings and transient_hash exactly; never invent provenance or refresh signatures yourself.",
     "winding-overlap": "Move the named extra winding's two pins along the transformer axis (keep their x / across-axis coordinate) so its coil sits after the other winding on that axis with a gap; keep its length and every wire end attached.",
-    "unknown-pin": "A transformer only has p1, p2, s1, s2, optional sct and extra windings w3a/w3b .. w6a/w6b; rename the stray pin to the next free winding, keeping both ends.",
+    "unknown-pin": "Use the kind's declared pins. MOSFETs accept d/s and optional g; IGBTs accept c/e and optional g. Transformer pins are p1/p2/s1/s2, optional sct and w3a/w3b .. w6a/w6b.",
     "bad-emi": "Use the declared emi fields, existing voltage probes referred to the same chassis, and existing C/L/transformer IDs. Keep the explicitly drawn LISN/filter and parasitic paths connected; preserve bound devices. Correct bad values or ask the user to revise EMI settings; never erase settings to hide an error.",
     "ai-simulation": "Keep unrelated physical values and measurement channels. Update renamed device references consistently; different device kinds need their own simulation parameters. Return complete simulation data with the table. Do not guess missing ratings/PWM or clear simulation to hide an error; ask the user to configure missing values. Split ambiguous rename/move edits.",
     "module-box-overlap": "Shrink collapsed_size or move the named instances/devices so their rendered boxes do not overlap each other or cover external symbols, leads, labels or pins. Boundary contact and the box's own ports are allowed. Preserve links, port names, hidden internals and electrical parameters; do not delete a device to silence the error.",
@@ -1234,7 +1252,8 @@ HINTS = {
     "netlist-short": "separate the two nets: a wire or T-junction joins them",
     "too-cramped": "the drawing is too wide for the column: make it narrower",
     "open-pin": "run a wire to the pin",
-    "dangling-wire": "end the wire on a pin or on another wire",
+    "dangling-wire": "end the wire on a pin or another wire; for MOSFET/IGBT gates declare and connect the optional g pin",
+    "bad-gate-pin": "Place g on the gate side, aligned with the switch centre and at least 0.06 cm beyond its body; rotate/mirror all pins together",
 }
 
 
@@ -1308,6 +1327,12 @@ name/title: optional strings. blocks: a list of patches by unique id; unspecifie
 template/current blocks and fields are kept. remove: explicit block ids to remove.
 Each block: id, type, text (LaTeX allowed), label, label_pos, signs, style,
 fill/border/color/size_pt, optional tf, and for a switch throws (names only), on/toggle.
+Text can use JSON newline escapes or LaTeX line breaks; ordinary newlines are
+converted to LaTeX line breaks before measuring and drawing. Keep box text concise.
+texts: optional patches to EXISTING free text by index, e.g.
+{"texts":[{"index":0,"text":"$g_{1\\ldots8}$"}]} updates an output caption.
+Indices come from the selected template/current texts list. Omitted entries retain
+their text and position. Do not add coordinates or invent new indices.
 type is exactly block, limiter, tag, sum, mul, div or switch. PI/PR/LPF/PWM are
 ordinary block text, never new types. Example:
 {"template":"dual_loop","blocks":[{"id":"pii","text":"PR","tf":{"pr":{"kp":0.02,"kr":60,"f0":50,"fc":1}}}]}
@@ -1357,7 +1382,7 @@ Only add/change appearance when the user requests colours or line styles. Otherw
 omit these optional keys and preserve existing fill/border/color/dash, including on
 links that must be rerouted. Tag style sets defaults only; explicit colours win.
 Link labels/arrowheads follow link colour; branch dots remain black. Appearance has
-no effect on transfer functions, simulation or code generation. Free texts are kept
-from the current table, never invent coordinates to recolour them.
+no effect on transfer functions, simulation or code generation. Existing free text
+can be edited through texts index/text patches; its position and appearance are kept.
 Example: {"blocks":[{"id":"pi","fill":"lightblue","border":"blue","color":"red"}]}
 ''' + control_appearance_reference() + '\nSAVED DIGITAL CONTROL FIELD REFERENCE:\n' + digital_reference() + '\nSAVED CUSTOM C FIELD REFERENCE:\n' + custom_c_reference()

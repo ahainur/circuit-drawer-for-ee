@@ -28,6 +28,7 @@ from typing import Any
 from .layout import EXTRA_WINDINGS, Layout, windings
 from .pipeline import LayoutRejected
 from .profiles import get_profile
+from .runtime import find_tool, ngspice_environment
 from .validate import check
 from .completeness import simulation_completeness
 from . import pmsm
@@ -98,6 +99,7 @@ FIELDS = {
              ("fall", "下降时间 (s)", "10n")],
 }
 FIELDS["pmos"] = FIELDS["nmos"]
+PWM_FIELDS = tuple(k for k, _, _ in FIELDS["nmos"][2:]) + ("phase_shift", "phase_ramp")
 FIELDS["pmsm"] = pmsm.FIELDS
 FIELDS["igbt"] = [*FIELDS["nmos"], ("vce0", "正向压降截距 Vce0 (V，≥0；非固定 Vce(sat))", "1.5")]
 # A thyristor's gate is a pulse train with the PWM fields: delay is the first
@@ -144,6 +146,17 @@ BODY_DIODE = "IS=1e-9 N=1 RS=0.01"
 BODY_DIODE_VALUES = {"diode_is": 1e-9, "diode_n": 1.0, "diode_rs": 0.01}
 OPTIONAL_FIELDS["igbt"] = OPTIONAL_FIELDS["nmos"]
 OPTIONAL_FIELDS["pmos"] = OPTIONAL_FIELDS["nmos"]
+OPTIONAL_FIELDS["nmos"].extend([
+    ("gate_voltage", "内部驱动栅极电压幅值 (V)", "10"),
+    ("gate_threshold", "简化通道栅极导通阈值幅值 (V)", "3"),
+    ("gate_capacitance", "线性 Cgs / Cge (F，0 不建模)", "0"),
+    ("miller_capacitance", "线性 Cgd / Cgc (F，0 不建模)", "0"),
+])
+POSITIVE_OPTIONAL += ("gate_voltage", "gate_threshold")
+GATE_DRIVES = ("internal", "external")
+# Numerical gate-threshold width in volts. A discontinuous channel plus Cgd
+# creates a zero-time on/off feedback loop at the Miller plateau.
+GATE_TRANSITION = 0.01
 OPTIONAL_FIELDS["pmsm"] = pmsm.OPTIONAL_FIELDS
 # RC snubber and firing-angle phase shift / soft start, as on a PWM switch;
 # holding / latching current (0: off at zero current, latched at once)
@@ -170,10 +183,10 @@ SOURCE_WAVE_FIELDS = {
               ("fall", "返回过渡时间 (s)", "1u"), ("width", "脉冲平台宽度 (s)", "1m"),
               ("period", "重复周期 (s)", "2m")],
 }
-LIMIT_NOTE = ("简化模型：MOSFET 符号导出为 PWM 理想开关和通用反并联二极管；"
+LIMIT_NOTE = ("简化模型：MOSFET 使用简化通道和通用反并联二极管，可由内部 PWM 或实际栅极电压驱动；"
               "IGBT 为正向分段线性通道（Vce0 + Ron·I）和独立反并联二极管，反向不走通道；"
               "变压器为无损理想变比，可选填折算到原边的线性励磁电感和漏感，副边数值参考电阻需显式填写；"
-              "开关可选填线性输出电容 Coss，只能定性观察 ZVS 换流过程，不含电压相关的 Coss 和栅极电荷；"
+              "开关可选填线性输出电容 Coss，只能定性观察 ZVS 换流过程，可接线栅极支持线性 Cgs／Cge 和 Cgd／Cgc，器件电容均为常数；"
               "晶闸管为门极脉冲触发、正向导通（Vf + Ron）、电流将要反向时关断的简化模型；维持 / 擎住电流和关断时间 tq 是可选的简化判据，不含 dv/dt 误触发；"
               "PMSM 为三线星形、正弦磁链、恒定 Ld/Lq 和恒定负载转矩的 dq 机电动态模型，"
               "电角度以 rad 表示、机械转速以 rad/s 表示；不含铁耗、磁饱和和齿槽转矩；"
@@ -802,6 +815,55 @@ def native_metadata(layout: Layout, profile="ieee-single", base_dir=None) -> Dec
     return _make_deck(layout, profile, base_dir, native=True)
 
 
+def gate_drives(layout, nets, loop=None):
+    """Resolve explicit electrical gates and optional PWM-controlled V drivers."""
+    components = layout.extra["simulation"]["components"]
+    elements = {e.id: e for e in layout.elements}
+    gates, sources = {}, {}
+    for e in layout.elements:
+        if e.kind not in PWM_SWITCHES:
+            continue
+        cfg = components[e.id]
+        if not isinstance(cfg, dict):
+            raise SpiceError(f"{e.id}: 仿真参数必须为对象")
+        mode = cfg.get("gate_drive", "external" if "g" in e.pins else "internal")
+        source = cfg.get("gate_source", "")
+        if mode not in GATE_DRIVES or not isinstance(source, str):
+            raise SpiceError(f"{e.id}: gate_drive 必须为 {GATE_DRIVES}，gate_source 必须为电压源 ID")
+        if "g" not in e.pins:
+            if mode != "internal" or source or any(number(cfg.get(k, 0), k) for k in ("gate_capacitance", "miller_capacitance")):
+                raise SpiceError(f"{e.id}: 请先在属性中启用可接线栅极 g")
+            continue
+        reference = "e" if e.kind == "igbt" else "s"
+        voltage = number(cfg.get("gate_voltage", "10"), f"{e.id}.gate_voltage")
+        threshold = number(cfg.get("gate_threshold", "3"), f"{e.id}.gate_threshold")
+        mapped = layout.extra.get("model_mapping", {}).get("switch", {})
+        if mapped.get("model") == "mosfet":
+            threshold = number(mapped["vto"], "model_mapping.switch.vto")
+        if voltage <= 0 or threshold <= 0 or mode == "internal" and voltage <= threshold:
+            raise SpiceError(f"{e.id}: 栅极幅值和阈值须大于 0，内部驱动幅值须高于通道阈值")
+        bound = loop and e.id in loop.driven
+        if mode == "external" and (source or bound):
+            raise SpiceError(f"{e.id}: 外部栅极由接线电路驱动；使用 PWM／闭环控制时请选择 internal 并指定驱动电压源")
+        if bound and loop.outputs[loop.driven[e.id]].get("model") == "average":
+            raise SpiceError(f"{e.id}: 实际栅极电压需要 switching 模型，请修改闭环输出设置")
+        if source:
+            driver = elements.get(source)
+            if driver is None or driver.kind != "V" or source in sources:
+                raise SpiceError(f"{e.id}: gate_source 必须为独占的 V 元件 ID")
+            if not isinstance(components[source], dict):
+                raise SpiceError(f"{source}: 仿真参数必须为对象")
+            if "wave" in components[source]:
+                raise SpiceError(f"{source}: 已绑定内部栅极驱动，请将源激励设为 DC，避免重复配置 wave")
+            if nets[f"{source}.a"] != nets[f"{e.id}.{reference}"]:
+                raise SpiceError(f"{source}.a 必须连接 {e.id}.{reference}，驱动电压以源极／发射极为参考")
+            sources[source] = e.id
+        gates[e.id] = {"mode": mode, "source": source, "reference": reference,
+                       "voltage": voltage * (-1 if e.kind == "pmos" else 1),
+                       "threshold": threshold, "polarity": -1 if e.kind == "pmos" else 1}
+    return gates, sources
+
+
 def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
     closed = layout.extra.get("closed_loop")
     layout, rep = connected_layout(layout, profile)
@@ -835,6 +897,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                         {e.id: e.kind for e in devices}, names_)
         except ClosedLoopError as exc:
             raise SpiceError(str(exc)) from None
+    gates, gate_sources = gate_drives(layout, rep.nets, loop)
     driven = {}
     ground = rep.nets[sim["ground"]]
     nodes = {n: ("0" if n == ground else f"n{i}") for i, n in enumerate(sorted(set(rep.nets.values())), 1)}
@@ -860,6 +923,8 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
              "* Generated from the validated JSON table. Do not use for device losses or ZVS.",
              "* Startup uses UIC with explicit L/C initial conditions; all units are SI.",
              "* PWM control is normalized 0/1, not a physical gate-voltage model."]
+    if gates:
+        lines[-1] = "* Explicit g pins solve source/emitter-referenced gate voltages; ctl nodes report normalized threshold states."
     if any(e.kind == "scr" for e in devices):
         # C1 joins avoid discontinuous conductance/Jacobian during commutation.
         lines += [".func cd_scr_on(q) {q*q/(q*q+(1-q)*(1-q))}",
@@ -881,12 +946,15 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 lines.append(f"* branch {branch_ids[e.id]}: {json.dumps(e.id, ensure_ascii=True)} -> {name}")
             lines.extend(_pmsm_lines(name, {pin: node(f"{e.id}.{pin}") for pin in "abc"}, val))
             continue
-        fields = [k for k, _, _ in FIELDS[e.kind]]
+        external_gate = e.id in gates and gates[e.id]["mode"] == "external"
+        fields = [k for k, _, _ in FIELDS[e.kind] if not external_gate or k not in PWM_FIELDS]
         defaults = {k: d for k, _, d in OPTIONAL_FIELDS.get(e.kind, [])}
-        optional = list(defaults)
+        optional = [k for k in defaults if not external_gate or k not in PWM_FIELDS]
         extra = ["model", "polarity"] if e.kind == "transformer" else ["model"] if e.kind in ("D", *GATED) else []
         _keys(cfg, fields + extra,
-              optional=[*optional, *(["wave"] if e.kind in (*VOLTAGE_SOURCES, "I") else [])], label=e.id)
+              optional=[*optional, *(["wave"] if e.kind in (*VOLTAGE_SOURCES, "I") else []),
+                        *(["gate_drive", "gate_source"] if e.kind in PWM_SWITCHES else []),
+                        *(PWM_FIELDS if external_gate else [])], label=e.id)
         val = {k: number(cfg[k], f"{e.id}.{k}") for k in fields}
         for k in optional:
             val[k] = number(cfg.get(k, defaults[k]), f"{e.id}.{k}")
@@ -903,6 +971,10 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 raise SpiceError(f"{e.id}.{k} 必须大于 0")
             if k in ("delay", "rs", "vce0", "vf") and v < 0:
                 raise SpiceError(f"{e.id}.{k} 不能小于 0")
+        if external_gate:
+            # These fields describe a disabled internal command generator.
+            val.update({k: number(v, k) for k, _, v in FIELDS[e.kind] if k in PWM_FIELDS})
+            val.update(phase_shift=0, phase_ramp=0)
         n = lambda pin: node(f"{e.id}.{pin}")
         s = lambda key: f"{val[key]:.15g}"
         name = names[e.id]
@@ -925,7 +997,14 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                     end = middle
                 if val["series_resistance"]:
                     inner.append(f"Rseries_{name} {top} {end} {s('series_resistance')}")
-            lines.append(f"{name} {top} {n(pins[1])} {source_excitation(cfg, e.id, tr)}")
+            if e.id in gate_sources:
+                switch = gate_sources[e.id]
+                drive = gates[switch]
+                # E keeps the voltage-source branch current available to probes.
+                lines += [f"{name} {top} cd_driver_{name} 0",
+                          f"Edriver_{name} cd_driver_{name} {n(pins[1])} ctl_cmd_{names[switch]} 0 {drive['voltage']:.15g}"]
+            else:
+                lines.append(f"{name} {top} {n(pins[1])} {source_excitation(cfg, e.id, tr)}")
             lines += inner
         elif e.kind in ("R", "L", "C"):
             if mapping.get(e.kind, {}).get("model") == "parasitic":
@@ -958,6 +1037,9 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
         elif e.kind == "transformer":
             lines.extend(_transformer_lines(e, cfg, val, name, node))
         else:
+            gate = gates.get(e.id)
+            external = gate and gate["mode"] == "external"
+            command = f"cmd_{name}" if gate else name
             model = {"igbt": "simplified_igbt", "scr": "simplified_thyristor"}.get(e.kind, "ideal_switch")
             if cfg["model"] != model:
                 raise SpiceError(f"{e.id}: {e.kind} 仅支持 {model} 模型")
@@ -976,7 +1058,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             is_averaged = loop and any(e.id in (upper, lower) for upper, (lower, _) in loop.averaged.items())
             # An averaged leg has no carrier edges to sample. Physical switches
             # (including independent load switches) still need PWM resolution.
-            if not is_averaged and not is_vco:
+            if not is_averaged and not is_vco and not external:
                 check_pwm_timing(e.id, val, tr)
             if e.kind == "scr":
                 if loop and e.id in loop.driven:
@@ -1002,7 +1084,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             if loop and e.id in loop.driven:
                 if val.get("phase_shift") or val.get("phase_ramp"):
                     raise SpiceError(f"{e.id}: 闭环驱动的开关不支持 phase_shift / phase_ramp")
-                driven[e.id] = (name, val)
+                driven[e.id] = (command, val)
                 averaged = {lo: up for up, (lo, _) in loop.averaged.items()}
                 if e.id in loop.averaged or e.id in averaged:
                     if e.id in loop.averaged:
@@ -1017,15 +1099,30 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                         lines.extend(average_leg(name, duty_node(loop, out), n(pins[0]), n(pins[1]),
                                                  node(f"{lower}.{lpins[1]}")))
                     continue
-            else:
-                lines.extend(_pwm_lines(name, val, tr, e.id))
+            elif not external:
+                lines.extend(_pwm_lines(command, val, tr, e.id))
+            if gate:
+                reference = n(gate["reference"])
+                if gate["mode"] == "internal" and not gate["source"]:
+                    lines.append(f"Egate_{name} {n('g')} {reference} ctl_{command} 0 {gate['voltage']:.15g}")
+                lines.append(f"Bgate_{name} ctl_{name} 0 V = 0.5*(1+tanh(({gate['polarity']}*v({n('g')},{reference})-{gate['threshold']:.15g})/{GATE_TRANSITION:g}))")
+                if val["gate_capacitance"]:
+                    lines.append(f"Cgate_{name} {n('g')} {reference} {s('gate_capacitance')} IC=0")
+                if val["miller_capacitance"]:
+                    other = n('c' if e.kind == 'igbt' else 'd')
+                    if "switch" in mapping:
+                        other = f"cd_{name}_channel"
+                    elif e.kind == "igbt":
+                        other = f"cd_{name}_c"
+                    lines.append(f"Cmiller_{name} {n('g')} {other} {s('miller_capacitance')} IC=0")
             sr, sc = val["snubber_resistance"], val["snubber_capacitance"]
             if bool(sr) != bool(sc):
                 raise SpiceError(f"{e.id}: snubber_resistance / snubber_capacitance 须同时 > 0，或同时为 0 禁用")
             if "switch" in mapping:
                 from .model_mapping import switch_lines
                 positive, negative = (n('c'), n('e')) if e.kind == "igbt" else (n('d'), n('s'))
-                lines.extend(switch_lines(mapping["switch"], e, name, positive, negative, val, body))
+                lines.extend(switch_lines(mapping["switch"], e, name, positive, negative, val, body,
+                                          gate=n('g') if gate else None))
                 a, b = negative, f"cd_{name}_channel"
             elif e.kind == "igbt":
                 collector, emitter = f"cd_{name}_c", n('e')
@@ -1033,15 +1130,15 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 # A closed-loop drive is a smooth compare (closed_loop.modulator)
                 # without solver breakpoints: the channel then follows it
                 # continuously instead of switching at a threshold.
-                on = (f"min(max(v(ctl_{name}), 0), 1)" if e.id in driven else f"(v(ctl_{name}) > 0.5 ? 1 : 0)")
+                on = (f"min(max(v(ctl_{name}), 0), 1)" if gate or e.id in driven else f"(v(ctl_{name}) > 0.5 ? 1 : 0)")
                 lines += [f"* {name}: forward-only channel; separate e-to-c diode; finite bidirectional leakage",
                           f"Vsense_{name} {n('c')} {collector} 0",
                           f"Bchannel_{name} {collector} {emitter} I = {vce}/{s('roff')} + "
-                          f"{on}*max({vce}-{s('vce0')},0)/{s('ron')}" if e.id in driven else
+                          f"{on}*max({vce}-{s('vce0')},0)/{s('ron')}" if gate or e.id in driven else
                           f"Bchannel_{name} {collector} {emitter} I = {vce}/{s('roff')} + "
                           f"(v(ctl_{name}) > 0.5 ? max({vce}-{s('vce0')},0)/{s('ron')} : 0)"]
                 a, b = emitter, collector
-            elif e.id in driven:
+            elif gate or e.id in driven:
                 vds = f"v({n('d')},{n('s')})"
                 # A solver iterate or delayed edge can undershoot zero. Keep
                 # the normalized gate inside physical conductance bounds;
@@ -1166,9 +1263,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
 
 def executable(value=None) -> str | None:
     requested = value or os.environ.get("CIRCUIT_DRAWER_NGSPICE")
-    if requested:
-        return shutil.which(str(requested))
-    return shutil.which("ngspice_con") or shutil.which("ngspice")
+    return find_tool("ngspice", requested)
 
 
 def _convergence_hint(deck: Deck, log: str) -> str:
@@ -1187,6 +1282,7 @@ def _convergence_hint(deck: Deck, log: str) -> str:
 
 def _run_process(args, cwd, timeout, should_stop=None):
     options = dict(cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                   env=ngspice_environment(args[0]),
                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if should_stop is None:
         return subprocess.run(args, timeout=timeout, **options)

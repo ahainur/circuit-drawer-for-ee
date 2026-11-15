@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 from pathlib import Path
 import threading
 import webbrowser
@@ -26,6 +27,8 @@ from .ai.settings import locked, validate_url, environment_key
 
 
 def project_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path.home()
     candidate = Path(__file__).resolve().parents[2]
     return candidate if (candidate / "pyproject.toml").is_file() else Path.cwd()
 
@@ -210,6 +213,57 @@ def create_control(template_name: str | None, path: Path):
         stream.write("\n")
 
 
+ASSETS = Path(__file__).with_name("assets")
+
+
+def set_window_icon(root) -> None:
+    """Title-bar and taskbar icon; the launcher still opens without it."""
+    import tkinter as tk
+    try:
+        if os.name == "nt":
+            from ctypes import wintypes
+            path = str(ASSETS / "icon.ico")
+            root.iconbitmap(default=path)
+            user = ctypes.WinDLL("user32", use_last_error=True)
+            user.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT,
+                                       ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            user.LoadImageW.restype = wintypes.HICON
+            user.GetSystemMetrics.argtypes = [ctypes.c_int]
+            user.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user.SendMessageW.restype = wintypes.LPARAM
+            user.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+            user.GetAncestor.restype = wintypes.HWND
+            user.DestroyIcon.argtypes = [wintypes.HICON]
+            root._app_icons = []
+            # Tk scales ICO frames; Windows selects the original small and large frames.
+            for kind, metric in ((0, 49), (1, 11)):
+                icon = user.LoadImageW(None, path, 1, user.GetSystemMetrics(metric),
+                                       user.GetSystemMetrics(metric + 1), 0x10)
+                if icon:
+                    root._app_icons.append((kind, icon))
+
+            def apply_icons(event):
+                if event.widget is root:
+                    # Tk can recreate its native wrapper while constructing the window.
+                    window = user.GetAncestor(root.winfo_id(), 2)
+                    for kind, icon in root._app_icons:
+                        user.SendMessageW(window, 0x80, kind, icon)
+
+            def release_icons(event):
+                if event.widget is root:
+                    for _, icon in root._app_icons:
+                        user.DestroyIcon(icon)
+                    root._app_icons.clear()
+
+            root.bind("<Map>", apply_icons, add="+")
+            root.bind("<Destroy>", release_icons, add="+")
+        else:
+            root._app_icon = tk.PhotoImage(file=str(ASSETS / "icon.png"))
+            root.iconphoto(True, root._app_icon)
+    except (tk.TclError, OSError):
+        pass
+
+
 class Launcher:
     def __init__(self, root, settings: Settings):
         import tkinter as tk
@@ -222,6 +276,7 @@ class Launcher:
         self.file = tk.StringVar(value=recent[0] if recent else "")
         self.auto = tk.BooleanVar(value=settings.values.get("open_last", True))
         root.title("Circuit Drawer 启动器")
+        set_window_icon(root)
         root.geometry("900x480")
         root.minsize(760, 420)
         style = ttk.Style(root)

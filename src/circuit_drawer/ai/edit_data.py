@@ -66,6 +66,9 @@ def simulation_edit(old, new, proposed, description):
         if e.kind != "port" and i not in kept and i in configs:
             kept[i] = deepcopy(configs[i])
     sim["components"] = kept
+    for cfg in kept.values():
+        if isinstance(cfg, dict) and isinstance(cfg.get("gate_source"), str):
+            cfg["gate_source"] = renames.get(cfg["gate_source"], cfg["gate_source"])
     pins = {f"{e.id}.{p}" for e in after.values() for p in e.pins}
     sim["ground"] = pin(sim.get("ground"))
     if sim["ground"] not in pins and "ground" in supplied:

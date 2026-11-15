@@ -18,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from ..compile import FORMATS, CompileError
+from ..compile import FORMATS, CompileError, convert_pdf
 from ..ai.settings import SettingsRoutes, WebSettings
 from ..geometry import region_label_box
 from ..profiles import PROFILES, get_profile
@@ -101,9 +101,7 @@ def preview_png(raw: dict, profile: str | None, grid: bool, mono: bool,
                 dpi: int = PREVIEW_DPI) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         res = render(raw, profile, tmp, "preview", ("pdf",), mono=mono, grid=grid)
-        from ..compile import _tool
-        _tool(["pdftocairo", "-png", "-singlefile", "-r", str(dpi),
-               str(res.files["pdf"]), str(Path(tmp) / "preview")])
+        convert_pdf(res.files["pdf"], Path(tmp) / "preview.png", dpi)
         return base64.b64encode((Path(tmp) / "preview.png").read_bytes()).decode()
 
 
@@ -126,10 +124,9 @@ BODE_PROFILE = "ieee-single"   # the loop dialog previews and exports single-col
 
 
 def _pdf_png(pdf: Path, dpi: int) -> str:
-    from ..compile import _tool
-    stem = pdf.with_suffix("")
-    _tool(["pdftocairo", "-png", "-singlefile", "-r", str(dpi), str(pdf), str(stem)])
-    return base64.b64encode(stem.with_suffix(".png").read_bytes()).decode()
+    png = pdf.with_suffix(".png")
+    convert_pdf(pdf, png, dpi)
+    return base64.b64encode(png.read_bytes()).decode()
 
 
 def loop_report(raw: dict, profile: str | None, mono: bool = False) -> dict:

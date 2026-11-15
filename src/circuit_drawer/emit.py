@@ -547,10 +547,14 @@ def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = Non
                      rf"({el.id}.{anchors[1]}) -- {_p(el.pins[bot])};"]
             if el.label:
                 lines.append(rf"\node at {_p(unscaled(fp.extra['label_at'], s))} {{{el.label}}};")
+            if "g" in el.pins:
+                lines.append(rf"\draw {_p(el.pins['g'])} -- ({el.id}.G);")
             return "\n".join(lines) + "\n"
         lines = [rf"\node[{shape}{diode}{shape_scale}] ({el.id}) at {_p(c)} {{}};",
                  rf"\draw {_p(el.pins[top])} -- ({el.id}.{anchors[0]}) "
                  rf"({el.id}.{anchors[1]}) -- {_p(el.pins[bot])};"]
+        if "g" in el.pins:
+            lines.append(rf"\draw {_p(el.pins['g'])} -- ({el.id}.G);")
         if el.label:
             if el.label_pos or "label_offset" in fp.extra:
                 lines.append(rf"\node at {_p(unscaled(fp.extra['label_at'], s))} {{{el.label}}};")

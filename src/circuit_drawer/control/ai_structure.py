@@ -31,7 +31,7 @@ ARROW_MARGIN = 0.08          # cm above the checker minimum, allowing scale roun
 PORT_LANE_HALF = 0.04        # cm reserved beside an unused port's arrow approach
 PORT_EXIT_LEAD = 0.08        # cm: a source has no arrowhead, so can turn earlier
 BLOCK_FIELDS = {"id", "type", "text", "label", "label_pos", "signs", "style", "fill", "border", "color", "size_pt", "on", "toggle"}
-STRUCTURE_FIELDS = {"template", "snippets", "name", "title", "blocks", "links", "regions", "inputs", "outputs", "stateful", "dynamic_links", "remove", "loop"}
+STRUCTURE_FIELDS = {"template", "snippets", "name", "title", "blocks", "links", "regions", "texts", "inputs", "outputs", "stateful", "dynamic_links", "remove", "loop"}
 ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 REF = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$")
 
@@ -131,6 +131,7 @@ def to_structure(raw, profile="double"):
                         **{k: deepcopy(v) for k, v in region.items() if k in ("label", "fill", "border", "border_color", "label_pos")}})
     metadata = raw.get("control_ai", {})
     return {"name": raw.get("name", "control_ai"), "title": raw.get("title", ""), "blocks": blocks,
+            "texts": [{"index": i, "text": t["text"]} for i, t in enumerate(raw.get("texts", []))],
             "links": links, "inputs": metadata.get("inputs", inputs), "outputs": metadata.get("outputs", outputs),
             "stateful": metadata.get("stateful", []), "dynamic_links": metadata.get("dynamic_links", []), "regions": regions,
             **({"loop": deepcopy(raw["loop"])} if "loop" in raw else {})}
@@ -146,6 +147,13 @@ def _merge_objects(base, patch):
 def expand(proposal, current, profile, directory=None):
     if not isinstance(proposal, dict) or set(proposal) - STRUCTURE_FIELDS:
         fail("control-schema", f"顶层字段只允许 {sorted(STRUCTURE_FIELDS)}")
+    proposal = deepcopy(proposal)
+    for section in ("blocks", "links", "regions", "texts"):
+        for item in array(proposal.get(section, []), section):
+            if isinstance(item, dict):
+                for field in ("text", "label"):
+                    if isinstance(item.get(field), str):
+                        item[field] = item[field].replace("\r\n", "\n").replace("\r", "\n").replace("\n", r"\\")
     base = deepcopy(current) if current else {"kind": "control", "name": "control_ai", "blocks": [], "links": [], "regions": [], "texts": []}
     if "template" in proposal:
         try:
@@ -159,6 +167,17 @@ def expand(proposal, current, profile, directory=None):
         except (library.LibraryError, KeyError, TypeError):
             fail("control-template", f"未知片段 {name!r}")
     structure = to_structure(base, profile)
+    seen_texts = set()
+    for patch in proposal.get("texts", []):
+        if not isinstance(patch, dict) or set(patch) != {"index", "text"}:
+            fail("control-schema", "texts 只接受已有文字的 index 和 text")
+        index = patch["index"]
+        if type(index) is not int or not 0 <= index < len(structure["texts"]) or index in seen_texts:
+            fail("control-schema", "texts.index 必须是当前文字列表中未重复的索引")
+        if not isinstance(patch["text"], str):
+            fail("control-schema", "texts.text 必须是文字或公式字符串")
+        seen_texts.add(index)
+        structure["texts"][index]["text"] = patch["text"]
     # These annotations describe legacy power-line measurement taps, whose
     # drawing differs from a pure signal graph. Trust authored annotations,
     # never let a model declare arbitrary edges dynamic to evade cycle checks.
@@ -359,7 +378,10 @@ def _new_blocks(structure, base, prof):
     if base.get("blocks") and fresh:
         ys = [b.get("at", b.get("pole"))[1] - b.get("size", [0, 0])[1] / 2 for b in base["blocks"]]
         anchor = (0, min(ys) - ROW_GAP)
-    width = max([b.get("size", [1, 1])[0] for b in fresh] or [1]) + BLOCK_GAP
+    # An output stub also occupies the next block's approach lane.
+    width = max([b.get("size", [1, 1])[0] +
+                 (BLOCK_GAP if b["id"] in structure["outputs"] and b["type"] != "tag" else 0)
+                 for b in fresh] or [1]) + BLOCK_GAP
     height = max([b.get("size", [1, 1])[1] for b in fresh] or [1]) + ROW_GAP
     for i, block in enumerate(fresh):
         x, y = anchor[0] + (i % NEW_COLUMNS) * width, anchor[1] - (i // NEW_COLUMNS) * height
@@ -391,6 +413,8 @@ def compile_structure(s, base, profile):
     out = deepcopy(base)
     out.update(kind="control", name=s["name"], title=s["title"], profile=prof.name)
     out["blocks"] = _new_blocks(s, base, prof)
+    for text in s["texts"]:
+        out["texts"][text["index"]]["text"] = text["text"]
     out["control_ai"] = {key: deepcopy(s[key]) for key in ("inputs", "outputs", "stateful", "dynamic_links")}
     if "loop" in s:
         out["loop"] = deepcopy(s["loop"])
@@ -423,16 +447,22 @@ def compile_structure(s, base, profile):
                 kept.append({"from": bid + ".e", "to": [x + w / 2 + BLOCK_GAP, y], "open": True})
     old_regions = to_structure(base, profile)["regions"]
     out["regions"] = []
+    out["links"] = kept
+    member_geometry = geometry(parse(out), 1.0, prof)
+    same_labels = {b["id"] for b in out["blocks"] for old in base["blocks"]
+                   if b["id"] == old["id"] and all(b.get(k) == old.get(k) for k in ("label", "label_pos", "size_pt"))}
     for region in s["regions"]:
-        if region in old_regions and set(region["members"]) <= same_geometry:
+        if region in old_regions and set(region["members"]) <= same_geometry & same_labels:
             out["regions"].append(deepcopy(base["regions"][old_regions.index(region)]))
         else:
-            members = [b for b in out["blocks"] if b["id"] in region["members"]]
-            bounds = library._bounds(members)
+            members = set(region["members"])
+            boxes = [box for bid, box in member_geometry.bodies.items() if bid in members]
+            boxes += [label.box for label in member_geometry.labels if label.owner.split()[0] in members]
+            bounds = (min(b.x0 for b in boxes), min(b.y0 for b in boxes),
+                      max(b.x1 for b in boxes), max(b.y1 for b in boxes))
             out["regions"].append({k: deepcopy(v) for k, v in region.items() if k != "id"} | {
                 "from": [bounds[0] - REGION_PAD, bounds[1] - REGION_PAD],
                 "to": [bounds[2] + REGION_PAD, bounds[3] + REGION_PAD]})
-    out["links"] = kept
     if pending:
         _route_links(out, kept, pending, prof)
     return out
@@ -548,7 +578,8 @@ class ControlWorkflow:
         validate_structure(structure)
         table = compile_structure(structure, base, self.profile)
         report = check(table, get_profile(self.profile))
-        errors = ["control-layout: " + error + " — " + CONTROL_HINTS["control-layout"] for error in report.errors]
+        collisions = [warning for warning in report.warnings if warning.startswith("texts ") and warning.endswith(" overlap")]
+        errors = ["control-layout: " + error + " — " + CONTROL_HINTS["control-layout"] for error in report.errors + collisions]
         return Evaluation(ControlDocument(table, structure), errors)
 
     def unreadable(self, exc):
@@ -564,4 +595,5 @@ class ControlWorkflow:
                 [f"删除方块 {bid}" for bid in old if bid not in new] +
                 [f"更新方块 {bid}" for bid in new if bid in old and new[bid] != old[bid]] +
                 (["连接或分区已更新"] if self.current and any(document.table.get(k) != self.current.get(k) for k in ("links", "regions")) else []) +
+                (["独立文字已更新"] if self.current and document.table.get("texts") != self.current.get("texts") else []) +
                 (["传递函数参数已更新，环路分析可直接读取"] if self.current and document.table.get("loop") != self.current.get("loop") else []))

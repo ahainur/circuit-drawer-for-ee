@@ -219,8 +219,8 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
     circuit = Circuit([], [], [], pin_nodes, tr, deck.columns, notes, reference, _drawing(flat))
     if level1:
         notes.append('已明确启用 LEVEL=1 开关近似，通道按各器件 simulation.components 中的 ron/roff '
-                     '导出为双向电阻开关，由逻辑 PWM 的 0.5 阈值控制。'
-                     '此近似替代 LEVEL=1 的 VTO、KP 和 gate_voltage 非线性通道计算，'
+                     '导出为双向电阻通道，由 PWM 或实际栅极电压控制。'
+                     '电气栅极保留 VTO 阈值，非线性通道采用 Ron/Roff 近似计算，'
                      '请按工作点填写 Ron。体二极管沿用独立支路及其线性化设置，'
                      'LEVEL=1 内部体结不另行保留。目标模型用于电路级近似，不能据此判断损耗或 ZVS。')
     if any(e.kind == 'pmos' for e in flat.elements):
@@ -229,7 +229,14 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
     owner = {}        # element id -> the collapsed instance (subsystem) it is inside
     if assembly is not None and assembly.boxed:
         owner = _subsystems(circuit, assembly, flat, (layout.extra.get('module_authoring') or {}).get('aliases', {}))
+    from .spice import gate_drives, PWM_FIELDS
+    gates, gate_sources = gate_drives(flat, report.nets, loop)
+    if gates:
+        circuit.notes.append('电气栅极及驱动 R/C 网络保留，开关由源极／发射极参考的实际电压与阈值比较驱动。'
+                             'ngspice 与 Simulink 简化通道在阈值附近使用 10 mV 数值平滑，'
+                             'PLECS／PSIM 使用理想阈值，过渡细节存在差异。')
     entries, drives, driven = {}, {}, {}
+    gate_commands = {}
     node_counter = 0
     occupied_nodes = set(pin_nodes.values())
 
@@ -268,7 +275,10 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
         if e.kind == 'port':
             continue
         cfg = sim['components'][e.id]
-        values = {k: number(v, f'{e.id}.{k}') for k, v in cfg.items() if k not in ('model', 'polarity', 'wave')}
+        excluded = {'model', 'polarity', 'wave', 'gate_drive', 'gate_source'}
+        if e.id in gates and gates[e.id]['mode'] == 'external':
+            excluded.update(PWM_FIELDS)
+        values = {k: number(v, f'{e.id}.{k}') for k, v in cfg.items() if k not in excluded}
         pos = (sum(p[0] for p in e.pins.values()) / len(e.pins) * PIXELS_PER_UNIT,
                -sum(p[1] for p in e.pins.values()) / len(e.pins) * PIXELS_PER_UNIT)
         n = lambda pin: pin_nodes[f'{e.id}.{pin}']
@@ -384,6 +394,7 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                     part('R', [n(f'{w}b'), n('p2')], {'value': values['reference_resistance']}, pos, e.id)
         else:
             a, b = (n('c'), n('e')) if e.kind == 'igbt' else (n('d'), n('s'))
+            gate = gates.get(e.id)
             if loop and e.id in loop.driven:
                 # Native backends currently expand average legs into switches.
                 from .spice import check_pwm_timing
@@ -393,8 +404,21 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                 circuit.signals.append(s)
                 drive = s.name
                 driven[e.id] = (drive, values)
-            else:
+            elif not gate or gate['mode'] == 'internal':
                 drive = signal(values, pos, pwm=True)
+            if gate:
+                if gate['mode'] == 'internal':
+                    gate_commands[e.id] = drive
+                    if not gate['source']:
+                        part('V', [n('g'), b], {'signal': drive, 'gain': gate['voltage']}, pos, e.id, 'gate_driver')
+                sensor = part('VM', [b, n('g')] if e.kind == 'pmos' else [n('g'), b], {}, pos, e.id, 'gate_sensor')
+                sensed = Signal(f'signal_{len(circuit.signals) + 1}', 'gate',
+                                {'sensor': sensor.name, 'threshold': gate['threshold']}, pos)
+                circuit.signals.append(sensed)
+                drive = sensed.name
+                for key, end in (('gate_capacitance', b), ('miller_capacitance', a)):
+                    if values.get(key, 0):
+                        part('C', [n('g'), end], {'value': values[key], 'initial': 0}, pos, e.id, 'gate_capacitance')
             drives[e.id] = drive
             mapped = mapping.get('switch', {})
             kind = mapped.get('model', 'igbt' if e.kind == 'igbt' else 'ideal_switch')
@@ -419,6 +443,11 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
             # IGBT probes measure total terminal current, including the reverse
             # diode, off-state leakage and snubber, as in the existing exporter.
             entries[e.id, ''] = [(p, i) for p in circuit.parts[first:] for i, net in enumerate(p.nodes) if net == a]
+    for source, switch in gate_sources.items():
+        driver = next(p for p in circuit.parts if p.source == source and p.kind == 'V')
+        driver.params = {'signal': gate_commands[switch], 'gain': gates[switch]['voltage']}
+    used_signals = {p.params.get('signal') for p in circuit.parts} | set(drives.values()) | set(gate_commands.values())
+    circuit.signals = [s for s in circuit.signals if s.name in used_signals]
     # Which level a part sits on: a drawn element's parts go with it; a part
     # the drawing has no place for goes where its nets are.  Ground is a
     # reference block at any level, so net 0 counts as reachable everywhere.

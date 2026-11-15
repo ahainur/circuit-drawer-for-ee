@@ -60,26 +60,33 @@ def passive_lines(kind, cfg, name, a, b, value, initial):
             f"{name} {internal}2 {b} {value} IC={initial}"]
 
 
-def switch_lines(cfg, e, name, positive, negative, val, body="IS=1e-9 N=1 RS=0.01"):
+def switch_lines(cfg, e, name, positive, negative, val, body="IS=1e-9 N=1 RS=0.01", *, gate=None):
     """Common sensed input permits current probes regardless of mapped model."""
     from .spice import number
     s = lambda key: f"{val[key]:.15g}"
     channel = f"cd_{name}_channel"
     out = [f"Vsense_{name} {positive} {channel} 0"]
     if cfg["model"] == "ideal_switch":
-        out += [f"Smap_{name} {channel} {negative} ctl_{name} 0 ms_{name}",
-                f".model ms_{name} SW(RON={s('ron')} ROFF={s('roff')} VT=0.5 VH=0)"]
+        if gate is not None:
+            on = f"min(max(v(ctl_{name}),0),1)"
+            out.append(f"Bmap_{name} {channel} {negative} I = v({channel},{negative})*"
+                       f"(({on})/{s('ron')}+(1-({on}))/{s('roff')})")
+        else:
+            out += [f"Smap_{name} {channel} {negative} ctl_{name} 0 ms_{name}",
+                    f".model ms_{name} SW(RON={s('ron')} ROFF={s('roff')} VT=0.5 VH=0)"]
     elif cfg["model"] == "mosfet":
-        gate = f"cd_{name}_gate"
         polarity = -1 if e.kind == "pmos" else 1
         model = "PMOS" if e.kind == "pmos" else "NMOS"
-        out += [f"Egate_{name} {gate} {negative} ctl_{name} 0 {polarity * number(cfg['gate_voltage'], 'gate_voltage'):.15g}",
-                f"Mmap_{name} {channel} {gate} {negative} {negative} mm_{name}",
+        if gate is None:
+            gate = f"cd_{name}_gate"
+            out.append(f"Egate_{name} {gate} {negative} ctl_{name} 0 {polarity * number(cfg['gate_voltage'], 'gate_voltage'):.15g}")
+        out += [f"Mmap_{name} {channel} {gate} {negative} {negative} mm_{name}",
                 f".model mm_{name} {model}(LEVEL=1 VTO={polarity * number(cfg['vto'], 'vto'):.15g} KP={number(cfg['kp'], 'kp'):.15g})"]
     else:
         vce = f"v({channel},{negative})"
-        out += [f"Bchannel_{name} {channel} {negative} I = {vce}/{s('roff')} + "
-                f"(v(ctl_{name}) > 0.5 ? max({vce}-{number(cfg['vce0'], 'vce0'):.15g},0)/{s('ron')} : 0)"]
+        forward = f"max({vce}-{number(cfg['vce0'], 'vce0'):.15g},0)/{s('ron')}"
+        on = f"min(max(v(ctl_{name}),0),1)*({forward})" if gate is not None else f"(v(ctl_{name}) > 0.5 ? {forward} : 0)"
+        out += [f"Bchannel_{name} {channel} {negative} I = {vce}/{s('roff')} + {on}"]
     if e.opts.get("diode", True) is not False:
         # Match the terminal-current convention: all parallel branches sit
         # behind Vsense, including the snubber appended by the shared exporter.

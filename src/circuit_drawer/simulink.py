@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import math
 import re
 
-from .spice import SpiceError
+from .spice import SpiceError, GATE_TRANSITION
 
 # Foundation diode and switch blocks require strictly positive leakage. Declare
 # this target-specific regularization; never silently use library defaults.
@@ -209,12 +209,32 @@ def emit(circuit, name):
     # their default zero derivative would give a wrong current in a capacitor
     # driven directly by a sine or ramp voltage source.
     derivative_signals = {p.params['signal'] for p in circuit.parts if p.kind in ('V', 'I')}
+    for s in circuit.signals:
+        if s.kind == 'control' and s.name in derivative_signals:
+            pos = nearby((x0, bottom), (180, 2*ROW), occupied)
+            limiter = add('model', 'simulink/Discontinuities/Rate Limiter', s.name + '_driver_edges', pos,
+                          {'RisingSlewLimit': 1/s.params['rise'], 'FallingSlewLimit': -1/s.params['fall']})
+            connect('model', outputs[s.name], limiter + '.Inport(1)')
+            outputs[s.name] = limiter + '.Outport(1)'
+            derivative = add('model', 'simulink/Continuous/Derivative', s.name + '_driver_derivative',
+                             (pos[0], pos[1] + ROW))
+            connect('model', outputs[s.name], derivative + '.Inport(1)')
+            derivatives[s.name] = derivative + '.Outport(1)'
     for s in generators:
         v, pos = s.params, s.position
         needs_derivative = s.name in derivative_signals
         derivative_pos = pos[0], pos[1] + ROW
         derivative_name = s.name + '_derivative'
-        if s.kind == 'dc':
+        if s.kind == 'gate':
+            sensor = add('model', 'simulink/Signal Routing/From', s.name + '_voltage', pos, {'GotoTag': 'gate_' + v['sensor']})
+            compare = add('model', 'simulink/User-Defined Functions/Fcn', s.name,
+                          (pos[0] + ROW, pos[1]), {'Expr': f"0.5*(1+tanh((u-{num(v['threshold'])})/{num(GATE_TRANSITION)}))"})
+            connect('model', sensor + '.Outport(1)', compare + '.Inport(1)')
+            outputs[s.name] = compare + '.Outport(1)'
+            if not any(o['origin'] == s.name for o in circuit.outputs):
+                sink = add('model', 'simulink/Sinks/Terminator', s.name + '_unused', (pos[0] + 2*ROW, pos[1]))
+                connect('model', outputs[s.name], sink + '.Inport(1)')
+        elif s.kind == 'dc':
             outputs[s.name] = add('model', 'simulink/Sources/Constant', s.name, pos, {'Value': v['dc']}) + '.Outport(1)'
             if needs_derivative:
                 derivatives[s.name] = add('model', 'simulink/Sources/Constant', derivative_name, derivative_pos, {'Value': 0}) + '.Outport(1)'
@@ -262,6 +282,7 @@ def emit(circuit, name):
         centre = ((x0 + x1) / 2, (y0 + y1) / 2)
         converters = []          # where the converters placed so far stand
         latches, senses = [], {}  # thyristors and their anode-cathode voltage readings
+        electrical_gates, physical_sensors = [], {}
 
         def beside(spot, outward=False):
             """Across the block from its axis: the side the layout kept free for a
@@ -279,13 +300,29 @@ def emit(circuit, name):
             return spot.pos[0] + sx, spot.pos[1] + sy
 
         def control(p, handle, pos):
+            signal = next(s for s in circuit.signals if s.name == p.params['signal'])
+            if signal.kind == 'gate':
+                electrical_gates.append((p, handle, pos, signal))
+                return
             unit = 'V' if p.kind == 'V' else 'A' if p.kind == 'I' else '1'
             params = {'Unit': unit, 'FilteringAndDerivatives': 'provide', 'UdotUserProvided': '1' if p.kind in ('V', 'I') else '0'}
             converter = add(system, 'nesl_utility/Simulink-PS Converter', p.name + '_input', pos, params)
             converters.append(pos)
-            connect(system, signals[p.params['signal']], converter + '.Inport(1)')
+            value = signals[p.params['signal']]
+            if 'gain' in p.params:
+                gain = add(system, 'simulink/Math Operations/Gain', p.name + '_voltage_gain',
+                           (pos[0], pos[1] + ROW), {'Gain': p.params['gain']})
+                connect(system, value, gain + '.Inport(1)')
+                value = gain + '.Outport(1)'
+            connect(system, value, converter + '.Inport(1)')
             if p.kind in ('V', 'I'):
-                connect(system, slopes[p.params['signal']], converter + '.Inport(2)')
+                slope = slopes[p.params['signal']]
+                if 'gain' in p.params:
+                    gain = add(system, 'simulink/Math Operations/Gain', p.name + '_slope_gain',
+                               (pos[0], pos[1] + 2*ROW), {'Gain': p.params['gain']})
+                    connect(system, slope, gain + '.Inport(1)')
+                    slope = gain + '.Outport(1)'
+                connect(system, slope, converter + '.Inport(2)')
             connect(system, converter + '.RConn(1)', handle + '.RConn(1)')
 
         def motor(p, spot):
@@ -552,6 +589,9 @@ def emit(circuit, name):
                         senses[p.name + '_vak'] = reading + '.Outport(1)'
                     nodes[1] = joint
                     params.update(R_closed=v['ron'] / 2, G_open=MIN_CONDUCTANCE)
+                if p.kind in ('S', 'Q') and next(s for s in circuit.signals if s.name == v['signal']).kind == 'gate':
+                    path = electrical + 'Electrical Elements/Variable Resistor'
+                    params = {'Rmin': 0}
             elif p.kind == 'T':
                 path = electrical + 'Electrical Elements/Ideal Transformer'
                 params = {'n': 1 / abs(v['ratio'])}  # Foundation uses Np/Ns.
@@ -563,7 +603,10 @@ def emit(circuit, name):
                 path = electrical + 'Electrical Sensors/' + ('Voltage' if p.kind == 'VM' else 'Current') + ' Sensor'
             facing = ORIENTATION[turn] if p.kind == 'I' else turn
             h = add(system, path, p.name, pos, params, facing)
-            if p.kind == 'T':
+            if path.endswith('/Variable Resistor'):
+                # R2024b exposes R at LConn(1), then + at LConn(2) and - at RConn(1).
+                ports = [h + '.LConn(2)', h + '.RConn(1)']
+            elif p.kind == 'T':
                 ports = [h + '.' + port for port in ('LConn(1)', 'LConn(2)', 'RConn(1)', 'RConn(2)')]
             else:
                 # Sources, switches and sensors expose their physical signal at
@@ -581,10 +624,38 @@ def emit(circuit, name):
             elif p.kind == 'SCR':
                 latches.append((p, h, SimpleNamespace(pos=pos, direction=facing)))
             elif p.kind in ('VM', 'AM'):
+                physical_sensors[p.name] = h + '.RConn(1)'
                 unit = 'V' if p.kind == 'VM' else 'A'
                 converter = add(system, 'nesl_utility/PS-Simulink Converter', p.name + '_measurement', beside(spot, True), {'Unit': unit})
                 connect(system, h + '.RConn(1)', converter + '.LConn(1)')
-                readings[p.name] = converter + '.Outport(1)'
+                if p.role == 'gate_sensor':
+                    tag = add(system, 'simulink/Signal Routing/Goto', p.name + '_gate_voltage',
+                              (spot.pos[0], spot.pos[1] + ROW), {'GotoTag': 'gate_' + p.name, 'TagVisibility': 'global'})
+                    connect(system, converter + '.Outport(1)', tag + '.Inport(1)')
+                else:
+                    readings[p.name] = converter + '.Outport(1)'
+        for p, h, pos, signal in electrical_gates:
+            # Continuous conductance avoids threshold chatter with Cgd/Cgc.
+            # Keep the feedback entirely inside the Simscape equation solver.
+            ron = p.params['ron'] / 2 if p.kind == 'Q' else p.params['ron']
+            roff = 1/MIN_CONDUCTANCE if p.kind == 'Q' else p.params['roff']
+            ratio = ron/roff
+            stages = [('PS Gain', {'gain': 1/GATE_TRANSITION, 'gain_unit': '1/V'}),
+                      ('PS Bias', {'bias': -signal.params['threshold']/GATE_TRANSITION}),
+                      ('PS Math Function', {'fcn_choice': 'foundation.enum.math_function.tanh'}),
+                      ('PS Gain', {'gain': (1-ratio)/2}),
+                      ('PS Bias', {'bias': (1+ratio)/2}),
+                      ('PS Math Function', {'fcn_choice': 'foundation.enum.math_function.reciprocal'}),
+                      ('PS Gain', {'gain': ron, 'gain_unit': 'Ohm'})]
+            x, y = nearby(pos, (4*ROW, 2*ROW), list(layout.occupied) + list(placed[system]))
+            source = physical_sensors[signal.params['sensor']]
+            for index, (block, parameters) in enumerate(stages):
+                column = index % 4 if index < 4 else 3-index % 4
+                stage = add(system, 'fl_lib/Physical Signals/Functions/' + block,
+                            p.name + '_gate_' + str(index), (x+(column-1.5)*ROW, y+(index//4-.5)*ROW), parameters)
+                connect(system, source, stage + '.LConn(1)')
+                source = stage + '.RConn(1)'
+            connect(system, source, h + '.LConn(1)')
         for p, h, pos in latches:
             latch(p, h, pos, senses[p.name + '_vak'])
         return nets
@@ -661,7 +732,8 @@ def emit(circuit, name):
         # through Outports down the right
         signals, slopes, readings = {}, {}, {}
         inputs = sorted({(p.params['signal'], p.kind in ('V', 'I')) for p in circuit.parts
-                         if p.name in s.parts and p.kind in ('V', 'I', 'S', 'Q', 'SCR')})
+                         if p.name in s.parts and p.kind in ('V', 'I', 'S', 'Q', 'SCR')
+                         and not any(sig.name == p.params['signal'] and sig.kind == 'gate' for sig in circuit.signals)})
         for k, (signal_name, with_slope) in enumerate(inputs):
             y = iy0 + 2 * k * ROW
             signals[signal_name] = add(system, 'simulink/Sources/In1', 'in_' + signal_name, (ix0 - 160, y),

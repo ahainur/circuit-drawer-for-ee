@@ -2,7 +2,7 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | [繁體中文](USER_MANUAL.zh-TW.md) | English
 
-This manual covers Circuit Drawer for EE 1.7.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 1.8.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
 Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
 
@@ -107,7 +107,7 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 #### 64-bit Windows 10 and 11 installer
 
-1、Download `CircuitDrawer-Setup-1.7.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-1.8.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Use an ASCII installation path. Spaces are supported. Drawing paths, export paths and Windows user names may contain Chinese characters.
 
@@ -116,17 +116,17 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 4、The installer is unsigned. Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the source and SHA256, select **More info → Run anyway** if offered. Compare the command's output with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run the newer installer to upgrade. Uninstall through Windows **Settings → Apps → Circuit Drawer**. User drawings and settings are retained. Save documents in your own drawing folders.
 
 #### Python installation for developers, macOS and Linux
 
-1、Download the wheel `circuit_drawer_for_ee-1.7.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download the wheel `circuit_drawer_for_ee-1.8.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
 ```
 
 2、You can also install directly from the repository with the following command.
@@ -428,9 +428,9 @@ Menus can be operated with the arrow keys and Enter, and closed with Esc or by c
 | 二极管 (diode) | `D` | `a` (anode), `b` (cathode) | Generic diode |
 | 稳压管 (Zener diode) | `D` with `opts.zener: true` | As diode | Drawn as a Zener; simulation needs breakdown parameters |
 | 晶闸管 (thyristor) | `scr` | `a` (anode), `b` (cathode) | Horizontal or vertical only; the gate lead is drawn on the left of a→b, `F` moves it to the right; the gate is driven by the simulation trigger pulse and is not a pin |
-| MOSFET | `nmos` | `d`, `s` | Body diode by default (`opts.diode: false` removes it) |
-| P-channel MOSFET | `pmos` | `d`, `s` | Source-up symbol with a gate dot; body diode d→s; logical PWM 1 = on. Set its parameters in Simulation → SPICE simulation. |
-| IGBT | `igbt` | `c`, `e` | Anti-parallel diode by default |
+| MOSFET | `nmos` | `d`, `s` + optional `g` | Body diode by default (`opts.diode: false` removes it) |
+| P-channel MOSFET | `pmos` | `d`, `s` + optional `g` | Source-up symbol with a gate dot; body diode d→s; logical PWM 1 = on. Set its parameters in Simulation → SPICE simulation. |
+| IGBT | `igbt` | `c`, `e` + optional `g` | Anti-parallel diode by default |
 | 电压源 (voltage source) | `V` | `a` (−), `b` (+) | DC voltage source |
 | 交流电源 (AC source) | `vac` | `a` (reference), `b` | Sinusoidal source |
 | 三相电源 (three-phase source) | three `vac` | `a`, `b` each | Places three AC sources in star with the neutral wire, labelled v_a, v_b, v_c |
@@ -1576,6 +1576,16 @@ circuit-drawer-control edit out/grid-forming/parallel/control.json
 
 4. Linear analysis uses a zero-order-held plant and quantized coefficients, with poles tested against the unit circle. Sampled simulation supports scalar controllers. Native Simulink/PLECS quantization models remain a future integration. The GaN application example uses ideal switches with finite on-resistance, with device losses requiring a device-specific model. [Parameters, rounding rules and commands](../examples/digital_control/README.md#five-english-guide)
 
+### 17.17 Electrical gates and external drivers
+
+1、Select a MOSFET or IGBT and enable **Electrical gate g** in Properties. Connect the driver voltage source, resistor and wires to g. In **Simulation → SPICE simulation**, select **External gate circuit** and enter the source pulse waveform and R/C values. Open `examples/spice/gate_driver_rc.json` for a working example.
+
+2、Add a voltage probe between g and source s, or emitter e for an IGBT, to view actual Vgs or Vge. PMOS conduction follows −Vgs. Internal PWM or closed-loop control can also drive a drawn V source. Connect its a terminal to s/e and its b terminal to g through the gate resistor. Use the DC source setting when the source is bound to internal control.
+
+3、The internal drive amplitude defaults to 10 V and the simplified channel threshold to 3 V. Both can be edited in the simulation settings. Cgs/Cge and Cgd/Cgc are linear capacitances, defaulting to zero. Enter values for the device and operating point. The ngspice and Simulink simplified channels use a 10 mV numerical transition around the threshold. PLECS and PSIM use an ideal threshold, so transient details can differ.
+
+4、External drive supports transient simulation. Automatic mode identification and parameter-range search require declared-period internal fixed-frequency PWM. Use the switching closed-loop model with an electrical gate.
+
 ## 18. Simulink and PLECS export, closed-loop control
 
 The same circuit and simulation parameters can be exported as Simulink and PLECS models. The export carries the real wiring, part values, PWM and probes, and lays the model out like the original drawing.
@@ -2303,10 +2313,10 @@ Each part has an `id` (unique in the drawing), a `kind` and `pins`, and optional
 | `current_side` | Two-terminal parts | `^`, `_` (`^`) | Arrow text on the left or right of the a→b direction |
 | `invert` | Two-terminal parts | `true`/`false` | Draws the symbol reversed only; ignored by simulation |
 | `wave`, `wave_pos`, `wave_scale` | `V`, `I` | `step-up`, `step-down`, `pulse`; `auto`, `left`, `right`, `above`, `below`; 0.5–2 | Small waveform next to the source |
-| `mirror` | `nmos`, `pmos`, `igbt`, `scr` | `true`/`false` | Gate on the other side |
+| `mirror` | `nmos`, `pmos`, `igbt`, `scr` |`true`/`false` + optional `g` | Gate on the other side |
 | `battery` | `V` | `true`/`false` | Draw as a battery |
 | `zener` | `D` | `true`/`false` | Draw as a Zener diode |
-| `diode` | `nmos`, `pmos`, `igbt` | `true`/`false` (`true`) | Body / anti-parallel diode; `false` removes it from drawing and simulation |
+| `diode` | `nmos`, `pmos`, `igbt` |`true`/`false` (`true`) + optional `g` | Body / anti-parallel diode; `false` removes it from drawing and simulation |
 | `ratio` | `transformer` | Text, such as `"$1:n$"` | Ratio text, display only |
 | `dots` | `transformer` | `same`, `opposite`, `false` (`same`) | Dots; must agree with the simulation polarity |
 | `core` | `transformer` | `true`/`false` (`true`) | `false` draws a coupled inductor |

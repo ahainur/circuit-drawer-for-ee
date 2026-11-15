@@ -310,7 +310,7 @@ function openPortForm(state) {
       const side = row.querySelector("select"); side.value=p.side; side.onchange=e=>p.side=e.target.value;
       const move = j => { if(j<0 || j>=state.ports.length)return; state.ports.splice(j,0,state.ports.splice(i,1)[0]); drawRows(); };
       const buttons=row.querySelectorAll("button"); buttons[0].onclick=()=>move(i-1); buttons[1].onclick=()=>move(i+1);
-      buttons[2].onclick=()=>{ if(state.editing && Object.hasOwn(definitionEdit.definition.ports,p.name)){moduleButton("moduleSaveError").textContent="已有实例引用端口，请保留名称；可在画布里移动端口节点。";return;} state.ports.splice(i,1);drawRows(); };
+      buttons[2].onclick=()=>{ if(state.editing && Object.prototype.hasOwnProperty.call(definitionEdit.definition.ports,p.name)){moduleButton("moduleSaveError").textContent="已有实例引用端口，请保留名称；可在画布里移动端口节点。";return;} state.ports.splice(i,1);drawRows(); };
       row.ondragstart=ev=>{dragged=i;ev.dataTransfer.setData("text/plain",String(i));};
       row.ondragover=ev=>ev.preventDefault(); row.ondrop=ev=>{ev.preventDefault(); if(dragged===null)return;state.ports.splice(i,0,state.ports.splice(dragged,1)[0]);dragged=null;drawRows();};
       box.appendChild(row);
@@ -356,7 +356,7 @@ function openPortForm(state) {
       if(state.editing){
         const d=clone(definitionEdit.definition);d.layout=clone(layout);delete d.layout.simulation;d.defaults??={};
         for (const p of state.ports) {
-          if (Object.hasOwn(d.ports,p.name)) continue;
+          if (Object.prototype.hasOwnProperty.call(d.ports,p.name)) continue;
           const terminal = d.layout.elements.find(e => e.kind === "port" && same(e.pins.p,p.at));
           if (terminal) { d.ports[p.name] = terminal.id + ".p"; continue; }
           const used = new Set(d.layout.elements.map(e => e.id));
@@ -429,7 +429,7 @@ function moduleParameters(id){
   const overrides=clone(inst.overrides||{});
   for(const p of d?.editable||[]){
     const row=document.createElement("label");row.style.cssText="display:flex;gap:8px;margin:8px 0";
-    const custom=Object.hasOwn(overrides[p.element]||{},p.field);
+    const custom=Object.prototype.hasOwnProperty.call(overrides[p.element]||{},p.field);
     row.innerHTML=`<input type="checkbox" ${custom?"checked":""}><span>${esc(p.element+"."+p.field)}</span><input value="${esc(String(custom?overrides[p.element][p.field]:d.defaults?.[p.element]?.[p.field]??""))}" aria-label="${esc(p.element+"."+p.field)}">`;
     const [check,value]=row.querySelectorAll("input");
     const update=()=>{if(check.checked){overrides[p.element]??={};overrides[p.element][p.field]=value.value;}else{delete overrides[p.element]?.[p.field];if(!Object.keys(overrides[p.element]||{}).length)delete overrides[p.element];}};

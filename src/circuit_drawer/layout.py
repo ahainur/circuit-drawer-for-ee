@@ -45,6 +45,7 @@ MAX_WINDINGS = 6
 EXTRA_WINDINGS = tuple(f"w{k}" for k in range(3, MAX_WINDINGS + 1))
 # Pins a kind may add to its required PIN_NAMES.
 OPTIONAL_PINS: dict[str, tuple[str, ...]] = {
+    "nmos": ("g",), "pmos": ("g",), "igbt": ("g",),
     "transformer": ("sct",) + tuple(f"{w}{end}" for w in EXTRA_WINDINGS for end in "ab"),
 }
 

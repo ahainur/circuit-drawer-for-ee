@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from itertools import combinations
 
-from .geometry import (WINDING_GAP, BODY_FRAC, symbol_kind, EPS, MIN_LEAD, SW_HALF_SPAN, Box, sw_k, Footprint,
+from .geometry import (WINDING_GAP, BODY_FRAC, symbol_kind, EPS, MIN_LEAD, SW_HALF_SPAN, SW_LEFT, Box, sw_k, Footprint,
                        COIL_HALF_W, CORE_GAP, Scale, annotation_box, axis_sizes,
                        footprint, is_diagonal, scaled, transformer_frame, unscaled,
                        callout_box, callout_gap, callout_label_box, callout_shape, region_label_box,
@@ -191,6 +191,11 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
             schema_ok = False
             continue
         missing = [p for p in need if p not in el.pins]
+        if el.kind in SWITCHES:
+            stray = sorted(set(el.pins) - set(need) - set(OPTIONAL_PINS[el.kind]))
+            if stray:
+                add(Issue("unknown-pin", f"{el.id}: unknown pins {stray}; allowed pins are {(*need, 'g')}"))
+                schema_ok = False
         if el.kind == "transformer":
             # an extra winding needs both ends; any other pin name is a typo
             missing += [f"{w}{end}" for w in EXTRA_WINDINGS for end in "ab"
@@ -256,6 +261,13 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                           f"{(min_two - max(dx, dy)) / k:.2f} units"))
         elif el.kind in SWITCHES:
             t, b = (P[p] for p in PIN_NAMES[el.kind])
+            if "g" in P:
+                fp = footprint(el, s, prof)
+                delta = tuple(P["g"][i] - fp.centre[i] for i in (0, 1))
+                along = sum(delta[i] * fp.extra["u"][i] for i in (0, 1))
+                away = -sum(delta[i] * fp.extra["side"][i] for i in (0, 1))
+                if abs(along) > EPS or away < SW_LEFT * sw_k(prof) * width + MIN_LEAD - EPS:
+                    add(Issue("bad-gate-pin", f"{el.id}.g 须位于栅极侧，与器件中心对齐，并留出至少 {MIN_LEAD:g} cm 引线"))
             span = max(abs(t[0] - b[0]), abs(t[1] - b[1]))
             if abs(t[0] - b[0]) > EPS and abs(t[1] - b[1]) > EPS:
                 add(Issue("not-orthogonal", f"{el.id}: a switch's two pins must be on one "
@@ -469,6 +481,14 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     # A pin in an explicit module-compiler connection is joined even with no
     # wire drawn to it (a folded instance's port, see Assembly.sheets).
     joined = {ref for refs in connections if len(refs) > 1 for ref in refs}
+    simulation = layout.extra.get("simulation")
+    settings = simulation.get("components", {}) if isinstance(simulation, dict) else {}
+    if isinstance(settings, dict):
+        for el in layout.elements:
+            cfg = settings.get(el.id, {})
+            if (el.kind in SWITCHES and "g" in el.pins and isinstance(cfg, dict)
+                    and cfg.get("gate_drive") == "internal" and not cfg.get("gate_source")):
+                joined.add(f"{el.id}.g")  # The explicit internal source drives this terminal.
     for ref, p in pin_at.items():
         if ref in nc and degree.get(_key(p), 0) >= 2:
             add(Issue("bad-no-connect", f"{ref}: NoConn 只允许用于悬空引脚，请移除标记或断开连接"))

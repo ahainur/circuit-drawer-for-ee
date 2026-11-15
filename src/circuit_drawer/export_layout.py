@@ -211,7 +211,9 @@ def plan(parts, elements, wires, pin_nodes, terminal, signal_side=lambda part, d
             continue
         pa, pb = TWO_PIN[kind]
         na, nb = pin_nodes[f"{eid}.{pa}"], pin_nodes[f"{eid}.{pb}"]
-        group = [p for p in by_source[eid] if p.kind != "AM"]
+        # Gate helpers connect a third electrical terminal, outside the
+        # source-drain/collector-emitter branches drawn on the power axis.
+        group = [p for p in by_source[eid] if p.kind != "AM" and not p.role.startswith("gate_")]
         nodes = {n for p in group for n in p.nodes}
         lead = {}
         for side, net in (("a", na), ("b", nb)):

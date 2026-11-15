@@ -132,6 +132,9 @@ class OpenAIChat:
             self.messages.pop()
             raise OutputTruncated("length", limit=self.max_tokens,
                                   output_tokens=usage.get("completion_tokens"), text_chars=len(content))
+        if not content.strip():
+            self.messages.pop()
+            raise ModelError("模型接口返回空正文，请检查服务端请求记录后重试。")
         self.messages.append({"role": "assistant", "content": content})
         return content
 

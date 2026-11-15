@@ -243,6 +243,9 @@ class ClaudeChat:
             self.messages.pop()
             raise OutputTruncated("max_tokens", limit=self.max_tokens,
                                   output_tokens=u.output_tokens, text_chars=len(text))
+        if not text.strip():
+            self.messages.pop()
+            raise ModelError("模型接口返回空正文，请检查服务端请求记录后重试。")
         self.messages.append({"role": "assistant", "content": msg.content})
         return text
 
@@ -509,7 +512,8 @@ def plan(description: str, profile: str = "ieee-single", chat: Chat | None = Non
          model: str | None = None, provider: str | None = None,
          images: list[tuple[str, str]] | None = None,
          on_text: Callable[[str], None] | None = None,
-         log: Callable[[str], None] = lambda s: None) -> str:
+         log: Callable[[str], None] = lambda s: None,
+         should_stop: Callable[[], bool] = lambda: False) -> str:
     """Ask only for the model's reading of the circuit (topology, parts with
     their pins' nodes, assumptions), so the user can correct it before any
     coordinates.  It has its own short prompt and low reasoning effort; the
@@ -518,7 +522,41 @@ def plan(description: str, profile: str = "ieee-single", chat: Chat | None = Non
     if not description.strip():
         raise ValueError("描述为空")
     chat = chat or make_chat(PLAN_SYSTEM, provider, model, stage="plan")
-    return _send(chat, plan_message(description), images, on_text, log, "结构").strip()
+    request = plan_message(description)
+    for attempt in range(2):
+        if should_stop():
+            raise Cancelled("已取消")
+        reply = _send(chat, request, images if attempt == 0 else None, on_text, log, "结构").strip()
+        errors = _plan_pin_errors(reply)
+        if not errors:
+            return reply
+        log("结构引脚检查未通过：" + "；".join(errors))
+        request = ("结构清单含当前元件不支持的引脚，请修正后重新输出完整清单。\n" + "\n".join(errors) +
+                   "\nMOSFET/IGBT 可用 g 接外置驱动，参考端为 s/e；请使用各器件已声明的引脚名。")
+    raise ModelError("结构清单仍含不支持的引脚：" + "；".join(errors))
+
+
+def _plan_pin_errors(text: str) -> list[str]:
+    errors = []
+    for line in text.splitlines():
+        part = re.search(r"([A-Za-z][\w]*)\s*[（(]([^）)]+)[）)]\s*[:：](.*)", line)
+        if not part:
+            continue
+        identifier, kind, connections = part.groups()
+        kind = kind.strip().lower()
+        if kind.upper() in PIN_NAMES:
+            kind = kind.upper()
+        if "mosfet" in kind or "mos管" in kind:
+            kind = "nmos"  # Both channel types have the same declared pin names.
+        elif "igbt" in kind:
+            kind = "igbt"
+        if kind not in PIN_NAMES:
+            continue
+        allowed = (*PIN_NAMES[kind], *OPTIONAL_PINS.get(kind, ()))
+        for pin in re.findall(r"\b([A-Za-z][\w]*)\s*(?:→|->)", connections):
+            if pin not in allowed:
+                errors.append(f"{identifier}.{pin} 不存在，可用引脚为 {', '.join(allowed)}")
+    return errors
 
 
 def _send(chat: Chat, text: str, images: list[tuple[str, str]] | None,
@@ -530,6 +568,8 @@ def _send(chat: Chat, text: str, images: list[tuple[str, str]] | None,
     stats = getattr(chat, "stats", None)
     if stats:
         log(f"{what}请求用时：{describe(stats[-1])}")
+    if not reply.strip():
+        raise ModelError("模型接口返回空正文，请检查服务端请求记录后重试。")
     return reply
 
 

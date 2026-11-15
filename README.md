@@ -8,11 +8,11 @@ Circuit Drawer turns one hand-placed, validated coordinate table into paper-read
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for Windows — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/CircuitDrawer-Setup-1.7.0.exe"><img alt="Download for Windows — Offline installer v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v1.7.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.7.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
-All four buttons download the same **universal Python package (`.whl`, Python 3.10+)**. See [installation](#installation) below. macOS and Linux currently have preview support.
+The Windows button downloads the offline installer. The macOS and Linux buttons download the universal Python package (`.whl`, Python 3.10+). macOS and Linux currently have preview support. See the installation steps below.
 
 [Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.7.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-trial-1.7.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-manuals-1.7.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-public-source-1.7.0.zip)
 
@@ -52,9 +52,27 @@ The web editor:
 
 ## Installation
 
+### 64-bit Windows 10 and 11
+
+1、Download `CircuitDrawer-Setup-1.7.0.exe` and run it. Select the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+
+2、Choose an installation path containing ASCII characters. Spaces are supported. Drawing files, export folders and Windows user names can contain Chinese characters.
+
+3、Open **Circuit Drawer** from the desktop or Start menu. The installer includes Python, TinyTeX with Chinese fonts, Poppler, ngspice and the Anthropic SDK. Drawing, previews, exports and ngspice simulation work offline. The AI assistant uses your configured online service.
+
+4、The installer is unsigned, so Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the download source and SHA256, select **More info → Run anyway** if that option is available. In PowerShell, compare the following result with the installer's entry in the release's `SHA256SUMS.txt`.
+
+```powershell
+Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+```
+
+5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run a newer installer to upgrade. To uninstall, open Windows **Settings → Apps → Circuit Drawer → Uninstall**. User drawings and settings are retained. Save drawings in your own document folders.
+
+### Python installation for developers, macOS and Linux
+
 Circuit Drawer needs Python 3.10 or newer. The core package has no third-party Python dependencies.
 
-Download the wheel using a button above, then open a terminal in its download folder.
+Download the wheel from the release page, then open a terminal in its download folder.
 
 On Windows:
 
@@ -82,7 +100,7 @@ This installs three commands: `circuit-drawer` (circuits), `circuit-drawer-contr
 
 The example files used throughout the documentation live in the [`examples/`](examples/) folder of this repository. They are not part of the wheel; download the source archive from the release page or clone the repository to get them.
 
-Optional components:
+The Python installation can use the following optional components. The Windows installer already includes LaTeX, Poppler, Chinese fonts, ngspice and the Anthropic SDK.
 
 | Component | Needed for |
 | --- | --- |

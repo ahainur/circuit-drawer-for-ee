@@ -86,6 +86,8 @@ Circuit Drawer 是给电力电子论文和报告画电路图的工具。你在�
 
 ### 1、需要什么
 
+1、Windows 安装包包含 Python、带中文字体的 TinyTeX、Poppler、ngspice 和 Anthropic SDK。下表说明程序所用组件及 Python 安装方式的依赖，MATLAB、PLECS 按需要另行准备。
+
 | 组件 | 用途 | 是否必需 |
 | --- | --- | --- |
 | Python 3.10 或更新版本 | 运行程序 | 必需 |
@@ -101,13 +103,31 @@ Circuit Drawer 是给电力电子论文和报告画电路图的工具。你在�
 
 ### 2、安装程序
 
-方法一，从 [GitHub Release](https://github.com/ahainur/circuit-drawer-for-ee/releases) 下载 wheel 文件 `circuit_drawer_for_ee-1.7.0-py3-none-any.whl`，在它所在的文件夹运行：
+#### 64 位 Windows 10 和 11 安装包
+
+1、下载并双击 `CircuitDrawer-Setup-1.7.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+
+2、安装目录使用 ASCII 字符，允许空格。图纸路径、导出路径和 Windows 用户名可包含中文。
+
+3、从桌面或开始菜单打开 **Circuit Drawer**。绘图、预览、导出和 ngspice 仿真可离线完成，AI 助手连接你配置的在线服务。
+
+4、安装包尚未签名，Windows 可能显示“未知发布者”或“Windows 已保护你的电脑”。核对来源和 SHA256 后，可在提供该选项的界面选择“更多信息 → 仍要运行”。在 PowerShell 执行下面的命令，与同一发布页 `SHA256SUMS.txt` 中的对应条目比较。
+
+```powershell
+Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+```
+
+5、升级或卸载前先保存图纸，关闭启动器和正在运行的 Circuit Drawer 命令行任务。升级时运行新版安装程序。卸载入口位于 Windows“设置 → 应用 → Circuit Drawer”，用户图纸及设置会保留。图纸请保存到自己的文档目录。
+
+#### 开发者、macOS 和 Linux 的 Python 安装方式
+
+1、下载 wheel 文件 `circuit_drawer_for_ee-1.7.0-py3-none-any.whl`，在文件所在目录执行下面的命令。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
 python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
-方法二，直接从仓库安装：
+2、也可以执行下面的命令，从仓库安装。
 
 ```bash
 python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
@@ -149,7 +169,7 @@ brew install --cask mactex-no-gui
 brew install poppler
 ```
 
-5、**ngspice**：从 [ngspice 官网](https://ngspice.sourceforge.io/download.html)下载。Windows 解压后使用 `Spice64\bin\ngspice_con.exe`；Linux 用发行版的包管理器安装。程序按以下顺序查找：命令行 `--ngspice`、环境变量 `CIRCUIT_DRAWER_NGSPICE`、PATH 中的 `ngspice_con` 或 `ngspice`。Windows 启动器的“API 与仿真设置”里也可以选择它。
+5、Windows 解压 ngspice 后使用 `Spice64\bin\ngspice_con.exe`，Linux 用发行版的包管理器安装。程序依次查找命令行 `--ngspice`、环境变量 `CIRCUIT_DRAWER_NGSPICE`、随程序配置的运行环境、PATH 中的 `ngspice_con` 或 `ngspice`。Windows 启动器的“API 与仿真设置”也可以指定程序路径。已指定的路径失效时会提示找不到仿真器，需修正或清空该设置后重试。[ngspice 下载](https://ngspice.sourceforge.io/download.html)
 
 6、**MATLAB 与 PLECS**：Simulink 导出使用 Simscape Foundation Library，需要 MATLAB、Simulink 和 Simscape；含 PMSM 或闭环控制器用到 Clarke、Park 变换时还需要 Simscape Electrical。PLECS 导出的是 PLECS Standalone 的原生文件，不是 PLECS Blockset 文件。导出本身不需要安装这两个软件。
 
@@ -174,6 +194,8 @@ cd circuit-drawer-for-ee
 
 ### 5、命令行启动电路编辑器
 
+安装包用户可用安装目录中 `circuit-drawer.exe` 和 `circuit-drawer-control.exe` 的完整路径执行命令。在 PowerShell 中，含空格的程序路径加引号，并在前面加 `&`。
+
 ```bash
 circuit-drawer edit fb.json -t flyback       # fb.json 不存在时从反激模板创建，然后打开浏览器
 circuit-drawer edit fb.json                  # 继续编辑已有的表
@@ -195,9 +217,9 @@ circuit-drawer edit fb.json --port 8770      # 默认端口 8765 被占用时换
 
 ### 6、Windows 启动器
 
-启动器是一个小窗口，让你不开终端也能打开电路、新建电路和管理编辑器。它使用本机已安装的 Python 和本程序，不包含 LaTeX、Poppler 等工具。
+启动器提供打开电路、新建电路和管理编辑器的小窗口。Windows 安装包自带 Python 及出图工具，Python 安装方式使用本机配置的工具。
 
-1、**打开启动器**：在“运行”或终端输入 `circuit-drawer-launcher`（Windows 上不会出现控制台窗口），或运行 `python -m circuit_drawer.launcher`。想在桌面双击打开，可以先用下面的命令找到 Python 的 Scripts 文件夹，再给其中的 `circuit-drawer-launcher.exe` 创建桌面快捷方式：
+1、安装包用户从桌面或开始菜单打开 **Circuit Drawer**。通过 Python 安装的用户运行 `circuit-drawer-launcher` 或 `python -m circuit_drawer.launcher`，也可以用下面的命令找到 Python 的 Scripts 文件夹，为其中的 `circuit-drawer-launcher.exe` 创建快捷方式。
 
 ```bash
 python -c "import sysconfig; print(sysconfig.get_path('scripts'))"

@@ -88,6 +88,8 @@ Coordinates are in "layout units", roughly 1 cm each. Dragging in the editor sna
 
 ### 2.1 Requirements
 
+1、The Windows installer includes Python, TinyTeX with Chinese fonts, Poppler, ngspice and the Anthropic SDK. The following table describes the components used by the program and the requirements for a Python-package installation. MATLAB and PLECS are obtained separately when needed.
+
 | Component | Purpose | Required? |
 | --- | --- | --- |
 | Python 3.10 or newer | Running the program | Yes |
@@ -103,13 +105,31 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 ### 2.2 Installing the program
 
-Option 1: download the wheel `circuit_drawer_for_ee-1.7.0-py3-none-any.whl` from the [GitHub Releases](https://github.com/ahainur/circuit-drawer-for-ee/releases) page and run, in the folder that contains it:
+#### 64-bit Windows 10 and 11 installer
+
+1、Download `CircuitDrawer-Setup-1.7.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+
+2、Use an ASCII installation path. Spaces are supported. Drawing paths, export paths and Windows user names may contain Chinese characters.
+
+3、Open **Circuit Drawer** from the desktop or Start menu. Drawing, previews, exports and ngspice simulation work offline. The AI assistant uses your configured online service.
+
+4、The installer is unsigned. Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the source and SHA256, select **More info → Run anyway** if offered. Compare the command's output with the installer's entry in the release's `SHA256SUMS.txt`.
+
+```powershell
+Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+```
+
+5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run the newer installer to upgrade. Uninstall through Windows **Settings → Apps → Circuit Drawer**. User drawings and settings are retained. Save documents in your own drawing folders.
+
+#### Python installation for developers, macOS and Linux
+
+1、Download the wheel `circuit_drawer_for_ee-1.7.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
 python -m pip install circuit_drawer_for_ee-1.7.0-py3-none-any.whl
 ```
 
-Option 2: install directly from the repository:
+2、You can also install directly from the repository with the following command.
 
 ```bash
 python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
@@ -151,7 +171,7 @@ brew install --cask mactex-no-gui
 brew install poppler
 ```
 
-5、**ngspice:** download it from the [ngspice website](https://ngspice.sourceforge.io/download.html). On Windows, unpack it and use `Spice64\bin\ngspice_con.exe`; on Linux, use your distribution's package manager. The program looks for it in this order: the `--ngspice` command-line option, the environment variable `CIRCUIT_DRAWER_NGSPICE`, then `ngspice_con` or `ngspice` on PATH. The Windows launcher's API and simulation settings can also point to it.
+5、On Windows, unpack ngspice and use `Spice64\bin\ngspice_con.exe`. On Linux, use your distribution's package manager. The program checks the `--ngspice` command-line option, `CIRCUIT_DRAWER_NGSPICE`, a configured bundled runtime, and finally `ngspice_con` or `ngspice` on PATH, in that order. The Windows launcher's API and simulation settings can also specify its path. An invalid explicit path produces a missing-simulator error. Correct or clear that setting before retrying. [Download ngspice](https://ngspice.sourceforge.io/download.html)
 
 6、**MATLAB and PLECS:** the Simulink export uses the Simscape Foundation Library and needs MATLAB, Simulink and Simscape. A PMSM component or a controller using Clarke/Park transforms also needs Simscape Electrical. The PLECS export is a native PLECS Standalone file, not a PLECS Blockset file. Neither program is needed to produce the export files.
 
@@ -176,6 +196,8 @@ Run the example commands in this manual from that folder. The built-in templates
 
 ### 2.5 Starting the circuit editor from the command line
 
+Windows installer users can invoke `circuit-drawer.exe` and `circuit-drawer-control.exe` by their full paths in the installation folder. In PowerShell, place `&` before a quoted executable path containing spaces.
+
 ```bash
 circuit-drawer edit fb.json -t flyback       # create fb.json from the flyback template if missing, then open the browser
 circuit-drawer edit fb.json                  # continue editing an existing table
@@ -197,9 +219,9 @@ circuit-drawer edit fb.json --port 8770      # use another port when 8765 is tak
 
 ### 2.6 Windows launcher
 
-The launcher is a small window for opening circuits, creating circuits and managing editors without a terminal. It uses the Python installation and this program; it does not bundle LaTeX, Poppler or other tools.
+The launcher is a small window for opening circuits, creating circuits and managing editors. The Windows installer supplies it with its Python and drawing tools. A Python-package installation uses the configured tools on your computer.
 
-1、**Opening the launcher:** type `circuit-drawer-launcher` in the Run box or a terminal (on Windows it opens without a console window), or run `python -m circuit_drawer.launcher`. For a desktop icon, find Python's Scripts folder with the command below and create a desktop shortcut to `circuit-drawer-launcher.exe` in it:
+1、After using the Windows installer, open **Circuit Drawer** from the desktop or Start menu. For a Python-package installation, run `circuit-drawer-launcher` or `python -m circuit_drawer.launcher`. To create a shortcut for that installation, use the following command to find Python's Scripts folder, then create a shortcut to its `circuit-drawer-launcher.exe`.
 
 ```bash
 python -c "import sysconfig; print(sysconfig.get_path('scripts'))"

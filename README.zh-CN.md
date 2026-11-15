@@ -8,11 +8,11 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.7.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.7.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 Windows 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/CircuitDrawer-Setup-1.7.0.exe"><img alt="下载 Windows 版 — 离线安装程序 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.7.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit_drawer_for_ee-1.7.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v1.7.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.7.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
-四个按钮均下载同一份 **通用 Python 安装包（`.whl`，需要 Python 3.10+）**，安装步骤见下方[安装说明](#三安装)。macOS 和 Linux 当前为预览支持。
+Windows 按钮下载离线安装程序。macOS 和 Linux 按钮下载通用 Python 安装包（`.whl`，需要 Python 3.10+），当前为预览支持。安装步骤见下方。
 
 [新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.7.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-trial-1.7.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-manuals-1.7.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.7.0/circuit-drawer-public-source-1.7.0.zip)
 
@@ -54,9 +54,27 @@ Circuit Drawer 用一张手工摆放、经过校验的坐标表，画出可直�
 
 ## 三、安装
 
+### 64 位 Windows 10 和 11
+
+1、下载并双击 `CircuitDrawer-Setup-1.7.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+
+2、安装目录使用 ASCII 字符，允许空格。图纸、导出目录和 Windows 用户名可使用中文。
+
+3、从桌面或开始菜单打开 **Circuit Drawer**。安装包包含 Python、带中文字体的 TinyTeX、Poppler、ngspice 和 Anthropic SDK。绘图、预览、导出及 ngspice 仿真可离线使用，AI 助手连接你配置的在线服务。
+
+4、安装包尚未签名，Windows 可能显示“未知发布者”或“Windows 已保护你的电脑”。核对下载来源及 SHA256 后，可在提供该选项的界面选择“更多信息 → 仍要运行”。在 PowerShell 运行下面的命令，将结果与同一发布页 `SHA256SUMS.txt` 中的对应条目比较。
+
+```powershell
+Get-FileHash .\CircuitDrawer-Setup-1.7.0.exe -Algorithm SHA256
+```
+
+5、升级或卸载前先保存图纸，关闭启动器和正在运行的 Circuit Drawer 命令行任务。升级时运行新版安装程序。卸载入口在 Windows“设置 → 应用 → Circuit Drawer → 卸载”，用户图纸和设置会保留。图纸请保存到自己的文档目录。
+
+### 开发者、macOS 和 Linux 的 Python 安装方式
+
 需要 Python 3.10 或更新版本。核心功能不依赖任何第三方 Python 包。
 
-点击上方按钮下载 wheel，在下载文件所在目录打开终端。
+从发布页下载 wheel，在下载文件所在目录打开终端。
 
 Windows：
 
@@ -84,7 +102,7 @@ python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
 
 文档中用到的示例文件在本仓库的 [`examples/`](examples/) 文件夹，不包含在 wheel 里；请从 Release 页面下载源码压缩包，或克隆仓库。
 
-可选组件：
+Python 安装方式可按需要配置下列组件。Windows 安装包已包含 LaTeX、Poppler、中文字体、ngspice 和 Anthropic SDK。
 
 | 组件 | 用途 |
 | --- | --- |

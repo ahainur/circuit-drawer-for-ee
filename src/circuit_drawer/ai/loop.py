@@ -262,12 +262,19 @@ _FENCE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.S)
 
 
 def extract_table(text: str) -> dict:
-    """The last fenced JSON block, or the outermost braces as a fallback."""
+    """Read the last fenced JSON block, or one object surrounded by prose."""
     blocks = _FENCE.findall(text)
-    raw = blocks[-1] if blocks else text[text.find("{"):text.rfind("}") + 1]
-    if not raw.strip():
-        raise ValueError("回复里没有 JSON 坐标表")
-    return json.loads(raw)
+    if blocks:
+        return json.loads(blocks[-1])
+    start = text.find("{")
+    if start < 0:
+        raise json.JSONDecodeError("回复里没有 JSON 坐标表", text, 0)
+    # Keep an unfinished suffix so diagnostics point at the actual missing text.
+    raw = text[start:]
+    table, end = json.JSONDecoder().raw_decode(raw)
+    if "{" in raw[end:] or "}" in raw[end:]:
+        raise json.JSONDecodeError("Extra data", raw, end)
+    return table
 
 
 def _missing_netlist(lay: Layout) -> list[str]:
@@ -606,7 +613,7 @@ class CircuitWorkflow:
                                  [f"{i.code}: {i.message}" for i in report.errors], self.prof.name)
         return first_message(description, self.structure)
 
-    def evaluate(self, reply):
+    def evaluate(self, reply, *, should_stop=lambda: False):
         from .nudge import nudge
         data = extract_table(reply)
         try:
@@ -773,10 +780,11 @@ def generate(description: str, profile: str = "ieee-single",
         if should_stop():
             raise Cancelled("已取消")
         try:
-            result = workflow.evaluate(reply)
+            result = workflow.evaluate(reply, should_stop=should_stop)
             lay, errors, fixes = result.layout, result.errors, result.fixes
         except ValueError as exc:
-            att = Attempt(n, [str(exc) if getattr(exc, "code", None) else f"bad-json: {exc}"], None, reply)
+            error = f"bad-json: {exc}" if isinstance(exc, json.JSONDecodeError) else str(exc)
+            att = Attempt(n, [error], None, reply)
             gen.attempts.append(att)
             on_attempt(att)
             log(f"第 {n} 轮：回复不是合法{workflow.document_kind}（{exc}）")

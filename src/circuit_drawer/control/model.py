@@ -60,7 +60,7 @@ SECTIONS = ("blocks", "links", "texts", "regions")
 # sections that carry numbers, not drawing: ``loop`` (transfer functions,
 # plant, loop breaks) is read by ``loop.py``, ``code`` (sample rate, number
 # format, limits) by ``codegen.py``; neither is drawn
-DATA_SECTIONS = ("loop", "code", "digital", "functions", "control_ai")
+DATA_SECTIONS = ("loop", "code", "digital", "functions", "control_ai", "circuit")
 
 _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _PORT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$")

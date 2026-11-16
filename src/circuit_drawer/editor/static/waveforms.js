@@ -43,17 +43,18 @@
       if (id===revision) installed(result);
     } catch (e) { if(id===revision) { note(e.message,true); controls(); draw(); } }
   }
-  async function importCsv(args) {
+  async function importCsv(args, isCurrent = () => true) {
     const id=++revision;
     note("正在读取 CSV…");
     const result=await api("/api/waveform-import",{layout,profile,preview_target:previewTarget,...args});
+    if (!isCurrent()) throw new Error("图纸已改变，请重新选择对应版本的波形。");
     if (id===revision) installed(result);
   }
   window.openWaveforms=async (options={}) => {
     if (!layout) return;
     panel.hidden=false;
     try {
-      if (options.source) await importCsv({source:options.source});
+      if (options.source) await importCsv({source:options.source}, options.isCurrent);
       else if (layout.waveform?.source) installed(await request("/api/waveform-view",layout.waveform),false);
       else { info=null; controls(); draw(); note("先导入仿真或测量 CSV。第一行是列名，随后是数值数据。"); }
     } catch (e) { info=null; controls(); draw(); note(e.message,true); }

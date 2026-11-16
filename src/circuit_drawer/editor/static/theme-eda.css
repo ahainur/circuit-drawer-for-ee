@@ -18,9 +18,9 @@ header { background: var(--panel); border-bottom: 1px solid #8c887f; }
 .menu-bar > button { padding: 2px 9px; font-size: 12px; border: 1px solid transparent; background: transparent; }
 .menu-bar > button:hover, .menu-bar > button[aria-expanded="true"] { background: var(--accent); color: #fff; }
 .app-label { font-size: 11px; color: #666; letter-spacing: 0; white-space: nowrap; }
-.app-label::after { content: " 1.8 | 原理图编辑器"; }
-html[lang="zh-TW"] .app-label::after { content: " 1.8 | 電路圖編輯器"; }
-html[lang="en"] .app-label::after { content: " 1.8 | Schematic editor"; }
+.app-label::after { content: " 2.0 | 原理图编辑器"; }
+html[lang="zh-TW"] .app-label::after { content: " 2.0 | 電路圖編輯器"; }
+html[lang="en"] .app-label::after { content: " 2.0 | Schematic editor"; }
 .quick-tools { padding: 3px 4px; min-height: 32px; gap: 4px;
   background: linear-gradient(#f6f5f1, #e4e1da); border-bottom: 1px solid var(--line); }
 .tool-group { padding: 0 5px; border-right: 1px solid var(--line); box-shadow: 1px 0 0 #fff; }

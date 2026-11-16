@@ -11,11 +11,12 @@ from dataclasses import dataclass
 import json
 import re
 
-from ..ai.loop import Evaluation, extract_table
+from ..ai.loop import Cancelled, Evaluation, extract_table
 from ..ai.prompt import CONTROL_HINTS, control_system_prompt
+from ..geometry import font_of
 from ..profiles import get_profile
 from . import library
-from .check import (BLOCK_CLEARANCE, MIN_ARROW_RUN, SIDE_DIR, TEXT_PAD, TEXT_PAD_Y,
+from .check import (AUTO_ROUTE_MIN_RUN, BLOCK_CLEARANCE, MIN_ARROW_RUN, SIDE_DIR, TEXT_PAD, TEXT_PAD_Y,
                     check, geometry, on_boundary, port_point, text_box_size)
 from .loop import evaluate as number, parse_tf
 from .model import BLOCK_TYPES, BOX_TYPES, ControlError, parse, validate_appearance
@@ -27,11 +28,12 @@ BLOCK_GAP = 1.0              # room for arrowheads and routes between boxes
 ROW_GAP = 2.0                # routing lanes between rows
 REGION_PAD = 0.4             # clear block labels when framing a group
 ROUTE_PASSES = 3             # circle ports depend on the final printed scale
+CONTROL_ROUTE_BUDGET = 120000  # bounded search, including edits through dense existing feedback wires
 ARROW_MARGIN = 0.08          # cm above the checker minimum, allowing scale rounding
 PORT_LANE_HALF = 0.04        # cm reserved beside an unused port's arrow approach
-PORT_EXIT_LEAD = 0.08        # cm: a source has no arrowhead, so can turn earlier
+PORT_EXIT_LEAD = 0.08        # cm: edits of fixed geometry may have tightly spaced ports
 BLOCK_FIELDS = {"id", "type", "text", "label", "label_pos", "signs", "style", "fill", "border", "color", "size_pt", "on", "toggle"}
-STRUCTURE_FIELDS = {"template", "snippets", "name", "title", "blocks", "links", "regions", "texts", "inputs", "outputs", "stateful", "dynamic_links", "remove", "loop"}
+STRUCTURE_FIELDS = {"template", "snippets", "name", "title", "blocks", "links", "regions", "texts", "inputs", "outputs", "stateful", "dynamic_links", "remove", "loop", "code", "circuit"}
 ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 REF = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$")
 
@@ -134,7 +136,7 @@ def to_structure(raw, profile="double"):
             "texts": [{"index": i, "text": t["text"]} for i, t in enumerate(raw.get("texts", []))],
             "links": links, "inputs": metadata.get("inputs", inputs), "outputs": metadata.get("outputs", outputs),
             "stateful": metadata.get("stateful", []), "dynamic_links": metadata.get("dynamic_links", []), "regions": regions,
-            **({"loop": deepcopy(raw["loop"])} if "loop" in raw else {})}
+            **{key: deepcopy(raw[key]) for key in ("loop", "code", "circuit") if key in raw}}
 
 
 def _merge_objects(base, patch):
@@ -228,6 +230,15 @@ def expand(proposal, current, profile, directory=None):
         # mutually exclusive forms into the same object.
         if "tf" in proposal["loop"]:
             structure["loop"]["tf"].update(deepcopy(proposal["loop"]["tf"]))
+    for key in ("code", "circuit"):
+        if key in proposal:
+            if not isinstance(proposal[key], dict):
+                fail("control-schema", f"{key} 必须是对象")
+            structure[key] = _merge_objects(structure.get(key, {}), proposal[key])
+            if key == "circuit":
+                for field in ("inputs", "outputs"):
+                    if field in proposal[key]:
+                        structure[key][field] = deepcopy(proposal[key][field])
     explicit_tf = {b["id"] for b in proposal.get("blocks", []) if "tf" in b}
     patched_tf = proposal.get("loop", {}).get("tf", {})
     for block in structure["blocks"]:
@@ -236,7 +247,8 @@ def expand(proposal, current, profile, directory=None):
         if "tf" in block:
             structure.setdefault("loop", {}).setdefault("tf", {})[block["id"]] = deepcopy(block["tf"])
     # Explicit removals remove their old data references, never arbitrary unknown ids.
-    for mapping in (structure.get("loop", {}).get("tf", {}), base.get("code", {}).get("blocks", {}),
+    for mapping in (structure.get("loop", {}).get("tf", {}), structure.get("code", {}).get("blocks", {}),
+                    base.get("code", {}).get("blocks", {}),
                     base.get("functions", {}), base.get("digital", {}).get("adc", {})):
         for bid in removed:
             mapping.pop(bid, None)
@@ -358,7 +370,7 @@ def _algebraic_cycles(s, edges):
         visit(node)
 
 
-def _new_blocks(structure, base, prof):
+def _new_blocks(structure, base, prof, arrange=False, spacing=1.0):
     old = {b["id"]: b for b in base.get("blocks", [])}
     result, fresh = [], []
     for b in structure["blocks"]:
@@ -368,11 +380,32 @@ def _new_blocks(structure, base, prof):
                 block.pop(key, None)
             fresh.append(block)
         if block["type"] in BOX_TYPES and "size" not in block:
-            w, h = text_box_size(block.get("text", ""), prof.font_pt)
+            w, h = text_box_size(block.get("text", ""), font_of(block.get("size_pt"), prof))
             block["size"] = [max(0.8, w + 2 * TEXT_PAD + .1), max(.6, h + 2 * TEXT_PAD_Y + .1)]
         if block["type"] == "switch" and "throws" not in block:
             block["throws"] = {name: [0, 0] for name in b["throws"]}
         result.append(block)
+    if (not old or arrange) and result:
+        from .arrange import place
+        place(result, structure, prof, spacing)
+        if not old:
+            # Fonts keep their printed size when a wide diagram shrinks.
+            # Fit freshly generated boxes at that scale before routing wires.
+            for _ in range(ROUTE_PASSES):
+                scale = check({'kind': 'control', 'name': 'placement', 'blocks': result, 'links': []}, prof).geometry.s
+                resized = False
+                for block in result:
+                    if block['type'] not in ('block', 'tag') or not block.get('text'):
+                        continue
+                    w, h = text_box_size(block['text'], font_of(block.get('size_pt'), prof))
+                    required = [(w + 2 * TEXT_PAD + .1) / scale, (h + 2 * TEXT_PAD_Y + .1) / scale]
+                    size = [max(old_size, needed) for old_size, needed in zip(block['size'], required)]
+                    if any(value > old_size + 1e-4 for value, old_size in zip(size, block['size'])):
+                        block['size'], resized = size, True
+                if not resized:
+                    break
+                place(result, structure, prof, spacing)
+        return result
     # Reuse the snippet placement convention for the next row; existing blocks stay put.
     anchor = (0, 0)
     if base.get("blocks") and fresh:
@@ -407,21 +440,37 @@ def _new_blocks(structure, base, prof):
     return result
 
 
-def compile_structure(s, base, profile):
+def compile_structure(s, base, profile, *, arrange=False, reroute=False, spacing=1.0, check_cancelled=None):
     """Build a conventional control table; never let AI-provided coordinates through."""
     prof = get_profile(profile)
     out = deepcopy(base)
     out.update(kind="control", name=s["name"], title=s["title"], profile=prof.name)
-    out["blocks"] = _new_blocks(s, base, prof)
+    for key in ("code", "circuit"):
+        if key in s:
+            out[key] = deepcopy(s[key])
+    out["blocks"] = _new_blocks(s, base, prof, arrange, spacing)
     for text in s["texts"]:
         out["texts"][text["index"]]["text"] = text["text"]
+    if arrange and base.get("blocks"):
+        old_by_id = {b["id"]: b for b in base["blocks"]}
+        new_by_id = {b["id"]: b for b in out["blocks"]}
+        for text in out.get("texts", []):
+            at = text.get("at")
+            if not at:
+                continue
+            owner = min(old_by_id, key=lambda bid: (sum((a-b)**2 for a,b in zip(at, old_by_id[bid].get("at", old_by_id[bid].get("pole")))), bid))
+            old, new = old_by_id[owner], new_by_id[owner]
+            a, b = old.get("at", old.get("pole")), new.get("at", new.get("pole"))
+            text["at"] = [at[0]+b[0]-a[0], at[1]+b[1]-a[1]]
     out["control_ai"] = {key: deepcopy(s[key]) for key in ("inputs", "outputs", "stateful", "dynamic_links")}
     if "loop" in s:
         out["loop"] = deepcopy(s["loop"])
     _, native, _, base_outputs = structural_links(base, profile)
     same_geometry = {b["id"] for b in out["blocks"] for old in base["blocks"] if b["id"] == old["id"] and all(b.get(k) == old.get(k) for k in ("type", "at", "size", "pole", "throws"))}
+    if reroute or arrange:
+        same_geometry = set()
     kept, pending = [], []
-    for link in s["links"]:
+    for link in sorted(s["links"], key=lambda link: (link["from"], link["to"])):
         key = (link["from"], link["to"])
         # Rerouting changes geometry, not a logical connection's appearance.
         link = {**{k: v for k, v in native.get(key, {}).items() if k in ("color", "dash")}, **link}
@@ -432,6 +481,26 @@ def compile_structure(s, base, profile):
     ids = {b["id"] for b in out["blocks"]}
     # Keep explicit template input/output stubs and their captions.
     kept += [deepcopy(l) for l in base["links"] if l.get("open") and any(isinstance(l.get(k), str) and endpoint(l[k])[0] in ids and endpoint(l[k])[0] in s[boundary] for k, boundary in (("from", "outputs"), ("to", "inputs")))]
+    if arrange:
+        # Open input/output stubs are geometry anchored to their owning block.
+        old_blocks = {b["id"]: b for b in base["blocks"]}
+        new_blocks = {b["id"]: b for b in out["blocks"]}
+        for link in kept:
+            if not link.get("open"):
+                continue
+            ref = next((link[k] for k in ("from", "to") if isinstance(link.get(k), str)), None)
+            if ref is None:
+                continue
+            bid = endpoint(ref)[0]
+            old, new = old_blocks[bid], new_blocks[bid]
+            a, b = old.get("at", old.get("pole")), new.get("at", new.get("pole"))
+            def shift(p):
+                return [p[0]+b[0]-a[0], p[1]+b[1]-a[1]]
+            for key in ("from", "to"):
+                if isinstance(link.get(key), list):
+                    link[key] = shift(link[key])
+            if "via" in link:
+                link["via"] = [shift(p) for p in link["via"]]
     # Keep original order as well as geometry, including interspersed output stubs.
     def route_key(link):
         return json.dumps([link.get(k) for k in ("from", "via", "to")], sort_keys=True)
@@ -464,11 +533,12 @@ def compile_structure(s, base, profile):
                 "from": [bounds[0] - REGION_PAD, bounds[1] - REGION_PAD],
                 "to": [bounds[2] + REGION_PAD, bounds[3] + REGION_PAD]})
     if pending:
-        _route_links(out, kept, pending, prof)
+        min_run = AUTO_ROUTE_MIN_RUN if arrange or reroute or not base.get('blocks') else 0.0
+        _route_links(out, kept, pending, prof, min_run=min_run, check_cancelled=check_cancelled)
     return out
 
 
-def _route_links(out, kept, pending, prof):
+def _route_links(out, kept, pending, prof, *, min_run=0.0, check_cancelled=None):
     from ..modules import _grid_route, _on, _segs, _trim
     # Use the same visibility-grid router as module wiring, with control geometry.
     scale = check(out, prof).geometry.s
@@ -485,20 +555,26 @@ def _route_links(out, kept, pending, prof):
             if isinstance(native["from"], str) and path:
                 branches.setdefault(native["from"], []).extend(_segs(path))
         pins = []
+        ports = {}
         reservations = {}
         for link in kept + pending:
             for key in ("from", "to"):
                 if isinstance(link.get(key), str):
                     bid, side, offset = endpoint(link[key])
                     pins.append(tuple(round(v, 4) for v in port_point(dia.block(bid), side, offset, scale)))
+                    ports[link[key]] = pins[-1]
                     if link in pending and side in SIDE_DIR:
                         point = pins[-1]
-                        distance = MIN_ARROW_RUN + ARROW_MARGIN if key == "to" else PORT_EXIT_LEAD
+                        distance = min_run or (MIN_ARROW_RUN + ARROW_MARGIN if key == 'to' else PORT_EXIT_LEAD)
                         lead = tuple(x + d * distance / scale for x, d in zip(point, SIDE_DIR[side]))
                         half = PORT_LANE_HALF / scale
                         reservations[link[key]] = (min(point[0], lead[0])-half, min(point[1], lead[1])-half,
                                                    max(point[0], lead[0])+half, max(point[1], lead[1])+half)
-        for link in pending:
+        # Route the nearest sink first, so a fan-out grows from its short trunk
+        # instead of trapping that sink behind a long detour to another row.
+        ordered = sorted(pending, key=lambda link: (link['from'],
+                         sum(abs(x - y) for x, y in zip(ports[link['from']], ports[link['to']])), link['to']))
+        for link in ordered:
             ends = []
             for key in ("from", "to"):
                 bid, side, offset = endpoint(link[key])
@@ -508,25 +584,23 @@ def _route_links(out, kept, pending, prof):
                 ends.append((point, face, True))
             same = branches.get(link["from"], [])
             route_boxes = boxes + [box for ref, box in reservations.items() if ref not in (link["from"], link["to"])]
-            starts = [] if same else [ends[0]]
-            for a, b in same:
-                middle = tuple(round((x + y) / 2, 4) for x, y in zip(a, b))
-                starts.append((middle, None, False))
-            path = None
-            for start in starts:
-                path = _grid_route(start, ends[1], wires, pins, route_boxes, same, clearance=BLOCK_CLEARANCE / scale)
-                if path and len(path) > 1 and sum(abs(x-y) for x,y in zip(path[-2], path[-1])) * scale < MIN_ARROW_RUN + ARROW_MARGIN:
-                    target, face, _ = ends[1]
-                    if face:
-                        lead = tuple(round(x + d * (MIN_ARROW_RUN + ARROW_MARGIN) / scale, 4) for x, d in zip(target, face))
-                        path = _grid_route(start, (lead, face, False), wires, pins, route_boxes, same, clearance=BLOCK_CLEARANCE / scale)
-                        if path:
-                            path.append(target)
-                            path = [p for i, p in enumerate(path) if i in (0, len(path)-1) or not _on(p, path[i-1], path[i+1])]
-                if path:
-                    path = _trim(path, same)
-                    if len(path) > 1:
-                        break
+            path = _grid_route(ends[0], ends[1], wires, pins, route_boxes, same,
+                               clearance=BLOCK_CLEARANCE / scale, min_run=min_run / scale,
+                               budget=CONTROL_ROUTE_BUDGET, check_cancelled=check_cancelled, source_wires=same)
+            if not min_run and path and len(path) > 1 and sum(abs(x-y) for x,y in zip(path[-2], path[-1])) * scale < MIN_ARROW_RUN + ARROW_MARGIN:
+                target, face, _ = ends[1]
+                if face:
+                    lead = tuple(round(x + d * (MIN_ARROW_RUN + ARROW_MARGIN) / scale, 4) for x, d in zip(target, face))
+                    path = _grid_route(ends[0], (lead, face, False), wires, pins, route_boxes, same,
+                                       clearance=BLOCK_CLEARANCE / scale, budget=CONTROL_ROUTE_BUDGET,
+                                       check_cancelled=check_cancelled, source_wires=same)
+                    if path:
+                        path.append(target)
+                        path = [p for i, p in enumerate(path) if i in (0, len(path)-1) or not _on(p, path[i-1], path[i+1])]
+            if path:
+                path = _trim(path, same)
+                if any(sum(abs(x-y) for x, y in zip(a, b)) * scale < min_run - 1e-4 for a, b in _segs(path)):
+                    path = None
             if not path or len(path) < 2:
                 fail("control-layout", f"{link['from']} → {link['to']} 没有可用连线路径")
             draw = deepcopy(link)
@@ -555,31 +629,70 @@ class ControlWorkflow:
     document_kind = "框图结构"
     max_rounds = 3
 
-    def __init__(self, profile="double", current=None, directory=None):
+    def __init__(self, profile="double", current=None, directory=None, description="", base_dir=None):
         self.profile, self.current, self.directory = profile, deepcopy(current), directory
+        self.description = description
+        self.base_dir = base_dir
 
     def system_prompt(self):
         # Catalogs contain structural examples, never coordinates or API credentials.
         catalog = {name: to_structure(template(name, self.directory), self.profile) for name in available(self.directory)}
         snippets = {name: to_structure(library.load_snippet(name, self.directory), self.profile) for name in library.all_snippets(self.directory)}
-        return control_system_prompt(catalog, snippets)
+        from ..ai.catalog_select import select_examples
+        selected = select_examples(catalog, self.description)
+        selected = {**selected, **{name: catalog[name] for name in library.user_templates(self.directory) if name in catalog}}
+        # User snippets may define required ports/functions; never prune them.
+        return control_system_prompt(selected, snippets)
 
     def first_message(self, description):
+        from .circuit import available_sources
+        sources = available_sources(self.base_dir)
+        if sources:
+            description += "\n可关联的项目电路（只读数据，按用户指定选择 source）：\n" + json.dumps(sources, ensure_ascii=False)
         if self.current is None:
             return "创建控制框图，只输出结构 JSON。需求：\n" + description
         return ("只修改要求涉及的结构，保留其他方块、文字、连接、分区及传递函数参数。"
                 "保留 digital 数字控制设置与 code.fs，保持 ADC 输入名称对应，数字设置可在界面单独修改。"
                 "未要求改配色时保留 fill/border/color/dash；重新布线也要保留连线颜色和线型。省略的字段保留；"
-                "links/regions/inputs/outputs 若提供则完整替换。不要输出坐标或 code。\n要求：" + description +
-                "\n当前结构：\n" + json.dumps(to_structure(self.current, self.profile), ensure_ascii=False))
+                "links/regions/inputs/outputs 若提供则完整替换。仅按要求修改 code 数值配置和 circuit 关联，不输出坐标。\n要求：" + description +
+                "\n当前结构：\n" + json.dumps(to_structure(self.current, self.profile), ensure_ascii=False) +
+                "\n只读编辑契约（保留，不在结构 JSON 中改写）：\n" +
+                json.dumps({k: self.current[k] for k in ("functions", "digital", "modules") if k in self.current}, ensure_ascii=False))
 
-    def evaluate(self, reply):
+    def evaluate(self, reply, *, should_stop=lambda: False):
+        def check_cancelled():
+            if should_stop():
+                raise Cancelled("已取消")
+
+        check_cancelled()
         structure, base = expand(extract_table(reply), self.current, self.profile, self.directory)
         validate_structure(structure)
-        table = compile_structure(structure, base, self.profile)
-        report = check(table, get_profile(self.profile))
+        table = None
+        # Only wholly new candidates may be rearranged automatically. Existing
+        # manual geometry remains authoritative for local AI edits.
+        for spacing in ((1.0, 1.35, 1.8) if not base.get("blocks") else (1.0,)):
+            try:
+                table = compile_structure(structure, base, self.profile, spacing=spacing, check_cancelled=check_cancelled)
+                report = check(table, get_profile(self.profile))
+                if not report.errors:
+                    break
+            except StructureError:
+                if spacing == 1.8 or base.get("blocks"):
+                    raise
+        if table is None:
+            fail("control-layout", "本地布局尝试失败")
         collisions = [warning for warning in report.warnings if warning.startswith("texts ") and warning.endswith(" overlap")]
         errors = ["control-layout: " + error + " — " + CONTROL_HINTS["control-layout"] for error in report.errors + collisions]
+        if not errors and "circuit" in table:
+            from .circuit import resolve
+            from ..simulation_export import build_circuit
+            from ..layout import Layout
+            try:
+                circuit, source, _ = resolve(table, self.base_dir)
+                build_circuit(Layout.from_dict(circuit), circuit.get("profile") or "ieee-double",
+                              base_dir=source.parent, control="continuous")
+            except (ValueError, TypeError, KeyError) as exc:
+                errors.append("control-schema: " + str(exc))
         return Evaluation(ControlDocument(table, structure), errors)
 
     def unreadable(self, exc):

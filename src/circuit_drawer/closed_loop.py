@@ -1,4 +1,4 @@
-"""Closed-loop simulation: a control table drives PWM or VCO switches.
+"""Closed-loop control: PWM/VCO simulation and sampled SPS export.
 
 The circuit table's ``closed_loop`` section links the two tables::
 
@@ -13,9 +13,11 @@ The circuit table's ``closed_loop`` section links the two tables::
 ``inputs`` names every input of the controller (``codegen.plan``): a fixed
 reference (``value``, optionally ramped from 0 over ``ramp`` seconds) or a
 measured signal, by the name of a ``simulation.probes`` channel.  ``outputs``
-maps a controller output, read as a duty cycle 0..1, onto PWM switches; each
-switch keeps its own frequency, edge times and start delay from
-``simulation.components`` and its fixed ``duty`` is not used.
+maps a controller output, read as a duty cycle 0..1, onto PWM switches.
+Unpaired switches keep their frequency, edge times and start delay from
+``simulation.components``. Each complementary pair shares the upper switch's
+frequency and delay, with the longer rise/fall times of the pair. Fixed
+open-loop duty values are replaced by the controller output.
 With ``modulation: vco``, the command instead denotes Hz, clamped to explicit
 frequency bounds and integrated into a shared phase for the switch group.
 
@@ -37,11 +39,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .sps import DEFAULT_SAMPLES, FIELDS as SPS_FIELDS, Timing as SpsTiming
+
 KEYS = ("control", "inputs", "outputs", "note")
 INPUT_KEYS = ("probe", "value", "ramp", "filter")
-MODULATIONS = ("pwm", "vco")
+MODULATIONS = ("pwm", "vco", "sps")
 VCO_FIELDS = ("frequency_min", "frequency_max")  # Hz, explicit positive ordered limits
-OUTPUT_KEYS = ("switches", "complement", "dead_time", "model", "modulation", *VCO_FIELDS)
+OUTPUT_KEYS = ("switches", "complement", "dead_time", "model", "modulation", *VCO_FIELDS, *SPS_FIELDS)
 MODELS = ("switching", "average")
 ROOT_ABS = 1e-6            # rad/s: a root this small is s = 0
 DEFAULT_W = 2 * math.pi * 1e3
@@ -217,6 +221,8 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
         modulation = cfg.get("modulation", "pwm")
         if modulation not in MODULATIONS:
             raise ClosedLoopError(f"{what}.modulation 须为 {list(MODULATIONS)}")
+        if modulation == "pwm" and comp and len(comp) != len(sws):
+            raise ClosedLoopError(f"{what}：PWM 的 switches 与 complement 须一一对应（上管、下管）")
         bounds = {}
         if modulation == "vco":
             bounds = {k: _num(cfg.get(k), f"{what}.{k}") for k in VCO_FIELDS}
@@ -224,9 +230,24 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
                 raise ClosedLoopError(f"{what}：要求 0 < frequency_min < frequency_max，单位 Hz")
         elif set(cfg).intersection(VCO_FIELDS):
             raise ClosedLoopError(f"{what}：{', '.join(VCO_FIELDS)} 仅用于 VCO 变频调制")
+        if modulation == "sps":
+            if len(sws) != 4 or len(comp) != 4:
+                raise ClosedLoopError(f"{what}：SPS 的 switches/complement 各需四项，按原A、原B、副A、副B桥臂排列上/下管")
+            try:
+                timing = SpsTiming(_num(cfg.get('frequency'), what+'.frequency'),
+                    _num(cfg.get('phase_min'), what+'.phase_min'),
+                    _num(cfg.get('phase_max'), what+'.phase_max'), dead,
+                    cfg.get('samples_per_cycle', DEFAULT_SAMPLES))
+            except ValueError as exc:
+                raise ClosedLoopError(f"{what}：{exc}") from None
+            bounds = {k: getattr(timing, k) for k in SPS_FIELDS}
+        elif set(cfg).intersection(SPS_FIELDS):
+            raise ClosedLoopError(f"{what}：{', '.join(SPS_FIELDS)} 仅用于 SPS 相移调制")
         model = cfg.get("model", "average" if comp and modulation == "pwm" else "switching")
         if modulation == "vco" and model != "switching":
             raise ClosedLoopError(f"{what}：VCO 变频调制只支持 switching 模型")
+        if modulation == "sps" and model != "switching":
+            raise ClosedLoopError(f"{what}：SPS 调制只支持 switching 模型")
         if model not in MODELS or (model == "average" and len(comp) != len(sws)):
             raise ClosedLoopError(f"{what}.model 须为 {list(MODELS)}；average 用于桥臂，"
                                   f"switches 与 complement 一一对应（上管、下管）")
@@ -247,6 +268,8 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
         loop.digital = parse(raw["digital"], pl, spec.params)
         if loop.digital.pwm_bits and any(cfg.get('modulation') == 'vco' for cfg in loop.outputs.values()):
             raise ClosedLoopError("VCO 的输出单位为 Hz，不能使用占空比 digital.pwm_bits；请移除此设置")
+        if loop.digital.pwm_bits and any(cfg.get('modulation') == 'sps' for cfg in loop.outputs.values()):
+            raise ClosedLoopError("SPS 的输出单位为 rad，不能使用占空比 digital.pwm_bits；请移除此设置")
         loop.plan = prepare(pl, loop.digital)
         loop.warnings = [NOTE]
     else:
@@ -471,6 +494,23 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
         duty = duty_node(loop, bid)
         if loop.digital:
             out.append(f"V{duty} {duty} 0 DC {_g(cfg.get('frequency_min', 0))}")
+        if cfg.get('modulation') == 'sps':
+            timing = validate_sps(cfg, switches, tr)
+            if native:
+                out.append('* SPS: native sampled gate scheduler')
+            else:
+                from .sps_spice import sources, tick_count
+                if loop.digital or len(loop.outputs) != 1:
+                    raise ClosedLoopError('ngspice SPS 暂仅支持连续控制器与单一 SPS 输出组；数字、多速率或混合输出尚未验收')
+                if tr.get('node_capacitance', 0) <= 0:
+                    raise ClosedLoopError('ngspice SPS 要求显式设置正的 transient.node_capacitance 处理浮置网络；不会自动接地或修改电路，须核对该数值电容的敏感性')
+                try:
+                    tick_count(timing, tr['stop'])
+                except ValueError as exc:
+                    raise ClosedLoopError(str(exc)) from exc
+                out += sources(['ctl_' + switches[sw][0] for sw in cfg['switches'] + cfg['complement']])
+                loop.warnings.append('ngspice SPS 实验模式：连续控制、单组、前瞻 PWL；数值边沿为时间格的 0.001，死区不缩短。必须复核阶跃、步长及显式节点电容敏感性；不代表已整定或原生验收。')
+            continue
         if cfg.get('modulation') == 'vco':
             out += vco_lines(index, cfg, switches, duty, tr)
             continue
@@ -485,13 +525,30 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
                 out.append(f"Bctl_{name} ctl_{name} 0 V = 1 - min(max(v({duty}), 0), 1)")
             continue
         bridge = bool(cfg["complement"])
-        for sw in cfg["switches"]:
-            name, val = switches[sw]
-            out += modulator(name, val, duty, sw, triangle=bridge, dead=cfg["dead_time"])
-        for sw in cfg["complement"]:
-            name, val = switches[sw]
-            out += modulator(name, val, duty, sw, triangle=True, dead=cfg["dead_time"], low=True)
+        for sw, (name, val), low in pwm_drives(cfg, switches):
+            if bridge:
+                from .spice import check_pwm_timing
+                check_pwm_timing(sw, val, tr)
+            out += modulator(name, val, duty, sw, triangle=bridge, dead=cfg["dead_time"], low=low)
     return out
+
+
+def pwm_drives(cfg, switches):
+    """Pairwise carrier timing shared by ngspice and both native exporters."""
+    if not cfg["complement"]:
+        return [(sw, switches[sw], False) for sw in cfg["switches"]]
+    drives = []
+    for upper, lower in zip(cfg["switches"], cfg["complement"]):
+        high, low = switches[upper][1], switches[lower][1]
+        timing = {"frequency": high["frequency"], "delay": high["delay"],
+                  "rise": max(high["rise"], low["rise"]), "fall": max(high["fall"], low["fall"])}
+        edge = (timing["rise"] + timing["fall"]) / 2
+        if cfg["dead_time"] + MIN_PULSE_EDGES * 2 * edge >= .5 / timing["frequency"]:
+            raise ClosedLoopError(f"{upper}/{lower}：PWM 死区和边沿过长，半周期内没有足够导通时间")
+        for sw, is_lower in ((upper, False), (lower, True)):
+            name, values = switches[sw]
+            drives.append((sw, (name, {**values, **timing}), is_lower))
+    return drives
 
 
 def vco_lines(index, cfg, switches, signal, tr):
@@ -549,8 +606,9 @@ def modulator(name: str, val: dict, duty: str, label: str, *, triangle=False, de
     reset until the carrier passes the duty (trailing edge).  In a bridge leg
     the carrier is a triangle (centre-aligned) so both edges are compares: the
     upper switch is on below duty - dead/T, the lower above duty + dead/T,
-    which leaves ``dead`` seconds with both off at every edge.  A leg's duty
-    is kept MIN_PULSE_EDGES edge times away from 0 and 1."""
+    giving a nominal ``dead`` gap at constant duty. Continuous duty changes
+    affect that gap. A leg's duty is kept MIN_PULSE_EDGES edge times away
+    from 0 and 1."""
     period = 1 / val["frequency"]
     edge = (val["rise"] + val["fall"]) / 2
     gate = f"(time >= {_g(val['delay'])} ? 1 : 0)*" if val["delay"] > 0 else ""
@@ -587,3 +645,16 @@ def average_leg(upper: str, duty: str, p: str, mid: str, n: str) -> list[str]:
             f"Bavg_{upper} cd_{upper}_avg {n} V = {d}*v({p},{n})",
             f"Vavg_{upper} cd_{upper}_avg {mid} 0",
             f"Bdc_{upper} {p} {n} I = {d}*i(Vavg_{upper})"]
+
+
+def validate_sps(cfg, switches, tr):
+    """Native and internal export front doors must share timing checks."""
+    t = SpsTiming(cfg['frequency'], cfg['phase_min'], cfg['phase_max'], cfg['dead_time'], cfg['samples_per_cycle'])
+    group = [switches[sw][1] for sw in cfg['switches'] + cfg['complement']]
+    if any(v['delay'] != 0 for v in group):
+        raise ClosedLoopError('SPS 使用共享启动：首周期全关断；所有开关 delay 须为 0')
+    if any(tr[key] > t.ts + 8*math.ulp(t.ts) for key in ('max_step', 'step')):
+        raise ClosedLoopError(f'SPS 时间步长过大：step 和 max_step 均须 ≤ {t.ts:g} s')
+    if tr['stop'] < 3 / t.frequency:
+        raise ClosedLoopError('SPS 结束时间须覆盖至少三个开关周期（含启动和命令流水延迟）')
+    return t

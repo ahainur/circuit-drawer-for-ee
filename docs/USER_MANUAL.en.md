@@ -2,9 +2,22 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | [繁體中文](USER_MANUAL.zh-TW.md) | English
 
-This manual covers Circuit Drawer for EE 1.8.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 2.0.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
 Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
+
+## Agent workflow in 2.0
+
+1、Click Agent in either editor, choose a blank canvas or the current drawing, and describe the task. The prompt library supports parameter entry, personal prompts and a close button. AI uses your configured online API service.
+
+2、Review drawing and simulation-parameter candidates using before, after and overlay views. Adopt a candidate to continue the task, or undo its transaction in the editor. Save writes the drawing to JSON.
+
+3、A control diagram can include the reference, error, controller, modulator, power stage and feedback. Save the power circuit beside the control file, specify its filename and numerical settings, then adopt the candidate to run a supported ngspice loop or export PLECS／Simulink. Open and solve native models in the corresponding application. External MCP clients connect through the optional Python MCP installation.
+
+4、Results show measured waveforms, sampling windows, metrics and files. Task history belongs to the current editor service session. The agent-output directory beside the drawing retains run records. Automatic modes use fixed-frequency internal PWM. Variable-frequency cycle repeatability is shown as unverified.
+
+5、The internal mode check and the results page's uniformly sampled cycle check can disagree. Inspect the original waveforms, channels and sampling windows together. Dynamic PWM dead time uses a carrier-threshold approximation and requires verification against the actual gate timing. SPS currently uses one two-bridge group. Unified scheduling for two outputs sharing a primary bridge remains under development.
+
 
 ## Contents
 
@@ -107,7 +120,7 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 #### 64-bit Windows 10 and 11 installer
 
-1、Download `CircuitDrawer-Setup-1.8.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-2.0.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Use an ASCII installation path. Spaces are supported. Drawing paths, export paths and Windows user names may contain Chinese characters.
 
@@ -116,17 +129,17 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 4、The installer is unsigned. Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the source and SHA256, select **More info → Run anyway** if offered. Compare the command's output with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run the newer installer to upgrade. Uninstall through Windows **Settings → Apps → Circuit Drawer**. User drawings and settings are retained. Save documents in your own drawing folders.
 
 #### Python installation for developers, macOS and Linux
 
-1、Download the wheel `circuit_drawer_for_ee-1.8.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download the wheel `circuit_drawer_for_ee-2.0.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
 ```
 
 2、You can also install directly from the repository with the following command.
@@ -2515,3 +2528,10 @@ A horizontal scale below 0.55 means the drawing does not fit the column; the com
 4、Folded boxes may not overlap each other or hide the symbols, leads, labels or pins of visible outside parts (`module-box-overlap`); port links must be routable (`module-route`).
 
 5、Simulation exports (SPICE, Simulink, PLECS) do not refuse known annotation-only problems (arrows and text covering things, region borders, decorative colours and text formatting); drawing previews and PDF still require them to be fixed or explicitly allowed. Electrical connections, the netlist, parameters, model mappings and instance completeness are always checked.
+
+
+## Explicit control arrangement
+
+1. In the control editor, Reroute wires keeps block positions and rebuilds connections. Rearrange layout places blocks and connections from logical topology. Both show a candidate footprint preview labelled with block IDs, not a final typeset-label preview.
+
+2. Adopt result changes the drawing as one undoable/redoable step; Save writes the file. Regenerate if the drawing or page profile changes. A failed arrangement leaves the original unchanged. Control parameters, sum signs and logical connections are preserved.

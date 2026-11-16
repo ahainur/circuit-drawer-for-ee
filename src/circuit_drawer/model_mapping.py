@@ -43,7 +43,7 @@ def problems(layout):
             yield "bad-model-mapping", f"model_mapping.{kind}: {exc}"
 
 
-def passive_lines(kind, cfg, name, a, b, value, initial):
+def passive_lines(kind, cfg, name, a, b, value, initial, *, sense=False):
     from .spice import number
     s = lambda key: f"{number(cfg[key], key):.15g}"
     internal = f"cd_{name}_par"
@@ -52,9 +52,11 @@ def passive_lines(kind, cfg, name, a, b, value, initial):
                 f"{name} {internal} {b} {value}",
                 f"Cpar_{name} {a} {b} {s('parallel_capacitance')}"]
     if kind == "L":
+        end = f"cd_{name}_sense" if sense else b
         return [f"Rpar_{name} {a} {internal} {s('series_resistance')}",
-                f"{name} {internal} {b} {value} IC={initial}",
-                f"Cpar_{name} {a} {b} {s('parallel_capacitance')}"]
+                f"{name} {internal} {end} {value} IC={initial}",
+                f"Cpar_{name} {a} {b} {s('parallel_capacitance')}",
+                *([f"Vfeedback_{name} {end} {b} 0"] if sense else [])]
     return [f"Rpar_{name} {a} {internal} {s('series_resistance')}",
             f"Lpar_{name} {internal} {internal}2 {s('series_inductance')}",
             f"{name} {internal}2 {b} {value} IC={initial}"]

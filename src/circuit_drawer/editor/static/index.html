@@ -95,6 +95,7 @@
 <link rel="stylesheet" href="/editor-ui.css">
 <link rel="stylesheet" href="/hints.css">
 <link rel="stylesheet" href="/theme-eda.css">
+<link rel="stylesheet" href="/agent.css">
 </head>
 <body>
 <header>
@@ -455,6 +456,7 @@
 </script>
 <script src="/i18n-messages.js"></script>
 <script src="/i18n.js"></script>
+<script src="/prompt-library.js"></script>
 <script src="/electrical.js"></script>
 <script src="/editor-ui.js"></script>
 <script>
@@ -4497,18 +4499,29 @@ function openSpice(info) {
       const lower = cfg.complement || [], elsewhere = new Set(Object.entries(saved?.outputs || {})
         .filter(([other]) => other !== id).flatMap(([, c]) => [...(c.switches || []), ...(c.complement || [])]));
       row.className = "loop-output"; row.dataset.id = id;
-      row.innerHTML = `<p><span>输出</span> <span translate="no">${esc(id)}</span> <span>驱动开关</span>：${switches.filter(sw => !lower.includes(sw) && !elsewhere.has(sw)).map(sw =>
+      row.innerHTML = `<p class="loop-legacy-field"><span>输出</span> <span translate="no">${esc(id)}</span> <span>驱动开关</span>：${switches.filter(sw => !lower.includes(sw) && !elsewhere.has(sw)).map(sw =>
         `<label><input type="checkbox" value="${esc(sw)}" ${used.includes(sw) ? "checked" : ""}> ${esc(sw)}</label>`).join(" ") || "电路中没有 MOSFET / IGBT"}${
         lower.length ? `<br><span class="hint loop-frequency-field"><span>互补开关（在 JSON 中设置）</span> <span translate="no">${esc(lower.join("、"))}</span></span>
         <span class="hint loop-pwm-field"><span>桥臂下管</span> <span translate="no">${esc(lower.join("、"))}</span>，<span>${cfg.model === 'switching' || cfg.modulation === 'vco' ? '逐开关模型（在 JSON 中设置）' : '平均模型（在 JSON 中设置）'}</span></span>` : ""}</p>
         <div class="spice-fields"><label>调制方式<select class="loop-modulation">${loopInfo.modulations.map(value=>
-          `<option value="${value}">${value === 'vco' ? 'VCO 频率（Hz）' : 'PWM 占空比（0–1）'}</option>`).join('')}</select></label>
+          `<option value="${value}">${value === 'sps' ? 'SPS 相移（rad，原生导出）' : value === 'vco' ? 'VCO 频率（Hz）' : 'PWM 占空比（0–1）'}</option>`).join('')}</select></label>
+        <div class="loop-sps-field">
+        ${['原边A桥臂','原边B桥臂','副边A桥臂','副边B桥臂'].map((label,i)=>`<label>${label} 上管<select class="loop-sps-high" data-leg="${i}"><option value="">请选择</option>${switches.map(sw=>`<option value="${esc(sw)}" ${used[i]===sw?'selected':''}>${esc(sw)}</option>`).join('')}</select></label><label>${label} 下管<select class="loop-sps-low" data-leg="${i}"><option value="">请选择</option>${switches.map(sw=>`<option value="${esc(sw)}" ${lower[i]===sw?'selected':''}>${esc(sw)}</option>`).join('')}</select></label>`).join('')}
+        <label>开关频率（Hz）<input class="loop-sps-frequency" value="${esc(String(cfg.frequency ?? ''))}"></label>
+        <label>最小相移（rad）<input class="loop-sps-min" value="${esc(String(cfg.phase_min ?? ''))}"></label>
+        <label>最大相移（rad）<input class="loop-sps-max" value="${esc(String(cfg.phase_max ?? ''))}"></label>
+        <label>每周期时间格数（4的倍数）<input class="loop-sps-samples" value="${esc(String(cfg.samples_per_cycle ?? 200))}"></label>
+        <label>SPS 死区（s）<input class="loop-sps-dead" value="${esc(String(cfg.dead_time ?? ''))}"></label>
+        <p class="hint">正相移表示副桥滞后；首周期全关断，边界采样用于下一周期，变化限为每周期 pi/2。上下管须按实际端子逐桥臂绑定，变压器方向须人工核对。死区向上取整至时间格。支持 PLECS／Simulink 原生导出；ngspice 仅限受限连续控制实验，不支持数字或混合采样控制，须按 SPS 文档核对条件。</p>
+        </div>
         <label class="loop-frequency-field">最低频率（Hz）<input class="loop-frequency-min" value="${esc(String(cfg.frequency_min ?? ''))}"></label>
         <label class="loop-frequency-field">最高频率（Hz）<input class="loop-frequency-max" value="${esc(String(cfg.frequency_max ?? ''))}"></label>
-        ${lower.length ? `<label>死区（s）<input class="loop-dead-time" value="${esc(String(cfg.dead_time ?? 0))}"></label>` : ''}</div>
+        ${lower.length ? `<label class="loop-legacy-field">死区（s）<input class="loop-dead-time" value="${esc(String(cfg.dead_time ?? 0))}"></label>` : ''}</div>
         <p class="hint loop-frequency-field">VCO 将控制器输出按 Hz 限幅并积分为连续相位，互补组共享频率；名义频率和占空比不参与驱动。各开关 delay 须相同。支持 ngspice 逐开关仿真及 PLECS／Simulink 导出，死区按秒保持。</p>`;
       const modulation = row.querySelector('.loop-modulation'); modulation.value = cfg.modulation || 'pwm';
       const showModulation = () => {
+        for (const field of row.querySelectorAll('.loop-sps-field')) field.hidden = modulation.value !== 'sps';
+        for (const field of row.querySelectorAll('.loop-legacy-field')) field.hidden = modulation.value === 'sps';
         for (const field of row.querySelectorAll('.loop-frequency-field')) field.hidden = modulation.value !== 'vco';
         for (const field of row.querySelectorAll('.loop-pwm-field')) field.hidden = modulation.value === 'vco';
       };
@@ -4569,11 +4582,22 @@ function openSpice(info) {
     }
     for (const row of $("loopMap").querySelectorAll(".loop-output")) {
       const sws = [...row.querySelectorAll('input[type="checkbox"]:checked')].map(i => i.value);
-      const {switches: _, modulation: oldModulation, frequency_min, frequency_max, ...rest} = saved.outputs?.[row.dataset.id] || {};
+      const {switches: _, modulation: oldModulation, frequency_min, frequency_max, frequency: oldFrequency,
+        phase_min: oldPhaseMin, phase_max: oldPhaseMax, samples_per_cycle: oldSamples, ...rest} = saved.outputs?.[row.dataset.id] || {};
       const dead = row.querySelector('.loop-dead-time')?.value.trim();
       if (dead !== undefined && dead !== String(rest.dead_time ?? 0)) rest.dead_time = dead;
       const frequency = (selector, old) => { const value = row.querySelector(selector).value.trim(); return value === String(old) ? old : value; };
       const modulation = row.querySelector('.loop-modulation').value;
+      if (modulation === 'sps') {
+        const high = [...row.querySelectorAll('.loop-sps-high')].map(x=>x.value);
+        const low = [...row.querySelectorAll('.loop-sps-low')].map(x=>x.value);
+        if ([...high,...low].some(x=>!x) || new Set([...high,...low]).size !== 8) throw new Error('SPS 需要八个不重复开关，按四个桥臂选择上管和下管');
+        outputs[row.dataset.id] = {...rest, switches:high, complement:low, modulation, model:'switching',
+          frequency:frequency('.loop-sps-frequency',oldFrequency), phase_min:frequency('.loop-sps-min',oldPhaseMin),
+          phase_max:frequency('.loop-sps-max',oldPhaseMax), samples_per_cycle:Number(row.querySelector('.loop-sps-samples').value),
+          dead_time:frequency('.loop-sps-dead',rest.dead_time)};
+        continue;
+      }
       // An omitted model meant switching for VCO; keep it when returning to PWM.
       if (oldModulation === 'vco' && modulation === 'pwm' && !('model' in rest)) rest.model = 'switching';
       if (sws.length) outputs[row.dataset.id] = {...rest, switches: sws, ...(modulation === 'vco'
@@ -4581,7 +4605,7 @@ function openSpice(info) {
         : oldModulation ? {modulation} : {})};
     }
     const drivers = {};
-    for (const [id, cfg] of Object.entries(outputs)) for (const sw of cfg.switches) (drivers[sw] ||= []).push(id);
+    for (const [id, cfg] of Object.entries(outputs)) for (const sw of [...cfg.switches,...(cfg.complement || [])]) (drivers[sw] ||= []).push(id);
     const twice = Object.entries(drivers).find(([, ids]) => ids.length > 1);
     if (twice) throw new Error(`开关 ${twice[0]} 同时被输出 ${twice[1].join("、")} 驱动，请只保留一个`);
     if (!Object.keys(outputs).length) throw new Error("请至少为一个控制器输出勾选要驱动的开关");
@@ -4961,6 +4985,7 @@ document.getElementById("describe").onclick = () => {
   if (existing) return;
   const form = describeForm, $ = id => form.querySelector('#' + id);
   let job = null, matchTimer = null, revision = 0, planRevision = null, planContext = null;
+  CircuitPromptLibrary.mount({textarea: $("descText"), domain:"circuit", mode:"create", table:() => layout, api, busy:() => !!job});
   const context = () => JSON.stringify([$("descText").value.trim(), references.images, profile]);
   const invalidatePlan = () => {
     ++revision; planRevision = null; planContext = null;
@@ -5145,6 +5170,7 @@ document.getElementById("tweak").onclick = () => {
   if (existing) return;
   const form = tweakForm, $ = id => form.querySelector('#' + id);
   let job = null;
+  CircuitPromptLibrary.mount({textarea: $("twText"), domain:"circuit", mode:"edit", table:() => layout, api, busy:() => !!job});
   if (profile === "ieee-single" && (report?.issues || []).some(i => ["too-cramped", "too-short"].includes(i.code))) {
     api("/api/check", {layout, profile: "ieee-double"}).then(r => {
       if (!$("twWidth")) return;
@@ -5342,5 +5368,8 @@ async function initializeEditor() {
 <script src="/context-menu.js"></script>
 <script src="/guides.js"></script>
 <script src="/menu.js"></script>
+<script src="/agent-editor.js"></script>
+<script src="/agent.js"></script>
 </body>
 </html>
+

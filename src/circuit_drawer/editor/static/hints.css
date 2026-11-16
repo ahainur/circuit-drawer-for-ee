@@ -14,3 +14,11 @@
 .help-body ol { margin: 0; padding-left: 18px; }
 .help-body li + li { margin-top: 4px; }
 .field-error { display: block; margin-top: 2px; color: var(--bad); font-size: 12px; }
+
+fieldset[data-prompt-library] { min-width:0; margin:6px 0; }
+[data-prompt-library] legend { display:flex; align-items:center; gap:8px; width:100%; }
+[data-prompt-library] legend span { flex:1; min-width:0; }
+[data-prompt-library] [data-toggle] { flex:none; }
+[data-prompt-library] [data-content] { max-height:min(30vh,280px); overflow:auto; }
+[data-prompt-library] [data-content][hidden] { display:none; }
+[data-prompt-library] input, [data-prompt-library] select { max-width:100%; box-sizing:border-box; }

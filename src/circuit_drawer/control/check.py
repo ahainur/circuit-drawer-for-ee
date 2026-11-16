@@ -36,6 +36,7 @@ MAX_SCALE = 1.0        # cm per layout unit: never stretch beyond the drawn size
 FIT_ROUNDS = 6         # scale refinements to absorb the fixed-size symbols and text
 # the run into an arrowhead must show the head (LINE_HEAD) plus some line
 MIN_ARROW_RUN = LINE_HEAD + 0.1
+AUTO_ROUTE_MIN_RUN = 0.35  # cm: legible straight runs between automatic route bends
 PT_CM = 2.54 / 72.27
 LEAD = 1.2             # baseline skip / font size, as the preamble sets it
 SIDE_DIR = {"w": (-1.0, 0.0), "e": (1.0, 0.0), "n": (0.0, 1.0), "s": (0.0, -1.0)}
@@ -405,6 +406,12 @@ def check(raw: Any, prof: Profile) -> Report:
     if isinstance(raw, dict) and "code" in raw:
         from .codegen import check_code_section
         errors += check_code_section(raw, dia)
+    if isinstance(raw, dict) and "circuit" in raw:
+        from .circuit import parse_section
+        try:
+            parse_section(raw, dia)
+        except ValueError as exc:
+            errors.append(str(exc))
     if isinstance(raw, dict) and "functions" in raw:
         from .functions import parse as parse_functions, wiring
         fns, ferr = parse_functions(raw["functions"], dia)

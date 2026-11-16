@@ -42,6 +42,7 @@ def preamble(prof: Profile, cjk: bool = False) -> str:
     lead = prof.font_pt * 1.2
     head = rf"""\documentclass[border=1pt]{{standalone}}
 \usepackage{{mathptmx}}  % Times text and math
+\usepackage{{amsmath}}
 \usepackage{{circuitikz}}
 \ctikzset{{bipoles/length={prof.bipole_len}cm, transistors/scale={prof.transistor_scale},
   inductors/coils=4, current/distance=.5, bipoles/diode/height=.32,
@@ -432,7 +433,7 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
         # + to - and flip the label side to match the reversed travel.
         a, b = b, a
         side = "_" if side == "^" else "^"
-    current = (f"i>{el.opts.get('current_side', '^')}={el.opts['current']}"
+    current = (f"i>{el.opts.get('current_side', '^')}={{{el.opts['current']}}}"
                if el.opts.get("current") else None)
     if zigzag:
         line = _wave_path(fp.extra["resistor_path"], s)
@@ -443,7 +444,7 @@ def _two_terminal(el: Element, fp: Footprint, s: Scale, prof: Profile) -> str:
     else:
         opts = [CTIKZ_KIND[symbol_kind(el)]]
         if el.label and not own_label:
-            opts.append(f"l{side}={el.label}")
+            opts.append(f"l{side}={{{el.label}}}")
         if current:
             opts.append(current)
         if el.opts.get("invert"):

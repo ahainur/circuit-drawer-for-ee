@@ -874,7 +874,16 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
             params = {'DelayTime': p['seconds'], 'InitialOutput': 0}
         elif b.kind == 'carrier':
             period = 1 / p['f']
-            if p['shape'] == 'saw':
+            if p['delay']:
+                # Shift a periodic ramp before shaping it, preserving phase on
+                # every cycle. The separate enable block handles start-up.
+                ramp = add(path, b.name + '_ramp', (x - 80, y),
+                           {'rep_seq_t': vec([0, period]), 'rep_seq_y': vec([0, 1])}, size=size)
+                phase = f"(u-{p['delay'] % period / period:.17g})"
+                wrapped = f'({phase}-floor({phase}))'
+                path = 'simulink/User-Defined Functions/Fcn'
+                params = {'Expr': wrapped if p['shape'] == 'saw' else f'1-abs(2*{wrapped}-1)'}
+            elif p['shape'] == 'saw':
                 params = {'rep_seq_t': vec([0, period]), 'rep_seq_y': vec([0, 1])}
             else:
                 params = {'rep_seq_t': vec([0, period / 2, period]), 'rep_seq_y': vec([0, 1, 0])}
@@ -897,6 +906,8 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
         elif b.kind == 'c':
             params = {'SampleTime':p['ts']}
         h = add(path, b.name, (x, y), params, size=size)
+        if b.kind == 'carrier' and p['delay']:
+            connect(ramp + '.Outport(1)', h + '.Inport(1)')
         if b.kind == 'c':
             from .control.custom_c import statements
             inputs = {key:f'cd_in{i}' for i,key in enumerate(p['names'])}

@@ -578,6 +578,9 @@ def _checked(lay: Layout, profile: str, message: str):
 # POST path -> handler method.  PLAIN routes read their own fields and answer
 # for themselves; LAYOUT routes get the posted table and return the answer.
 PLAIN_ROUTES = {
+    "/api/prompt-library": "_prompt_library",
+
+    "/api/agent": "_agent_post",
     "/api/dq-stability-info": "_dq_stability_info",
     "/api/dq-stability": "_dq_stability",
     "/api/impedance-ratio-info": "_impedance_ratio_info",
@@ -855,6 +858,8 @@ class Editor:
         self.parameter_search_lock = threading.Lock()
         from ..waveforms import WaveStore
         self.wave_store = WaveStore(path)
+        from ..agent import AgentTasks
+        self.agent_tasks = AgentTasks(self, "circuit")
 
     def output_path(self, value=None) -> Path:
         if value is None:
@@ -929,8 +934,11 @@ class Editor:
     def handler(self):
         editor = self
 
-        class H(SettingsRoutes, BaseHTTPRequestHandler):
+        from ..agent_http import AgentRoutes
+
+        class H(AgentRoutes, SettingsRoutes, BaseHTTPRequestHandler):
             web_settings = editor.web_settings
+            agent_tasks = editor.agent_tasks
             def log_message(self, *args):  # keep the terminal quiet
                 pass
 
@@ -945,7 +953,30 @@ class Editor:
                 self._send(code, json.dumps(obj, ensure_ascii=False).encode(),
                            "application/json; charset=utf-8")
 
+            def _prompt_library(self, req):
+                try:
+                    self._settings_guard()
+                    if self.headers.get_content_type() != "application/json":
+                        raise ValueError("提示词请求必须使用 JSON")
+                    from ..ai.presets import request
+                    self._json(request(req))
+                except (ValueError, OSError) as exc:
+                    self._json({"error": str(exc)}, 400)
+
             def do_GET(self):
+                if self.path.startswith("/api/agent-file?"):
+                    self._agent_asset()
+                    return
+                if self.path.split("?", 1)[0] == "/agent-results.html":
+                    self._send(200, (STATIC / "agent-results.html").read_bytes(), "text/html; charset=utf-8")
+                    return
+                if self.path.split("?", 1)[0] == "/" and "agent-preview" in self.path:
+                    self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
+                    return
+                if self.path in ("/agent.js", "/agent.css", "/agent-editor.js"):
+                    self._send(200, (STATIC / self.path[1:]).read_bytes(),
+                               "text/css; charset=utf-8" if self.path.endswith(".css") else "text/javascript; charset=utf-8")
+                    return
                 if self.path in PLAIN_GET_ROUTES:
                     try:
                         self._json(getattr(self, PLAIN_GET_ROUTES[self.path])())
@@ -955,7 +986,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "index.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js")
                                else "text/css; charset=utf-8")
@@ -1508,8 +1539,14 @@ class Editor:
                 return job.status()
 
             def _spice_save(self, lay: Layout, prof: str, req: dict) -> dict:
-                from ..spice import make_deck
-                make_deck(lay, prof, editor.path.parent)
+                from ..spice import make_deck, native_metadata
+                # Saving a native-only controller is valid, but running/exporting
+                # SPICE must still fail explicitly rather than substitute PWM.
+                loop = lay.extra.get('closed_loop')
+                outputs = loop.get('outputs', {}) if isinstance(loop, dict) else {}
+                native_only = isinstance(outputs, dict) and any(
+                    isinstance(cfg, dict) and cfg.get('modulation') == 'sps' for cfg in outputs.values())
+                (native_metadata if native_only else make_deck)(lay, prof, editor.path.parent)
                 lay.save(editor.path)
                 return {"saved": str(editor.path)}
 
@@ -1613,3 +1650,4 @@ def serve(path: Path, profile: str = "ieee-single", port: int = 8765,
         pass
     finally:
         httpd.server_close()
+

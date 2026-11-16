@@ -1,0 +1,569 @@
+[
+  {
+    "id": "buck_voltage",
+    "title": {
+      "zh-CN": "Buck 电压单环",
+      "en": "Buck voltage loop",
+      "zh-TW": "Buck 電壓單環"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "Buck 降压电路及电压负反馈：参考→误差→PI→占空比限幅→PWM→功率级，输出电压反馈至误差负端。",
+    "fields": [
+      {
+        "key": "vin",
+        "label": {
+          "zh-CN": "输入电压",
+          "en": "Input voltage",
+          "zh-TW": "輸入電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "vout",
+        "label": {
+          "zh-CN": "目标输出电压",
+          "en": "Target output voltage",
+          "zh-TW": "目標輸出電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "frequency",
+        "label": {
+          "zh-CN": "开关频率",
+          "en": "Switching frequency",
+          "zh-TW": "開關頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "inductance",
+        "label": {
+          "zh-CN": "电感",
+          "en": "Inductance",
+          "zh-TW": "電感"
+        },
+        "unit": "H",
+        "required": true
+      },
+      {
+        "key": "capacitance",
+        "label": {
+          "zh-CN": "输出电容",
+          "en": "Output capacitance",
+          "zh-TW": "輸出電容"
+        },
+        "unit": "F",
+        "required": true
+      },
+      {
+        "key": "load",
+        "label": {
+          "zh-CN": "负载电阻",
+          "en": "Load resistance",
+          "zh-TW": "負載電阻"
+        },
+        "unit": "Ω",
+        "required": true
+      },
+      {
+        "key": "kp",
+        "label": {
+          "zh-CN": "比例增益",
+          "en": "Proportional gain",
+          "zh-TW": "比例增益"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "ki",
+        "label": {
+          "zh-CN": "积分增益",
+          "en": "Integral gain",
+          "zh-TW": "積分增益"
+        },
+        "unit": "1/s",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "buck_dual",
+    "title": {
+      "zh-CN": "Buck 电压电流双环",
+      "en": "Buck voltage/current loops",
+      "zh-TW": "Buck 電壓電流雙環"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "Buck 电压电流双闭环：电压误差→外环 PI→电流参考限幅→电流误差→内环 PI→占空比限幅→PWM→功率级；电压、电流分别负反馈。",
+    "fields": [
+      {
+        "key": "vin",
+        "label": {
+          "zh-CN": "输入电压",
+          "en": "Input voltage",
+          "zh-TW": "輸入電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "vout",
+        "label": {
+          "zh-CN": "目标输出电压",
+          "en": "Target output voltage",
+          "zh-TW": "目標輸出電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "frequency",
+        "label": {
+          "zh-CN": "开关频率",
+          "en": "Switching frequency",
+          "zh-TW": "開關頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "inductance",
+        "label": {
+          "zh-CN": "电感",
+          "en": "Inductance",
+          "zh-TW": "電感"
+        },
+        "unit": "H",
+        "required": true
+      },
+      {
+        "key": "capacitance",
+        "label": {
+          "zh-CN": "输出电容",
+          "en": "Output capacitance",
+          "zh-TW": "輸出電容"
+        },
+        "unit": "F",
+        "required": true
+      },
+      {
+        "key": "load",
+        "label": {
+          "zh-CN": "负载电阻",
+          "en": "Load resistance",
+          "zh-TW": "負載電阻"
+        },
+        "unit": "Ω",
+        "required": true
+      },
+      {
+        "key": "kp",
+        "label": {
+          "zh-CN": "比例增益",
+          "en": "Proportional gain",
+          "zh-TW": "比例增益"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "ki",
+        "label": {
+          "zh-CN": "积分增益",
+          "en": "Integral gain",
+          "zh-TW": "積分增益"
+        },
+        "unit": "1/s",
+        "required": true
+      },
+      {
+        "key": "current_kp",
+        "label": {
+          "zh-CN": "电流环比例增益",
+          "en": "Current-loop proportional gain",
+          "zh-TW": "電流環比例增益"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "current_ki",
+        "label": {
+          "zh-CN": "电流环积分增益",
+          "en": "Current-loop integral gain",
+          "zh-TW": "電流環積分增益"
+        },
+        "unit": "1/s",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "dab_sps",
+    "title": {
+      "zh-CN": "DAB-SPS",
+      "en": "DAB-SPS",
+      "zh-TW": "DAB-SPS"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "DAB 双有源桥，电压采样→误差→PI→相移限幅→SPS→主副桥八路门极。明确桥臂上下管、变压器同名端与相移正方向。",
+    "fields": [
+      {
+        "key": "vin",
+        "label": {
+          "zh-CN": "输入电压",
+          "en": "Input voltage",
+          "zh-TW": "輸入電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "vout",
+        "label": {
+          "zh-CN": "目标输出电压",
+          "en": "Target output voltage",
+          "zh-TW": "目標輸出電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "frequency",
+        "label": {
+          "zh-CN": "开关频率",
+          "en": "Switching frequency",
+          "zh-TW": "開關頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "ratio",
+        "label": {
+          "zh-CN": "副原边匝数比",
+          "en": "Secondary/primary turns ratio",
+          "zh-TW": "副原邊匝數比"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "inductance",
+        "label": {
+          "zh-CN": "电感",
+          "en": "Inductance",
+          "zh-TW": "電感"
+        },
+        "unit": "H",
+        "required": true
+      },
+      {
+        "key": "capacitance",
+        "label": {
+          "zh-CN": "输出电容",
+          "en": "Output capacitance",
+          "zh-TW": "輸出電容"
+        },
+        "unit": "F",
+        "required": true
+      },
+      {
+        "key": "load",
+        "label": {
+          "zh-CN": "负载电阻",
+          "en": "Load resistance",
+          "zh-TW": "負載電阻"
+        },
+        "unit": "Ω",
+        "required": true
+      },
+      {
+        "key": "kp",
+        "label": {
+          "zh-CN": "比例增益",
+          "en": "Proportional gain",
+          "zh-TW": "比例增益"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "ki",
+        "label": {
+          "zh-CN": "积分增益",
+          "en": "Integral gain",
+          "zh-TW": "積分增益"
+        },
+        "unit": "1/s",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。SPS 动态闭环能力以当前后端校验为准。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "llc_frequency",
+    "title": {
+      "zh-CN": "LLC 变频控制",
+      "en": "LLC frequency control",
+      "zh-TW": "LLC 變頻控制"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "LLC 谐振变换器的电压闭环：输出采样→误差→PI→频率限幅→VCO→互补门极。谐振参数、变比及死区缺失时保持待填写，不推定工作点控制方向。",
+    "fields": [
+      {
+        "key": "vin",
+        "label": {
+          "zh-CN": "输入电压",
+          "en": "Input voltage",
+          "zh-TW": "輸入電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "vout",
+        "label": {
+          "zh-CN": "目标输出电压",
+          "en": "Target output voltage",
+          "zh-TW": "目標輸出電壓"
+        },
+        "unit": "V",
+        "required": true
+      },
+      {
+        "key": "frequency",
+        "label": {
+          "zh-CN": "开关频率",
+          "en": "Switching frequency",
+          "zh-TW": "開關頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "fmin",
+        "label": {
+          "zh-CN": "最低频率",
+          "en": "Minimum frequency",
+          "zh-TW": "最低頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "fmax",
+        "label": {
+          "zh-CN": "最高频率",
+          "en": "Maximum frequency",
+          "zh-TW": "最高頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      },
+      {
+        "key": "kp",
+        "label": {
+          "zh-CN": "比例增益",
+          "en": "Proportional gain",
+          "zh-TW": "比例增益"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "ki",
+        "label": {
+          "zh-CN": "积分增益",
+          "en": "Integral gain",
+          "zh-TW": "積分增益"
+        },
+        "unit": "1/s",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "sampling_filter",
+    "title": {
+      "zh-CN": "增加采样滤波",
+      "en": "Add sampling filter",
+      "zh-TW": "增加採樣濾波"
+    },
+    "mode": "edit",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "只在指定采样支路增加一阶低通滤波，保持反馈符号及其他连接参数不变。",
+    "fields": [
+      {
+        "key": "target",
+        "label": {
+          "zh-CN": "目标器件或测量点 ID",
+          "en": "Target component or measurement ID",
+          "zh-TW": "目標器件或測量點 ID"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "cutoff",
+        "label": {
+          "zh-CN": "滤波截止频率",
+          "en": "Filter cutoff frequency",
+          "zh-TW": "濾波截止頻率"
+        },
+        "unit": "Hz",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "limiter",
+    "title": {
+      "zh-CN": "增加限幅",
+      "en": "Add limiter",
+      "zh-TW": "增加限幅"
+    },
+    "mode": "edit",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "只在指定信号路径增加限幅，保留其余控制结构、反馈符号及参数。",
+    "fields": [
+      {
+        "key": "target",
+        "label": {
+          "zh-CN": "目标器件或测量点 ID",
+          "en": "Target component or measurement ID",
+          "zh-TW": "目標器件或測量點 ID"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "lower",
+        "label": {
+          "zh-CN": "下限",
+          "en": "Lower limit",
+          "zh-TW": "下限"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "upper",
+        "label": {
+          "zh-CN": "上限",
+          "en": "Upper limit",
+          "zh-TW": "上限"
+        },
+        "unit": "",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  },
+  {
+    "id": "change_parameter",
+    "title": {
+      "zh-CN": "修改参数",
+      "en": "Change parameter",
+      "zh-TW": "修改參數"
+    },
+    "mode": "edit",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "body": "只修改指定对象的指定参数，保留其他器件、连接、函数、用户模块和控制参数。",
+    "fields": [
+      {
+        "key": "target",
+        "label": {
+          "zh-CN": "目标器件或测量点 ID",
+          "en": "Target component or measurement ID",
+          "zh-TW": "目標器件或測量點 ID"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "parameter",
+        "label": {
+          "zh-CN": "参数名",
+          "en": "Parameter name",
+          "zh-TW": "參數名"
+        },
+        "unit": "",
+        "required": true
+      },
+      {
+        "key": "value",
+        "label": {
+          "zh-CN": "新值（含单位）",
+          "en": "New value (with unit)",
+          "zh-TW": "新值（含單位）"
+        },
+        "unit": "",
+        "required": true
+      }
+    ],
+    "capability": {
+      "zh-CN": "可生成符号图。数值分析和原生导出需补齐参数、绑定并通过相应校验；不保证控制器已整定。",
+      "en": "Symbolic drawing is available. Numeric analysis and native export require complete parameters, bindings and validation; controllers are not automatically tuned.",
+      "zh-TW": "可生成符號圖。數值分析與原生匯出需補齊參數、綁定並通過對應校驗；不保證控制器已整定。"
+    }
+  }
+]

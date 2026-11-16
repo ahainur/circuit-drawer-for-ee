@@ -398,7 +398,9 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
             if loop and e.id in loop.driven:
                 # Native backends currently expand average legs into switches.
                 from .spice import check_pwm_timing
-                check_pwm_timing(e.id, values, tr)
+                output = loop.outputs[loop.driven[e.id]]
+                if output.get('modulation') in ('sps', 'vco') or not output['complement']:
+                    check_pwm_timing(e.id, values, tr)
                 # the gate comes from the control panel's carrier compare
                 s = Signal(f'signal_{len(circuit.signals) + 1}', 'control', {**values, 'switch': e.id}, (pos[0], pos[1] + 100))
                 circuit.signals.append(s)
@@ -544,8 +546,13 @@ def _controller(circuit, loop, mode, driven, probe_outputs, tr):
             s = Signal(name, 'dc', {'kind': 'dc', 'dc': cfg['value'], 'input': bid}, (0, 0))
         circuit.signals.append(s)
         references[bid] = name
-    from .closed_loop import ClosedLoopError
+    from .closed_loop import ClosedLoopError, pwm_drives
+    from .spice import check_pwm_timing
     try:
+        for output in loop.outputs.values():
+            if output.get('modulation') not in ('sps', 'vco') and output['complement']:
+                for switch, (_, timing), _ in pwm_drives(output, driven):
+                    check_pwm_timing(switch, timing, tr)
         panel = build(loop, mode, driven, probe_outputs, references)
     except ClosedLoopError as exc:
         raise SpiceError(str(exc)) from None

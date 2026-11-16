@@ -483,7 +483,8 @@ def analyse(layout, report, settings, period, signature, times, data, graph=None
     return result
 
 
-def run(layout, out_dir=None, *, options=None, profile="ieee-single", base_dir=None, ngspice=None, timeout=120):
+def run(layout, out_dir=None, *, options=None, profile="ieee-single", base_dir=None, ngspice=None, timeout=120,
+        should_stop=None):
     deck, scene, settings, period, signature = _prepare(layout, options, profile, base_dir)
     engine = executable(ngspice)
     if not engine:
@@ -491,7 +492,10 @@ def run(layout, out_dir=None, *, options=None, profile="ieee-single", base_dir=N
     measured, columns = _instrument(scene.layout, deck, layout.extra.get("module_authoring", {}).get("aliases"))
     with tempfile.TemporaryDirectory(prefix="cd_modes_") as folder:
         stage = Path(folder)
-        _simulate(measured, engine, stage, timeout)
+        if should_stop is None:
+            _simulate(measured, engine, stage, timeout)
+        else:
+            _simulate(measured, engine, stage, timeout, should_stop=should_stop)
         times, data = _read_trace(stage / "device_states.dat", columns, deck.stop, period)
         result = analyse(scene.layout, scene.report, settings, period, signature, times, data, scene.graph)
         result["waveform_sha256"] = hashlib.sha256((stage / "waveforms.csv").read_bytes()).hexdigest()

@@ -31,8 +31,9 @@ def _compile(tex_file: Path) -> Path:
     if run.returncode != 0:
         log_file = tex_file.with_suffix(".log")
         log = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else run.stdout
-        errors = [line for line in log.splitlines() if line.startswith("!")]
-        raise CompileError("pdflatex failed: " + "; ".join(errors[:5] or [(log + run.stderr)[-800:]]))
+        lines = log.splitlines()
+        errors = ["\n".join(lines[i:i + 6]) for i, line in enumerate(lines) if line.startswith("!")]
+        raise CompileError("pdflatex failed:\n" + "\n".join(errors[:3] or [(log + run.stderr)[-800:]]))
     return tex_file.with_suffix(".pdf")
 
 
@@ -76,6 +77,10 @@ def _export_pdf(pdf: Path, out_dir: Path, stem: str,
 
 def build(tex: str, out_dir: Path, stem: str,
           formats: tuple[str, ...] = FORMATS, png_dpi: int = 600) -> dict[str, Path]:
+    if "→" in tex:
+        # pdfLaTeX's text arrow requires a TS1 font outside the bundled subset.
+        tex = tex.replace(r"\begin{document}",
+                          r"\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}" "\n" r"\begin{document}", 1)
     out_dir.mkdir(parents=True, exist_ok=True)
     made: dict[str, Path] = {}
     if "tex" in formats:

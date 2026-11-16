@@ -1,0 +1,827 @@
+{
+  "name": "dab_sps",
+  "elements": [
+    {
+      "id": "Vin",
+      "kind": "V",
+      "pins": {
+        "a": [
+          0,
+          0
+        ],
+        "b": [
+          0,
+          3.9
+        ]
+      },
+      "label": "$V_{in}$",
+      "label_pos": "left"
+    },
+    {
+      "id": "S1",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          1,
+          3.9
+        ],
+        "s": [
+          1,
+          2.9
+        ]
+      },
+      "label": "$S_1$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S2",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          1,
+          1
+        ],
+        "s": [
+          1,
+          0
+        ]
+      },
+      "label": "$S_2$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S3",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          2.35,
+          3.9
+        ],
+        "s": [
+          2.35,
+          2.9
+        ]
+      },
+      "label": "$S_3$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S4",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          2.35,
+          1
+        ],
+        "s": [
+          2.35,
+          0
+        ]
+      },
+      "label": "$S_4$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "L",
+      "kind": "L",
+      "pins": {
+        "a": [
+          2.6,
+          2.5
+        ],
+        "b": [
+          3.65,
+          2.5
+        ]
+      },
+      "label": "$L$",
+      "label_pos": "above"
+    },
+    {
+      "id": "T",
+      "kind": "transformer",
+      "pins": {
+        "p1": [
+          3.9,
+          2.5
+        ],
+        "p2": [
+          3.9,
+          1.2
+        ],
+        "s1": [
+          4.5,
+          2.5
+        ],
+        "s2": [
+          4.5,
+          1.2
+        ]
+      },
+      "label": "$T$",
+      "label_pos": "below",
+      "opts": {
+        "dots": "same"
+      }
+    },
+    {
+      "id": "S5",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          5.2,
+          3.9
+        ],
+        "s": [
+          5.2,
+          2.9
+        ]
+      },
+      "label": "$S_5$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S6",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          5.2,
+          1
+        ],
+        "s": [
+          5.2,
+          0
+        ]
+      },
+      "label": "$S_6$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S7",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          6.55,
+          3.9
+        ],
+        "s": [
+          6.55,
+          2.9
+        ]
+      },
+      "label": "$S_7$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "S8",
+      "kind": "nmos",
+      "pins": {
+        "d": [
+          6.55,
+          1
+        ],
+        "s": [
+          6.55,
+          0
+        ]
+      },
+      "label": "$S_8$",
+      "opts": {
+        "diode": true
+      }
+    },
+    {
+      "id": "Co",
+      "kind": "C",
+      "pins": {
+        "a": [
+          7.5,
+          3.9
+        ],
+        "b": [
+          7.5,
+          0
+        ]
+      },
+      "label": "$C_o$",
+      "label_pos": "left"
+    },
+    {
+      "id": "RL",
+      "kind": "R",
+      "pins": {
+        "a": [
+          8.55,
+          3.9
+        ],
+        "b": [
+          8.55,
+          0
+        ]
+      },
+      "label": "$R_L$",
+      "label_pos": "left"
+    }
+  ],
+  "wires": [
+    [
+      [
+        0,
+        3.9
+      ],
+      [
+        2.35,
+        3.9
+      ]
+    ],
+    [
+      [
+        0,
+        0
+      ],
+      [
+        2.35,
+        0
+      ]
+    ],
+    [
+      [
+        1,
+        2.9
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    [
+      [
+        2.35,
+        2.9
+      ],
+      [
+        2.35,
+        1
+      ]
+    ],
+    [
+      [
+        1,
+        2.5
+      ],
+      [
+        2.6,
+        2.5
+      ]
+    ],
+    [
+      [
+        3.65,
+        2.5
+      ],
+      [
+        3.9,
+        2.5
+      ]
+    ],
+    [
+      [
+        3.9,
+        1.2
+      ],
+      [
+        2.35,
+        1.2
+      ]
+    ],
+    [
+      [
+        4.5,
+        2.5
+      ],
+      [
+        6.55,
+        2.5
+      ]
+    ],
+    [
+      [
+        4.5,
+        1.2
+      ],
+      [
+        5.2,
+        1.2
+      ]
+    ],
+    [
+      [
+        5.2,
+        2.9
+      ],
+      [
+        5.2,
+        1
+      ]
+    ],
+    [
+      [
+        6.55,
+        2.9
+      ],
+      [
+        6.55,
+        1
+      ]
+    ],
+    [
+      [
+        5.2,
+        3.9
+      ],
+      [
+        8.55,
+        3.9
+      ]
+    ],
+    [
+      [
+        5.2,
+        0
+      ],
+      [
+        8.55,
+        0
+      ]
+    ]
+  ],
+  "hops": [
+    [
+      2.35,
+      2.5
+    ],
+    [
+      5.2,
+      2.5
+    ]
+  ],
+  "annotations": [
+    {
+      "at": [
+        1.65,
+        2.5
+      ],
+      "text": "$i_L$",
+      "arrow": "right",
+      "side": "above"
+    },
+    {
+      "at": [
+        4.3,
+        -0.65
+      ],
+      "text": "$V_{in}=400\\,\\mathrm{V};\\quad V_o^*=48\\,\\mathrm{V};\\quad N_p:N_s=8:1$"
+    },
+    {
+      "at": [
+        4.3,
+        -1.2
+      ],
+      "text": "$L=100\\,\\mu\\mathrm{H};\\quad C_o=470\\,\\mu\\mathrm{F};\\quad R_L=4.8\\,\\Omega;\\quad \\mathrm{SPS},\\ f_s=50\\,\\mathrm{kHz}$"
+    }
+  ],
+  "netlist": {
+    "Vin.a": "N",
+    "Vin.b": "P",
+    "S1.d": "P",
+    "S1.s": "A",
+    "S2.d": "A",
+    "S2.s": "N",
+    "S3.d": "P",
+    "S3.s": "B",
+    "S4.d": "B",
+    "S4.s": "N",
+    "L.a": "A",
+    "L.b": "X",
+    "T.p1": "X",
+    "T.p2": "B",
+    "T.s1": "D",
+    "T.s2": "C",
+    "S5.d": "Vo",
+    "S5.s": "C",
+    "S6.d": "C",
+    "S6.s": "M",
+    "S7.d": "Vo",
+    "S7.s": "D",
+    "S8.d": "D",
+    "S8.s": "M",
+    "Co.a": "Vo",
+    "Co.b": "M",
+    "RL.a": "Vo",
+    "RL.b": "M"
+  },
+  "modes": [
+    {
+      "name": "区间1",
+      "caption": "$v_p=V_{in},\\quad v_s=-V_o,\\quad i_L<0$",
+      "condition": "SPS 代表性区间；桥侧回路经 Co 与 RL 并联端口，Co 净电流取决于桥侧电流与负载电流之差；反向电流不限定为体二极管独占导通。",
+      "on": [
+        "S1",
+        "S4",
+        "S5",
+        "S8"
+      ],
+      "loops": [
+        [
+          "T:p",
+          "L",
+          "S1",
+          "Vin",
+          "S4"
+        ],
+        [
+          "T:s",
+          "S5",
+          "Co|RL",
+          "S8"
+        ]
+      ]
+    },
+    {
+      "name": "区间2",
+      "caption": "$v_p=V_{in},\\quad v_s=-V_o,\\quad i_L>0$",
+      "condition": "SPS 代表性区间；副边桥侧回路经 Co 返回，负载回路保持 Vo 经 RL 流向 M；反向电流不限定为体二极管独占导通。",
+      "on": [
+        "S1",
+        "S4",
+        "S5",
+        "S8"
+      ],
+      "loops": [
+        [
+          "Vin",
+          "S1",
+          "L",
+          "T:p",
+          "S4"
+        ],
+        [
+          "T:s",
+          "S8",
+          "Co",
+          "S5"
+        ],
+        [
+          "RL",
+          "Co"
+        ]
+      ]
+    },
+    {
+      "name": "区间3",
+      "caption": "$v_p=V_{in},\\quad v_s=V_o,\\quad i_L>0$",
+      "condition": "SPS 代表性区间；桥侧回路经 Co 与 RL 并联端口，Co 净电流取决于桥侧电流与负载电流之差。",
+      "on": [
+        "S1",
+        "S4",
+        "S6",
+        "S7"
+      ],
+      "loops": [
+        [
+          "Vin",
+          "S1",
+          "L",
+          "T:p",
+          "S4"
+        ],
+        [
+          "T:s",
+          "S7",
+          "Co|RL",
+          "S6"
+        ]
+      ]
+    },
+    {
+      "name": "区间4",
+      "caption": "$v_p=-V_{in},\\quad v_s=V_o,\\quad i_L>0$",
+      "condition": "SPS 代表性区间；桥侧回路经 Co 与 RL 并联端口，Co 净电流取决于桥侧电流与负载电流之差；反向电流不限定为体二极管独占导通。",
+      "on": [
+        "S2",
+        "S3",
+        "S6",
+        "S7"
+      ],
+      "loops": [
+        [
+          "L",
+          "T:p",
+          "S3",
+          "Vin",
+          "S2"
+        ],
+        [
+          "T:s",
+          "S7",
+          "Co|RL",
+          "S6"
+        ]
+      ]
+    }
+  ],
+  "regions": [],
+  "callouts": [],
+  "blocks": [],
+  "simulation": {
+    "version": 1,
+    "ground": "Vin.a",
+    "components": {
+      "Vin": {
+        "dc": "400",
+        "series_resistance": "0",
+        "series_inductance": "0"
+      },
+      "S1": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S2": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S3": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S4": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "L": {
+        "value": "100u",
+        "initial": "0",
+        "series_resistance": "0.05"
+      },
+      "T": {
+        "ratio": "0.125",
+        "reference_resistance": "1T",
+        "magnetizing_inductance": "0",
+        "leakage_inductance": "0",
+        "model": "ideal_transformer",
+        "polarity": "same"
+      },
+      "S5": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S6": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S7": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "S8": {
+        "ron": "0.01",
+        "roff": "1G",
+        "frequency": "50k",
+        "duty": 0.5,
+        "delay": 0,
+        "rise": "10n",
+        "fall": "10n",
+        "snubber_resistance": "0",
+        "snubber_capacitance": "0",
+        "phase_shift": 0,
+        "phase_ramp": 0,
+        "output_capacitance": "0",
+        "diode_is": "1n",
+        "diode_n": "1",
+        "diode_rs": "0.01",
+        "gate_voltage": "10",
+        "gate_threshold": "3",
+        "gate_capacitance": "0",
+        "miller_capacitance": "0",
+        "model": "ideal_switch"
+      },
+      "Co": {
+        "value": "470u",
+        "initial": "48"
+      },
+      "RL": {
+        "value": "4.8"
+      }
+    },
+    "transient": {
+      "step": "100n",
+      "stop": "5m",
+      "max_step": "100n",
+      "node_capacitance": "0"
+    },
+    "probes": [
+      {
+        "name": "v_o",
+        "kind": "voltage",
+        "positive": "Co.a",
+        "negative": "Co.b"
+      },
+      {
+        "name": "i_L",
+        "kind": "current",
+        "element": "L"
+      },
+      {
+        "name": "v_p",
+        "kind": "voltage",
+        "positive": "T.p1",
+        "negative": "T.p2"
+      },
+      {
+        "name": "v_s",
+        "kind": "voltage",
+        "positive": "T.s1",
+        "negative": "T.s2"
+      }
+    ]
+  },
+  "title": "DAB sampled SPS native-export candidate (not tuned)",
+  "closed_loop": {
+    "control": "dab_sps.control.json",
+    "inputs": {
+      "ref": {
+        "value": 48
+      },
+      "plant": {
+        "probe": "v_o"
+      },
+      "bias": {
+        "value": 0.10471975511965977
+      }
+    },
+    "outputs": {
+      "phase": {
+        "switches": [
+          "S1",
+          "S3",
+          "S7",
+          "S5"
+        ],
+        "complement": [
+          "S2",
+          "S4",
+          "S8",
+          "S6"
+        ],
+        "modulation": "sps",
+        "model": "switching",
+        "frequency": 50000,
+        "phase_min": 0,
+        "phase_max": 0.5,
+        "dead_time": 2e-07,
+        "samples_per_cycle": 200
+      }
+    },
+    "note": "Native-export candidate only. PI numeric seed, not validated tuning. Secondary A is S7/S8 because T.s1 connects to right bridge midpoint. First period blank; sampled command affects following cycle. Experimental ngspice requires explicit positive node_capacitance and at most 20000 ticks; this candidate is not silently regularized or shortened."
+  }
+}

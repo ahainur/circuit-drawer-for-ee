@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-sidebar]').forEach(tab => {
     tab.onclick = () => showSidebar(tab.dataset.sidebar);
     tab.onkeydown = event => {
-      const tabs = [...document.querySelectorAll('[data-sidebar]')], i = tabs.indexOf(tab);
+      const tabs = [...document.querySelectorAll('[data-sidebar]')], i = tabs.indexOf(event.currentTarget);
       const next = event.key === 'ArrowRight' ? (i + 1) % tabs.length : event.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length :
         event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
       if (next !== null) { event.preventDefault(); event.stopPropagation(); showSidebar(tabs[next].dataset.sidebar, true); }

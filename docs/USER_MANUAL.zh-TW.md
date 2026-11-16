@@ -2,7 +2,20 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | 繁體中文 | [English](USER_MANUAL.en.md)
 
-本書對應 Circuit Drawer for EE 1.8.0。先讀第一、二章完成安裝，再按需要查閱後面的章節。命令、選單名和欄位名都按程式中的原樣書寫。
+本書對應 Circuit Drawer for EE 2.0.0。先讀第一、二章完成安裝，再按需要查閱後面的章節。命令、選單名和欄位名都按程式中的原樣書寫。
+
+## 2.0 的 Agent 操作
+
+1、在兩個編輯器的工具列點選「Agent」，選擇空白畫布或目前圖紙，填寫需求。提示詞庫可填常用參數、儲存個人提示詞，並透過關閉按鈕收起。AI需要使用你設定的線上API。
+
+2、圖紙與模擬參數先顯示為候選。查看修改前、修改後、疊加及參數依據，點選「採用」後任務繼續，編輯器可單筆復原。點選「儲存」將圖紙寫入JSON。
+
+3、控制圖可以同時畫出參考、誤差、控制器、調變器、功率級和回授。先將功率圖儲存到同目錄，在需求中寫明檔名與數值，採用後可執行支援的ngspice閉迴路或匯出PLECS／Simulink。原生模型在對應軟體中開啟並求解。外部MCP用戶端可透過Python選用依賴安裝接入。
+
+4、結果頁顯示實際波形、取樣區間、指標和檔案。任務歷史屬於目前編輯器服務工作階段，圖紙旁的agent-output目錄保留執行記錄。自動模態使用固定頻率內部PWM工況，變頻工況的週期重複性顯示待確認。
+
+5、固定工況的模態內部檢查與結果頁均勻取樣檢查可能給出不同判定，請同時查看原始波形、通道和取樣區間。動態PWM死區採用載波閾值近似，需要核對實際閘極時序。SPS目前按單組雙橋繫結使用，雙輸出共用原橋的統一排程仍待完善。
+
 
 ## 目錄
 
@@ -105,7 +118,7 @@ Circuit Drawer 是給電力電子論文和報告畫電路圖的工具。你在�
 
 #### 64 位 Windows 10 和 11 安裝包
 
-1、下載並雙擊 `CircuitDrawer-Setup-1.8.0.exe`，選擇安裝語言，按照精靈完成目前使用者安裝。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下載並雙擊 `CircuitDrawer-Setup-2.0.0.exe`，選擇安裝語言，按照精靈完成目前使用者安裝。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、安裝目錄使用 ASCII 字元，允許空格。圖紙路徑、匯出路徑和 Windows 使用者名稱可包含中文。
 
@@ -114,17 +127,17 @@ Circuit Drawer 是給電力電子論文和報告畫電路圖的工具。你在�
 4、安裝包尚未簽署數位簽章，Windows 可能顯示「未知的發行者」或「Windows 已保護您的電腦」。核對來源和 SHA256 後，可在提供該選項的畫面選擇「其他資訊 → 仍要執行」。在 PowerShell 執行下列命令，與同一發佈頁 `SHA256SUMS.txt` 中的對應項目比較。
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
 ```
 
 5、升級或解除安裝前先儲存圖紙，關閉啟動器和正在執行的 Circuit Drawer 命令列工作。升級時執行新版安裝程式。解除安裝入口位於 Windows「設定 → 應用程式 → Circuit Drawer」，使用者圖紙及設定會保留。圖紙請儲存到自己的文件目錄。
 
 #### 開發者、macOS 和 Linux 的 Python 安裝方式
 
-1、下載 wheel 檔案 `circuit_drawer_for_ee-1.8.0-py3-none-any.whl`，在檔案所在目錄執行下列命令。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下載 wheel 檔案 `circuit_drawer_for_ee-2.0.0-py3-none-any.whl`，在檔案所在目錄執行下列命令。[發佈下載頁](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
 ```
 
 2、也可以執行下列命令，從倉庫安裝。
@@ -2511,3 +2524,10 @@ JSON 不記錄欄寬，預設按單欄開啟。用 `circuit-drawer edit x.json -
 4、摺疊框不能互相重疊，也不能遮住可見外部元件的符號、引線、標籤或引腳（`module-box-overlap`）；埠連線要能布通（`module-route`）。
 
 5、模擬匯出（SPICE、Simulink、PLECS）對已知的純標註問題（箭頭和文字遮擋、區域邊框、裝飾顏色與文字格式）不拒絕匯出；繪圖預覽和 PDF 仍要求修好或明確允許。電氣連線、網表、參數、模型對映和例項完整性照常檢查。
+
+
+## 控制框圖顯式整理
+
+1、控制框圖的「整理佈線」保留方塊座標，僅重建連線；「重新排版」根據邏輯連接重排方塊和連線。兩者先顯示佈局候選，方框以 ID 標識，並非最終標籤排印預覽。
+
+2、只有點選「採用結果」才修改目前圖紙，可一步撤銷或重做；點選儲存才寫入檔案。候選產生後若圖紙或版面規格改變，請重新整理。失敗時原圖不變；控制參數、求和符號與邏輯連接不得改變。

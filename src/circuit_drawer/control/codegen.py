@@ -183,19 +183,31 @@ def plan(rep) -> Plan:
         raise CodeError("; ".join(ferr))
     net = Network(rep, spec)
     blocks = net.blocks
+    from .circuit import parse_section, output_signals
+    try:
+        circuit = parse_section(dia.raw, dia)
+        bindings = output_signals(circuit, net) if circuit else None
+    except ValueError as exc:
+        raise CodeError(str(exc)) from None
     external = set(cfg["external"]) | {b for b, tf in spec.tf.items() if tf.form == "model"}
+    if circuit:
+        external.update(circuit["inputs"])
+        external.update(circuit["outputs"])
     code_ids = [b.id for b in dia.blocks if b.id not in external]
 
     def reads(bid: str) -> list[tuple[str, str]]:
         """(port, source) for a code block, the drawing's lines only."""
         return net.inputs.get(bid, [])
 
-    inputs = [b for b in code_ids if blocks[b].type == "tag"
+    declared_outputs = set(cfg["outputs"]) | set(dia.raw.get("control_ai", {}).get("outputs", []))
+    output_tags = {b for b in code_ids if blocks[b].type == "tag" and reads(b)
+                   and (b in declared_outputs or all(_owner(src) not in external for _, src in reads(b)))}
+    inputs = [b for b in code_ids if (blocks[b].type == "tag" and b not in output_tags)
               or (not reads(b) and blocks[b].type not in ("sum", "switch"))]
     inputs += [b for b in dia.blocks if b.id in external and
                any(src == b.id for c in code_ids for _, src in reads(c))]
     inputs = [b if isinstance(b, str) else b.id for b in inputs]
-    outputs = cfg["outputs"] or _default_outputs(rep, net, spec, code_ids, external, fns)
+    outputs = list(bindings) if bindings else cfg["outputs"] or _default_outputs(rep, net, spec, code_ids, external, fns)
     if any(fn.kind == "c" for fn in fns.values()) and cfg["arith"] != "double":
         raise CodeError("C 代码方块要求 code.arith = double")
     if fns and pl_arith_fixed(cfg):
@@ -262,6 +274,7 @@ def cid(signal: str) -> str:
 def _default_outputs(rep, net, spec, code_ids, external, fns) -> list[str]:
     outs = [p.src for p in spec.plant if _owner(p.src) in code_ids]
     outs += [src for b in external for _, src in net.inputs.get(b, []) if _owner(src) in code_ids]
+    outs += [bid for bid in rep.diagram.raw.get("control_ai", {}).get("outputs", []) if bid in code_ids]
     if not outs:
         g = rep.geometry
         for lk, path in zip(rep.diagram.links, g.paths):
@@ -297,6 +310,8 @@ def _step(b, ins: list[tuple[str, str]], tf: Tf | None, cfg: dict, pl: Plan) -> 
         raise CodeError(f"{b.id} has {len(ins)} inputs; code needs one (loop.tf.{b.id}.port "
                         f"picks it)")
     src = [ins[0][1]]
+    if b.type == "tag" and tf is None:
+        return Step(b.id, "copy", src, lo=lo, hi=hi)
     if b.type == "limiter" and tf is None:
         if lo is None or hi is None:
             raise CodeError(f"{b.id}: a limiter needs its range in code.blocks.{b.id} "

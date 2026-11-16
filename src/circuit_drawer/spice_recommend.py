@@ -67,6 +67,24 @@ def parameter_values(simulation):
     return result
 
 
+def parameter_label(path, layout, simulation):
+    """Reuse the parameter editor's field names and units in review tables."""
+    keys = path.split(".")
+    if keys[0] == "components" and len(keys) >= 3:
+        element = next((e for e in layout.elements if e.id == keys[1]), None)
+        if element:
+            fields = spice.FIELDS.get(element.kind, []) + spice.OPTIONAL_FIELDS.get(element.kind, [])
+            if keys[2] == "wave" and len(keys) == 4:
+                wave = simulation["components"][element.id].get("wave", {})
+                fields = spice.SOURCE_WAVE_FIELDS.get(wave.get("kind"), [])
+            names = {key: label for key, label, _ in fields}
+            names.update(model="仿真模型", polarity="绕组极性", gate_drive="栅极驱动", gate_source="驱动电压源", kind="激励类型")
+            return element.id + " · " + names.get(keys[-1], keys[-1])
+    if keys[0] == "transient" and len(keys) == 2:
+        return next((label for key, label, _ in spice.TRANSIENT_FIELDS if key == keys[1]), path)
+    return {"ground": "参考地", "probes": "测量通道"}.get(path, path)
+
+
 def recognize(layout, profile):
     if layout.extra.get("model_mapping"):
         return None, None  # explicit advanced models need their own assumptions
@@ -143,7 +161,7 @@ def formula(layout, topology, preset, requested):
             "method": f"{n} 相 Buck 公式" if topology == "buck" else "Boost 公式"}
 
 
-def quick_check(layout, profile, base_dir=None):
+def quick_check(layout, profile, base_dir=None, *, should_stop=None):
     """Run a disposable copy. Existing output files and JSON are untouched."""
     deck = spice.make_deck(layout, profile, base_dir)
     if not spice.executable():
@@ -155,7 +173,8 @@ def quick_check(layout, profile, base_dir=None):
     candidate.extra["simulation"]["transient"]["stop"] = f"{stop:.12g}"
     with tempfile.TemporaryDirectory(prefix="cd_recommend_") as folder:
         spice.export_spice(candidate, folder, "preview", profile=profile, run=True,
-                           timeout=CHECK_TIMEOUT, base_dir=base_dir)
+                           timeout=CHECK_TIMEOUT, base_dir=base_dir,
+                           **({"should_stop": should_stop} if should_stop else {}))
         with (Path(folder) / "preview.csv").open(encoding="utf-8", newline="") as file:
             reader = csv.DictReader(file)
             columns = [c for c in reader.fieldnames if c != "time_s"]
@@ -279,7 +298,8 @@ class RecommendationWorkflow:
     document_kind = "仿真参数建议"
     max_rounds = 3
 
-    def __init__(self, layout, profile="ieee-single", requested=None, description="", base_dir=None):
+    def __init__(self, layout, profile="ieee-single", requested=None, description="", base_dir=None,
+                 *, use_formula=True, should_stop=None, preview_simulation=True):
         self.layout = Layout.from_dict(layout.to_dict())
         self.profile, self.base_dir = profile, base_dir
         self.tuning = "modules" in layout.extra or "closed_loop" in layout.extra
@@ -291,22 +311,35 @@ class RecommendationWorkflow:
         else:
             spice.connected_layout(self.layout, profile)
             self.full = self.layout
+            if "simulation" in layout.extra:
+                try:
+                    spice.make_deck(self.layout, profile, base_dir)
+                    _, self.catalog, _ = tuning_parameters(self.layout, profile, base_dir)
+                except spice.SpiceError:
+                    pass  # incomplete configurations still need a full proposal
         self.requested = requirements({} if requested is None else requested)
         if not isinstance(description, str) or len(description) > 8000:
             raise spice.SpiceError("parameter-description: 文字需求必须是最多 8000 字的文本")
         self.description = description.strip()
-        self.topology, self.preset = (None, None) if self.tuning else recognize(self.layout, profile)
+        self.topology, self.preset = (None, None) if self.tuning or not use_formula else recognize(self.layout, profile)
+        self.should_stop = should_stop
+        self.preview_simulation = preview_simulation
         self.use_ai = self.topology is None or bool(self.description)
 
     def system_prompt(self):
         from .ai.prompt import simulation_parameter_prompt
-        return simulation_parameter_prompt(self.topology, INPUTS, tuning=self.tuning)
+        return simulation_parameter_prompt(self.topology, INPUTS, tuning=self.tuning,
+                                           incremental=bool(self.catalog),
+                                           kinds={e.kind for e in self.full.elements})
 
     def first_message(self, description):
         graph = {"elements": [{"id": e.id, "kind": e.kind, "pins": list(e.pins), "opts": e.opts}
                                for e in self.full.elements], "netlist": self.full.netlist,
                  "simulation": self.full.extra.get("simulation"), "model_mapping": self.layout.extra.get("model_mapping")}
-        if self.tuning:
+        graph["component_ids"] = [e.id for e in self.full.elements if e.kind != "port"]
+        if not self.tuning:
+            graph["component_fields"] = self.component_contract(self.full.extra.get("simulation") or {})
+        if self.catalog:
             graph["adjustable"] = {k: {"value": v["value"], "label": v["label"]} for k, v in self.catalog.items()}
             if self.control is not None:
                 graph["closed_loop"] = {**self.layout.extra["closed_loop"], "control": self.control}
@@ -315,33 +348,73 @@ class RecommendationWorkflow:
                 "\n已填写的固定要求（优先遵守）：" + json.dumps(self.requested, ensure_ascii=False) +
                 "\n当前连接与参数：" + json.dumps(graph, ensure_ascii=False))
 
+    def component_contract(self, simulation):
+        result = {}
+        components = simulation.get("components", {}) if isinstance(simulation, dict) else {}
+        if not isinstance(components, dict):
+            components = {}
+        for element in self.full.elements:
+            if element.kind == "port":
+                continue
+            config = components.get(element.id, {})
+            mode = config.get("gate_drive", "external" if "g" in element.pins else "internal") if isinstance(config, dict) else "internal"
+            required, optional = spice.component_fields(element.kind, mode == "external" and element.kind in spice.PWM_SWITCHES)
+            result[element.id] = {"required": required, "optional": optional}
+            if element.kind in spice.MODELS:
+                result[element.id]["model"] = spice.MODELS[element.kind]
+        return result
+
     def formula(self):
         return self._check(formula(self.layout, self.topology, self.preset, self.requested))
 
     def _check(self, data):
-        allowed = {"updates" if self.tuning else "simulation", "requirements", "reasons", "assumptions", "method"}
+        patch = self.tuning or isinstance(data, dict) and "updates" in data
+        allowed = {"updates" if patch else "simulation", "requirements", "reasons", "assumptions", "method"}
         if not isinstance(data, dict) or set(data) - allowed:
             raise spice.SpiceError(f"parameter-fields: 只能返回 {sorted(allowed)}；不能修改坐标、接线、模型映射或控制结构")
         req = requirements(data.get("requirements", {}))
         if any(k not in req or not math.isclose(v, req[k], rel_tol=1e-9) for k, v in self.requested.items()):
             raise spice.SpiceError("parameter-requirements: 返回的 requirements 必须保留所有固定要求")
         data = deepcopy(data)
+        data["requirements"] = req
         candidate = Layout.from_dict(self.layout.to_dict())
-        if self.tuning:
+        if patch:
             candidate, values = self._tuned(data.get("updates"))
         else:
             candidate.extra["simulation"] = deepcopy(data.get("simulation"))
+            simulation = candidate.extra["simulation"]
+            if isinstance(simulation, dict) and isinstance(simulation.get("components"), dict):
+                contract = self.component_contract(simulation)
+                errors = []
+                for key, fields in contract.items():
+                    try:
+                        spice._keys(simulation["components"].get(key), fields["required"], fields["optional"],
+                                    label="components." + key)
+                    except spice.SpiceError as exc:
+                        errors.append(str(exc))
+                extra = simulation["components"].keys() - contract.keys()
+                if extra:
+                    errors.append("components 含多余 ID：" + ", ".join(sorted(extra)))
+                if errors:
+                    raise spice.SpiceError("\n".join(errors))
         spice.make_deck(candidate, self.profile, self.base_dir)
-        if not self.tuning:
+        if not patch:
             values = parameter_values(data["simulation"])
         reasons = data.get("reasons")
-        if not isinstance(reasons, dict) or any(not isinstance(reasons.get(k), str) or not reasons[k].strip() for k in values):
-            raise spice.SpiceError("parameter-reasons: reasons 必须为每个建议参数路径提供非空理由（普通电路还包括 ground、probes、transient.*、components.<ID>.*）")
+        missing = [k for k in values if not isinstance(reasons, dict) or
+                   not isinstance(reasons.get(k), str) or not reasons[k].strip()]
+        if missing:
+            raise spice.SpiceError("parameter-reasons: 缺少以下 reasons 键的非空理由：" + ", ".join(missing))
         assumptions = data.get("assumptions")
         if not isinstance(assumptions, list) or not assumptions or any(not isinstance(x, str) or not x.strip() for x in assumptions):
             raise spice.SpiceError("parameter-assumptions: assumptions 必须列出至少一项明确的工况或模型假设")
-        data["verification"] = quick_check(candidate, self.profile, self.base_dir)
-        if self.tuning:
+        if self.preview_simulation:
+            data["verification"] = quick_check(candidate, self.profile, self.base_dir,
+                                               **({"should_stop": self.should_stop} if self.should_stop else {}))
+        else:
+            # Agent tasks run the requested simulation after candidate adoption.
+            data["verification"] = {"status": "not_run", "message": "配置已校验，采用后由仿真步骤运行。"}
+        if patch:
             for key in ("simulation", "modules", "closed_loop"):
                 if key in candidate.extra:
                     data[key] = deepcopy(candidate.extra[key])
@@ -366,20 +439,21 @@ class RecommendationWorkflow:
         if "vout" in req and "v_out_V" in data["verification"].get("channels", {}):
             measured = data["verification"]["channels"]["v_out_V"]["mean"]
             data["verification"]["voltage_error_pct"] = 100 * (measured - req["vout"]) / req["vout"]
-        if self.tuning:
+        if patch:
             return Proposal(data)
         before = self.layout.extra.get("simulation")
         try:
             old = parameter_values(before) if isinstance(before, dict) else {}
         except (KeyError, TypeError, AttributeError):
             old = {}  # an incomplete old configuration must not prevent repair
-        data["parameters"] = [{"path": k, "before": old.get(k), "value": v, "reason": reasons[k]} for k, v in values.items()]
+        data["parameters"] = [{"path": k, "label": parameter_label(k, self.layout, data["simulation"]),
+                               "before": old.get(k), "value": v, "reason": reasons[k]} for k, v in values.items()]
         return Proposal(data)
 
     def _tuned(self, updates):
         return apply_parameters(self.layout, self.catalog, updates, self.control)
 
-    def evaluate(self, reply):
+    def evaluate(self, reply, *, should_stop=lambda: False):
         data = extract_table(reply)
         if self.topology:
             if not isinstance(data, dict) or set(data) != {"requirements"}:
@@ -392,8 +466,11 @@ class RecommendationWorkflow:
         return Evaluation(self._check(data), [])
 
     def unreadable(self, exc):
+        if isinstance(exc, json.JSONDecodeError):
+            return (f"JSON 语法错误：{exc}。请检查此处的逗号、引号及括号，返回一个完整 JSON 对象。"
+                    "字符串内反斜杠须转义，数字字段使用 SI 或 SPICE 后缀，禁止注释及省略号。")
         return (f"参数或短仿真未通过：{exc}\n按具体错误修正并返回完整 JSON；不能改动电路接线或模型映射。"
-                "缺少理由时，为每个参数路径补上理由。")
+                "保留已经正确的参数；缺少理由时只补报错列出的完整 reasons 键。")
 
     def feedback(self, result, best, improved, previous):
         return self.unreadable("；".join(result.errors))

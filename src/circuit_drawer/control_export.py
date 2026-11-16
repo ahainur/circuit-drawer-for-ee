@@ -59,7 +59,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .closed_loop import CONTINUOUS_NOTE, MIN_PULSE_EDGES, ClosedLoopError, Loop
+from .closed_loop import CONTINUOUS_NOTE, MIN_PULSE_EDGES, ClosedLoopError, Loop, pwm_drives
 
 MODES = ("continuous", "discrete")
 COLUMN = 170          # px between columns of control blocks (a PLECS PID block is 88 px wide)
@@ -334,6 +334,9 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
         sig[st.id] = port
     for bid, cfg in loop.outputs.items():
         duty = sig[bid]
+        if cfg.get("modulation") == "sps":
+            _sps(b, panel, bid, cfg, switches, duty)
+            continue
         if cfg.get("modulation") == "vco":
             _vco(b, panel, bid, cfg, switches, duty)
             continue
@@ -341,10 +344,8 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
         if cfg["model"] == "average":
             panel.warnings.append(f"{bid}：桥臂 {cfg['switches'] + cfg['complement']} 的 average 模型在原生库里没有对应方块，"
                                   f"按逐开关模型导出（三角载波、死区 {cfg['dead_time']:g} s）")
-        for sw in cfg["switches"]:
-            _modulator(b, panel, sw, switches[sw], duty, bid, bridge, cfg["dead_time"], False)
-        for sw in cfg["complement"]:
-            _modulator(b, panel, sw, switches[sw], duty, bid, True, cfg["dead_time"], True)
+        for sw, drive, low in pwm_drives(cfg, switches):
+            _modulator(b, panel, sw, drive, duty, bid, bridge, cfg["dead_time"], low)
     for lk in panel.links:
         if lk.src[0].startswith("?"):
             lk.src = placeholders[lk.src[0][1:]]
@@ -475,3 +476,16 @@ def describe(panel: Panel) -> dict[str, Any]:
             "links": [{"from": list(lk.src), "to": list(lk.dst)} for lk in panel.links],
             "exports": {k: list(v) for k, v in panel.exports.items()},
             "warnings": list(panel.warnings)}
+
+
+def _sps(b, panel, out, cfg, switches, command):
+    from .sps import Timing, OUTPUTS, c_spec
+    t = Timing(cfg['frequency'], cfg['phase_min'], cfg['phase_max'], cfg['dead_time'], cfg['samples_per_cycle'])
+    names = [out + '.' + name for name in OUTPUTS]
+    name = b.add('c', out+'_sps', {'names':['command'], 'outs':names, 'c':c_spec(t), 'ts':t.ts}, 1, 8, out)
+    b.link(command, (name, 1))
+    for i, sw in enumerate(cfg['switches'] + cfg['complement'], 1):
+        panel.exports[switches[sw][0]] = (name, i)
+    panel.warnings.append(f'{out}：SPS 理想离散门极，步长 {t.ts:g} s，死区向上量化为 {t.dead_ticks*t.ts:g} s。'
+        '相移命令为弧度，正值副桥滞后；首周期关断；周期边界采样并作用于下一周期，'
+        '每周期相移变化不超过 pi/2。原生模型尚须目标软件求解验收；ngspice 仅有连续单组受限实验模式，使用数值 PWL 边沿，不能代替原生验收。')

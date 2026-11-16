@@ -12,7 +12,7 @@ import json
 import re
 
 from .. import blocks, regions, schema
-from ..closed_loop import MODULATIONS, OUTPUT_KEYS as CLOSED_OUTPUT_KEYS, VCO_FIELDS
+from ..closed_loop import INPUT_KEYS as CLOSED_INPUT_KEYS, MODELS as CLOSED_MODELS, MODULATIONS, OUTPUT_KEYS as CLOSED_OUTPUT_KEYS, VCO_FIELDS
 from ..completeness import INSTANCE_STYLES
 from ..control_view import KEYS as CONTROL_VIEW_KEYS, DISPLAYS as CONTROL_VIEW_DISPLAYS
 from ..geometry import BODY_FRAC, HALF_HEIGHT, MIN_LEAD, WINDING_GAP
@@ -386,6 +386,25 @@ phase and physical dead_time in seconds. For example preserve
 VCO uses switching only and requires equal switch delays. Native PLECS/Simulink
 exports preserve Hz, shared continuous phase and seconds of dead time. Do not convert Hz commands to duty or replace VCO
 with fixed-frequency PWM. Preserve frequency limits and dead time on edits.
+PWM complement lists are paired one-to-one. Each pair uses its upper switch's
+frequency and delay and the longer rise/fall of the pair. Different upper delays
+provide interleaving. Preserve the stored open-loop values when binding control.
+SPS is sampled phase modulation in radians (positive secondary lag), with four
+ordered upper switches and four paired complement switches (primary A/B,
+secondary A/B), explicit frequency, phase_min/phase_max within +/-pi/2,
+samples_per_cycle (multiple of four), and positive dead_time. Preserve the order
+and all timing fields on edits. Native PLECS/Simulink require target-software
+acceptance. Experimental ngspice SPS accepts ONLY one SPS output group with a
+continuous controller, explicit positive transient.node_capacitance, and at most
+20000 timing ticks; ngspice rejects SPS digital/mixed-rate or mixed-output models.
+Never silently add grounding or node capacitance: the explicit numerical shunt
+changes common-mode behavior and needs sensitivity checks. A generated deck or
+passing gate trace does not mean the controller is tuned. ngspice reads the
+right side of period boundaries using an explicitly bounded positive numerical
+sampling guard; it rejects unresolved or too-short electrical dead time.
+First period blank; boundary commands schedule the following cycle with pi/2
+maximum phase change per period. Do not replace this scheduler with a raw sine
+phase subtraction, which glitches at command steps.
 Preserve embedded control.digital sampling, delay and quantization settings too.
 A zoomed detail is a separate small drawing beside the circuit, never wired to it:
 its parts get their own ids and node names, its terminals end in ports, and the
@@ -633,11 +652,13 @@ def _field(f, kinds: bool = False) -> str:
     return f"- {f.name}{scope}: {f.accepted()}{default}. {f.doc}"
 
 
-def simulation_parameter_prompt(topology, inputs, *, tuning=False) -> str:
+def simulation_parameter_prompt(topology, inputs, *, tuning=False, incremental=False, kinds=None) -> str:
     """Parameter-only proposals use the same field declarations as the exporter."""
     import json
     from ..spice import FIELDS, OPTIONAL_FIELDS, SOURCE_WAVE_FIELDS, TRANSIENT_FIELDS
     from ..pmsm import QUANTITIES
+    required = {k: v for k, v in FIELDS.items() if kinds is None or k in kinds}
+    optional = {k: v for k, v in OPTIONAL_FIELDS.items() if kinds is None or k in kinds}
     intro = ("你是仿真参数建议助手。只返回一个完整 JSON 对象，不能输出坐标、接线、元件类型、"
              "模型映射或控制结构，也不能输出 SPICE 语句、表达式、文件路径或可执行代码。"
              "缺少需求时给出明确标为假设的常见演示工况，不声称是器件额定值或最优设计。"
@@ -665,6 +686,14 @@ def simulation_parameter_prompt(topology, inputs, *, tuning=False) -> str:
         return intro + (f"已按真实接线识别 {topology}。你只需从文字里提取需求，"
                         "返回 {\"requirements\":{...}}；未提及的字段省略，不能自己计算元件值。"
                         "随后由程序按 CCM 公式计算。字段（*_pct 为百分数）：" + fields)
+    if incremental:
+        intro += ("当前已有完整仿真配置。只修改已有数值时优先返回精简候选 "
+                  "{\"updates\":{\"simulation.transient.stop\":\"50m\"},\"requirements\":{},"
+                  "\"reasons\":{\"simulation.transient.stop\":\"按用户要求延长仿真\"},"
+                  "\"assumptions\":[\"沿用当前器件模型\"]}。示例数值仅说明格式。"
+                  "updates 仅填写本次要改的 adjustable 路径，每项附一句理由；其余参数自动保留。"
+                  "需要新增参数、测量或修正配置结构时才使用下面的完整 simulation 格式。"
+                  "updates 与 simulation 只能选一种格式，不要重复输出已保留参数及理由。\n")
     return intro + ("返回 {\"simulation\":{\"version\":1,\"ground\":\"真实元件.引脚\","
                     "\"components\":{...},\"transient\":{...},\"probes\":[...]},"
                     "\"requirements\":{...},\"reasons\":{\"components.L1.value\":\"计算或取值理由\",...},"
@@ -672,22 +701,24 @@ def simulation_parameter_prompt(topology, inputs, *, tuning=False) -> str:
                     "requirements 允许的字段：" + fields + "。所有固定要求必须保留。"
                     "reasons 对每个叶参数都给理由：ground、probes、components.<ID>.<字段>"
                     "（wave 用 components.<ID>.wave.<字段>）和 transient.<字段>。"
-                    "components 必须与当前器件 ID 一一对应，不能增加、遗漏或改名。"
+                    "probes 整个数组只需一个 reasons.probes 字符串，不要以 probes.<名称> 的理由替代。"
+                    "components 必须与当前消息的 component_ids 一一对应。kind=port 是连接端子，排除在 components 之外。"
                     "参考地和电压探针只用现有引脚；不能用标签猜电气数值。"
                     "probes 可为 {name,kind:'voltage',positive,negative}、"
                     "{name,kind:'current',element}、{name,kind:'drive',element}、"
                     "{name,kind:'motor',element,quantity}；电机 quantity 与单位：" + json.dumps(QUANTITIES, ensure_ascii=False) + "。"
                     "变压器 current 需 winding（primary/secondary；中心抽头为 upper/lower）。"
                     "给出一个名为 v_out 的输出电压测量，以便显示目标偏差。"
-                    "D 的 model 为 generic_diode，nmos/pmos 为 ideal_switch，IGBT 为 simplified_igbt，"
-                    "变压器为 ideal_transformer，需 polarity=same/opposite。"
+                    "严格遵守 component_fields 中每个 ID 的 required/optional 清单；清单中未声明的字段不能填写。"
+                    "仅在 required 含 model 的器件中，model 是必填字符串，其值采用清单中的 model。"
+                    "V、I、R、L、C 没有 model 字段。变压器需 polarity=same/opposite。"
                     "V/vac 的电压是 b−a，I 电流 a→b；vac 需要 sine 激励，幅值为峰值。"
                     "保留已指定的模型映射，不要从映射模型降级。开关相移、互补、变压器极性应逐项核对连接。"
                     "0<max_step<=step<stop，stop/max_step<=1000000；初始 L/C 值明确填写。"
                     "短窗口不保证稳态，不得承诺损耗、ZVS 或额定值合格。\n"
                     "元件必填数值字段（第三列只为格式示例，不能照抄为所有拓扑的参数）：\n" +
-                    json.dumps(FIELDS, ensure_ascii=False) + "\n可选字段：\n" +
-                    json.dumps(OPTIONAL_FIELDS, ensure_ascii=False) + "\n激励 wave.kind 与数值字段：\n" +
+                    json.dumps(required, ensure_ascii=False) + "\n可选字段：\n" +
+                    json.dumps(optional, ensure_ascii=False) + "\n激励 wave.kind 与数值字段：\n" +
                     json.dumps(SOURCE_WAVE_FIELDS, ensure_ascii=False) + "\n瞬态字段：\n" +
                     json.dumps(TRANSIENT_FIELDS, ensure_ascii=False))
 
@@ -1318,6 +1349,8 @@ def control_system_prompt(templates, snippets):
     from ..schema import control_appearance_reference
     from ..control.digital import field_reference as digital_reference
     from ..control.custom_c import field_reference as custom_c_reference
+    from ..control.codegen import CODE_KEYS, BLOCK_KEYS
+    from ..control.circuit import KEYS as CIRCUIT_KEYS
     return r'''You draw control block diagrams. Return one complete JSON object, no coordinates.
 FORMAT (AI exchange only; the saved file remains the ordinary kind=control table):
 template: optional catalog name, e.g. "dual_loop". Prefer its authored geometry.
@@ -1361,12 +1394,56 @@ not a numeric plant model. Unknown or removed link references are errors.
 Never declare a missing internal input/output external merely to pass validation.
 sum.signs maps EVERY incoming side to "+"/"-", with at least two signed inputs.
 regions: optional COMPLETE list of {id,members:[block ids],label,fill,border,border_color,label_pos}.
-Never output at, size, pole, via, coordinate endpoints, free text coordinates or code.
+Never output at, size, pole, via, coordinate endpoints or free text coordinates.
 Do not delete/change unrelated blocks, labels, signs, connections, regions or tf on edits.
 loop: existing control loop data only (params, tf, plant, breaks, closed, freq).
+code may set numerical export configuration when the user requests simulation or
+code generation. Supply code.fs in Hz, method, arith and numerical limits in
+code.blocks, using agreed values. Preserve unrequested existing code settings.
+For a complete closed-loop diagram tied to an existing project circuit, add circuit.
+circuit.source is the exact supplied project JSON name. circuit.inputs maps drawn
+reference blocks to {value,ramp?} and the power-stage measurement output block to
+{probe}, using a real simulation.probes name. circuit.outputs maps the DRAWN
+modulator block id to gate settings, using the existing closed_loop output fields.
+Bind only inputs actually read by the controller. Additional monitored waveforms
+already come from simulation.probes and need no circuit.inputs entry.
+Draw the full path reference -> error -> PI -> limiter -> modulator -> power stage,
+and power-stage output -> optional measurement gain -> the error's negative input.
+Use a block labelled with the physical topology and stateful for a genuinely
+dynamic power stage. Do not invent a transfer function for the physical circuit.
+If a separate measurement tag reads the power-stage block, bind that tag to its
+probe and list the physical power-stage block in code.external. Both
+modulator -> bound power-stage output and modulator -> external power stage ->
+bound measurement tag are valid. Keep controller gains/filters in the signal graph.
+The program reads the modulator's incoming line to choose the controller output
+and excludes the bound modulator/power stage from controller code automatically.
+PWM requires matching switches/complement lists, paired upper/lower devices.
+For PWM, frequency and interleaving delays come from simulation.components in
+the linked power circuit. Do not put frequency, phase_min, phase_max or
+samples_per_cycle in a PWM output binding; those fields belong to SPS.
+Each pair shares the upper device's frequency and delay and the longer rise/fall
+of the pair. Existing lower-device pulse delays stay stored for open-loop use.
+Use model switching when switching ripple is requested. Upper-device delays
+set the relative carrier phases for interleaved pairs.
+SPS needs four upper/lower pairs in primary A, primary B, secondary A, secondary B
+order, defined by transformer terminals in the supplied circuit, plus frequency,
+phase_min, phase_max in radians, dead_time in seconds and samples_per_cycle.
+Put the FOUR upper device IDs in switches and FOUR matching lower IDs in complement.
+Use the supplied existing_bindings when available and consistent with the task.
+For example, if the source defines primary A=S1/S2, B=S3/S4 and secondary
+A=S7/S8, B=S5/S6, the drawn modulator binding is
+{"sps":{"switches":["S1","S3","S7","S5"],"complement":["S2","S4","S8","S6"],
+"modulation":"sps","frequency":50000,"phase_min":0,"phase_max":0.5,
+"dead_time":"200n","samples_per_cycle":200}}.
+The optional model field uses the generated choices below; omit it for default
+switching simulation. A switch device's individual model name does not belong here.
+This example illustrates the schema; source IDs and requested values take precedence.
+Only bind a supplied source and existing IDs. Keep a symbolic diagram and ask for
+missing circuit/design inputs instead of fabricating a source or device identity.
+Do not request a Bode plot for a physical stage lacking a small-signal model.
 tf on a block is mapped into loop.tf under the same id; use the same pi/pr/lpf/gain/
-num+den/model forms as loop analysis. Keep existing loop/code data unless a requested
-structural removal invalidates that block. The table's functions section (Clarke, Park,
+num+den/model forms as loop analysis. Preserve unrequested loop/code values. The
+table's functions section (Clarke, Park,
 inverse Park, SVPWM, wrap blocks with their input/output ports) is kept as it is; keep
 those blocks and the port offsets of their links, and never invent one. Do not call a controller linear if its
 parameters are missing. Do not guess an absent plant to fabricate a Bode plot.
@@ -1385,4 +1462,4 @@ Link labels/arrowheads follow link colour; branch dots remain black. Appearance 
 no effect on transfer functions, simulation or code generation. Existing free text
 can be edited through texts index/text patches; its position and appearance are kept.
 Example: {"blocks":[{"id":"pi","fill":"lightblue","border":"blue","color":"red"}]}
-''' + control_appearance_reference() + '\nSAVED DIGITAL CONTROL FIELD REFERENCE:\n' + digital_reference() + '\nSAVED CUSTOM C FIELD REFERENCE:\n' + custom_c_reference()
+''' + control_appearance_reference() + '\nNUMERICAL CODE FIELDS\n' + json.dumps({"code": CODE_KEYS, "code.blocks": BLOCK_KEYS}) + '\nCIRCUIT BINDING FIELDS\n' + json.dumps({"circuit": CIRCUIT_KEYS, "circuit.inputs": CLOSED_INPUT_KEYS, "circuit.outputs": CLOSED_OUTPUT_KEYS, "circuit.outputs.<id>.model": CLOSED_MODELS, "circuit.outputs.<id>.modulation": MODULATIONS}) + '\nSAVED DIGITAL CONTROL FIELD REFERENCE:\n' + digital_reference() + '\nSAVED CUSTOM C FIELD REFERENCE:\n' + custom_c_reference()

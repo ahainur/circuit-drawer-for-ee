@@ -1,0 +1,249 @@
+{
+  "kind": "control",
+  "name": "dab_full_feedback",
+  "blocks": [
+    {
+      "id": "ref",
+      "type": "tag",
+      "style": "ref",
+      "text": "$V_{ref}$",
+      "size": [
+        0.8800000000000001,
+        0.6
+      ],
+      "at": [
+        0.44,
+        0.0
+      ]
+    },
+    {
+      "id": "error",
+      "type": "sum",
+      "signs": {
+        "w": "+",
+        "s": "-"
+      },
+      "at": [
+        2.18,
+        0.0
+      ]
+    },
+    {
+      "id": "pi",
+      "type": "block",
+      "text": "PI",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        3.88,
+        0.0
+      ]
+    },
+    {
+      "id": "bias",
+      "type": "tag",
+      "style": "ref",
+      "text": "$6^{\\circ}$",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        5.58,
+        -1.58
+      ]
+    },
+    {
+      "id": "add",
+      "type": "sum",
+      "signs": {
+        "w": "+",
+        "s": "+"
+      },
+      "at": [
+        5.58,
+        0.0
+      ]
+    },
+    {
+      "id": "lim",
+      "type": "limiter",
+      "label": "$0\\sim0.5$ rad",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        7.59,
+        0.0
+      ]
+    },
+    {
+      "id": "sps",
+      "type": "block",
+      "text": "SPS",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        9.6,
+        0.0
+      ]
+    },
+    {
+      "id": "power",
+      "type": "block",
+      "text": "DAB",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        11.3,
+        0.0
+      ]
+    },
+    {
+      "id": "sense",
+      "type": "block",
+      "text": "$V_o$",
+      "size": [
+        0.8,
+        0.6
+      ],
+      "at": [
+        2.98,
+        -2.78
+      ]
+    }
+  ],
+  "links": [
+    {
+      "from": "add.e",
+      "to": "lim.w"
+    },
+    {
+      "from": "bias.n",
+      "to": "add.s"
+    },
+    {
+      "from": "error.e",
+      "to": "pi.w"
+    },
+    {
+      "from": "lim.e",
+      "to": "sps.w"
+    },
+    {
+      "from": "pi.e",
+      "to": "add.w"
+    },
+    {
+      "from": "power.s",
+      "to": "sense.e",
+      "via": [
+        [
+          11.3,
+          -2.78
+        ]
+      ]
+    },
+    {
+      "from": "ref.e",
+      "to": "error.w"
+    },
+    {
+      "from": "sense.w",
+      "to": "error.s",
+      "via": [
+        [
+          2.18,
+          -2.78
+        ]
+      ]
+    },
+    {
+      "from": "sps.e",
+      "to": "power.w"
+    }
+  ],
+  "regions": [],
+  "texts": [],
+  "title": "DAB 电压闭环控制",
+  "profile": "ieee-double",
+  "code": {
+    "fs": 50000,
+    "method": "tustin",
+    "arith": "double",
+    "blocks": {
+      "lim": {
+        "min": 0,
+        "max": 0.5
+      }
+    }
+  },
+  "circuit": {
+    "source": "dab_sps_ngspice.json",
+    "inputs": {
+      "ref": {
+        "value": 48
+      },
+      "bias": {
+        "value": 0.10471975511965977
+      },
+      "power": {
+        "probe": "v_o"
+      }
+    },
+    "outputs": {
+      "sps": {
+        "switches": [
+          "S1",
+          "S3",
+          "S7",
+          "S5"
+        ],
+        "complement": [
+          "S2",
+          "S4",
+          "S8",
+          "S6"
+        ],
+        "modulation": "sps",
+        "model": "switching",
+        "frequency": 50000,
+        "phase_min": 0,
+        "phase_max": 0.5,
+        "dead_time": "200n",
+        "samples_per_cycle": 200
+      }
+    }
+  },
+  "control_ai": {
+    "inputs": [
+      "ref",
+      "bias"
+    ],
+    "outputs": [],
+    "stateful": [
+      "power"
+    ],
+    "dynamic_links": []
+  },
+  "loop": {
+    "tf": {
+      "pi": {
+        "pi": {
+          "kp": 0.05,
+          "ki": 200
+        }
+      },
+      "sense": {
+        "gain": 1
+      }
+    }
+  }
+}

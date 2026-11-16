@@ -5,18 +5,18 @@
 Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink, PLECS and open-loop PSIM models.
 
 <p align="center">
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/CircuitDrawer-Setup-1.8.0.exe"><img alt="Download Windows installer — Offline setup v1.8.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v1.8.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/CircuitDrawer-Setup-2.0.0.exe"><img alt="Download Windows installer — Offline setup v2.0.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v2.0.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit_drawer_for_ee-1.8.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v1.8.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v1.8.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit_drawer_for_ee-1.8.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v1.8.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v1.8.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v2.0.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v2.0.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/CircuitDrawer-Setup-1.8.0.exe"><img alt="Download for Windows — Offline installer v1.8.0" src="https://img.shields.io/badge/Download%20for%20Windows-v1.8.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit_drawer_for_ee-1.8.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v1.8.0" src="https://img.shields.io/badge/Download%20for%20Linux-v1.8.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/CircuitDrawer-Setup-2.0.0.exe"><img alt="Download for Windows — Offline installer v2.0.0" src="https://img.shields.io/badge/Download%20for%20Windows-v2.0.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Linux-v2.0.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
 The Windows button downloads the offline installer. The macOS and Linux buttons download the universal Python package (`.whl`, Python 3.10+). macOS and Linux currently have preview support. See the installation steps below.
 
-[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v1.8.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit-drawer-trial-1.8.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit-drawer-manuals-1.8.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v1.8.0/circuit-drawer-public-source-1.8.0.zip)
+[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.0.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-trial-2.0.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-manuals-2.0.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-public-source-2.0.0.zip)
 
 ![Full-bridge LLC converter, IEEE single column](docs/images/manual/example-llc-fullbridge.png)
 
@@ -38,6 +38,8 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 
 8、**AI drawing assistant (optional).** Describe a topology that has no template, or ask for a change to the current figure in one sentence. Circuit AI writes coordinates; control-diagram AI writes structure that the program lays out. Both go through validation. It uses your own API key with an Anthropic-compatible or OpenAI-compatible interface.
 
+9、**Agent workflow and prompt library.** Start from a blank canvas or an existing drawing, review and adopt circuit, controller and parameter candidates, then run ngspice, measurements, mode identification and figure export. A complete controller can reference the power circuit and export a closed-loop native model. Reuse parameterized prompts and preview control-diagram routing or layout changes. [Agent and MCP guide](docs/AGENT_MCP.md)
+
 ## Gallery
 
 | Operating modes of a DAB converter | Waveforms matched to modes |
@@ -56,7 +58,7 @@ The web editor:
 
 ### 64-bit Windows 10 and 11
 
-1、Download `CircuitDrawer-Setup-1.8.0.exe` and run it. Select the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-2.0.0.exe` and run it. Select the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Choose an installation path containing ASCII characters. Spaces are supported. Drawing files, export folders and Windows user names can contain Chinese characters.
 
@@ -65,7 +67,7 @@ The web editor:
 4、The installer is unsigned, so Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the download source and SHA256, select **More info → Run anyway** if that option is available. In PowerShell, compare the following result with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-1.8.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run a newer installer to upgrade. To uninstall, open Windows **Settings → Apps → Circuit Drawer → Uninstall**. User drawings and settings are retained. Save drawings in your own document folders.
@@ -79,7 +81,7 @@ Download the wheel from the release page, then open a terminal in its download f
 On Windows:
 
 ```powershell
-python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
 ```
 
 On macOS or Linux, install it in a virtual environment:
@@ -87,7 +89,7 @@ On macOS or Linux, install it in a virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install circuit_drawer_for_ee-1.8.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
 ```
 
 Keep this environment active when running the commands below. On Debian or Ubuntu, install `python3-venv` if the `venv` module is missing.

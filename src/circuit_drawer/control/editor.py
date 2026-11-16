@@ -227,8 +227,14 @@ class Editor:
     def handler(self):
         editor = self
 
-        class H(SettingsRoutes, BaseHTTPRequestHandler):
+        from ..agent import AgentTasks
+        from ..agent_http import AgentRoutes
+        if not hasattr(editor, "agent_tasks"):
+            editor.agent_tasks = AgentTasks(editor, "control")
+
+        class H(AgentRoutes, SettingsRoutes, BaseHTTPRequestHandler):
             web_settings = editor.web_settings
+            agent_tasks = editor.agent_tasks
             def log_message(self, *args):
                 pass
 
@@ -244,6 +250,19 @@ class Editor:
                            "application/json; charset=utf-8")
 
             def do_GET(self):
+                if self.path.startswith("/api/agent-file?"):
+                    self._agent_asset()
+                    return
+                if self.path.split("?", 1)[0] == "/agent-results.html":
+                    self._send(200, (MENU_STATIC / "agent-results.html").read_bytes(), "text/html; charset=utf-8")
+                    return
+                if self.path.split("?", 1)[0] == "/" and "agent-preview" in self.path:
+                    self._send(200, (STATIC / "editor.html").read_bytes(), "text/html; charset=utf-8")
+                    return
+                if self.path in ("/agent.js", "/agent.css", "/agent-editor.js"):
+                    self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
+                               "text/css; charset=utf-8" if self.path.endswith(".css") else "text/javascript; charset=utf-8")
+                    return
                 route = AI_GET_ROUTES.get("/api/job/" if self.path.startswith("/api/job/") else self.path)
                 if route:
                     try:
@@ -254,7 +273,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "editor.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/digital-control.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/digital-control.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js") else "text/css; charset=utf-8")
                 elif self.path == "/api/state":
@@ -277,8 +296,21 @@ class Editor:
                 except (library.LibraryError, CompileError, KeyError, ValueError, OSError) as exc:
                     self._json({"error": str(exc)}, 400)
 
+            def _prompt_library(self, req: dict) -> dict:
+                self._settings_guard()
+                if self.headers.get_content_type() != "application/json":
+                    raise ValueError("提示词请求必须使用 JSON")
+                from ..ai.presets import request
+                return request(req)
+
             def _check(self, req: dict) -> dict:
                 return analyse(req["table"], req.get("profile") or editor.profile)
+
+            def _arrange(self, req: dict) -> dict:
+                from .arrange import candidate
+                profile = req.get("profile") or editor.profile or "double"
+                table = candidate(req["table"], profile, req.get("mode", "layout"))
+                return {"table": table, "analysis": analyse(table, profile)}
 
             def _save(self, req: dict) -> dict:
                 return editor.save(req["table"])
@@ -384,7 +416,8 @@ class Editor:
                 if not isinstance(requested_rounds, int) or isinstance(requested_rounds, bool):
                     raise ValueError("rounds 必须是整数，最多 3 轮")
                 rounds = max(1, min(3, requested_rounds))
-                workflow = ControlWorkflow(profile, current, editor.library_dir)
+                workflow = ControlWorkflow(profile, current, editor.library_dir, description=description,
+                                           base_dir=editor.path.parent)
                 job = Job(description.strip(), profile, rounds, chat, editor.provider, editor.model,
                           "tweak" if current is not None else "draw", current=current, workflow=workflow)
                 editor.jobs[job.id] = job
@@ -401,6 +434,10 @@ class Editor:
 
 # POST path -> handler method; each takes the request body and returns the answer
 ROUTES = {
+    "/api/prompt-library": "_prompt_library",
+    "/api/arrange": "_arrange",
+
+    "/api/agent": "_agent",
     "/api/ai-settings": "_set_ai_settings",
     "/api/generate": "_ai_generate",
     "/api/cancel": "_ai_cancel",
@@ -441,3 +478,4 @@ def serve(path: Path, profile: str | None = None, port: int = 8766,
         pass
     finally:
         httpd.server_close()
+

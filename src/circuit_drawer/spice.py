@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+from decimal import Decimal, InvalidOperation
 import os
 import re
 import shutil
@@ -101,6 +102,8 @@ FIELDS = {
 FIELDS["pmos"] = FIELDS["nmos"]
 PWM_FIELDS = tuple(k for k, _, _ in FIELDS["nmos"][2:]) + ("phase_shift", "phase_ramp")
 FIELDS["pmsm"] = pmsm.FIELDS
+MODELS = {"D": "generic_diode", "nmos": "ideal_switch", "pmos": "ideal_switch",
+          "igbt": "simplified_igbt", "scr": "simplified_thyristor", "transformer": "ideal_transformer"}
 FIELDS["igbt"] = [*FIELDS["nmos"], ("vce0", "正向压降截距 Vce0 (V，≥0；非固定 Vce(sat))", "1.5")]
 # A thyristor's gate is a pulse train with the PWM fields: delay is the first
 # firing instant (firing angle alpha at frequency f: alpha / 360 / f), duty the
@@ -203,9 +206,15 @@ def number(value, label: str) -> float:
                          text, re.I)
     if not match:
         raise SpiceError(f"{label}: 无效数值 {text!r}；例如 24、500u、50k；兆用 Meg")
-    factors = {"": 1, "f": 1e-15, "p": 1e-12, "n": 1e-9, "u": 1e-6,
-               "µ": 1e-6, "m": 1e-3, "k": 1e3, "meg": 1e6, "g": 1e9, "t": 1e12}
-    out = float(match[1]) * factors[(match[2] or "").lower()]
+    exponents = {"": 0, "f": -15, "p": -12, "n": -9, "u": -6,
+                 "µ": -6, "m": -3, "k": 3, "meg": 6, "g": 9, "t": 12}
+    # Convert once after decimal scaling so equivalent spellings share one float.
+    try:
+        parsed = Decimal(match[1]).as_tuple()
+        exponent = parsed.exponent + exponents[(match[2] or "").lower()]
+        out = float(Decimal((parsed.sign, parsed.digits, exponent)))
+    except (InvalidOperation, OverflowError, ValueError):
+        raise SpiceError(f"{label} 必须是有限数值") from None
     if not math.isfinite(out):
         raise SpiceError(f"{label} 必须是有限数值")
     return out
@@ -218,6 +227,23 @@ def _keys(obj, required, optional=(), label="simulation"):
     if missing or extra:
         parts = ([f"缺少字段 {sorted(missing)}"] if missing else []) + ([f"未知字段 {sorted(extra)}"] if extra else [])
         raise SpiceError(f"{label}: " + "；".join(parts))
+
+
+def component_fields(kind, external_gate=False):
+    """The exporter and parameter proposals share the accepted component keys."""
+    required = [k for k, _, _ in FIELDS[kind] if not external_gate or k not in PWM_FIELDS]
+    optional = [k for k, _, _ in OPTIONAL_FIELDS.get(kind, []) if not external_gate or k not in PWM_FIELDS]
+    if kind in MODELS:
+        required.append("model")
+    if kind == "transformer":
+        required.append("polarity")
+    if kind in (*VOLTAGE_SOURCES, "I"):
+        optional.append("wave")
+    if kind in PWM_SWITCHES:
+        optional.extend(("gate_drive", "gate_source"))
+    if external_gate:
+        optional.extend(PWM_FIELDS)
+    return required, optional
 
 
 _DRAWING_ONLY = frozenset({
@@ -390,6 +416,7 @@ class Deck:
     element_names: dict[str, str] = field(default_factory=dict)
     digital_loop: Any = None
     probe_expressions: dict[str, str] = field(default_factory=dict)
+    sps_timing: Any = None
 
 
 def source_excitation(cfg: dict, label: str, tr: dict) -> str:
@@ -570,7 +597,7 @@ def _transformer_lines(e, cfg, val, name, node):
     circuit with Lm = k²·L1, leakage = (1−k²)·L1 and ratio = √(L2/L1)/k.
     See ngspice manual 4.2.2/4.2.3 (E/F dependent sources).
     """
-    if cfg["model"] != "ideal_transformer":
+    if cfg["model"] != MODELS[e.kind]:
         raise SpiceError(f"{e.id}: 仅支持 ideal_transformer；励磁电感、漏感用可选字段填写")
     polarity = cfg["polarity"]
     if polarity not in ("same", "opposite"):
@@ -898,6 +925,11 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
         except ClosedLoopError as exc:
             raise SpiceError(str(exc)) from None
     gates, gate_sources = gate_drives(layout, rep.nets, loop)
+    feedback_probes = {cfg['probe'] for cfg in loop.inputs.values()
+                       if isinstance(cfg.get('probe'), str)} if loop else set()
+    sensed = {p.get('element') for p in sim['probes'] if isinstance(p, dict)
+              and isinstance(p.get('element'), str) and p.get('kind') == 'current'
+              and isinstance(p.get('name'), str) and p['name'] in feedback_probes} if feedback_probes else set()
     driven = {}
     ground = rep.nets[sim["ground"]]
     nodes = {n: ("0" if n == ground else f"n{i}") for i, n in enumerate(sorted(set(rep.nets.values())), 1)}
@@ -950,11 +982,8 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
         fields = [k for k, _, _ in FIELDS[e.kind] if not external_gate or k not in PWM_FIELDS]
         defaults = {k: d for k, _, d in OPTIONAL_FIELDS.get(e.kind, [])}
         optional = [k for k in defaults if not external_gate or k not in PWM_FIELDS]
-        extra = ["model", "polarity"] if e.kind == "transformer" else ["model"] if e.kind in ("D", *GATED) else []
-        _keys(cfg, fields + extra,
-              optional=[*optional, *(["wave"] if e.kind in (*VOLTAGE_SOURCES, "I") else []),
-                        *(["gate_drive", "gate_source"] if e.kind in PWM_SWITCHES else []),
-                        *(PWM_FIELDS if external_gate else [])], label=e.id)
+        required_keys, optional_keys = component_fields(e.kind, external_gate)
+        _keys(cfg, required_keys, optional_keys, label=e.id)
         val = {k: number(cfg[k], f"{e.id}.{k}") for k in fields}
         for k in optional:
             val[k] = number(cfg.get(k, defaults[k]), f"{e.id}.{k}")
@@ -1009,16 +1038,22 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
         elif e.kind in ("R", "L", "C"):
             if mapping.get(e.kind, {}).get("model") == "parasitic":
                 from .model_mapping import passive_lines
-                lines.extend(passive_lines(e.kind, mapping[e.kind], name, n('a'), n('b'), s('value'), s('initial') if e.kind != 'R' else None))
+                lines.extend(passive_lines(e.kind, mapping[e.kind], name, n('a'), n('b'), s('value'),
+                                           s('initial') if e.kind != 'R' else None, sense=e.id in sensed))
                 continue
             end = n('b')
             if e.kind == "L" and val["series_resistance"]:
                 end = f"cd_{name}_series"
                 lines.append(f"Rseries_{name} {end} {n('b')} {s('series_resistance')}")
+            if e.kind == "L" and e.id in sensed:
+                # B-source feedback uses a voltage-source branch current so
+                # ngspice includes the measurement in its simultaneous solve.
+                lines.append(f"Vfeedback_{name} cd_{name}_sense {end} 0")
+                end = f"cd_{name}_sense"
             line = f"{name} {n('a')} {end} {s('value')}"
             lines.append(line + (f" IC={s('initial')}" if e.kind != "R" else ""))
         elif e.kind == "D":
-            if cfg["model"] != "generic_diode":
+            if cfg["model"] != MODELS[e.kind]:
                 raise SpiceError(f"{e.id}: 仅支持 generic_diode 模型")
             if e.opts.get("zener") and not val["breakdown_voltage"]:
                 raise SpiceError(f"{e.id}: 已画成稳压管，请在“仿真 → SPICE 仿真…”填写大于 0 的 "
@@ -1032,7 +1067,11 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 if not math.isfinite(nbv) or nbv <= 0:
                     raise SpiceError(f"{e.id}: 击穿系数超出数值范围，请核对 Izt 和 Zzt")
                 breakdown = f" BV={s('breakdown_voltage')} IBV={s('breakdown_current')} NBV={nbv:.15g}"
-            lines += [f"{name} {n('a')} {n('b')} md_{name}",
+            end = n('b')
+            if e.id in sensed:
+                lines.append(f"Vfeedback_{name} cd_{name}_sense {end} 0")
+                end = f"cd_{name}_sense"
+            lines += [f"{name} {n('a')} {end} md_{name}",
                       f".model md_{name} D(IS={s('is')} N={s('n')} RS={s('rs')}{breakdown})"]
         elif e.kind == "transformer":
             lines.extend(_transformer_lines(e, cfg, val, name, node))
@@ -1040,11 +1079,16 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             gate = gates.get(e.id)
             external = gate and gate["mode"] == "external"
             command = f"cmd_{name}" if gate else name
-            model = {"igbt": "simplified_igbt", "scr": "simplified_thyristor"}.get(e.kind, "ideal_switch")
+            model = MODELS[e.kind]
             if cfg["model"] != model:
                 raise SpiceError(f"{e.id}: {e.kind} 仅支持 {model} 模型")
             is_vco = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'vco'
+            is_sps = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'sps'
+            paired_pwm = (loop and e.id in loop.driven and not is_vco and not is_sps
+                          and bool(loop.outputs[loop.driven[e.id]]['complement']))
             timing = {**val, 'frequency': loop.outputs[loop.driven[e.id]]['frequency_max'], 'duty': .5} if is_vco else val
+            if is_sps:
+                timing = {**val, 'frequency': loop.outputs[loop.driven[e.id]]['frequency'], 'duty': .5}
             period = 1 / timing["frequency"]
             # Duty is measured between the 50% rising/falling threshold crossings.
             width = timing["duty"] * period - (val["rise"] + val["fall"]) / 2
@@ -1052,13 +1096,13 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 raise SpiceError(f"{e.id}: 占空比 {val['duty']:g} 超出范围，应大于 0、小于 1")
             if val["ron"] >= val["roff"]:
                 raise SpiceError(f"{e.id}: 导通电阻 Ron = {val['ron']:g} Ω 必须小于关断电阻 Roff = {val['roff']:g} Ω")
-            if not (width > 0 and width + val["rise"] + val["fall"] < period):
+            if not paired_pwm and not (width > 0 and width + val["rise"] + val["fall"] < period):
                 raise SpiceError(f"{e.id}: 上升 / 下降时间（{val['rise']:g} s / {val['fall']:g} s）相对开关周期 "
                                  f"{period:g} s 和占空比 {val['duty']:g} 过长，导通或关断段放不下")
             is_averaged = loop and any(e.id in (upper, lower) for upper, (lower, _) in loop.averaged.items())
             # An averaged leg has no carrier edges to sample. Physical switches
             # (including independent load switches) still need PWM resolution.
-            if not is_averaged and not is_vco and not external:
+            if not is_averaged and not is_vco and not is_sps and not paired_pwm and not external:
                 check_pwm_timing(e.id, val, tr)
             if e.kind == "scr":
                 if loop and e.id in loop.driven:
@@ -1084,6 +1128,25 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             if loop and e.id in loop.driven:
                 if val.get("phase_shift") or val.get("phase_ramp"):
                     raise SpiceError(f"{e.id}: 闭环驱动的开关不支持 phase_shift / phase_ramp")
+                if is_sps:
+                    cfg = loop.outputs[loop.driven[e.id]]
+                    if e.id == cfg['switches'][0]:
+                        def sps_pins(sw):
+                            kind = ids[sw].kind
+                            a, b = ('c', 'e') if kind == 'igbt' else ('s', 'd') if kind == 'pmos' else ('d', 's')
+                            return node(f'{sw}.{a}'), node(f'{sw}.{b}')
+                        for first in (0, 2):
+                            u1, u2 = (sps_pins(sw) for sw in cfg['switches'][first:first+2])
+                            l1, l2 = (sps_pins(sw) for sw in cfg['complement'][first:first+2])
+                            if u1[0] != u2[0] or l1[1] != l2[1] or u1[1] == u2[1] or u1[0] == l1[1]:
+                                raise SpiceError('SPS：每桥两桥臂须共用不同的正负母线，且两个中点必须不同')
+                    if e.id in cfg['switches']:
+                        lower = cfg['complement'][cfg['switches'].index(e.id)]
+                        pins = ('c', 'e') if e.kind == 'igbt' else ('s', 'd') if e.kind == 'pmos' else ('d', 's')
+                        low = ids[lower]
+                        lpins = ('c', 'e') if low.kind == 'igbt' else ('s', 'd') if low.kind == 'pmos' else ('d', 's')
+                        if node(f'{e.id}.{pins[1]}') != node(f'{lower}.{lpins[0]}'):
+                            raise SpiceError(f'{e.id}/{lower}: SPS 上下管不属于同一桥臂，请核对实际端子绑定')
                 driven[e.id] = (command, val)
                 averaged = {lo: up for up, (lo, _) in loop.averaged.items()}
                 if e.id in loop.averaged or e.id in averaged:
@@ -1171,7 +1234,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
     if not isinstance(probes, list) or not 1 <= len(probes) <= MAX_PROBES:
         raise SpiceError(f"probes 需要 1–{MAX_PROBES} 个测量通道")
     commands, vectors, columns, used, exprs = [], [], ["time_s"], set(), {}
-    diode_currents, diode_feedback = [], {}
+    diode_currents, current_feedback = [], {}
     for i, probe in enumerate(probes):
         if not isinstance(probe, dict):
             raise SpiceError("每个 probe 必须是对象")
@@ -1212,9 +1275,8 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             if kind == "current" and e.kind == "D":
                 expr = f"@{names[e.id].lower()}[id]"
                 diode_currents.append(expr)
-                # @device[id] is a saved vector, not a B-source expression.
-                # ngspice resolves i(D...) when a controller senses the diode.
-                diode_feedback[label] = f"i({names[e.id]})"
+            if kind == "current" and e.kind in ("L", "D") and e.id in sensed:
+                current_feedback[label] = f"i(Vfeedback_{names[e.id]})"
             if e.kind == "transformer":
                 accepted = (("primary", "upper", "lower") if "sct" in e.pins else ("primary", "secondary")) \
                     + tuple(w for w, *_ in windings(e) if w in EXTRA_WINDINGS)
@@ -1233,7 +1295,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
     if loop:
         from .closed_loop import lines as loop_lines
         try:
-            lines += loop_lines(loop, {**exprs, **diode_feedback}, driven, tr, native=native)
+            lines += loop_lines(loop, {**exprs, **current_feedback}, driven, tr, native=native)
         except ClosedLoopError as exc:
             raise SpiceError(str(exc)) from None
     if diode_currents:
@@ -1246,10 +1308,21 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                        *dvdt_commands, "wrdata thyristor_dvdt.dat " + " ".join(dvdt_vectors)]
                       if dvdt_limits else [])
     run_commands = ["run"]
+    sps_timing = None
     if loop and loop.digital:
         from .digital_spice import commands as digital_commands
         try:
             run_commands = digital_commands(loop, tr["stop"])
+        except ValueError as exc:
+            raise SpiceError(str(exc)) from None
+    if loop and not native and any(cfg.get('modulation') == 'sps' for cfg in loop.outputs.values()):
+        from .closed_loop import validate_sps, duty_node
+        from .sps_spice import commands as sps_commands
+        bid, cfg = next(iter(loop.outputs.items()))  # loop_lines checked single-group scope
+        sps_timing = validate_sps(cfg, driven, tr)
+        gates = ['ctl_' + driven[sw][0] for sw in cfg['switches'] + cfg['complement']]
+        try:
+            run_commands = sps_commands(sps_timing, duty_node(loop, bid), gates, tr['stop'])
         except ValueError as exc:
             raise SpiceError(str(exc)) from None
     lines += [f".tran {tr['step']:.15g} {tr['stop']:.15g} 0 {tr['max_step']:.15g} uic",
@@ -1258,7 +1331,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
               "set numdgt=15", "wrdata waveforms.dat " + " ".join(vectors), "quit", ".endc", ".end"]
     return Deck("" if native else "\n".join(lines) + "\n", columns, tr["step"], tr["stop"], loop.warnings if loop else [],
                 dvdt_limits, {ref: node(ref) for ref in rep.nets}, names, loop if loop and loop.digital else None,
-                dict(zip(columns[1:], exprs.values())))
+                dict(zip(columns[1:], exprs.values())), sps_timing)
 
 
 def executable(value=None) -> str | None:
@@ -1325,12 +1398,21 @@ def run_deck(deck: Deck, engine: str, stage: Path, timeout: float, *, should_sto
     log = proc.stdout.decode("utf-8", errors="replace")
     (stage / "simulation.log").write_text(log, encoding="utf-8")
     checked_log = log
-    if deck.digital_loop and "CD_DIGITAL_COMPLETE" in log:
+    if (deck.digital_loop and "CD_DIGITAL_COMPLETE" in log) or (deck.sps_timing and "CD_SPS_COMPLETE" in log):
         # The controller deliberately pauses at each sample. Actual solver
         # errors and the complete output time range are still checked.
         checked_log = re.sub(r"(?im)^(?:run )?simulation interrupted\s*$", "", log)
     if proc.returncode or re.search(r"(?im)^\s*(?:error\b|fatal\b|syntax error\b)|timestep too small|simulation interrupted", checked_log):
         raise SpiceError("ngspice 仿真失败：\n" + log[-3500:] + _convergence_hint(deck, log))
+    if deck.sps_timing:
+        if 'CD_SPS_COMPLETE' not in log:
+            raise SpiceError('SPS 时序运行未完成，未发布仿真结果')
+        from .sps_spice import inspect as inspect_sps
+        try:
+            result = inspect_sps(deck.sps_timing, deck.stop, stage)
+        except (OSError, ValueError) as exc:
+            raise SpiceError(f'SPS 时序验收失败，未发布仿真结果：{exc}') from exc
+        (stage / 'sps.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
 def _simulate(deck: Deck, engine: str, stage: Path, timeout: float, *, should_stop=None) -> None:
@@ -1427,7 +1509,8 @@ def _check_dvdt(deck: Deck, stage: Path) -> list[dict]:
 
 
 def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
-                 profile="ieee-single", run=False, ngspice=None, timeout=120, base_dir=None) -> dict:
+                 profile="ieee-single", run=False, ngspice=None, timeout=120, base_dir=None,
+                 should_stop=None) -> dict:
     """Validate everything before creating output; stage runs to prevent stale CSV."""
     deck = make_deck(layout, profile, base_dir)
     if not isinstance(stem, str) or not re.fullmatch(r"[\w-]+", stem):
@@ -1443,9 +1526,15 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
         rating_checks = []
         digital_result = None
         if run:
-            _simulate(deck, engine, stage, timeout)
+            if should_stop is None:
+                _simulate(deck, engine, stage, timeout)
+            else:
+                _simulate(deck, engine, stage, timeout, should_stop=should_stop)
             sources.update(csv=stage / "waveforms.csv", log=stage / "simulation.log")
             rating_checks = _check_dvdt(deck, stage)
+            if deck.sps_timing:
+                sources.update({'sps.json': stage / 'sps.json', 'sps_samples.dat': stage / 'sps_samples.dat',
+                                'sps_gates.dat': stage / 'sps_gates.dat'})
             if deck.digital_loop:
                 from .digital_spice import inspect
                 try:
@@ -1459,6 +1548,8 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
                 ratings.write_text(json.dumps({"sampling": "adaptive_solver_points", "checks": rating_checks},
                                               ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 sources["ratings.json"] = ratings
+        if should_stop and should_stop():
+            raise SpiceCancelled("已取消")
         destination.mkdir(parents=True, exist_ok=True)
         files = []
         for ext, source in sources.items():
@@ -1469,3 +1560,4 @@ def export_spice(layout: Layout, out_dir: str | Path, stem="circuit", *,
             "ran": bool(run), "notes": [LIMIT_NOTE, *deck.notes, *[r["message"] for r in rating_checks],
                                        *(digital_result["messages"] if digital_result else [])],
             "rating_checks": rating_checks, **({"digital": digital_result} if digital_result else {})}
+

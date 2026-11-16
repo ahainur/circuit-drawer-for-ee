@@ -170,7 +170,7 @@ class WaveNoteWorkflow:
                 raise ValueError('箭尾超出当前波形范围，请缩小 tail_offset 或选择 tail 候选点。')
         return tail
 
-    def evaluate(self, reply):
+    def evaluate(self, reply, *, should_stop=lambda: False):
         result = extract_table(reply)
         if not isinstance(result, dict) or set(result) != {'notes'} or not isinstance(result['notes'], list):
             raise ValueError('请返回含 notes 列表的 JSON 对象。')

@@ -1,5 +1,808 @@
 // Offline interface translations: [Simplified Chinese, English, Traditional Chinese].
+
+// Agent cards use stable keys and the same offline three-language resource.
+window.CircuitAgentMessages = {
+  "agent.steps_done": ["已完成 {0} 步", "{0} steps done", "已完成 {0} 步"],
+  "agent.no_changes": ["无改动", "No changes", "無改動"],
+  "agent.setting_changed": ["已更改", "Changed", "已變更"],
+  "agent.raw_changes": ["原始改动数据", "Raw change data", "原始改動資料"],
+  "agent.drawing_version": ["图纸 v{0}", "drawing v{0}", "圖紙 v{0}"],
+  "agent.periodicity_summary": ["周期重复性 {0}/{1} 通过", "Cycle repeatability {0}/{1} passed", "週期重複性 {0}/{1} 通過"],
+  "agent.periodicity_check": ["待查：{0}", "check {0}", "待查：{0}"],
+  "agent.section.elements": ["元件", "Components", "元件"],
+  "agent.section.wires": ["导线", "Wires", "導線"],
+  "agent.section.blocks": ["方块", "Blocks", "方塊"],
+  "agent.section.links": ["连线", "Links", "連線"],
+  "agent.section.texts": ["文字", "Text", "文字"],
+  "agent.section.annotations": ["标注", "Annotations", "標註"],
+  "agent.section.regions": ["区域框", "Regions", "區域框"],
+  "agent.section.callouts": ["引线标注", "Callouts", "引線標註"],
+  "agent.section.simulation": ["仿真设置", "Simulation settings", "模擬設定"],
+  "agent.section.modules": ["模块", "Modules", "模組"],
+  "agent.section.closed_loop": ["闭环设置", "Closed-loop settings", "閉環設定"],
+  "agent.section.circuit": ["关联电路", "Linked circuit", "關聯電路"],
+  "agent.section.code": ["控制器设置", "Controller settings", "控制器設定"],
+  "agent.section.loop": ["控制参数", "Control parameters", "控制參數"],
+  "agent.field.source": ["电路文件", "Circuit file", "電路檔案"],
+  "agent.field.probe": ["测量通道", "Measurement channel", "量測通道"],
+  "agent.field.value": ["输入值", "Input value", "輸入值"],
+  "agent.field.kp": ["比例增益 Kp", "Proportional gain Kp", "比例增益 Kp"],
+  "agent.field.ki": ["积分增益 Ki", "Integral gain Ki", "積分增益 Ki"],
+  "agent.field.gain": ["增益", "Gain", "增益"],
+  "agent.field.min": ["下限", "Lower limit", "下限"],
+  "agent.field.max": ["上限", "Upper limit", "上限"],
+  "agent.field.fs": ["采样频率 (Hz)", "Sample rate (Hz)", "取樣頻率 (Hz)"],
+  "agent.field.method": ["离散方法", "Discretization", "離散方法"],
+  "agent.field.arith": ["数值精度", "Arithmetic", "數值精度"],
+  "agent.field.switches": ["受控开关", "Controlled switches", "受控開關"],
+  "agent.field.complement": ["互补开关", "Complementary switches", "互補開關"],
+  "agent.field.modulation": ["调制方式", "Modulation", "調變方式"],
+  "agent.field.model": ["仿真模型", "Simulation model", "模擬模型"],
+  "agent.field.frequency": ["开关频率 (Hz)", "Switching frequency (Hz)", "開關頻率 (Hz)"],
+  "agent.field.phase_min": ["最小相移 (rad)", "Minimum phase (rad)", "最小相移 (rad)"],
+  "agent.field.phase_max": ["最大相移 (rad)", "Maximum phase (rad)", "最大相移 (rad)"],
+  "agent.field.dead_time": ["死区 (s)", "Dead time (s)", "死區 (s)"],
+  "agent.field.samples_per_cycle": ["每周期时间格数", "Ticks per cycle", "每週期時間格數"],
+  "agent.reason": ["依据", "Reason", "依據"],
+  "agent.field_details": ["字段详情", "Field details", "欄位詳情"],
+  "agent.step_details": ["步骤详情", "Step details", "步驟詳情"],
+  "agent.settings_count": ["参数设置 {0} 项", "{0} parameter settings", "參數設定 {0} 項"],
+  "agent.request_followup": ["补充要求", "Follow-up", "補充要求"],
+  "agent.model_notes": ["模型与运行说明", "Model and run notes", "模型與執行說明"],
+  "agent.range.window": ["取样区间", "Sampling window", "取樣區間"],
+  "agent.range.full": ["完整波形", "Full waveform", "完整波形"],
+  "agent.target_comparison": ["输出均值 {0}，目标 {1}，偏差 {2}", "Output mean {0}, target {1}, deviation {2}", "輸出均值 {0}，目標 {1}，偏差 {2}"],
+  "agent.periodicity.repeatable": ["末段周期重复性通过", "Final-cycle repeatability passed", "末段週期重複性通過"],
+  "agent.periodicity.changing": ["末段仍有周期漂移", "Final cycles still drifting", "末段仍有週期漂移"],
+  "agent.periodicity.unavailable": ["周期重复性待确认", "Cycle repeatability unverified", "週期重複性待確認"],
+  "agent.periodicity_unavailable_count": ["{0} 项待确认", "{0} unverified", "{0} 項待確認"],
+  "agent.periodicity.fixed_pwm_required": ["此检查适用于单一固定频率的内部开环 PWM。", "This check applies to internal open-loop PWM at one fixed frequency.", "此檢查適用於單一固定頻率的內部開環 PWM。"],
+  "agent.periodicity.short_window": ["请提供至少 {0} 个完整周期的取样区间。", "Provide a sampling window covering at least {0} complete cycles.", "請提供至少 {0} 個完整週期的取樣區間。"],
+  "agent.periodicity.coarse_samples": ["采样间隔过大，请提高输出采样分辨率。", "Sample spacing is too large. Increase output sampling resolution.", "取樣間隔過大，請提高輸出取樣解析度。"],
+  "agent.periodicity_evidence": ["比较末尾 {0} 个周期的同相位值，最大漂移 {1}，阈值 {2}。阈值取纹波的 5%、幅值的 0.001% 与 1e-7 中的最大值。此项判断仅对应这些通道和周期。", "Compared matching phases over the last {0} cycles. Maximum drift {1}, threshold {2}. The threshold is the largest of 5% of ripple, 0.001% of magnitude and 1e-7. This check covers these channels and cycles.", "比較末尾 {0} 個週期的同相位值，最大漂移 {1}，閾值 {2}。閾值取紋波的 5%、幅值的 0.001% 與 1e-7 中的最大值。此項判斷僅對應這些通道和週期。"],
+  "agent.finish_edit": ["请先完成当前拖动或模块编辑", "Finish the current drag or module edit first", "請先完成目前拖曳或模組編輯"],
+  "agent.undo_conflict": ["撤销历史已变化，请使用编辑器撤销", "Undo history changed. Use the editor's Undo command", "復原歷史已變更，請使用編輯器復原"],
+  "agent.generating_round": ["AI 正在生成第 {0} 轮候选", "AI is generating candidate round {0}", "AI 正在產生第 {0} 輪候選"],
+  "agent.followups": ["接着可以", "Continue with", "接著可以"],
+  "agent.followup.export": ["将当前图纸导出为 PDF 和 SVG", "Export the current drawing as PDF and SVG", "將目前圖紙匯出為 PDF 和 SVG"],
+  "agent.followup.revise": ["检查当前图纸，提出需要修正的候选", "Check the current drawing and propose corrections", "檢查目前圖紙，提出需要修正的候選"],
+  "agent.followup.parameters": ["结合已有仿真结果建议参数修改，先给出候选", "Propose parameter changes using the recorded simulation results", "結合已有模擬結果建議參數修改，先給出候選"],
+  "agent.followup.loop": ["分析当前控制框图的环路裕度并导出波特图", "Analyse the current loop margins and export Bode plots", "分析目前控制框圖的迴路裕度並匯出波德圖"],
+  "agent.retry_delay": ["服务限流，{0} 秒后重试（{1}/3）", "Service rate limit. Retrying in {0} seconds ({1}/3)", "服務限流，{0} 秒後重試（{1}/3）"],
+  "agent.tool.parameters": ["仿真参数候选", "Simulation parameter candidate", "模擬參數候選"],
+  "agent.tool.export_simulation": ["导出仿真模型", "Export simulation model", "匯出模擬模型"],
+  "agent.model_exported": ["模型已导出，待目标软件求解", "Model exported, awaiting target solver", "模型已匯出，待目標軟體求解"],
+  "agent.cap.circuit": ["需要电路图", "Requires a circuit drawing", "需要電路圖"],
+  "agent.assumptions": ["工况与模型假设", "Operating conditions and model assumptions", "工況與模型假設"],
+  "agent.waveforms": ["波形", "Waveforms", "波形"],
+  "agent.attach_waveform": ["打开波形窗口并绑定到图纸", "Open waveforms and attach to drawing", "開啟波形視窗並綁定到圖紙"],
+  "agent.undo_task_changes": ["撤销本任务改图", "Undo task drawing changes", "撤銷本任務改圖"],
+  "agent.apply_fix": ["按报错生成修正候选", "Generate a correction from the error", "按報錯產生修正候選"],
+  "agent.skip_simulation": ["跳过仿真，继续出图", "Skip simulation and continue rendering", "跳過模擬，繼續出圖"],
+  "agent.new_task": [
+    "新任务",
+    "New task",
+    "新任務"
+  ],
+  "agent.history": [
+    "历史",
+    "History",
+    "歷史"
+  ],
+  "agent.close": [
+    "收起",
+    "Close",
+    "收起"
+  ],
+  "agent.intro": [
+    "让 AI 完成一项任务",
+    "Ask AI to complete a task",
+    "讓 AI 完成一項任務"
+  ],
+  "agent.intro_detail": [
+    "先列步骤，修改图纸先给候选，采用后继续运行。",
+    "Review the plan and drawing candidates, then continue to measured results.",
+    "先列步驟，修改圖紙先給候選，採用後繼續執行。"
+  ],
+  "agent.capabilities": [
+    "可用工具",
+    "Tools",
+    "可用工具"
+  ],
+  "agent.examples": [
+    "试试这些",
+    "Try these",
+    "試試這些"
+  ],
+  "agent.example1": [
+    "从空白画布画 48 V 转 12 V 的 Buck，仿真并查看输出纹波",
+    "Draw a 48 V to 12 V buck from a blank canvas, simulate and measure output ripple",
+    "從空白畫布畫 48 V 轉 12 V 的 Buck，模擬並查看輸出漣波"
+  ],
+  "agent.example2": [
+    "检查当前电路，列出需要修正的问题",
+    "Check the current circuit and list issues to fix",
+    "檢查目前電路，列出需要修正的問題"
+  ],
+  "agent.example3": [
+    "为当前电路识别开关模态并导出 SVG",
+    "Identify switching modes and export SVG for this circuit",
+    "為目前電路識別開關模態並匯出 SVG"
+  ],
+  "agent.example.control1": [
+    "从空白画布画电压 PI 闭环控制框图",
+    "Draw a PI voltage-control block diagram from a blank canvas",
+    "從空白畫布畫電壓 PI 閉環控制框圖"
+  ],
+  "agent.example.control2": [
+    "分析当前控制框图的环路裕度和波特图",
+    "Analyse the current diagram's loop margins and Bode plots",
+    "分析目前控制框圖的迴路裕度和波德圖"
+  ],
+  "agent.example.control3": [
+    "检查当前框图并导出 SVG 和 PDF",
+    "Check the current diagram and export SVG and PDF",
+    "檢查目前框圖並匯出 SVG 和 PDF"
+  ],
+  "agent.start_from": [
+    "起点",
+    "Starting point",
+    "起點"
+  ],
+  "agent.current": [
+    "当前图纸",
+    "Current drawing",
+    "目前圖紙"
+  ],
+  "agent.blank": [
+    "空白画布",
+    "Blank canvas",
+    "空白畫布"
+  ],
+  "agent.presets": [
+    "提示词库",
+    "Prompt library",
+    "提示詞庫"
+  ],
+  "agent.presets_pending": [
+    "提示词库等待 PR #200 合并后接入。",
+    "The prompt library becomes available when PR #200 is merged.",
+    "提示詞庫等待 PR #200 合併後接入。"
+  ],
+  "agent.task_input": [
+    "描述任务或补充要求…",
+    "Describe a task or add instructions…",
+    "描述任務或補充要求…"
+  ],
+  "agent.start": [
+    "开始",
+    "Start",
+    "開始"
+  ],
+  "agent.send": [
+    "发送",
+    "Send",
+    "傳送"
+  ],
+  "agent.supplement": [
+    "补充要求",
+    "Add instructions",
+    "補充要求"
+  ],
+  "agent.planning": [
+    "正在规划任务…",
+    "Planning the task…",
+    "正在規劃任務…"
+  ],
+  "agent.parameters": [
+    "请补充参数",
+    "Complete the parameters",
+    "請補充參數"
+  ],
+  "agent.submit_params": [
+    "用这些参数继续",
+    "Continue with these values",
+    "用這些參數繼續"
+  ],
+  "agent.use_defaults": [
+    "全部用建议值",
+    "Use all suggested values",
+    "全部用建議值"
+  ],
+  "agent.progress": [
+    "进度",
+    "Progress",
+    "進度"
+  ],
+  "agent.waiting_time": [
+    "等你",
+    "Waiting for you",
+    "等你"
+  ],
+  "agent.candidate": [
+    "候选 #{0}",
+    "Candidate #{0}",
+    "候選 #{0}"
+  ],
+  "agent.candidate.pending": [
+    "待采用",
+    "Awaiting adoption",
+    "待採用"
+  ],
+  "agent.candidate.adopted": [
+    "已采用",
+    "Adopted",
+    "已採用"
+  ],
+  "agent.candidate.undone": [
+    "已撤销",
+    "Undone",
+    "已撤銷"
+  ],
+  "agent.candidate.stale": [
+    "基于旧版本",
+    "Outdated drawing version",
+    "基於舊版本"
+  ],
+  "agent.candidate.discarded": [
+    "已放弃",
+    "Discarded",
+    "已放棄"
+  ],
+  "agent.versions": [
+    "基于图纸 v{0} · 当前 v{1}",
+    "Based on drawing v{0} · current v{1}",
+    "基於圖紙 v{0} · 目前 v{1}"
+  ],
+  "agent.valid": [
+    "校验通过",
+    "Validation passed",
+    "校驗通過"
+  ],
+  "agent.invalid": [
+    "校验未通过",
+    "Validation failed",
+    "校驗未通過"
+  ],
+  "agent.rework": [
+    "返工 {0} 次",
+    "{0} rework attempts",
+    "返工 {0} 次"
+  ],
+  "agent.stale": [
+    "图纸已经变化，请基于当前版本重新生成候选。",
+    "The drawing changed. Regenerate the candidate from the current version.",
+    "圖紙已經變化，請基於目前版本重新產生候選。"
+  ],
+  "agent.issues": [
+    "校验问题",
+    "Validation issues",
+    "校驗問題"
+  ],
+  "agent.type": [
+    "类型",
+    "Type",
+    "類型"
+  ],
+  "agent.object": [
+    "对象",
+    "Object",
+    "物件"
+  ],
+  "agent.value": [
+    "值",
+    "Value",
+    "值"
+  ],
+  "agent.locate": [
+    "定位",
+    "Locate",
+    "定位"
+  ],
+  "agent.add": [
+    "新增",
+    "Added",
+    "新增"
+  ],
+  "agent.modify": [
+    "修改",
+    "Modified",
+    "修改"
+  ],
+  "agent.remove": [
+    "删除",
+    "Removed",
+    "刪除"
+  ],
+  "agent.setting": [
+    "设置",
+    "Setting",
+    "設定"
+  ],
+  "agent.before": [
+    "改前",
+    "Before",
+    "改前"
+  ],
+  "agent.after": [
+    "改后",
+    "After",
+    "改後"
+  ],
+  "agent.overlay": [
+    "叠加",
+    "Overlay",
+    "疊加"
+  ],
+  "agent.adopt": [
+    "采用（可撤销）",
+    "Adopt (undoable)",
+    "採用（可撤銷）"
+  ],
+  "agent.discard": [
+    "放弃",
+    "Discard",
+    "放棄"
+  ],
+  "agent.revise": [
+    "让 AI 再改",
+    "Revise with AI",
+    "讓 AI 再改"
+  ],
+  "agent.regenerate": [
+    "按当前图重新生成",
+    "Regenerate from current drawing",
+    "按目前圖重新產生"
+  ],
+  "agent.undo_candidate": [
+    "撤销采用",
+    "Undo adoption",
+    "撤銷採用"
+  ],
+  "agent.readopt": [
+    "再次采用",
+    "Adopt again",
+    "再次採用"
+  ],
+  "agent.stop": [
+    "■ 停止",
+    "■ Stop",
+    "■ 停止"
+  ],
+  "agent.cancelled": [
+    "已停止",
+    "Stopped",
+    "已停止"
+  ],
+  "agent.stopped_at": [
+    "停在第 {0} 步，已完成的结果保留。",
+    "Stopped at step {0}. Completed results are retained.",
+    "停在第 {0} 步，已完成的結果保留。"
+  ],
+  "agent.resume_from_step": [
+    "从停止步骤继续",
+    "Resume from stopped step",
+    "從停止步驟繼續"
+  ],
+  "agent.retry_step": [
+    "重试失败步骤",
+    "Retry failed step",
+    "重試失敗步驟"
+  ],
+  "agent.recheck_engine": [
+    "重新检查环境",
+    "Recheck environment",
+    "重新檢查環境"
+  ],
+  "agent.settings": [
+    "API 与仿真设置",
+    "API and simulation settings",
+    "API 與模擬設定"
+  ],
+  "agent.raw": [
+    "原始报错",
+    "Raw error",
+    "原始報錯"
+  ],
+  "agent.retained": [
+    "当前图纸 v{0}，已保留 {1} 个完成步骤和 {2} 份运行结果。",
+    "Current drawing v{0}. Retained {1} completed steps and {2} run results.",
+    "目前圖紙 v{0}，已保留 {1} 個完成步驟與 {2} 份執行結果。"
+  ],
+  "agent.done": [
+    "完成",
+    "Completed",
+    "完成"
+  ],
+  "agent.view_results": [
+    "查看结果",
+    "View results",
+    "查看結果"
+  ],
+  "agent.queued": [
+    "运行中补充，待步骤结束处理",
+    "Queued until the current step finishes",
+    "執行中補充，待步驟結束處理"
+  ],
+  "agent.withdraw": [
+    "撤回",
+    "Withdraw",
+    "撤回"
+  ],
+  "agent.log": [
+    "工具日志",
+    "Tool log",
+    "工具日誌"
+  ],
+  "agent.expand": [
+    "展开／折叠",
+    "Expand / collapse",
+    "展開／摺疊"
+  ],
+  "agent.snapshot_run": [
+    "运行中 · 基于图纸 v{0}，可以继续改图，结果仍记在 v{0}",
+    "Running on drawing v{0} · you can keep editing; results stay with v{0}",
+    "執行中 · 基於圖紙 v{0}，可以繼續改圖，結果仍記在 v{0}"
+  ],
+  "agent.change_summary": [
+    "新增 {0} · 修改 {1} · 删除 {2}",
+    "Added {0} · modified {1} · removed {2}",
+    "新增 {0} · 修改 {1} · 刪除 {2}"
+  ],
+  "agent.candidate_preview": [
+    "候选预览",
+    "Candidate preview",
+    "候選預覽"
+  ],
+  "agent.preview_failed": [
+    "候选预览未完成，请重新打开 Agent。",
+    "Candidate preview failed. Reopen Agent.",
+    "候選預覽未完成，請重新開啟 Agent。"
+  ],
+  "agent.results": [
+    "结果",
+    "Results",
+    "結果"
+  ],
+  "agent.new_tab": [
+    "在新标签页打开",
+    "Open in new tab",
+    "在新分頁開啟"
+  ],
+  "agent.files": [
+    "文件",
+    "Files",
+    "檔案"
+  ],
+  "agent.file_missing": [
+    "文件已移动或删除",
+    "File moved or deleted",
+    "檔案已移動或刪除"
+  ],
+  "agent.modes": [
+    "模态",
+    "Modes",
+    "模態"
+  ],
+  "agent.metric": [
+    "指标",
+    "Metric",
+    "指標"
+  ],
+  "agent.sampling_label": [
+    "取样区间",
+    "Sampling window",
+    "取樣區間"
+  ],
+  "agent.sampling": [
+    "取样 {0}–{1} s",
+    "Window {0}–{1} s",
+    "取樣 {0}–{1} s"
+  ],
+  "agent.sample_window": [
+    "指标来自标明的取样区间，是否已达稳态请结合波形判断。",
+    "Metrics use the stated sampling window. Check the waveform for steady-state behaviour.",
+    "指標來自標明的取樣區間，是否已達穩態請結合波形判斷。"
+  ],
+  "agent.no_results": [
+    "这项任务还没有生成结果。可补充仿真或出图要求。",
+    "This task has no results yet. Add simulation or export instructions.",
+    "這項任務尚未產生結果。可補充模擬或出圖要求。"
+  ],
+  "agent.no_waveforms": [
+    "这个步骤没有生成波形。",
+    "This step produced no waveform.",
+    "這個步驟沒有產生波形。"
+  ],
+  "agent.no_metrics": [
+    "这个步骤没有数值指标。",
+    "This step has no numerical metrics.",
+    "這個步驟沒有數值指標。"
+  ],
+  "agent.no_modes": [
+    "这个步骤没有识别模态。",
+    "This step did not identify modes.",
+    "這個步驟沒有識別模態。"
+  ],
+  "agent.run_record": [
+    "查看运行记录",
+    "View run record",
+    "查看執行記錄"
+  ],
+  "agent.stop_first": [
+    "请先停止正在运行的任务。",
+    "Stop the running task first.",
+    "請先停止正在執行的任務。"
+  ],
+  "agent.tool.generate": [
+    "改图",
+    "Generate drawing",
+    "改圖"
+  ],
+  "agent.tool.validate": [
+    "校验",
+    "Validate",
+    "校驗"
+  ],
+  "agent.tool.render": [
+    "出图",
+    "Render",
+    "出圖"
+  ],
+  "agent.tool.simulate": [
+    "ngspice 仿真",
+    "ngspice simulation",
+    "ngspice 模擬"
+  ],
+  "agent.tool.metrics": [
+    "读波形",
+    "Measure waveforms",
+    "讀波形"
+  ],
+  "agent.tool.modes": [
+    "识别模态",
+    "Identify modes",
+    "識別模態"
+  ],
+  "agent.tool.loop": [
+    "环路分析",
+    "Loop analysis",
+    "迴路分析"
+  ],
+  "agent.tool.native": [
+    "PLECS／Simulink 原生运行",
+    "Native PLECS / Simulink runs",
+    "PLECS／Simulink 原生執行"
+  ],
+  "agent.tool.cross_editor": [
+    "跨编辑器任务",
+    "Cross-editor tasks",
+    "跨編輯器任務"
+  ],
+  "agent.cap.ngspice": [
+    "需要 ngspice 和电路图",
+    "Requires ngspice and a circuit drawing",
+    "需要 ngspice 和電路圖"
+  ],
+  "agent.cap.fixed_pwm": [
+    "需要可识别的固定 PWM 工况",
+    "Requires supported fixed-frequency PWM",
+    "需要可識別的固定 PWM 工況"
+  ],
+  "agent.cap.control": [
+    "需要控制框图",
+    "Requires a control diagram",
+    "需要控制框圖"
+  ],
+  "agent.cap.phase3": [
+    "第三阶段开放",
+    "Available in phase 3",
+    "第三階段開放"
+  ],
+  "agent.cap.separate_tasks": [
+    "目前可在两个编辑器分别创建任务",
+    "Create separate tasks in each editor",
+    "目前可在兩個編輯器分別建立任務"
+  ],
+  "agent.step.todo": [
+    "未开始",
+    "Not started",
+    "未開始"
+  ],
+  "agent.step.running": [
+    "执行中",
+    "Running",
+    "執行中"
+  ],
+  "agent.step.waiting": [
+    "等你处理",
+    "Waiting for you",
+    "等你處理"
+  ],
+  "agent.step.done": [
+    "完成",
+    "Completed",
+    "完成"
+  ],
+  "agent.step.failed": [
+    "失败",
+    "Failed",
+    "失敗"
+  ],
+  "agent.step.cancelled": [
+    "已停止",
+    "Stopped",
+    "已停止"
+  ],
+  "agent.state.draft": [
+    "草稿",
+    "Draft",
+    "草稿"
+  ],
+  "agent.state.planning": [
+    "规划中",
+    "Planning",
+    "規劃中"
+  ],
+  "agent.state.waiting_input": [
+    "等你补参数",
+    "Waiting for parameters",
+    "等你補參數"
+  ],
+  "agent.state.waiting_candidate": [
+    "等你采用候选",
+    "Waiting for adoption",
+    "等你採用候選"
+  ],
+  "agent.state.running": [
+    "执行中",
+    "Running",
+    "執行中"
+  ],
+  "agent.state.done": [
+    "完成",
+    "Completed",
+    "完成"
+  ],
+  "agent.state.failed": [
+    "失败",
+    "Failed",
+    "失敗"
+  ],
+  "agent.state.cancelled": [
+    "已停止",
+    "Stopped",
+    "已停止"
+  ],
+  "agent.metric.mean": [
+    "平均值",
+    "Mean",
+    "平均值"
+  ],
+  "agent.metric.rms": [
+    "有效值",
+    "RMS",
+    "有效值"
+  ],
+  "agent.metric.min": [
+    "最小值",
+    "Minimum",
+    "最小值"
+  ],
+  "agent.metric.max": [
+    "最大值",
+    "Maximum",
+    "最大值"
+  ],
+  "agent.metric.peak_to_peak": [
+    "峰峰值",
+    "Peak-to-peak",
+    "峰峰值"
+  ],
+  "agent.metric.fc_hz": [
+    "穿越频率",
+    "Crossover frequency",
+    "穿越頻率"
+  ],
+  "agent.metric.pm_deg": [
+    "相位裕度",
+    "Phase margin",
+    "相位裕度"
+  ],
+  "agent.metric.gm_db": [
+    "增益裕度",
+    "Gain margin",
+    "增益裕度"
+  ],
+  "agent.error.auth": [
+    "API 验证失败",
+    "API authentication failed",
+    "API 驗證失敗"
+  ],
+  "agent.error.quota": [
+    "API 余额或额度不足",
+    "API quota exhausted",
+    "API 餘額或額度不足"
+  ],
+  "agent.error.rate_limit": [
+    "API 请求受限",
+    "API rate limit",
+    "API 請求受限"
+  ],
+  "agent.error.network": [
+    "网络请求未完成",
+    "Network request failed",
+    "網路請求未完成"
+  ],
+  "agent.error.validation": [
+    "校验未通过",
+    "Validation failed",
+    "校驗未通過"
+  ],
+  "agent.error.engine_missing": [
+    "未找到仿真程序",
+    "Simulation engine missing",
+    "未找到模擬程式"
+  ],
+  "agent.error.solver": [
+    "求解未完成",
+    "Solver failed",
+    "求解未完成"
+  ],
+  "agent.error.version_conflict": [
+    "图纸版本已变化",
+    "Drawing version changed",
+    "圖紙版本已變化"
+  ]
+};
+
 window.CircuitDrawerMessages = [
+  ["SPS 相移（rad，原生导出）", "SPS phase (rad, native export)", "SPS 相移（rad，原生匯出）"],
+  ["每周期时间格数（4的倍数）", "Ticks per period (multiple of 4)", "每週期時間格數（4的倍數）"],
+  ["SPS 死区（s）", "SPS dead time (s)", "SPS 死區（s）"],
+  ["最小相移（rad）", "Minimum phase (rad)", "最小相移（rad）"],
+  ["最大相移（rad）", "Maximum phase (rad)", "最大相移（rad）"],
+  ["SPS 需要八个不重复开关，按四个桥臂选择上管和下管", "SPS needs eight distinct switches: select upper/lower devices for four legs", "SPS 需要八個不重複開關，按四個橋臂選擇上管和下管"],
+  ["原边A桥臂 上管", "Primary leg A upper", "原邊A橋臂 上管"],
+  ["原边A桥臂 下管", "Primary leg A lower", "原邊A橋臂 下管"],
+  ["原边B桥臂 上管", "Primary leg B upper", "原邊B橋臂 上管"],
+  ["原边B桥臂 下管", "Primary leg B lower", "原邊B橋臂 下管"],
+  ["副边A桥臂 上管", "Secondary leg A upper", "副邊A橋臂 上管"],
+  ["副边A桥臂 下管", "Secondary leg A lower", "副邊A橋臂 下管"],
+  ["副边B桥臂 上管", "Secondary leg B upper", "副邊B橋臂 上管"],
+  ["副边B桥臂 下管", "Secondary leg B lower", "副邊B橋臂 下管"],
+  ["正相移表示副桥滞后；首周期全关断，边界采样用于下一周期，变化限为每周期 pi/2。上下管须按实际端子逐桥臂绑定，变压器方向须人工核对。死区向上取整至时间格。支持 PLECS／Simulink 原生导出；ngspice 仅限受限连续控制实验，不支持数字或混合采样控制，须按 SPS 文档核对条件。", "Positive phase means secondary lag. First period blank; boundary samples schedule the next cycle, slew limited to pi/2 per period. Bind each physical upper/lower leg and check transformer polarity. Dead time rounds up to ticks. PLECS/Simulink native export is available; ngspice is limited to constrained continuous-control experiments, not digital or mixed-rate control. Check the SPS documentation for conditions.", "正相移表示副橋滯後；首週期全關斷，邊界採樣用於下一週期，變化限為每週期 pi/2。上下管須按實際端子逐橋臂綁定，變壓器方向須人工核對。死區向上取整至時間格。支援 PLECS／Simulink 原生匯出；ngspice 僅限受限連續控制實驗，不支援數位或混合取樣控制，須依 SPS 文件核對條件。"],
+
+
+  ["常用需求与个人提示词", "Common requirements and personal prompts", "常用需求與個人提示詞"],
+  ["展开提示词库", "Open prompt library", "展開提示詞庫"],
+  ["搜索提示词", "Search prompts", "搜尋提示詞"],
+  ["选择常用需求", "Select a requirement", "選擇常用需求"],
+  ["填入需求（仍可编辑）", "Fill requirement (editable)", "填入需求（仍可編輯）"],
+  ["个人提示词名称", "Personal prompt name", "個人提示詞名稱"],
+  ["另存个人提示词", "Save as personal prompt", "另存個人提示詞"],
+  ["更新所选个人提示词", "Update selected personal prompt", "更新所選個人提示詞"],
+  ["删除所选个人提示词", "Delete selected personal prompt", "刪除所選個人提示詞"],
+  ["待填写；留空保留符号", "Required; leave empty for symbolic drawing", "待填寫；留空保留符號"],
+  ["当前图对象：", "Objects in this drawing:", "目前圖紙物件："],
+  ["缺少设计值：可先生成符号图，数值分析前必须补齐。", "Missing design values: symbolic drawing is possible; fill values before numerical analysis.", "缺少設計值：可先生成符號圖，數值分析前必須補齊。"],
+  ["需求已填入，请检查后再生成。", "Requirement filled. Review it before generation.", "需求已填入，請檢查後再生成。"],
+  ["个人提示词已保存。", "Personal prompt saved.", "個人提示詞已儲存。"],
+  ["删除所选个人提示词？", "Delete the selected personal prompt?", "刪除所選個人提示詞？"],
+  ["个人提示词已删除。", "Personal prompt deleted.", "個人提示詞已刪除。"],
+  ["请填写名称和需求文字", "Enter a name and requirement text", "請填寫名稱與需求文字"],
+  ["提示词库已变化，请刷新后重试；未覆盖已有内容", "The library changed. Refresh and try again; no content was overwritten.", "提示詞庫已變更，請重新整理後重試；未覆蓋既有內容"],
+
+  ["整理布线", "Reroute wires", "整理佈線"],
+  ["重新排版", "Rearrange layout", "重新排版"],
+  ["只生成候选预览，采用后可一步撤销；点保存才写入文件。", "Preview only. Adoption is one undoable step; Save writes the file.", "只產生候選預覽，採用後可一步撤銷；點儲存才寫入檔案。"],
+  ["正在整理…", "Arranging…", "正在整理…"],
+  ["当前图已发生变化，请重新整理。", "The drawing changed. Please arrange again.", "目前圖紙已變更，請重新整理。"],
+  ["布局预览（方块显示 ID）；已通过检查，采用后查看完整标签。", "Layout preview (block IDs). Checks passed; adopt to see full labels.", "佈局預覽（方塊顯示 ID）；已通過檢查，採用後查看完整標籤。"],
+  ["已采用整理结果；可撤销。点保存后写入文件。", "Arrangement adopted; Undo is available. Save writes the file.", "已採用整理結果；可撤銷。點儲存後寫入檔案。"],
+
+
+  ["图纸已改变，请重新选择对应版本的波形。", "The drawing changed. Select waveforms for the corresponding version again.", "圖紙已改變，請重新選擇對應版本的波形。"],
   ["可接线栅极 g","Electrical gate g","可接線閘極 g"],
   ["栅极引脚位置不合适","Invalid gate pin position","閘極引腳位置不合適"],
   ["栅极驱动","Gate drive","閘極驅動"],
@@ -2573,3 +3376,4 @@ window.CircuitDrawerMessages = [
   ["方波源","Square-wave source","方波源"],
   ["方框里画的图标；选了图标后，文字改为写在方框下方","Icon drawn in the box; with an icon, the text moves under the box","方框裡畫的圖標；選了圖標後，文字改為寫在方框下方"]
 ];
+

@@ -516,6 +516,7 @@ ROUTE_TRIES = 6       # detours tried on each side
 # exists is found long before this; an impossible one would otherwise search
 # the whole grid on every scale pass (seconds each)
 GRID_ROUTE_BUDGET = 40000
+CONTROL_ROUTE_WEIGHT = 2.0  # weighted A*: favour progress through large feedback diagrams within the state budget
 _ROUTING = threading.local()
 
 
@@ -882,14 +883,14 @@ class _Index:
 
 
 def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, clearance=ROUTE_STEP * .75,
-                budget=None, insulated=()):
+                budget=None, insulated=(), min_run=0.0, check_cancelled=None, source_wires=()):
     """Visibility-grid fallback for ports picked inside a user's old drawing.
 
     Unlike the library's two-bend paths, this can navigate around several
     existing components. It changes only derived module links, never source
     coordinates. All output still goes through the ordinary validator.
-    Control AI passes its own printed-scale clearance; module callers retain
-    the existing three-quarter-lane default.
+    Control AI passes printed-scale clearance and a minimum straight run.
+    Module callers retain the existing three-quarter-lane default.
     """
     import heapq
     a, fa, sa = a_end
@@ -903,30 +904,115 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
         xs.update((x0, x1)); ys.update((y0, y1))
     # The half-lane gives clearance around obstacles without depending on any
     # symbol-specific dimensions. Bound the grid to two lanes outside drawing.
-    xs = sorted({round(x + k * ROUTE_STEP / 2, 4) for x in xs for k in (-4, -2, -1, 0, 1, 2, 4)})
-    ys = sorted({round(y + k * ROUTE_STEP / 2, 4) for y in ys for k in (-4, -2, -1, 0, 1, 2, 4)})
+    offsets = {k * ROUTE_STEP / 2 for k in (-4, -2, -1, 0, 1, 2, 4)}
+    if min_run:
+        # Control routing uses physical clearance and run length, not the
+        # unrelated module lane widths that multiply nearly identical cells.
+        lead = math.ceil(min_run * 10000) / 10000
+        offsets = {0, -clearance, clearance, -lead, lead}
+    xs = sorted({round(x + offset, 4) for x in xs for offset in offsets})
+    ys = sorted({round(y + offset, 4) for y in ys for offset in offsets})
     ix, iy = {x: i for i, x in enumerate(xs)}, {y: i for i, y in enumerate(ys)}
+    # Jump the minimum straight run after a bend. Remembering every possible
+    # bend origin multiplies the state space on a densely populated grid.
     start = (ix[a[0]], iy[a[1]], -1)
     index = _Index(wires, pins, bodies)
-    queue, distance, previous, cache = [(0, start)], {start: 0}, {}, {}
+    if min_run and not source_wires and fa and fb and a != b:
+        # Try readable port-lead paths before a cell search. This covers long
+        # feedback returns without visiting every point in the intervening rows.
+        first = tuple(round(v + d * lead, 4) for v, d in zip(a, fa))
+        last = tuple(round(v + d * lead, 4) for v, d in zip(b, fb))
+        shapes = [[first, (first[0], last[1]), last], [first, (last[0], first[1]), last]]
+        shapes += [[first, (x, first[1]), (x, last[1]), last] for x in xs]
+        shapes += [[first, (first[0], y), (last[0], y), last] for y in ys]
+        best = None
+        for number, middle in enumerate(shapes):
+            if check_cancelled is not None and number % 128 == 0:
+                check_cancelled()
+            if budget is not None and number >= budget:
+                return None
+            raw = [a, *middle, b]
+            path = [point for i, point in enumerate(raw) if i == 0 or point != raw[i - 1]]
+            path = [point for i, point in enumerate(path) if i in (0, len(path) - 1) or not _on(point, path[i-1], path[i+1])]
+            if any(point in insulated for point in path):
+                continue
+            segments = _segs(path)
+            if any(abs(p[0] - q[0]) + abs(p[1] - q[1]) < min_run - EPS for p, q in segments):
+                continue
+            if any(_overlap(*one, *other) or _cross(*one, *other)
+                   for i, one in enumerate(segments) for other in segments[i + 1:]):
+                continue
+            if not _leaves(path, a, fa, sa) or not _leaves(path, b, fb, sb):
+                continue
+            cost = _cost(path, a_end, b_end, wires, pins, bodies, same, clearance, index)
+            if cost is not None and (best is None or cost < best[0]):
+                best = cost, path
+        if best is not None:
+            return best[1]
+        if budget is not None:
+            budget -= len(shapes)
+    def remaining_cost(point, heading):
+        if not min_run or target_wires or point == b:
+            return 0.0
+        directions = []
+        if abs(point[0] - b[0]) > EPS:
+            directions.append(0 if point[0] < b[0] else 1)
+        if abs(point[1] - b[1]) > EPS:
+            directions.append(2 if point[1] < b[1] else 3)
+        finish = []
+        if fb and sb:
+            headings = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            finish = [headings.index((-fb[0], -fb[1]))]
+        turns = []
+        for order in (directions, directions[::-1]):
+            path = [heading, *order, *finish]
+            turns.append(sum(0 if u == v else 2 if u == (v ^ 1) else 1 for u, v in zip(path, path[1:])))
+        return min(turns) + .05 * (abs(point[0] - b[0]) + abs(point[1] - b[1]))
+
+    starts = {start}
+    if source_wires:
+        # A branch can leave anywhere on its source tree. Searching just each
+        # segment's midpoint can miss a free corridor or create a tiny stub.
+        starts = set()
+        for p, q in source_wires:
+            if abs(p[1] - q[1]) < EPS:
+                candidates = [(x, iy[p[1]], -1) for x in range(len(xs)) if _on((xs[x], p[1]), p, q)]
+            else:
+                candidates = [(ix[p[0]], y, -1) for y in range(len(ys)) if _on((p[0], ys[y]), p, q)]
+            for state in candidates:
+                point = xs[state[0]], ys[state[1]]
+                distance_to_end = min(abs(point[0] - end[0]) + abs(point[1] - end[1]) for end in (p, q))
+                if distance_to_end < EPS or distance_to_end >= min_run - EPS:
+                    starts.add(state)
+    queue = [(0, 0, 0, state) for state in sorted(starts)]
+    heapq.heapify(queue)
+    distance, previous, cache = {state: 0 for state in starts}, {}, {}
     expanded = 0
     while queue:
         expanded += 1
+        if check_cancelled is not None and expanded % 128 == 1:
+            check_cancelled()
         if budget is not None and expanded > budget:
             return None
-        cost, state = heapq.heappop(queue)
+        _, _, cost, state = heapq.heappop(queue)
         if cost != distance[state]:
             continue
         x, y, direction = state
         p = (xs[x], ys[y])
         if p == b or (p != a and any(_on(p, *w) for w in target_wires)):
             path = []
-            while state != start:
+            while state in previous:
                 path.append((xs[state[0]], ys[state[1]])); state = previous[state]
-            path.append(a); path.reverse()
+            path.append((xs[state[0]], ys[state[1]])); path.reverse()
             return [p for i, p in enumerate(path) if i in (0, len(path) - 1) or not _on(p, path[i - 1], path[i + 1])]
-        for dx, dy, axis in ((1, 0, 0), (-1, 0, 0), (0, 1, 1), (0, -1, 1)):
+        for heading, (dx, dy, axis) in enumerate(((1, 0, 0), (-1, 0, 0), (0, 1, 1), (0, -1, 1))):
+            next_direction = heading if min_run else axis
+            if min_run and direction != -1 and heading == direction ^ 1:
+                continue
             nx, ny = x + dx, y + dy
+            if min_run and next_direction != direction:
+                while 0 <= nx < len(xs) and 0 <= ny < len(ys) and abs(xs[nx] - p[0]) + abs(ys[ny] - p[1]) < min_run - EPS:
+                    nx += dx; ny += dy
             # A hop must cross a wire inside a segment, never stop/turn on it.
             # Skip grid vertices on foreign wire interiors to permit that hop.
             while 0 <= nx < len(xs) and 0 <= ny < len(ys) and ((xs[nx], ys[ny]) in insulated or any(
@@ -947,11 +1033,13 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
             extra = cache[edge]
             if extra is None:
                 continue
-            next_state = (nx, ny, axis)
-            candidate = cost + extra + (1 if direction not in (-1, axis) else 0)
+            next_state = (nx, ny, next_direction)
+            candidate = cost + extra + (1 if direction not in (-1, next_direction) else 0)
             if candidate < distance.get(next_state, float("inf")):
                 distance[next_state] = candidate; previous[next_state] = state
-                heapq.heappush(queue, (candidate, next_state))
+                # Obstacle-free length and turns bound the remaining cost.
+                remaining = remaining_cost(q, next_direction)
+                heapq.heappush(queue, (candidate + CONTROL_ROUTE_WEIGHT * remaining, remaining, candidate, next_state))
     return None
 
 

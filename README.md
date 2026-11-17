@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) | English
 
-Circuit Drawer turns one hand-placed, validated coordinate table into paper-ready CircuiTikZ figures of power electronic converters, and exports the same table to ngspice, Simulink, PLECS and open-loop PSIM models.
+Circuit Drawer is a circuit and control-diagram editor for power electronics. Draw by hand, edit a template, or ask the AI Agent to start from a blank canvas, configure parameters, run ngspice and inspect waveforms and operating modes. Editable JSON drawings produce paper-ready CircuiTikZ figures, and linked power circuits and control diagrams can be exported as complete closed-loop simulation models.
 
 <p align="center">
   <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/CircuitDrawer-Setup-2.0.0.exe"><img alt="Download Windows installer — Offline setup v2.0.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v2.0.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
@@ -18,27 +18,29 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 
 [Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.0.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-trial-2.0.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-manuals-2.0.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-public-source-2.0.0.zip)
 
+[Start from a blank canvas](#quick-start) · [Link a controller and export a closed loop](#link-a-controller-and-export-a-complete-closed-loop-model) · [Agent and MCP guide](docs/AGENT_MCP.md)
+
 ![Full-bridge LLC converter, IEEE single column](docs/images/manual/example-llc-fullbridge.png)
 
 ## Highlights
 
-1、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, a native PLECS Standalone model, and a Python builder for open-loop PSIM models. VCO control exports to PLECS and Simulink preserve frequency limits, continuous phase and dead time.
+1、**Agent workflow and prompt library.** Describe a task on a blank canvas or an existing drawing, supply parameters, review circuit, controller and simulation-parameter candidates, then adopt them to continue with ngspice, measurements, mode identification and figure export. Follow-up requests, stop/resume and undoable adoption are supported. Reuse parameterized prompts or save personal prompts. [Agent guide](docs/AGENT_MCP.md#四内置-agent-的使用)
 
-2、**Paper-ready by default.** Figures fit IEEE single (8.79 cm) or double (17.99 cm) columns with 8 pt Times text. Symbol sizes stay fixed; only the spacing between parts is scaled, so you insert the PDF at 100 % and the text matches your captions.
+2、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, and a native PLECS Standalone model. Open-loop PSIM export provides a Python builder for the official PSIM 2026 API. [PSIM models and steps](docs/PSIM_EXPORT.md)
 
-3、**Explicit coordinates, strict checking.** Every pin and every wire corner comes from a template or from you. Explicitly expanding a module can make room for its contents. The checker rejects slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and any difference between the drawing and its netlist, and tells you where and why.
+3、**Paper-ready by default.** Figures fit IEEE single (8.79 cm) or double (17.99 cm) columns with 8 pt Times text. Symbol sizes stay fixed while the spacing between parts is scaled, so you insert the PDF at 100 % and the text matches your captions.
 
-4、**Web editor.** Move parts, wires and modules as one selection; rotate selected ordinary parts and wires in either direction; merge overlapping wires and keep wire hops at their crossings. Box selection, context menus, undo/redo, arrow-key nudging and drawing scaling share the existing checks.
+4、**Editable drawings with validation.** Manual, template and AI-generated drawings share the coordinate-table format and remain editable after adoption. Explicitly expanding a module can make room for its contents. The checker reports slanted wires, overlapping symbols and labels, unmarked crossings, dangling wires and differences between the drawing and its netlist.
 
-5、**Modules.** Define a converter cell once, drag it from the library into the canvas, and connect its ports with ordinary wires. Instances can be folded into boxes with IEC symbols. Folding changes the picture only; simulation always uses the full circuit.
+5、**Web editor.** Move parts, wires and modules as one selection, rotate ordinary parts and wires in either direction, merge overlapping wires and keep wire hops at their crossings. Box selection, context menus, undo/redo, arrow-key nudging and drawing scaling are available.
 
-6、**Operating modes and waveforms.** Highlight the conducting path of each switching state, export a mode sheet, and line up simulated or measured waveforms with t0, t1, ... and the matching mode figures.
+6、**Modules.** Define a converter cell once, drag it from the library into the canvas, and connect its ports with ordinary wires. Instances can be folded into boxes with IEC symbols. Simulation uses the full circuit, and native exports can represent folded modules as subsystems.
 
-7、**Control block diagrams.** A separate editor for PI loops, FOC, MPC and similar diagrams, with loop analysis (margins, Bode plots, Type I/II/III compensators) and fixed- or floating-point C code generation. A control table can close the loop around a circuit in ngspice, Simulink and PLECS.
+7、**Operating modes and waveforms.** Highlight conducting paths and export mode sheets. Fixed-frequency internal PWM cases support mode identification from ngspice waveforms. Results show sampling windows, output means, ripple and cycle checks. Simulated or measured waveforms can also be arranged alongside t0, t1, ... and the matching mode figures.
 
-8、**AI drawing assistant (optional).** Describe a topology that has no template, or ask for a change to the current figure in one sentence. Circuit AI writes coordinates; control-diagram AI writes structure that the program lays out. Both go through validation. It uses your own API key with an Anthropic-compatible or OpenAI-compatible interface.
+8、**Control diagrams and complete closed loops.** A separate editor supports PI, FOC and MPC diagrams, loop analysis (margins, Bode plots, Type I/II/III compensators) and fixed- or floating-point C code generation. AI diagrams are laid out from their connections. Routing and layout adjustments can be previewed and adopted as one undoable edit. Link a saved power circuit, feedback signals and PWM, VCO or single-group SPS bindings to run supported ngspice loops or export Simulink and PLECS models.
 
-9、**Agent workflow and prompt library.** Start from a blank canvas or an existing drawing, review and adopt circuit, controller and parameter candidates, then run ngspice, measurements, mode identification and figure export. A complete controller can reference the power circuit and export a closed-loop native model. Reuse parameterized prompts and preview control-diagram routing or layout changes. [Agent and MCP guide](docs/AGENT_MCP.md)
+9、**AI interfaces and MCP.** The AI menu generates new drawings and edits existing ones. Agent tasks combine drawing, simulation and export. Built-in AI uses your API key with an Anthropic-compatible or OpenAI-compatible service. External MCP clients can use the optional Python MCP interface for candidate editing, validation, rendering, simulation and loop analysis. [MCP setup](docs/AGENT_MCP.md)
 
 ## Gallery
 
@@ -50,9 +52,9 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 | --- | --- |
 | ![Two DAB modules folded into boxes](docs/images/manual/example-modules-folded.png) | ![PMSM field-oriented control diagram](docs/images/manual/example-control-foc.png) |
 
-The web editor:
+The 2.0 circuit editor and Agent panel, with a Buck example on the canvas.
 
-![Circuit editor](docs/images/manual/en/editor-overview.png)
+![Circuit Drawer 2.0 circuit editor and Agent panel](docs/images/manual/en/editor-agent-2.png)
 
 ## Installation
 
@@ -100,7 +102,7 @@ Or install straight from the repository:
 python -m pip install "git+https://github.com/ahainur/circuit-drawer-for-ee"
 ```
 
-This installs three commands: `circuit-drawer` (circuits), `circuit-drawer-control` (control diagrams) and `circuit-drawer-launcher` (a small window for opening files, mainly for Windows users). If your shell cannot find them, use `python -m circuit_drawer`, `python -m circuit_drawer.control` and `python -m circuit_drawer.launcher` instead.
+Drawing entry points include `circuit-drawer` for circuits, `circuit-drawer-control` for control diagrams and `circuit-drawer-launcher` for the launcher window. If your shell cannot find them, use `python -m circuit_drawer`, `python -m circuit_drawer.control` and `python -m circuit_drawer.launcher`. External MCP clients use `circuit-drawer-mcp` with the optional MCP dependencies installed. [MCP setup](docs/AGENT_MCP.md#一安装与启动)
 
 The example files used throughout the documentation live in the [`examples/`](examples/) folder of this repository. They are not part of the wheel; download the source archive from the release page or clone the repository to get them.
 
@@ -112,14 +114,51 @@ The Python installation can use the following optional components. The Windows i
 | Poppler `pdftocairo` | SVG and PNG output |
 | `CJKutf8` LaTeX package | Chinese text in figures |
 | ngspice | Running simulations and getting CSV results |
-| MATLAB, Simulink and Simscape | Running the exported Simulink model; PMSM and Clarke/Park blocks also need Simscape Electrical |
+| MATLAB, Simulink and Simscape | Running the builder and generated `.slx`. C Function controllers require a compatible C compiler. PMSM and Clarke/Park blocks also require Simscape Electrical |
 | PLECS Standalone | Opening the exported `.plecs` model |
 | PSIM 2026 and its official Python API | Building and running the exported open-loop PSIM model; [supported models and steps](docs/PSIM_EXPORT.md) |
 | Python package `anthropic` | The AI assistant with an Anthropic-compatible interface (`python -m pip install "anthropic>=2.3"`) |
 
 Drawing, editing, checking, exporting TeX and exporting simulation models need none of these. See the [user manual](docs/USER_MANUAL.en.md#2-installation-and-startup) for step-by-step instructions on each platform.
 
-## Five-minute start
+## Quick start
+
+### Start from a blank canvas
+
+1、Open **Circuit Drawer** and configure the provider, model and API key in the launcher's **API 与仿真设置…** dialog. Choose **新建电路… → 空白电路** and save the drawing in your project folder.
+
+2、Click **Agent** in the browser editor and select **Blank canvas** as the starting point. Choose a topology and fill its parameters in **Prompt library**, or describe the task directly, then click **Start**. For example, enter the request below.
+
+> Draw a 48 V to 12 V buck from a blank canvas, ask me to confirm missing parameters, run ngspice, show the output voltage and ripple, then export PDF and SVG.
+
+3、Review the questions and proposed parameters, followed by drawing and simulation-parameter candidates. Inspect **Before / After / Overlay**, then click **Adopt** to continue. Adoption is undoable. Use the editor's **Save** action to write the drawing to JSON.
+
+4、Click **View results** to inspect waveforms, sampling windows, measurements and files. You can add follow-up requests or edit the drawing. Task history belongs to the current editor service session. Save drawings before closing it. Run files are stored in `agent-output` beside the drawing. [Detailed Agent steps](docs/AGENT_MCP.md#四内置-agent-的使用)
+
+### Link a controller and export a complete closed-loop model
+
+1、Save the power circuit, for example as `power.json`. Return to the launcher and choose **新建控制框图… → 空白控制框图**. Save the control drawing as `controller.json` in the same folder.
+
+2、In the control editor's Agent, specify the power file, feedback signal, control target and modulation. Confirm numerical parameters and adopt the candidate. The request below provides a starting point.
+
+> Link power.json in the same folder and draw a complete output-voltage feedback loop with reference, error, PI, modulator, power stage and voltage feedback. Use the saved circuit to identify parameters and switch bindings that need confirmation. After adoption, export a continuous-control Simulink model containing both the power stage and controller.
+
+3、The control JSON stores the power-file reference, feedback measurements and switch bindings. The program resolves the controller from the actual connections and reads the saved power circuit. **Export once from the control editor's Agent to produce the integrated closed-loop model.** Save power-circuit changes before exporting again.
+
+4、Use the generated files as described below. Native model building or solving takes place in the corresponding application.
+
+| Export target | Files and next step |
+| --- | --- |
+| Simulink | A `build_*.m` script, mapping manifest and instructions. In MATLAB, change to the export folder and run the builder to generate and open the `.slx`, then click Run |
+| PLECS | A `.plecs` model and supporting files. Open and run the model in PLECS Standalone |
+| PDF / SVG / PNG / TeX | Figure files for a paper or report. The control editor's toolbar **Export…** action provides these formats |
+
+The circuit editor's **Simulation → Export to Simulink… / Export to PLECS…** commands export the model and control bindings configured in that circuit. [Controller linking and export](docs/AGENT_MCP.md#四内置-agent-的使用)
+
+### Command-line examples
+
+<details>
+<summary>Expand template drawing, ngspice and native-model export commands</summary>
 
 ```bash
 # 1. List the built-in templates and their options
@@ -143,41 +182,52 @@ circuit-drawer plecs my_buck_sim.json -o out/plecs
 circuit-drawer simulink my_buck_sim.json -o out/simulink
 ```
 
+</details>
+
 In the editor, drag parts and wires, watch the status bar for problems, then use **File → Export circuit figure…** to write the figure. Export is only possible when the checker passes. Both editors offer **简体中文 / 繁體中文 / English** in the top-right language selector. Switching is immediate and preserves unsaved edits; the browser remembers the choice for that address and port.
 
 ## What you can do
 
 | Task | Where |
 | --- | --- |
+| Generate from a blank canvas, review candidates, simulate, measure and export | **Agent** in either editor's toolbar |
+| Fill common requirements or save personal prompts | **Agent → Prompt library** |
 | Draw a common topology (Buck, Boost, LLC, DAB, flyback, CLLC, NPC, Vienna, Z-source, ...) | `circuit-drawer draw <template>` |
 | Move parts, change labels, colours and symbol sizes | Web editor |
 | Group selection, context menus, undo/redo, arrow-key nudging | Web editor |
 | Background regions, stacked panels, block arrows, curved and wavy arrows, control blocks | Web editor, **Insert** menu |
 | Step and pulse marks next to sources | Web editor, part properties |
 | Reusable modules, folding, module library | Web editor, **Modules (subsystems)** group of the parts library |
-| Operating-mode figures | **Modes** tab, or `circuit-drawer modes` |
+| Operating-mode figures and fixed-PWM mode identification | Toolbar **Identify modes**, **Modes** tab or Agent, also `circuit-drawer modes` |
 | Waveforms bound to modes | **Modes and waveforms → Waveforms and modes…**, or `circuit-drawer waveforms` |
 | ngspice simulation | **Simulation → SPICE simulation…**, or `circuit-drawer spice` |
 | Conducted EMI engineering estimates and filter comparison | **Experimental → Conducted EMI estimate…**; start with the `buck_emi` template |
 | Simulink and PLECS models, closed-loop controllers, folded modules as subsystems | **Simulation → Export to Simulink… / Export to PLECS…**, or `circuit-drawer simulink` / `circuit-drawer plecs` |
 | Open-loop PSIM models | **Simulation → Export to PSIM…**, or `circuit-drawer psim`; run the generated Python builder with the official PSIM API |
-| Control diagrams, loop analysis, C code | `circuit-drawer-control` |
+| Control diagrams, loop analysis, C code | Launcher **新建控制框图…**, or `circuit-drawer-control` |
+| Link a complete controller to a power circuit and export the closed loop | Control editor **Agent**, with power and controller JSON files in the same project folder |
+| Adjust control-diagram routing and layout | **Reroute wires / Rearrange layout** in the control editor, preview and adopt |
+| Call drawing tools from an external AI client | Optional Python MCP interface `circuit-drawer-mcp` |
 | New topology from a description, or a one-sentence change | **AI** menu, or `circuit-drawer new` / `circuit-drawer tweak` |
 | Save a checked table as your own template | `circuit-drawer save-template` |
 
-What the checker does not do: it verifies connections, geometry and text placement, not operating conditions. Bias, device ratings, dead time and whether a mode really occurs remain your engineering judgement. The simulation models are simplified and are not meant for loss, efficiency or ZVS conclusions.
+Drawing validation checks connections, geometry and text placement. Simulation and result tools check numerical configuration, solver results and sampling windows. Device ratings, losses, efficiency and ZVS require suitable device models and engineering verification.
+
+Automatic mode identification in 2.0 applies to fixed-frequency internal PWM. The internal mode check and the results page's cycle check can differ because of sampling. Dynamic PWM dead time uses a carrier-threshold approximation, and SPS uses one two-bridge group. See the release notes and manual for the supported conditions. [2.0 scope](RELEASE_NOTES.md#当前适用范围)
 
 ## Documentation
 
-1、[User manual (English)](docs/USER_MANUAL.en.md)
+1、[Agent workflow and MCP interface](docs/AGENT_MCP.md)
 
-2、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
+2、[User manual (English)](docs/USER_MANUAL.en.md)
 
-3、[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
+3、[使用说明书（中文）](docs/USER_MANUAL.zh-CN.md)
 
-4、[Change log](CHANGELOG.md)
+4、[繁體中文使用說明書](docs/USER_MANUAL.zh-TW.md)
 
-5、[Examples](examples/)
+5、[Change log](CHANGELOG.md)
+
+6、[Examples](examples/)
 
 ## License
 

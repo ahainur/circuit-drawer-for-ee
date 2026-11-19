@@ -49,7 +49,7 @@ def available(directory: Path | None = None) -> dict[str, str]:
     return out
 
 
-def template(name: str, directory: Path | None = None) -> dict[str, Any]:
+def template(name: str, directory: Path | None = None, *, asset_dir=None) -> dict[str, Any]:
     if name in TEMPLATES:
         text = resources.files(__package__).joinpath("templates", f"{name}.json").read_text("utf-8")
         return json.loads(text)
@@ -58,7 +58,11 @@ def template(name: str, directory: Path | None = None) -> dict[str, Any]:
     if saved is None:
         raise KeyError(f"unknown control template {name!r}; "
                        f"choose from {sorted(available(directory))}")
-    return json.loads(saved[1].read_text(encoding="utf-8"))
+    raw = json.loads(saved[1].read_text(encoding="utf-8"))
+    if asset_dir is not None:
+        from ..figure_images import copy_assets
+        copy_assets(raw, saved[1].parent, asset_dir)
+    return raw
 
 
 def load(source: str) -> dict[str, Any]:
@@ -71,13 +75,13 @@ def load(source: str) -> dict[str, Any]:
 
 def render(raw: dict[str, Any], profile: str | None = None, out_dir: str | Path = "out",
            name: str | None = None, formats: tuple[str, ...] = FORMATS, mono: bool = False,
-           grid: bool = False) -> Result:
+           grid: bool = False, *, base_dir=None) -> Result:
     """Check, then write the figure.  Refuses a table with errors."""
     prof = get_profile(profile or str(raw.get("profile") or "ieee-double"))
     rep = check(raw, prof)
     if not rep.ok:
         raise Rejected(rep)
-    tex = emit(rep, prof, mono=mono, grid=grid)
+    tex = emit(rep, prof, mono=mono, grid=grid, base_dir=base_dir)
     stem = name or rep.diagram.name
     return Result(rep, build(tex, Path(out_dir), stem, formats))
 

@@ -1,0 +1,145 @@
+{
+  "kind": "control",
+  "algorithm": true,
+  "name": "algorithm_search",
+  "profile": "ieee-single",
+  "blocks": [
+    {
+      "id": "step_1",
+      "type": "block",
+      "text": "Initialize converter parameters\\\\and candidate inputs $u_c$",
+      "corner_radius": 0.18,
+      "size": [
+        3.9800000000000013,
+        0.8974014113740141
+      ],
+      "at": [
+        0,
+        -0.44870070568700704
+      ]
+    },
+    {
+      "id": "step_2",
+      "type": "block",
+      "text": "Read measured state $x[k]$",
+      "corner_radius": 0,
+      "size": [
+        3.9800000000000013,
+        0.6
+      ],
+      "at": [
+        0,
+        -2.097401411374014
+      ]
+    },
+    {
+      "id": "step_3",
+      "type": "block",
+      "text": "Predict $x[k+1]$\\\\for each candidate $u_c$",
+      "corner_radius": 0,
+      "size": [
+        3.9800000000000013,
+        0.8974014113740141
+      ],
+      "at": [
+        0,
+        -3.746102117061021
+      ]
+    },
+    {
+      "id": "step_4",
+      "type": "block",
+      "text": "Calculate the objective $g(u_c)$",
+      "corner_radius": 0,
+      "size": [
+        3.9800000000000013,
+        0.6
+      ],
+      "at": [
+        0,
+        -5.394802822748027
+      ]
+    },
+    {
+      "id": "step_5",
+      "type": "block",
+      "text": "Select $u_c^*=\\arg\\min g(u_c)$",
+      "corner_radius": 0,
+      "size": [
+        3.9800000000000013,
+        0.6
+      ],
+      "at": [
+        0,
+        -6.894802822748027
+      ]
+    },
+    {
+      "id": "step_6",
+      "type": "block",
+      "text": "Update the control output",
+      "corner_radius": 0,
+      "size": [
+        3.9800000000000013,
+        0.6
+      ],
+      "at": [
+        0,
+        -8.394802822748028
+      ]
+    },
+    {
+      "id": "step_7",
+      "type": "block",
+      "text": "Continue at the next sample",
+      "corner_radius": 0.18,
+      "size": [
+        3.9800000000000013,
+        0.6
+      ],
+      "at": [
+        0,
+        -9.894802822748028
+      ]
+    }
+  ],
+  "links": [
+    {
+      "from": "step_1.s",
+      "to": "step_2.n"
+    },
+    {
+      "from": "step_2.s",
+      "to": "step_3.n"
+    },
+    {
+      "from": "step_3.s",
+      "to": "step_4.n"
+    },
+    {
+      "from": "step_4.s",
+      "to": "step_5.n"
+    },
+    {
+      "from": "step_5.s",
+      "to": "step_6.n"
+    },
+    {
+      "from": "step_6.s",
+      "to": "step_7.n"
+    }
+  ],
+  "texts": [],
+  "regions": [],
+  "title": "",
+  "control_ai": {
+    "inputs": [
+      "step_1"
+    ],
+    "outputs": [
+      "step_7"
+    ],
+    "stateful": [],
+    "dynamic_links": []
+  }
+}

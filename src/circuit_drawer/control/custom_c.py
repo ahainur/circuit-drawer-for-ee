@@ -1,7 +1,8 @@
 """Scalar C steps with explicit old/next state, shared by native exporters.
 
 Only the table schema is checked here. Loading or drawing a table never runs C.
-The target compiler checks the user's statement body when the model is built.
+The target compiler checks the user's statement body when the model is built;
+ngspice and the Python reference run it through control.c_subset instead.
 """
 import math
 import re
@@ -54,14 +55,24 @@ def field_reference():
             "Use code.fs and code.arith='double'; no code.blocks overrides for C blocks. "
             "Use block.output names in code.outputs and closed_loop.outputs. "
             "Pure calculations only, explicit state, no static state or external effects. "
-            "Native PLECS C-Script / Simulink C Function discrete export and C code generation only; "
-            "ngspice, Python evaluation, digital timing/quantization and linear analysis do not support C bodies. "
+            "Native PLECS C-Script / Simulink C Function discrete export and C code generation compile the body as written. "
+            "ngspice closed-loop runs and the Python reference execute it through a checked subset sampled at code.fs "
+            "(first sample at t = Ts, output 0 before it, next_<state> committed once after the body); "
+            + subset_reference() + " "
+            "digital timing/quantization settings and linear analysis do not support C bodies. "
             "Keep body/states/ports on structural edits; AI exchange does not accept new C source.")
 
 
-def statements(spec, inputs, outputs, old, next_):
+def subset_reference():
+    from .c_subset import field_reference
+    return field_reference()
+
+
+def statements(spec, inputs, outputs, old, next_, *, enabled=None):
     """Bind user names in a local scope; targets decide when next state commits."""
     reads, writes = list(inputs.values()) + list(old.values()), list(outputs.values()) + list(next_.values())
+    if enabled is not None:
+        reads.append(enabled)
     bridge = 'cd_bind'
     while any(bridge in expr for expr in reads + writes):
         bridge += '_'
@@ -72,7 +83,11 @@ def statements(spec, inputs, outputs, old, next_):
     lines += [f"const double {name} = {bridge}_read[{len(inputs)+i}];\ndouble next_{name} = {name};"
               for i, name in enumerate(old)]
     lines += [f"double {name} = 0.0;" for name in outputs]
+    if enabled is not None:
+        lines.append(f"if ({bridge}_read[{len(reads) - 1}] > 0.5) {{")
     lines += ["/* user C body */", spec["body"], "/* end user C body */"]
+    if enabled is not None:
+        lines.append("}")
     values = list(outputs) + ['next_'+name for name in next_]
     lines += [f"{bridge}_write[{i}] = {name};" for i, name in enumerate(values)]
     lines += ["}"] + [f"{expr} = {bridge}_write[{i}];" for i, expr in enumerate(writes)]

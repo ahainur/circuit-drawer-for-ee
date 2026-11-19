@@ -16,7 +16,7 @@ from ..closed_loop import INPUT_KEYS as CLOSED_INPUT_KEYS, MODELS as CLOSED_MODE
 from ..completeness import INSTANCE_STYLES
 from ..control_view import KEYS as CONTROL_VIEW_KEYS, DISPLAYS as CONTROL_VIEW_DISPLAYS
 from ..geometry import BODY_FRAC, HALF_HEIGHT, MIN_LEAD, WINDING_GAP
-from ..glyphs import KINDS as GLYPH_KINDS
+from ..glyphs import COLORED as COLORED_GLYPHS, KINDS as GLYPH_KINDS
 from ..layout import EXTRA_WINDINGS, OPTIONAL_PINS, PIN_NAMES
 from ..modules import APPEARANCE_KEYS
 from ..profiles import get_profile
@@ -36,7 +36,7 @@ _FORMAT = """\
  "netlist": {"<id>.<pin>": "<net name>", ...},  // REQUIRED: every pin of every element
  "regions": [{"from": [x0, y0], "to": [x1, y1], "fill": "@FILLS@",
               "label": "...", "members": ["<id>", ...]}],  // optional: one per module
- "callouts": [{"from": [x, y], "to": [x, y], "style": "@CALLOUT_STYLES@"}],  // optional annotation arrows
+ "callouts": [{"from": [x, y], "to": [x, y], "style": "@CALLOUT_STYLES@"}],  // optional annotation arrows. For a line that follows a measured pin or box add from_anchor or to_anchor, e.g. {"element":"L1","pin":"a"} or {"block":"pwm","side":"w"}. Keep both numeric endpoints.
  "blocks": [{"id": "pwm", "from": [x0, y0], "to": [x1, y1], "text": "PWM"}],  // optional control boxes, not electrical
  "wave_symbols": [{"at": [x, y], "wave": "@WAVES@", "color": "blue", "scale": 1}]
 }
@@ -162,6 +162,11 @@ For a white box with a black outline, use {"fill":"#ffffff","border":"solid","bo
 Unspecified back layers of a region with fill=none use white; explicit stack.fills choose each back layer.
 Use "fit":"members" to derive a region from its non-empty members list:
 {"id":"bridge","fit":"members","members":["S1","S2"],"fill":"green"}.
+At the top level, members may also contain module instance IDs, for example
+{"id":"module_colour","fit":"members","members":["M1"],"fill":"blue"}.
+The module compiler fits the visible instance frame when expanded, collapsed or
+partially shown. A region for an entirely hidden grouped instance is hidden too.
+Keep these source IDs and omit derived coordinates.
 from/to can be omitted; if also present they are ignored with a warning.
 The symbol and label bounds get 0.3 layout units of padding, rounded outward
 onto a 0.05 grid at the current print scale. Derived corners are never saved.
@@ -171,13 +176,19 @@ Non-member symbols must still not intersect the fitted boundary; no parts move.
 glyphs are optional function marks drawn inside a box, e.g. for a block diagram:
 {"kind":"dcdc","from":[x0,y0],"to":[x1,y1]} (kinds acdc, dcdc, dcac draw the
 IEC converter diagonal with side labels; mosfet, igbt, diode draw a device;
-battery, pv, rack, capacitor, ac, square are pictorial icons).
+battery, pv, rack, capacitor, ac, square are pictorial icons; python,
+database, script, chip, monitor, neural are software / data icons).
 System-level block diagram (storage, PV, grid, server-rack loads around a DC bus
 or an SST, as review papers draw them): each unit is a "blocks" entry with
 "icon": @BLOCK_ICONS@ — dcac / dcdc / acdc give the converter box, battery a
 storage box, pv a PV string, rack a server rack, ac a grid / AC source, square a
 square-wave bridge port, capacitor a DC link.  Its "text" ("BESS", "Rack") is
-then a caption printed under the box.  Join the boxes with black line callouts
+then a caption printed under the box.  Co-simulation and data-driven figures
+use the software / data icons: python a Python script, database stored
+simulation data, script a code file, chip a DSP / MCU, monitor a simulation
+tool or scope, neural a neural network; add "icon_color": true only when the
+user wants them in colour (default line art), e.g.
+{"id":"py","from":[0,0],"to":[1,1],"icon":"python","icon_color":true,"text":"Python Script"}.  Join the boxes with black line callouts
 with "head":"none" that end on box edges (a bus is two parallel line callouts);
 show a power flow with a block callout.  These are drawing only, never elements.
 Stack layers are a drawing convention and never create electrical copies.
@@ -220,7 +231,7 @@ Control part of a figure (driver, PWM, controller, sensing, as papers draw it un
 or beside the power stage): each box is a "blocks" entry with a unique id and its one
 line of text centred inside ("Resonant Driver", "PWM", "$f_r$ calculation"); fill
 @BLOCK_FILLS@ (default white, which hides a grey area behind it), border
-@BLOCK_BORDERS@, color an ink (default black).  Blocks are not elements: no pins, no
+@BLOCK_BORDERS@ (none hides the frame independently of fill and icon strokes), color an ink (default black).  Blocks are not elements: no pins, no
 netlist, never joined to the circuit's nets.  Make the box wide enough for its text.
 Signal lines between blocks and to the circuit are line callouts with "color":"black"
 that end on a box edge (never inside a box, never on a symbol); "dash": @DASHES@
@@ -405,6 +416,13 @@ sampling guard; it rejects unresolved or too-short electrical dead time.
 First period blank; boundary commands schedule the following cycle with pi/2
 maximum phase change per period. Do not replace this scheduler with a raw sine
 phase subtraction, which glitches at command steps.
+Direct gate output (modulation "gate") applies a sampled controller's switch
+state: a command above 0.5 turns every listed switch on, complement switches
+take the inverse, and dead_time in seconds delays each turn-on. It needs a
+sampled controller (a custom C block or control.digital) and switching only;
+gates change only at code.fs sample instants and start off before the first
+sample. The switches' own PWM fields are unused. Preserve modulation "gate",
+switches, complement and dead_time on edits; never replace it with PWM duty.
 Preserve embedded control.digital sampling, delay and quantization settings too.
 A zoomed detail is a separate small drawing beside the circuit, never wired to it:
 its parts get their own ids and node names, its terminals end in ports, and the
@@ -742,6 +760,7 @@ def field_reference() -> str:
     lines += [_field(f, kinds=True) for f in schema.ELEMENT_OPTS]
     lines += [f"drawing_scale: [x,y], printed cm per layout unit; two finite numbers, each {DRAWING_SCALE_RANGE[0]}..{DRAWING_SCALE_RANGE[1]}; omit for automatic column fitting.",
               f"modules.instances[].appearance.title_size: finite number {FONT_RANGE[0]}..{FONT_RANGE[1]} pt; omit for profile font."]
+    lines += [schema.figure_field_reference()]
     lines += ["modes.source (program-owned simulation provenance): " + "; ".join(
         f"{key} = {value}" for key, value in SOURCE_FIELDS.items()) + ". Preserve exactly during edits."]
     lines += ["annotations (arrow, side, size, color; else bad-annotation):"]
@@ -761,7 +780,8 @@ def field_reference() -> str:
               f"blocks: {', '.join(blocks.KEYS)}; id unique; text one line; fill {_alts(blocks.FILLS)} "
               f"(or #rrggbb); border {_alts(blocks.BORDERS)}; color ink, default black; "
               f"each side at least {blocks.MIN_SIDE:g} units; icon {_alts(blocks.ICONS)} "
-              f"(text becomes a caption under the box).",
+              f"(text becomes a caption under the box); icon_color true|false (default false; "
+              f"only with {_alts(blocks.COLORED_ICONS)}).",
               f"wave_symbols: wave {_alts(WAVES)}; scale {WAVE_SCALE[0]:g}..{WAVE_SCALE[1]:g}; color ink, default blue; "
               f"on_wire true|false (drawn on a wire on purpose).",
               f"glyphs: kind {_alts(GLYPH_KINDS)}.",
@@ -1009,7 +1029,7 @@ PLAN_SYSTEM = PLAN_SYSTEM.replace("@EXTRA_WINDING_PINS@", ", ".join(f"{w}a/{w}b"
 PLAN_SYSTEM += "\n保留用户指定的节点/支路编号、物理数值、NoConn和模型映射；不猜编号，不重写程序管理的electrical。\n"
 PLAN_SYSTEM += "Arrows: foreground/over_parts only when explicitly requested; keep electrical data unchanged.\n"
 PLAN_SYSTEM += "省略实例仍列全体及端口连接，不短接或删电路。\n"
-PLAN_SYSTEM += "系统框图列blocks.icon单元及连接，纯绘图不冒充电气元件。\n"
+PLAN_SYSTEM += "系统框图列blocks.icon单元及连接，纯绘图不冒充电气元件。保留已导入 images 的素材引用；新增素材通过工作区导入。\n"
 PLAN_SYSTEM += "展示控制器时，用control_view将blocks方框关联closed_loop.control；不另建控制器。\n"
 PLAN_SYSTEM += "PMSM/FOC用pmsm，a/b/c三相；保留参数/反馈、区分机械转速与电角度；不改成直流/固定反电势负载。\n"
 PLAN_SYSTEM += "EMI列出双LISN、50Ω接收端、机壳及用户指定的滤波/寄生器件；缺参数先询问，保留emi绑定，FFT不保证CISPR合规。\n"
@@ -1171,6 +1191,7 @@ def tweak_message(instruction: str, table: dict, errors: list[str] | None = None
             "Rules for a change:\n"
             "- Keep every element id, pin coordinate, label, wire, hop and annotation the "
             "change does not need to touch exactly as it is; do not tidy or re-space the rest.\n"
+            "- Preserve region/block corner_radius and shadow unless the requested edit changes their appearance. Saved figure paper settings and composition provenance are carried over.\n"
             "- If a validator repair conflicts with an explicit preservation requirement, explain the conflict in 改动说明 and propose the adjustment for review; do not claim all requirements were met. The editor waits for the user's confirmation before adopting the candidate.\n"
             "- When you move a part, move the wire vertices on its pins with it and keep "
             "the wires orthogonal; when you add or remove a part, update the netlist.\n"
@@ -1188,7 +1209,8 @@ def tweak_message(instruction: str, table: dict, errors: list[str] | None = None
             "- Keep opts.zener and breakdown_voltage/breakdown_current/zener_resistance unchanged unless explicitly asked to edit that diode or its ratings.\n"
             "- Preserve pmsm phase order, motor parameters, motor probe quantity and closed_loop feedback bindings; rotating the symbol must not exchange phases or reset initial_angle/initial_speed.\n"
             "- Keep control_view tied to the same closed_loop.control. Preserve its block ID when moving or restyling; do not duplicate the source table or reinterpret signal callouts as electrical wires.\n"
-            "- Keep regions (module blocks), blocks (control boxes), glyphs (function marks), wave_symbols and callouts unless the change is about them; "
+            "- Preserve imported images, including source/mono_source/pixel_size. Image placement is edited in the publication workspace.\n"
+            "- For signal arrows on mixed schematics use style=line, explicit from/to coordinates and optional from_anchor/to_anchor: {block:id,side:n|s|e|w} or {element:id,pin:pin_name}. Bind illustration arrows only, keep electrical wires explicit. Keep regions (module blocks), blocks (control boxes), glyphs (function marks), wave_symbols and callouts unless the change is about them; "
             "when you add a part to a module, add its id to that region's members. "
             "Preserve fit=members and its member IDs; do not replace derived bounds with coordinates.\n"
             "- When renaming a device, keep its kind, pin positions and physical values; update netlist, modes, members, simulation.components keys, ground and probe references together. Split simultaneous moving/renaming into separate edits if identities would be ambiguous. For a replacement of a different kind, supply its own explicitly requested simulation parameters, never reuse the removed kind's parameters or silently drop probes. If required values are unknown, explain what the user must configure.\n"
@@ -1217,6 +1239,8 @@ def regression_message(report_lines: list[str], best_lines: list[str],
 
 # how to fix each kind of problem, sent along with the report
 HINTS = {
+    "bad-image": "Keep a unique image id, finite increasing from/to rectangle, positive integer pixel_size, foreground boolean, and the actual imported figure-assets/<sha256>.png source/mono_source. Restore existing paths and dimensions from the source; import new artwork through the workspace.",
+    "bad-figure": "Use finite figure font_pt 5..24, line_pt 0.1..3 and margin_mm 0..20. Preserve saved compositions, subfigure waveform snapshots (CSV hash, channels and notes), source signatures and grid_two/grid_three arrangements. Rectangular corner_radius is 0..1 cm, shadow and inner_shadow are booleans, border_width is 0.1..3 pt and font_weight is normal or bold.",
     "bad-drawing-scale": "drawing_scale needs two finite positive cm-per-layout-unit values within the declared range; omit the field to restore automatic fitting.",
     "drawing-scale-width": "The explicit paper scale exceeds the requested column width. Reduce the whole drawing, choose a wider profile, or restore automatic fitting if requested; preserve all devices and connections.",
     "bad-mode-source": "Restore the original program-generated modes.source with kind=simulation, signature and settings_hash. Preserve optional settings and transient_hash exactly; never invent provenance or refresh signatures yourself.",
@@ -1232,7 +1256,7 @@ HINTS = {
     "module-definition": '“模块定义”开头的问题改 definitions 里的局部坐标，不动实例 at。'
                          '库模块应修正库定义；不要逐个改副本来掩盖共享错误。',
     "empty-module": "The named definition is an empty editing draft. Build the requested real circuit and its complete local netlist/ports before export. Keep it as a draft when the user is only editing other parts; never invent a placeholder device or delete the subsystem to silence this error.",
-    "bad-region": 'For fit="members", supply a non-empty list of existing element IDs; '
+    "bad-region": 'For fit="members", supply a non-empty list of existing element IDs or top-level module instance IDs; '
                   'use local IDs in definitions or expanded IDs such as A/S1 in the assembled table. '
                   'Only fit="members" is supported; otherwise supply explicit from/to.',
     "region-fit-overrides": 'fit="members" takes precedence over from/to. Remove the stale corners, '
@@ -1331,8 +1355,8 @@ CONTROL_HINTS = {
     "control-schema": "只使用控制结构协议字段；列表不能写成对象，不能夹带坐标表。",
     "control-coordinates": "AI 只写方块、端口连线、分区成员；删除 at/size/pole/via/from-to 坐标，交给模板和布局适配器。",
     "control-block": "使用唯一的合法方块 id；所有引用和分区成员必须存在。",
-    "control-type": "图形类型只可为 block/limiter/tag/sum/mul/div/switch；PI、PR、LPF 是 block 的 text/tf，不是 type。",
-    "control-endpoint": "连线端点写已存在的 id.w/id.e/id.n/id.s；开关用 id.c 或声明的 throws 接点名。",
+    "control-type": "图形类型只可为 block/limiter/tag/compare/sum/mul/div/switch；PI、PR、LPF 是 block 的 text/tf，不是 type。",
+    "control-endpoint": "连线端点写已存在的 id.w/id.e/id.n/id.s；比较器只有平边一侧（输入）和尖端（输出）；开关用 id.c、声明的 throws 接点名，select:true 时还有 id.sel。",
     "control-dangling": "补齐缺失的输入或输出连接；只有真实外部输入/最终输出可列入 inputs/outputs，不可把中间控制器伪装成外部端口。",
     "control-input": "每个输入端口只接一个来源；合并用 sum，乘除用 mul/div；输入和输出不要复用同一个端口。",
     "control-sign": "sum.signs 必须覆盖全部输入端口且至少两个，每个值只能是 + 或 -；负反馈通常接负号端。",
@@ -1346,7 +1370,7 @@ CONTROL_HINTS = {
 def control_system_prompt(templates, snippets):
     """Control uses the same provider/rewrite engine with a coordinate-free format."""
     import json
-    from ..schema import control_appearance_reference
+    from ..schema import control_appearance_reference, figure_field_reference
     from ..control.digital import field_reference as digital_reference
     from ..control.custom_c import field_reference as custom_c_reference
     from ..control.codegen import CODE_KEYS, BLOCK_KEYS
@@ -1359,21 +1383,35 @@ with the existing snippet machinery; reconnect exposed signals in links.
 name/title: optional strings. blocks: a list of patches by unique id; unspecified
 template/current blocks and fields are kept. remove: explicit block ids to remove.
 Each block: id, type, text (LaTeX allowed), label, label_pos, signs, style,
-fill/border/color/size_pt, optional tf, and for a switch throws (names only), on/toggle.
+fill/border/color/size_pt, corner_radius/shadow/inner_shadow/border_width (pt) for rectangular blocks, font_weight normal or bold,
+optional tf, and for a switch throws (names only), on/toggle.
+Use logical ports and declare region members. The local layout places shared sensing branches together,
+keeps different named regions clear, reserves 2 mm of printed wire-to-block clearance and prefers fewer bends.
+The saved table may contain port_sides (logical port to printed side) and link label_gap (0..1 cm).
+Preserve logical port names in a revision; physical port_sides and label positions are fitted locally.
+A comparator is type "compare": a triangle whose tip points at "point" (e or w,
+default e), text such as "$>$" or "$<$"; inputs enter the flat side, output leaves the tip.
+port_labels (block/compare) prints a short label inside the box at a port, keyed
+by side and optional offset: {"w+0.4":"(9)","w":"(10)"}; a comparator labels its
+flat side only, e.g. {"w+0.25":"$+$","w-0.25":"$-$"}. A switch with "select": true
+has a select input sel at the blade middle, for a mode/flag signal such as $F_s$.
+A plain block may instead show an icon (@CONTROL_ICONS@), e.g. python for a Python
+script or database for simulation data: then it has no text, its caption goes in
+label, and "icon_color": true (only @CONTROL_COLOR_ICONS@) fills it in colour.
 Text can use JSON newline escapes or LaTeX line breaks; ordinary newlines are
 converted to LaTeX line breaks before measuring and drawing. Keep box text concise.
 texts: optional patches to EXISTING free text by index, e.g.
 {"texts":[{"index":0,"text":"$g_{1\\ldots8}$"}]} updates an output caption.
 Indices come from the selected template/current texts list. Omitted entries retain
 their text and position. Do not add coordinates or invent new indices.
-type is exactly block, limiter, tag, sum, mul, div or switch. PI/PR/LPF/PWM are
+type is exactly block, limiter, tag, compare, sum, mul, div or switch. PI/PR/LPF/PWM are
 ordinary block text, never new types. Example:
 {"template":"dual_loop","blocks":[{"id":"pii","text":"PR","tf":{"pr":{"kp":0.02,"kr":60,"f0":50,"fc":1}}}]}
 This numerical example is syntax only: use values from the request or the selected
 template, never invent design gains or plant parameters. When values are absent,
 keep symbolic labels and say in title that analysis parameters still need filling.
 links: optional COMPLETE replacement list of {from:"id.port",to:"id.port",label?}.
-Ports w/e/n/s (optional existing numeric port offsets), switch c and throw names.
+Ports w/e/n/s (optional existing numeric port offsets), switch c, throw names and sel.
 inputs/outputs: optional COMPLETE lists of external input/final output block ids.
 stateful: optional COMPLETE list of block ids with known internal state and NO
 direct feedthrough (e.g. PMSM current plant), when no numerical tf is supplied.
@@ -1453,7 +1491,7 @@ and loop parameter validator. Legitimate dynamic feedback is allowed. On failure
 use the error code + hint to rewrite the full proposal (max 3 model replies total).
 Plan the structure internally; do not emit a separate coordinate-writing stage.
 TEMPLATES (structure only):
-''' + json.dumps(templates, ensure_ascii=False) + '\nSNIPPETS (structure only):\n' + json.dumps(snippets, ensure_ascii=False) + '\nERROR HINTS:\n' + json.dumps(CONTROL_HINTS, ensure_ascii=False) + '''
+'''.replace("@CONTROL_ICONS@", " / ".join(GLYPH_KINDS)).replace("@CONTROL_COLOR_ICONS@", " / ".join(COLORED_GLYPHS)) + json.dumps(templates, ensure_ascii=False) + '\nSNIPPETS (structure only):\n' + json.dumps(snippets, ensure_ascii=False) + '\nERROR HINTS:\n' + json.dumps(CONTROL_HINTS, ensure_ascii=False) + '''
 APPEARANCE FIELD REFERENCE (generated):
 Only add/change appearance when the user requests colours or line styles. Otherwise
 omit these optional keys and preserve existing fill/border/color/dash, including on
@@ -1461,5 +1499,8 @@ links that must be rerouted. Tag style sets defaults only; explicit colours win.
 Link labels/arrowheads follow link colour; branch dots remain black. Appearance has
 no effect on transfer functions, simulation or code generation. Existing free text
 can be edited through texts index/text patches; its position and appearance are kept.
+Saved algorithm=true is a boolean document marker maintained by the workspace.
+Algorithm figures use procedural steps and branches with ordinary blocks/links.
+Preserve the marker during edits; do not write it in the structural proposal.
 Example: {"blocks":[{"id":"pi","fill":"lightblue","border":"blue","color":"red"}]}
-''' + control_appearance_reference() + '\nNUMERICAL CODE FIELDS\n' + json.dumps({"code": CODE_KEYS, "code.blocks": BLOCK_KEYS}) + '\nCIRCUIT BINDING FIELDS\n' + json.dumps({"circuit": CIRCUIT_KEYS, "circuit.inputs": CLOSED_INPUT_KEYS, "circuit.outputs": CLOSED_OUTPUT_KEYS, "circuit.outputs.<id>.model": CLOSED_MODELS, "circuit.outputs.<id>.modulation": MODULATIONS}) + '\nSAVED DIGITAL CONTROL FIELD REFERENCE:\n' + digital_reference() + '\nSAVED CUSTOM C FIELD REFERENCE:\n' + custom_c_reference()
+''' + control_appearance_reference() + '\n' + figure_field_reference() + '\nNUMERICAL CODE FIELDS\n' + json.dumps({"code": CODE_KEYS, "code.blocks": BLOCK_KEYS}) + '\nCIRCUIT BINDING FIELDS\n' + json.dumps({"circuit": CIRCUIT_KEYS, "circuit.inputs": CLOSED_INPUT_KEYS, "circuit.outputs": CLOSED_OUTPUT_KEYS, "circuit.outputs.<id>.model": CLOSED_MODELS, "circuit.outputs.<id>.modulation": MODULATIONS}) + '\nSAVED DIGITAL CONTROL FIELD REFERENCE:\n' + digital_reference() + '\nSAVED CUSTOM C FIELD REFERENCE:\n' + custom_c_reference()

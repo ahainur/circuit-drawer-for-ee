@@ -194,7 +194,7 @@ def wiring(fns: dict[str, Fn], links, errors: list[str]) -> None:
 def evaluate(kind: str, x: dict[str, float]) -> dict[str, float]:
     """Python reference, the same formulas as the C and SPICE forms."""
     if kind == "c":
-        raise FunctionError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
+        raise FunctionError("C 代码方块按 code.fs 逐拍执行，不能写成连续时间表达式")
     if kind == "clarke":
         a, b = x["a"], x["b"]
         c = x["c"] if "c" in x else -a - b
@@ -222,7 +222,7 @@ def expressions(kind: str, x: dict[str, str], lang: str) -> dict[str, str]:
     """Output name -> expression of the input expressions ``x``.  ``lang``:
     "c" (float), "cd" (double) or "spice" (an ngspice B source)."""
     if kind == "c":
-        raise FunctionError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
+        raise FunctionError("C 代码方块按 code.fs 逐拍执行，不能写成连续时间表达式")
     f = "f" if lang == "c" else ""
     cos = (lambda a: f"cos{f}({a})")
     sin = (lambda a: f"sin{f}({a})")

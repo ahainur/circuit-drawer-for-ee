@@ -1,0 +1,551 @@
+[
+  {
+    "id": "figure_ieee",
+    "title": {
+      "zh-CN": "IEEE 单栏／双栏整图",
+      "zh-TW": "IEEE 單欄／雙欄整圖",
+      "en": "IEEE single / double column"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "layout",
+    "starred": true,
+    "fields": [
+      {
+        "key": "栏宽",
+        "label": {
+          "zh-CN": "栏宽",
+          "zh-TW": "欄寬",
+          "en": "Column width"
+        },
+        "default": "双栏",
+        "options": [
+          "单栏",
+          "双栏"
+        ]
+      },
+      {
+        "key": "字号",
+        "label": {
+          "zh-CN": "字号",
+          "zh-TW": "字號",
+          "en": "Font size"
+        },
+        "default": "8 pt"
+      },
+      {
+        "key": "线宽",
+        "label": {
+          "zh-CN": "线宽",
+          "zh-TW": "線寬",
+          "en": "Line width"
+        },
+        "default": "0.55 pt"
+      },
+      {
+        "key": "最大高度",
+        "label": {
+          "zh-CN": "最大高度",
+          "zh-TW": "最大高度",
+          "en": "Maximum height"
+        },
+        "default": "12 cm"
+      }
+    ],
+    "body": "把这张图整理成 IEEE {栏宽} 图：图宽不超过栏宽，字号 {字号}，线宽统一 {线宽}，高度不超过 {最大高度}，收紧多余留白，不改电路。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_single",
+    "title": {
+      "zh-CN": "压缩到单栏",
+      "zh-TW": "壓縮到單欄",
+      "en": "Fit a single column"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "layout",
+    "starred": false,
+    "fields": [
+      {
+        "key": "允许折叠",
+        "label": {
+          "zh-CN": "允许折叠",
+          "zh-TW": "允許摺疊",
+          "en": "Allow collapsing"
+        },
+        "default": "是"
+      },
+      {
+        "key": "最小字号",
+        "label": {
+          "zh-CN": "最小字号",
+          "zh-TW": "最小字級",
+          "en": "Minimum font size"
+        },
+        "default": "7 pt"
+      }
+    ],
+    "body": "把图压缩到单栏 8.79 cm 图宽目标：优先缩短空导线、折叠重复模块，字号不小于 {最小字号}；放不下就说明哪里最挤。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_color",
+    "title": {
+      "zh-CN": "彩色分区（论文彩图）",
+      "zh-TW": "彩色分區（論文彩圖）",
+      "en": "Paper colour regions"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "color",
+    "starred": true,
+    "fields": [
+      {
+        "key": "功率级",
+        "label": {
+          "zh-CN": "功率级",
+          "zh-TW": "功率級",
+          "en": "Power stage"
+        },
+        "default": "浅蓝",
+        "options": [
+          "浅绿",
+          "浅蓝",
+          "浅橙",
+          "浅红",
+          "浅紫",
+          "浅黄",
+          "青绿",
+          "浅灰"
+        ]
+      },
+      {
+        "key": "控制部分",
+        "label": {
+          "zh-CN": "控制部分",
+          "zh-TW": "控制部分",
+          "en": "Control section"
+        },
+        "default": "浅灰",
+        "options": [
+          "浅绿",
+          "浅蓝",
+          "浅橙",
+          "浅红",
+          "浅紫",
+          "浅黄",
+          "青绿",
+          "浅灰"
+        ]
+      },
+      {
+        "key": "采样回路",
+        "label": {
+          "zh-CN": "采样回路",
+          "zh-TW": "取樣迴路",
+          "en": "Sensing loop"
+        },
+        "default": "虚线框"
+      },
+      {
+        "key": "区域标签",
+        "label": {
+          "zh-CN": "区域标签",
+          "zh-TW": "區域標籤",
+          "en": "Region label"
+        },
+        "default": "下方"
+      }
+    ],
+    "body": "功率级加{功率级}背景，控制部分加{控制部分}背景，采样回路用{采样回路}框出；区域名称放在{区域标签}；颜色要浅，黑白打印仍能区分。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_mono",
+    "title": {
+      "zh-CN": "黑白打印版",
+      "zh-TW": "黑白列印版",
+      "en": "Monochrome printing"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "color",
+    "starred": false,
+    "fields": [
+      {
+        "key": "色块处理",
+        "label": {
+          "zh-CN": "色块处理",
+          "zh-TW": "色塊處理",
+          "en": "Region treatment"
+        },
+        "default": "换灰度"
+      },
+      {
+        "key": "有色箭头",
+        "label": {
+          "zh-CN": "有色箭头",
+          "zh-TW": "有色箭頭",
+          "en": "Coloured arrows"
+        },
+        "default": "改黑色"
+      }
+    ],
+    "body": "改成黑白打印版：色块{色块处理}，相邻区域灰度至少差 8%；{有色箭头}；导线与器件保持纯黑。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_repeat",
+    "title": {
+      "zh-CN": "重复模块只展开一个",
+      "zh-TW": "重複模組只展開一個",
+      "en": "Expand one repeated module"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "module",
+    "starred": true,
+    "fields": [
+      {
+        "key": "保留展开",
+        "label": {
+          "zh-CN": "保留展开",
+          "zh-TW": "保留展開",
+          "en": "Keep expanded"
+        },
+        "source": "modules"
+      },
+      {
+        "key": "方框内标志",
+        "label": {
+          "zh-CN": "方框内标志",
+          "zh-TW": "方框內標誌",
+          "en": "Box symbol"
+        },
+        "default": "DC/DC"
+      }
+    ],
+    "body": "相同的模块只展开{保留展开}，其余折叠成方框，方框里画 {方框内标志} 标志，端口名保留，连接不变。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_partial",
+    "title": {
+      "zh-CN": "局部展开",
+      "zh-TW": "局部展開",
+      "en": "Partial module view"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "module",
+    "starred": false,
+    "fields": [
+      {
+        "key": "模块",
+        "label": {
+          "zh-CN": "模块",
+          "zh-TW": "模組",
+          "en": "Module"
+        },
+        "source": "modules"
+      },
+      {
+        "key": "展开部分",
+        "label": {
+          "zh-CN": "展开部分",
+          "zh-TW": "展開部分",
+          "en": "Expanded portion"
+        },
+        "default": "谐振腔"
+      }
+    ],
+    "body": "{模块}只展开{展开部分}，开关桥和整流桥折叠成方框，其余模块全部折叠。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_labels",
+    "title": {
+      "zh-CN": "标签避让与对齐",
+      "zh-TW": "標籤避讓與對齊",
+      "en": "Align and clear labels"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "label",
+    "starred": false,
+    "fields": [
+      {
+        "key": "标签位置",
+        "label": {
+          "zh-CN": "标签位置",
+          "zh-TW": "標籤位置",
+          "en": "Label position"
+        },
+        "default": "器件右侧"
+      },
+      {
+        "key": "下标规则",
+        "label": {
+          "zh-CN": "下标规则",
+          "zh-TW": "下標規則",
+          "en": "Subscript rule"
+        },
+        "default": "按模块编号"
+      }
+    ],
+    "body": "所有器件标签放在{标签位置}且不压线；同一列器件标签对齐；下标{下标规则}，如 S11、D12。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_references",
+    "title": {
+      "zh-CN": "电压电流参考方向",
+      "zh-TW": "電壓電流參考方向",
+      "en": "Voltage and current references"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "label",
+    "starred": false,
+    "fields": [
+      {
+        "key": "要标的量",
+        "label": {
+          "zh-CN": "要标的量",
+          "zh-TW": "要標的量",
+          "en": "Quantities to label"
+        },
+        "default": "i_Lr, i_Lm, v_o"
+      },
+      {
+        "key": "箭头位置",
+        "label": {
+          "zh-CN": "箭头位置",
+          "zh-TW": "箭頭位置",
+          "en": "Arrow position"
+        },
+        "default": "导线旁"
+      }
+    ],
+    "body": "在图上标出 {要标的量} 的参考方向，箭头放在{箭头位置}，不与导线和标签重叠。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_compose",
+    "title": {
+      "zh-CN": "主电路 + 模态 + 波形",
+      "zh-TW": "主電路 + 模態 + 波形",
+      "en": "Circuit, modes and waveforms"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "compose",
+    "starred": true,
+    "fields": [
+      {
+        "key": "模态",
+        "label": {
+          "zh-CN": "模态",
+          "zh-TW": "模態",
+          "en": "Modes"
+        },
+        "default": "谐振点 4 个"
+      },
+      {
+        "key": "波形",
+        "label": {
+          "zh-CN": "波形",
+          "zh-TW": "波形",
+          "en": "Waveform"
+        },
+        "default": "i_Lr, i_Lm, v_gs1"
+      },
+      {
+        "key": "版式",
+        "label": {
+          "zh-CN": "版式",
+          "zh-TW": "版式",
+          "en": "Layout"
+        },
+        "default": "主图 + 两小图"
+      }
+    ],
+    "body": "把主电路、{模态}模态图和 {波形} 波形组合成一张图，版式{版式}，子图编号 (a)(b)(c) 放下方，波形时间轴与模态对齐。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_detail",
+    "title": {
+      "zh-CN": "局部放大图",
+      "zh-TW": "局部放大圖",
+      "en": "Detail view"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "compose",
+    "starred": false,
+    "fields": [
+      {
+        "key": "放大对象",
+        "label": {
+          "zh-CN": "放大对象",
+          "zh-TW": "放大物件",
+          "en": "Detail target"
+        },
+        "source": "modules"
+      },
+      {
+        "key": "放在",
+        "label": {
+          "zh-CN": "放在",
+          "zh-TW": "放在",
+          "en": "Place at"
+        },
+        "default": "右侧"
+      }
+    ],
+    "body": "给{放大对象}加一个放大图，放在{放在}，用粗箭头从原位置指向放大图，放大图里器件编号完整。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_export",
+    "title": {
+      "zh-CN": "投稿导出检查",
+      "zh-TW": "投稿匯出檢查",
+      "en": "Submission checks"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "export",
+    "starred": true,
+    "fields": [
+      {
+        "key": "期刊",
+        "label": {
+          "zh-CN": "期刊",
+          "zh-TW": "期刊",
+          "en": "Journal"
+        },
+        "default": "IEEE Trans."
+      },
+      {
+        "key": "格式",
+        "label": {
+          "zh-CN": "格式",
+          "zh-TW": "格式",
+          "en": "Formats"
+        },
+        "default": "PDF, SVG"
+      }
+    ],
+    "body": "按 {期刊} 要求检查：图宽、最小字号、线宽、字体嵌入、黑白可读；全部通过后导出 {格式}。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  },
+  {
+    "id": "figure_slides",
+    "title": {
+      "zh-CN": "答辩／幻灯片版",
+      "zh-TW": "答辯／投影片版",
+      "en": "Presentation figure"
+    },
+    "mode": "edit",
+    "domains": [
+      "figure"
+    ],
+    "category": "export",
+    "starred": false,
+    "fields": [
+      {
+        "key": "字号",
+        "label": {
+          "zh-CN": "字号",
+          "zh-TW": "字號",
+          "en": "Font size"
+        },
+        "default": "14 pt"
+      },
+      {
+        "key": "线宽",
+        "label": {
+          "zh-CN": "线宽",
+          "zh-TW": "線寬",
+          "en": "Line width"
+        },
+        "default": "1 pt"
+      }
+    ],
+    "body": "另存一份幻灯片用的图：字号 {字号}、线宽 {线宽}，色块加深一档，不改论文版。",
+    "capability": {
+      "zh-CN": "填写出图需求，生成时按当前工作区可用操作执行。",
+      "zh-TW": "填寫出圖需求，產生時按目前工作區可用操作執行。",
+      "en": "Fill an editable figure request. Execution follows the available workspace actions."
+    }
+  }
+]

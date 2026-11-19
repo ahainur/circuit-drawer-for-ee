@@ -57,11 +57,12 @@ function updateEditorChrome() {
   document.getElementById('drawingStats').textContent = unassembled ? '模块拼装失败，见问题栏' : `${count} 元件 · ${nodes} 节点`;
   document.getElementById('drawingStats').style.color = unassembled ? 'var(--bad)' : '';
   document.getElementById('emptyCanvas').hidden = !!(modular || count || layout.wires.length ||
-    (layout.annotations || []).length || (layout.regions || []).length ||
+    (layout.annotations || []).length || (layout.regions || []).length || (layout.images || []).length ||
     (layout.callouts || []).length || (layout.blocks || []).length || (layout.wave_symbols || []).length);
   if (view && fittedViewWidth) document.getElementById('zoomStatus').textContent = `${Math.round(fittedViewWidth / view.w * 100)}%`;
   const tip = document.getElementById('modeTip');
-  const text = wireDraft || boxDraft ? cdI18n.sourceText(tip) :
+  const text = document.body.classList.contains('figure-open') ? '点选对象；拖动标签；中键平移纸面' :
+    wireDraft || boxDraft ? cdI18n.sourceText(tip) :
     (typeof moduleMarquee !== 'undefined' && moduleMarquee) ? '框选：拖出矩形，Shift 点选可追加' :
     selected ? `${selected.id || '已选对象'} · 拖动或方向键调整，属性页编辑` : '左键框选；中键或空格加左键平移';
   document.getElementById('toolHint').textContent = text;

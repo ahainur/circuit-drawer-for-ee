@@ -188,7 +188,7 @@ function arrowGuides(points, index, sourceIndex = -1) {
       api.lines = [line(horizontal ? 'horizontal' : 'vertical', a, q)];
       return q;
     }
-    if (event.altKey) return grid;
+    if (event.altKey) return sourceIndex >= 0 ? p.map(r4) : grid;
     // Both neighbours can constrain a corner, keeping each adjoining leg square.
     const q = grid.slice();
     for (const axis of [0, 1]) {

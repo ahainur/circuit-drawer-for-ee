@@ -2,15 +2,15 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | [繁體中文](USER_MANUAL.zh-TW.md) | English
 
-This manual covers Circuit Drawer for EE 2.0.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 2.1.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
 Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
 
-## Agent workflow in 2.0
+## Using the Agent in 2.1
 
-1、Click Agent in either editor, choose a blank canvas or the current drawing, and describe the task. The prompt library supports parameter entry, personal prompts and a close button. AI uses your configured online API service.
+1、Open **Agent** in the circuit or control editor and choose a blank canvas or the current drawing. In **Prompt library**, search by name or browse DC/DC, inverters and grid connection, rectification and PFC, or motor control. **My prompts** folds separately. Select a template and task mode, click **Fill requirement (editable)**, edit the text and click **Start**. Generation uses your configured online service.
 
-2、Review drawing and simulation-parameter candidates using before, after and overlay views. Adopt a candidate to continue the task, or undo its transaction in the editor. Save writes the drawing to JSON.
+2、**Drawing only** keeps unfilled values symbolic. **Example simulation** matches the circuit connections to an example, keeps supplied settings and proposes missing values. Adopt the drawing, then review the current values, suggested values and model assumptions. Confirm the operating point to start the run, including when you keep all current values. Adoption that changes the drawing can be undone. Click **Save** to write the drawing and parameters to JSON.
 
 3、A control diagram can include the reference, error, controller, modulator, power stage and feedback. Save the power circuit beside the control file, specify its filename and numerical settings, then adopt the candidate to run a supported ngspice loop or export PLECS／Simulink. Open and solve native models in the corresponding application. External MCP clients connect through the optional Python MCP installation.
 
@@ -18,6 +18,22 @@ Both editors support Simplified Chinese, Traditional Chinese and English. Choose
 
 5、The internal mode check and the results page's uniformly sampled cycle check can disagree. Inspect the original waveforms, channels and sampling windows together. Dynamic PWM dead time uses a carrier-threshold approximation and requires verification against the actual gate timing. SPS currently uses one two-bridge group. Unified scheduling for two outputs sharing a primary bridge remains under development.
 
+
+### Choose an example and inspect its waveforms
+
+| Prompt | Channels to inspect first |
+| --- | --- |
+| Boost | Output voltage, inductor current, PWM |
+| Single-phase full bridge | Output voltage, DC-side current, bridge gate |
+| Three-phase grid-connected dq inverter | Grid voltage, three phase currents |
+| Boost APFC | AC input voltage and current, output voltage, inductor current |
+| PMSM FOC | d/q currents, mechanical speed, electromagnetic torque |
+
+1、All five examples can run in ngspice or export to Simulink and PLECS. The two open-loop examples, Boost and single-phase full bridge, also export a PSIM builder script. Build or open and solve native models in the target application.
+
+2、For Boost, confirm the example operating point of 30 Ω and 50 kHz and run it. Open **Simulation → SPICE simulation…**. Search for `RL`, change its resistance to `12`, then search for `S1` and set its frequency to `40k`. Check the operating point and channels at the top, choose a new output folder and run again. Save and reopen the drawing to continue with those values.
+
+3、Drag the edge of the Agent sidebar to set its width. Drag the dividers to adjust the heights of the prompt library, reference image, task description and results. You can also focus a divider with Tab and press the arrow keys. Double-click or press Enter to reset one panel, or click **Reset layout** to restore the editor layout. The circuit and control editors remember their sizes separately. Narrow windows use a scrolling single column. Collapsing or resetting panels preserves your inputs.
 
 ## Contents
 
@@ -120,7 +136,7 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 #### 64-bit Windows 10 and 11 installer
 
-1、Download `CircuitDrawer-Setup-2.0.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-2.1.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Use an ASCII installation path. Spaces are supported. Drawing paths, export paths and Windows user names may contain Chinese characters.
 
@@ -129,17 +145,17 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 4、The installer is unsigned. Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the source and SHA256, select **More info → Run anyway** if offered. Compare the command's output with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run the newer installer to upgrade. Uninstall through Windows **Settings → Apps → Circuit Drawer**. User drawings and settings are retained. Save documents in your own drawing folders.
 
 #### Python installation for developers, macOS and Linux
 
-1、Download the wheel `circuit_drawer_for_ee-2.0.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download the wheel `circuit_drawer_for_ee-2.1.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
 ```
 
 2、You can also install directly from the repository with the following command.
@@ -1314,19 +1330,17 @@ circuit-drawer waveforms examples/waveforms/boost_side.json -p double -o out/boo
 
 1、Writing a `.cir` file does not need ngspice. Running a simulation needs ngspice installed (see [chapter 2](#2-installation-and-startup)), with its path set before the editor is started.
 
-2、Parameters are stored in the `simulation` field of the current table. The program never derives values from text labels, and every part needs parameters.
+2、The Agent and this window use the current drawing’s simulation configuration. The `simulation` section stores device values, timing and probes. Feedback bindings live in `closed_loop` and adjustable module parameters are stored on the instance. Supply numeric values before running. Drawing labels can stay symbolic.
 
 ### 17.2 The window
 
-**仿真 → SPICE 仿真…** opens the **SPICE 参数与导出** (SPICE parameters and export) window:
+1、Open **Simulation → SPICE simulation…**. The top of the window shows readiness, the operating point and measurement channels. Click a reported issue to reach the ground pin, device value, drive, transient setting, feedback binding or probe that needs attention. Use the action buttons to save, run or export when ready.
 
-1、**载入 Buck 示例参数（含多相交错）/ 载入 Boost 示例参数** (Load Buck example parameters, including interleaved / Load Boost example parameters): checks the topology and fills in example values. For an interleaved Buck, each phase runs at 50 kHz with duty 0.5, and phase k starts k/N periods later. Only the form changes; **保存参数** (Save parameters) writes the circuit file.
+2、Search by device ID or type on the left. Select a device to edit its values, initial conditions or switching drive on the right. Switching devices preserves entries in this window. Drag the divider to set the list width. On a narrow screen the editor appears below the list.
 
-2、**推荐仿真参数…** (Recommend simulation parameters): see section 17.6.
+3、Select a physical pin under **Reference ground** to use its net as SPICE ground. Loading the Buck or Boost example checks the topology and fills the form. The interleaved Buck example uses 50 kHz and 0.5 duty ratio per phase, with phase k delayed by k/N periods.
 
-3、**参考地（引脚）** (Reference ground, a pin): choose a real pin; its net becomes SPICE ground.
-
-4、**一、元件与驱动参数** (Part and drive parameters): one group per part; see section 17.3.
+4、Enter values directly or expand **Recommend simulation parameters…** to obtain suggestions. To compare a range of loads or switching frequencies, expand the parameter range search and specify bounds and the number of points. See section 17.6 for both workflows.
 
 5、**二、瞬态设置** (Transient settings): output sampling interval, stop time, maximum integration step, and numerical stabilising capacitance (from every net to simulation ground; default 0, off; it is not a device parasitic). The rules are 0 < maximum step ≤ sampling interval < stop time, at least 50 samples per PWM period, and at least 10 integration steps in each on and off interval. Simulation starts at time 0 from the inductor and capacitor initial conditions, without a DC operating point.
 
@@ -1828,9 +1842,11 @@ Clarke, inverse Clarke, Park, inverse Park, SVPWM and angle wrapping are declare
 
 2、The whole controller uses the fixed sample rate `code.fs` and double arithmetic. Applying replaces this block's transfer function and block limits; implement limits in the code. Use pure calculations and explicit state, without static state, external side effects or early return. The editor checks fields and wiring; the target compiler checks C syntax. Loading, editing and drawing do not execute C.
 
-3、Reference the same control table from the circuit and select **Discrete** when exporting to PLECS or Simulink. PLECS uses C-Script; Simulink uses C Function with Unit Delay state storage. Generated C source is also available; call step once per control period. Custom C is not supported by ngspice, Python waveform evaluation, Bode analysis or digital delay/quantization.
+3、Reference the same control table from the circuit and select **Discrete** when exporting to PLECS or Simulink. PLECS uses C-Script; Simulink uses C Function with Unit Delay state storage. Generated C source is also available; call step once per control period.
 
-4、Open [buck_c_mpc.json](../examples/closed_loop/buck_c_mpc.json) with its [control table](../examples/closed_loop/buck_c_mpc.control.json) in the same folder. It samples at 100 kHz and compares duty candidates over an eight-sample horizon. Output is about 5.08–5.09 V during a 12→9 V supply change; the simplified model has a steady-state error. Check the explicit algorithm constants when changing L, C, load or sample rate. This is a demonstration, not a tuned hardware controller.
+4、ngspice closed-loop runs and the Python reference execute the same C through a checked subset: `double`/`int` scalars declared with an initializer, assignments including `+=` and similar, `++`/`--`, `if`/`else`, `for`/`while`, `break`/`continue`, C operators with `(int)`/`(double)` casts, and `fabs sqrt exp log sin cos atan tanh floor ceil fmin fmax pow`. Arrays, pointers, `return`, `static` and other functions are not supported; the message names the construct, and the unchanged C still exports to PLECS/Simulink. Samples run at t = k·Ts (k ≥ 1): inputs are read at that instant, outputs change as soon as the step is computed, and `next_` states commit once at the end of the step. Outputs are 0 before the first sample. PLECS/Simulink discrete exports also execute their first sample at Ts, preserving initial states and holding both direct-gate groups off beforehand. Every run feeds the recorded inputs back through the Python reference and compares each sample (`replay` in `digital.json`); controller states are columns `state_block__name` in `digital.csv`. Loop-heavy code runs slowly in ngspice; the MPC example takes about 0.13 s per sample. Bode analysis and digital delay/quantization do not support custom C.
+
+5、Open [buck_c_mpc.json](../examples/closed_loop/buck_c_mpc.json) with its [control table](../examples/closed_loop/buck_c_mpc.control.json) in the same folder. It samples at 100 kHz and compares duty candidates over an eight-sample horizon. Output is about 5.08–5.09 V during a 12→9 V supply change; the simplified model has a steady-state error. Check the explicit algorithm constants when changing L, C, load or sample rate. This is a demonstration, not a tuned hardware controller.
 
 ### 19.8 Figures
 
@@ -1983,6 +1999,14 @@ circuit-drawer tweak buck.json "move D to the right"                     # resul
 ---
 
 ## 21. Export formats, LaTeX and Word
+
+### Figure studio, personal icons and compositions
+
+1、Open **Figure studio**. Select a symbol, text or callout arrow on the paper preview and drag it to move it. Drag an arrow’s end handles to change its direction. Set a system symbol’s frame and fill independently. Select no border and use the fill value `none` for transparent line art. **Send to figure Agent…** limits an edit to the selection. Compare the candidates and adopt the one you want.
+
+2、Open **System symbols → Images and personal icons → Generate icon with AI**. Enter a description and optionally add a reference image. Use the drawing model for a simple line icon, or choose the dedicated image model and enter a model supported by your service for an equipment illustration. A reference requires image input or editing support on that service. Preview the candidate, then save it to your library or apply it to the drawing. You can undo the insertion. When sharing the drawing, include the adjacent `figure-assets` folder.
+
+3、In **Algorithm flowchart**, enter one step per line, preview and adopt. Label arrows for decisions or loops. Use **Waveform publication** to import a numeric CSV and annotate it, then arrange waveforms, flowcharts or circuit panels in a composition. Use the export check to inspect color and monochrome previews, fonts and dimensions before writing PDF, SVG, PNG or TeX.
 
 ![Export circuit figure](images/manual/en/export-dialog.png)
 

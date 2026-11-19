@@ -5,18 +5,18 @@
 Circuit Drawer is a circuit and control-diagram editor for power electronics. Draw by hand, edit a template, or ask the AI Agent to start from a blank canvas, configure parameters, run ngspice and inspect waveforms and operating modes. Editable JSON drawings produce paper-ready CircuiTikZ figures, and linked power circuits and control diagrams can be exported as complete closed-loop simulation models.
 
 <p align="center">
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/CircuitDrawer-Setup-2.0.0.exe"><img alt="Download Windows installer — Offline setup v2.0.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v2.0.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/CircuitDrawer-Setup-2.1.0.exe"><img alt="Download Windows installer — Offline setup v2.1.0" src="https://img.shields.io/badge/Download%20Windows%20Installer-v2.1.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v2.0.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v2.0.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="Download for macOS Apple Silicon — Python wheel v2.1.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v2.1.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="Download for macOS Intel — Python wheel v2.1.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v2.1.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/CircuitDrawer-Setup-2.0.0.exe"><img alt="Download for Windows — Offline installer v2.0.0" src="https://img.shields.io/badge/Download%20for%20Windows-v2.0.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit_drawer_for_ee-2.0.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v2.0.0" src="https://img.shields.io/badge/Download%20for%20Linux-v2.0.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/CircuitDrawer-Setup-2.1.0.exe"><img alt="Download for Windows — Offline installer v2.1.0" src="https://img.shields.io/badge/Download%20for%20Windows-v2.1.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="Download for Linux — Python wheel v2.1.0" src="https://img.shields.io/badge/Download%20for%20Linux-v2.1.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
 The Windows button downloads the offline installer. The macOS and Linux buttons download the universal Python package (`.whl`, Python 3.10+). macOS and Linux currently have preview support. See the installation steps below.
 
-[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.0.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-trial-2.0.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-manuals-2.0.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.0.0/circuit-drawer-public-source-2.0.0.zip)
+[Release notes](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.1.0) / [Trial bundle with examples](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-trial-2.1.0.zip) / [Offline manuals — 简体 / 繁體 / English](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-manuals-2.1.0.zip) / [Source code](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-public-source-2.1.0.zip)
 
 [Start from a blank canvas](#quick-start) · [Link a controller and export a closed loop](#link-a-controller-and-export-a-complete-closed-loop-model) · [Agent and MCP guide](docs/AGENT_MCP.md)
 
@@ -24,7 +24,7 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 
 ## Highlights
 
-1、**Agent workflow and prompt library.** Describe a task on a blank canvas or an existing drawing, supply parameters, review circuit, controller and simulation-parameter candidates, then adopt them to continue with ngspice, measurements, mode identification and figure export. Follow-up requests, stop/resume and undoable adoption are supported. Reuse parameterized prompts or save personal prompts. [Agent guide](docs/AGENT_MCP.md#四内置-agent-的使用)
+1、**Agent workflow and prompt library.** Describe a task on a blank canvas or an existing drawing, supply parameters, review circuit, controller and simulation-parameter candidates, then adopt them to continue with ngspice, measurements, mode identification and figure export. Follow-up requests, stop/resume and undoable adoption are supported. Search the DC/DC, inverter and grid, rectifier and PFC, or motor-control categories, and save personal prompts. New examples cover Boost, single-phase full bridge, three-phase grid-connected dq control, Boost APFC and PMSM FOC. [Agent guide](docs/AGENT_MCP.md#四内置-agent-的使用)
 
 2、**One table, many outputs.** A single JSON file holds the parts, wires, netlist, operating modes, annotations, simulation parameters and waveform settings. From it you get PDF, SVG, PNG and TeX figures, ngspice decks with CSV results, a MATLAB build script for Simulink + Simscape, and a native PLECS Standalone model. Open-loop PSIM export provides a Python builder for the official PSIM 2026 API. [PSIM models and steps](docs/PSIM_EXPORT.md)
 
@@ -37,6 +37,8 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 6、**Modules.** Define a converter cell once, drag it from the library into the canvas, and connect its ports with ordinary wires. Instances can be folded into boxes with IEC symbols. Simulation uses the full circuit, and native exports can represent folded modules as subsystems.
 
 7、**Operating modes and waveforms.** Highlight conducting paths and export mode sheets. Fixed-frequency internal PWM cases support mode identification from ngspice waveforms. Results show sampling windows, output means, ripple and cycle checks. Simulated or measured waveforms can also be arranged alongside t0, t1, ... and the matching mode figures.
+
+7a、**Figure studio and personal icons.** Drag symbols, text and callout arrows on the paper preview, or select an object and send it to the figure Agent. Edit a system symbol’s border and fill. Under **System symbols → Images and personal icons**, choose the drawing model for line icons or a dedicated image model for equipment illustrations. Compose algorithm flowcharts, circuits and annotated waveforms on one sheet.
 
 8、**Control diagrams and complete closed loops.** A separate editor supports PI, FOC and MPC diagrams, loop analysis (margins, Bode plots, Type I/II/III compensators) and fixed- or floating-point C code generation. AI diagrams are laid out from their connections. Routing and layout adjustments can be previewed and adopted as one undoable edit. Link a saved power circuit, feedback signals and PWM, VCO or single-group SPS bindings to run supported ngspice loops or export Simulink and PLECS models.
 
@@ -52,15 +54,15 @@ The Windows button downloads the offline installer. The macOS and Linux buttons 
 | --- | --- |
 | ![Two DAB modules folded into boxes](docs/images/manual/example-modules-folded.png) | ![PMSM field-oriented control diagram](docs/images/manual/example-control-foc.png) |
 
-The 2.0 circuit editor and Agent panel, with a Buck example on the canvas.
+The 2.1 circuit editor shows a Boost converter with its task mode in the Agent prompt library.
 
-![Circuit Drawer 2.0 circuit editor and Agent panel](docs/images/manual/en/editor-agent-2.png)
+![Boost circuit and the example simulation option in the Agent prompt library](docs/images/manual/en/editor-agent-2.png)
 
 ## Installation
 
 ### 64-bit Windows 10 and 11
 
-1、Download `CircuitDrawer-Setup-2.0.0.exe` and run it. Select the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-2.1.0.exe` and run it. Select the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Choose an installation path containing ASCII characters. Spaces are supported. Drawing files, export folders and Windows user names can contain Chinese characters.
 
@@ -69,7 +71,7 @@ The 2.0 circuit editor and Agent panel, with a Buck example on the canvas.
 4、The installer is unsigned, so Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the download source and SHA256, select **More info → Run anyway** if that option is available. In PowerShell, compare the following result with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run a newer installer to upgrade. To uninstall, open Windows **Settings → Apps → Circuit Drawer → Uninstall**. User drawings and settings are retained. Save drawings in your own document folders.
@@ -83,7 +85,7 @@ Download the wheel from the release page, then open a terminal in its download f
 On Windows:
 
 ```powershell
-python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
 ```
 
 On macOS or Linux, install it in a virtual environment:
@@ -91,7 +93,7 @@ On macOS or Linux, install it in a virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install circuit_drawer_for_ee-2.0.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
 ```
 
 Keep this environment active when running the commands below. On Debian or Ubuntu, install `python3-venv` if the `venv` module is missing.
@@ -127,13 +129,11 @@ Drawing, editing, checking, exporting TeX and exporting simulation models need n
 
 1、Open **Circuit Drawer** and configure the provider, model and API key in the launcher's **API 与仿真设置…** dialog. Choose **新建电路… → 空白电路** and save the drawing in your project folder.
 
-2、Click **Agent** in the browser editor and select **Blank canvas** as the starting point. Choose a topology and fill its parameters in **Prompt library**, or describe the task directly, then click **Start**. For example, enter the request below.
+2、Open **Agent → Prompt library**, choose **Blank canvas** and search for **Boost**. Choose **Drawing only** to keep unspecified component values symbolic, or **Example simulation** to match the circuit connections to an example operating point. Click **Fill requirement (editable)**, edit the task, then click **Start**.
 
-> Draw a 48 V to 12 V buck from a blank canvas, ask me to confirm missing parameters, run ngspice, show the output voltage and ripple, then export PDF and SVG.
+3、For a simulation, adopt the circuit drawing first. The next review shows current values, proposed values and assumptions. Confirm the operating point to run ngspice. **View results** shows output voltage, inductor current and PWM. Save the drawing to keep its parameters. Run files are in `agent-output` beside the drawing. [Agent instructions](docs/AGENT_MCP.md#四内置-agent-的使用)
 
-3、Review the questions and proposed parameters, followed by drawing and simulation-parameter candidates. Inspect **Before / After / Overlay**, then click **Adopt** to continue. Adoption is undoable. Use the editor's **Save** action to write the drawing to JSON.
-
-4、Click **View results** to inspect waveforms, sampling windows, measurements and files. You can add follow-up requests or edit the drawing. Task history belongs to the current editor service session. Save drawings before closing it. Run files are stored in `agent-output` beside the drawing. [Detailed Agent steps](docs/AGENT_MCP.md#四内置-agent-的使用)
+4、To try a second load, open **Simulation → SPICE simulation…**. Search for `RL` on the left and change its resistance from 30 Ω to `12`. Search for `S1` and change the switching frequency from 50 kHz to `40k`. Check the operating point and channels at the top, select a new output folder, then run or rerun to compare the waveforms. You can also start directly with the [editable Boost circuit](examples/spice/boost.json).
 
 ### Link a controller and export a complete closed-loop model
 
@@ -213,7 +213,7 @@ In the editor, drag parts and wires, watch the status bar for problems, then use
 
 Drawing validation checks connections, geometry and text placement. Simulation and result tools check numerical configuration, solver results and sampling windows. Device ratings, losses, efficiency and ZVS require suitable device models and engineering verification.
 
-Automatic mode identification in 2.0 applies to fixed-frequency internal PWM. The internal mode check and the results page's cycle check can differ because of sampling. Dynamic PWM dead time uses a carrier-threshold approximation, and SPS uses one two-bridge group. See the release notes and manual for the supported conditions. [2.0 scope](RELEASE_NOTES.md#当前适用范围)
+Automatic mode identification applies to fixed-frequency internal PWM. The internal mode check and the results page's cycle check can differ because of sampling. Dynamic PWM dead time uses a carrier-threshold approximation, and SPS uses one two-bridge group. See the release notes and manual for the supported conditions. [Supported conditions](RELEASE_NOTES.md#当前适用范围)
 
 ## Documentation
 

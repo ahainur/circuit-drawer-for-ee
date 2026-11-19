@@ -8,7 +8,9 @@ reads the table and judges it.
 
 Sections::
 
-    blocks   PI boxes, sums, multipliers, limiters, input tags, A/B switches
+    blocks   PI boxes, sums, multipliers, limiters, input tags, comparators
+             (triangles), A/B switches with an optional select input;
+             a box may hold a pictorial icon (python, database...)
     links    signal lines between ports, with hand-written corners
     texts    free text
     regions  background panels and dashed boxes, in the circuit table's
@@ -29,7 +31,7 @@ from ..regions import (COLOR_ALIASES, INKS, PALETTE, Region,
                        RegionError, canon, parse_region, valid_ink)
 
 KIND = "control"
-BOX_TYPES = ("block", "limiter", "tag")
+BOX_TYPES = ("block", "limiter", "tag", "compare")
 CIRCLE_TYPES = ("sum", "mul", "div")
 BLOCK_TYPES = BOX_TYPES + CIRCLE_TYPES + ("switch",)
 SIDES = ("w", "e", "n", "s")
@@ -37,9 +39,14 @@ SIGNS = ("+", "-")
 POLE = "c"                 # the switch's common contact
 ARROWS = ("end", "none", "start", "both")
 LABEL_POS = ("above", "below", "left", "right")
+LABEL_GAP = .08              # default printed cm between ink and its signal or box
+MAX_LABEL_GAP = 1.0          # keep a signal caption within a centimetre of its line
 ANCHORS = ("center", "west", "east", "north", "south",
            "north west", "north east", "south west", "south east")
 TAG_STYLES = ("ref", "meas", "plain")
+COMPARE_POINTS = ("e", "w")   # which way a comparator's tip points
+SELECT = "sel"                # a switch's select input, on the middle of its blade
+PORT_LABEL_KEY = re.compile(r"^([nsew])([+-][0-9]*\.?[0-9]+)?$")
 
 # Input tags as in published control figures: references on a cyan tag,
 # measured signals on a yellow tag with a red frame, both in red type.
@@ -60,7 +67,7 @@ SECTIONS = ("blocks", "links", "texts", "regions")
 # sections that carry numbers, not drawing: ``loop`` (transfer functions,
 # plant, loop breaks) is read by ``loop.py``, ``code`` (sample rate, number
 # format, limits) by ``codegen.py``; neither is drawn
-DATA_SECTIONS = ("loop", "code", "digital", "functions", "control_ai", "circuit")
+DATA_SECTIONS = ("loop", "code", "digital", "functions", "control_ai", "circuit", "figure", "images", "algorithm")
 
 _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _PORT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)([+-][0-9]*\.?[0-9]+)?$")
@@ -168,7 +175,8 @@ def validate_appearance(obj: dict, section: str, name: str) -> None:
             continue
         value = obj[f.name]
         if f.type == "ink":
-            _ink(value, f"{name}: {f.name}")
+            if not (section == "blocks" and f.name == "border" and obj.get("type", "block") == "block" and value == "none"):
+                _ink(value, f"{name}: {f.name}")
         elif f.type == "fill" and value is not None:
             from ..regions import canon, valid_ink
             if section == "regions" and f.name == "border_color" and valid_ink(canon(value)):
@@ -199,6 +207,24 @@ class Block:
     throws: dict[str, Point] = field(default_factory=dict)   # switch contacts
     on: str | None = None              # switch: the throw the blade touches
     toggle: bool = False               # switch: curved arrow between throws
+    select: bool = False               # switch: a "sel" port on the blade for the selecting signal
+    point: str = "e"                   # compare: the tip's side
+    port_labels: dict[str, str] = field(default_factory=dict)  # block: "w+0.3" -> text inside the box
+    icon: str | None = None            # block: a glyph icon drawn in the box (glyphs.ICONS)
+    icon_color: bool = False           # block: software / data icon in colour
+    corner_radius: float = 0
+    shadow: bool = False
+    inner_shadow: bool = False
+    border_width: float | None = None
+    font_weight: str = "normal"
+
+    port_sides: dict[str, str] = field(default_factory=dict)  # logical port -> printed side
+
+    def port_side(self, name: str) -> str:
+        return self.port_sides.get(name, name)
+
+    def port_name(self, side: str) -> str:
+        return next((name for name, printed in self.port_sides.items() if printed == side), side)
 
     @property
     def is_box(self) -> bool:
@@ -238,6 +264,8 @@ class Link:
     name: str = "link"
     color: str | None = None
     dash: str = "solid"
+    font_weight: str = "normal"
+    label_gap: float = LABEL_GAP
 
 
 @dataclass
@@ -248,6 +276,7 @@ class Text:
     font: float | None = None
     color: str | None = None
     name: str = "text"
+    font_weight: str = "normal"
 
 
 @dataclass
@@ -301,7 +330,21 @@ def parse_block(d: Any, i: int) -> Block:
               font=_font(d.get("size_pt"), f"{name}: size_pt"),
               label=_text(d.get("label"), f"{name}: label"),
               color=_ink(d.get("color"), f"{name}: color"),
-              fill=d.get("fill"), border=_ink(d.get("border"), f"{name}: border"))
+              fill=d.get("fill"), border="none" if kind == "block" and d.get("border") == "none"
+              else _ink(d.get("border"), f"{name}: border"))
+    from ..figure_style import box_style
+    try:
+        b.corner_radius, b.shadow, b.inner_shadow, b.border_width, b.font_weight = box_style(d)
+    except ValueError as exc:
+        raise ControlError(f"{name}: {exc}") from None
+    sides = d.get("port_sides", {})
+    if (not isinstance(sides, dict) or not all(k in SIDES and isinstance(v, str) and v in SIDES for k, v in sides.items())
+            or set(sides) != set(sides.values()) or sides and kind in ("switch", "compare")):
+        raise ControlError(f"{name}: port_sides must permute sides of a symmetric block, e.g. {{'n':'s','s':'n'}}")
+    b.port_sides = dict(sides)
+    if (kind not in BOX_TYPES and (b.corner_radius or b.shadow)) or (
+            (kind not in BOX_TYPES or kind == "compare") and (b.inner_shadow or b.border_width is not None)):
+        raise ControlError(f"{name}: corner_radius and shadow apply to rectangular blocks")
     if b.fill is not None:
         try:
             block_fill(b.fill)
@@ -327,6 +370,33 @@ def parse_block(d: Any, i: int) -> Block:
         b.signs = dict(signs)
     elif "signs" in d:
         raise ControlError(f"{name}: only a sum takes signs")
+    if kind == "compare":
+        point = d.get("point", "e")
+        if point not in COMPARE_POINTS:
+            raise ControlError(f"{name}: point must be one of {list(COMPARE_POINTS)} (the tip's side)")
+        b.point = point
+    elif "point" in d:
+        raise ControlError(f"{name}: only a compare takes point")
+    if "port_labels" in d:
+        labels = d["port_labels"]
+        if kind not in ("block", "compare"):
+            raise ControlError(f"{name}: only a block or compare takes port_labels")
+        if not isinstance(labels, dict) or not labels:
+            raise ControlError(f"{name}: port_labels maps a port such as \"w+0.3\" to its text")
+        for key, text in labels.items():
+            if not isinstance(key, str) or not PORT_LABEL_KEY.match(key):
+                raise ControlError(f"{name}: port_labels key {key!r} is not a side with an optional "
+                                   f"offset, e.g. \"w\", \"e-0.4\"")
+            if not isinstance(text, str) or not text:
+                raise ControlError(f"{name}: port_labels.{key} must be text")
+        b.port_labels = dict(labels)
+    if "select" in d:
+        if kind != "switch":
+            raise ControlError(f"{name}: only a switch takes select")
+        if not isinstance(d["select"], bool):
+            raise ControlError(f"{name}: select must be true or false")
+    if "icon" in d or "icon_color" in d:
+        _icon(b, d, name)
     if kind == "tag":
         style = d.get("style", "ref")
         if style not in TAG_STYLES:
@@ -346,7 +416,28 @@ def parse_block(d: Any, i: int) -> Block:
             raise ControlError(f"{name}: on must name one of the throws {list(b.throws)}")
         b.on = on
         b.toggle = bool(d.get("toggle", False))
+        b.select = bool(d.get("select", False))
+        if b.select and SELECT in b.throws:
+            raise ControlError(f"{name}: a throw named {SELECT!r} clashes with the select input")
     return b
+
+
+def _icon(b: Block, d: dict, name: str) -> None:
+    """A plain block may hold one of the circuit blocks' pictorial icons
+    (battery, python, database...); its caption is then the ``label``."""
+    from ..glyphs import COLORED, KINDS
+    icon, colored = d.get("icon"), d.get("icon_color", False)
+    if b.type != "block":
+        raise ControlError(f"{name}: only a block takes icon / icon_color")
+    if icon not in KINDS:
+        raise ControlError(f"{name}: icon must be one of {list(KINDS)}")
+    if b.text:
+        raise ControlError(f"{name}: a block with an icon has no text; write the caption in label")
+    if not isinstance(colored, bool):
+        raise ControlError(f"{name}: icon_color must be true or false")
+    if colored and icon not in COLORED:
+        raise ControlError(f"{name}: icon_color needs one of the colour icons {list(COLORED)}")
+    b.icon, b.icon_color = icon, colored
 
 
 def parse_link(d: Any, i: int) -> Link:
@@ -366,12 +457,15 @@ def parse_link(d: Any, i: int) -> Link:
     at = _num(d.get("label_at", 0.5), f"{name}: label_at")
     if not 0 <= at <= 1:
         raise ControlError(f"{name}: label_at must be between 0 and 1")
+    gap = _num(d.get("label_gap", LABEL_GAP), f"{name}: label_gap")
+    if not 0 <= gap <= MAX_LABEL_GAP:
+        raise ControlError(f"{name}: label_gap must be 0..{MAX_LABEL_GAP:g} cm")
     dash = d.get("dash", "solid")
     validate_appearance(d, "links", name)
     return Link(a, b, [_point(p, f"{name}: via point") for p in via], arrow,
                 _text(d.get("label"), f"{name}: label"), pos, at,
                 _font(d.get("size_pt"), f"{name}: size_pt"), bool(d.get("open", False)), name,
-                _ink(d.get("color"), f"{name}: color"), dash)
+                _ink(d.get("color"), f"{name}: color"), dash, d.get("font_weight", "normal"), gap)
 
 
 def parse_text(d: Any, i: int) -> Text:
@@ -384,9 +478,10 @@ def parse_text(d: Any, i: int) -> Text:
     anchor = d.get("anchor", "center")
     if anchor not in ANCHORS:
         raise ControlError(f"{name}: anchor must be one of {list(ANCHORS)}")
+    validate_appearance(d, "texts", name)
     return Text(_point(d.get("at"), f"{name}: at"), text, anchor,
                 _font(d.get("size_pt"), f"{name}: size_pt"),
-                _ink(d.get("color"), f"{name}: color"), f"{name} ({text!r})")
+                _ink(d.get("color"), f"{name}: color"), f"{name} ({text!r})", d.get("font_weight", "normal"))
 
 
 def parse(raw: Any) -> Diagram:
@@ -402,6 +497,8 @@ def parse_lenient(raw: Any) -> tuple[Diagram, list[str]]:
     if not isinstance(raw, dict):
         return Diagram(), ["a control diagram must be a JSON object"]
     errors = []
+    from .algorithm import validate as algorithm_errors
+    errors.extend(algorithm_errors(raw))
     if raw.get("kind") != KIND:
         errors.append(f"kind must be {KIND!r} (a control diagram, not a circuit table)")
     dia = Diagram(name=str(raw.get("name") or "control"), title=str(raw.get("title") or ""),

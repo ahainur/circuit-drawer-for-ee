@@ -171,10 +171,15 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     from .control_view import problems as control_view_problems
     for message in control_view_problems(layout):
         add(Issue("bad-control-view", message))
+    from .figure_images import items as image_items
+    try:
+        image_items(layout.extra)
+    except ValueError as exc:
+        add(Issue("bad-image", str(exc)))
     # a system block diagram (boxes with icons, no parts) is a drawing too;
     # plain boxes alone are not (a control table also has "blocks")
     if not (layout.elements or layout.wires or layout.annotations or layout.extra.get("wave_symbols")
-            or any(b.icon for b in safe_blocks(layout))):
+            or any(b.icon for b in safe_blocks(layout)) or layout.extra.get("images")):
         add(Issue("empty-drawing", "Add components or describe a new topology before exporting."))
         return rep
 
@@ -821,7 +826,11 @@ def _slanted_pair(a: Seg, b: Seg, hops, used_hops, add, s: Scale) -> None:
 # ---------------------------------------------------------------------------
 def extent(layout: Layout, s: Scale, prof: Profile) -> Box:
     """Bounding box of everything drawn, in cm."""
+    from .geometry import decorated_extent
     boxes: list[Box] = []
+    from .figure_images import safe_items
+    from .geometry import image_box
+    boxes += [image_box(item, s) for item in safe_items(layout.extra)]
     for el in layout.elements:
         fp = footprint(el, s, prof)
         boxes += fp.bodies + fp.labels
@@ -841,11 +850,14 @@ def extent(layout: Layout, s: Scale, prof: Profile) -> Box:
             boxes.append(wave_symbol(scaled(w["at"], s), w["wave"], w["scale"])[1])
     regions, callouts = safe_regions(layout, s, prof)
     for r in regions:
-        boxes += [region_rect(r, s, k) for k in range(len(r.layers) + 1)]
+        boxes += [decorated_extent(region_rect(r, s, k), r.shadow) for k in range(len(r.layers) + 1)]
         boxes += [b for b in (region_label_box(r, s, prof),) if b is not None]
     for c in callouts:
         boxes += [b for b in (callout_box(c, s), callout_label_box(c, s, prof)) if b is not None]
-    boxes += [block_rect(b, s) for b in safe_blocks(layout)]
+    for b in safe_blocks(layout):
+        boxes.append(decorated_extent(block_rect(b, s), b.shadow))
+        if b.icon and (label := block_text_box(b, s, prof)) is not None:
+            boxes.append(label)
     from .glyphs import glyphs
     for glyph in glyphs(layout):
         a, b = scaled(glyph["from"], s), scaled(glyph["to"], s)
@@ -943,6 +955,11 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
     # Report schema mistakes before fitting the scale: measuring a label
     # looks its side up directly and would fail on a misspelt one.
     from .drawing_scale import read as drawing_scale, width_issue
+    from .figure_style import paper_profile
+    try:
+        prof = paper_profile(prof, layout.extra)
+    except ValueError as exc:
+        return Report(scale or Scale(1, 1), [Issue("bad-figure", str(exc))]), None
     try:
         requested = drawing_scale(layout)
     except ValueError as exc:
@@ -955,6 +972,7 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
         return Report(scale or Scale(1, 1), [Issue(code, msg) for code, msg in early]), None
     if "modules" in layout.extra:
         from .modules import checked
+        from .regions import RegionError
         try:
             assembly, _, report = checked(layout, prof, scale)
             if locked and assembly is not None:
@@ -962,6 +980,8 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
                 if issue:
                     report.issues.append(issue)
             return report, assembly
+        except RegionError as exc:
+            return Report(scale or Scale(1, 1), [Issue("bad-region", str(exc))]), None
         except (ValueError, TypeError, KeyError) as exc:
             return Report(scale or Scale(1, 1), [Issue("bad-module", str(exc))]), None
     s = fit_scale(layout, prof, connections=connections) if scale is None else scale

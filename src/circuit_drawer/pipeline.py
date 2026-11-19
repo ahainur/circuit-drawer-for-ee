@@ -29,9 +29,13 @@ class Result:
     files: dict[str, Path] = field(default_factory=dict)
 
 
-def from_template(name: str, text: str | None = None, **given) -> Layout:
+def from_template(name: str, text: str | None = None, *, asset_dir=None, **given) -> Layout:
     tpl = templates.get(name)
-    return tpl.build(parse(text, tpl.OPTIONS, given))
+    layout = tpl.build(parse(text, tpl.OPTIONS, given))
+    if asset_dir is not None and isinstance(tpl, templates.SavedTemplate):
+        from .figure_images import copy_assets
+        copy_assets(layout.extra, tpl.path.parent, asset_dir)
+    return layout
 
 
 def render(layout: Layout, profile: str = "ieee-single",

@@ -914,15 +914,18 @@ def _control_panel(circuit, panel, add, connect, outputs, lines, origin):
             output_values = {key.split('.',1)[1]:f'cd_out{i}' for i,key in enumerate(p['outs'])}
             states = {key:f'cd_state{i}' for i,key in enumerate(p['c']['states'])}
             next_states = {key:f'cd_next{i}' for i,key in enumerate(p['c']['states'])}
+            enable_inputs = {'enabled': 'cd_enabled'} if p.get('enabled') else {}
             handle = f"[model '/{b.name}']"
             lines += [f"cd_spec=get_param({handle},'SymbolSpec');",
                       "while ~isempty(cd_spec.Symbols), deleteSymbol(cd_spec,cd_spec.Symbols(1).Name); end"]
-            for scope, values in [('Input',inputs),('Output',output_values),('Input',states),('Output',next_states)]:
+            for scope, values in [('Input', inputs), ('Input', enable_inputs), ('Output', output_values),
+                                  ('Input', states), ('Output', next_states)]:
                 for symbol in values.values():
                     lines.append(f"cd_symbol=addSymbol(cd_spec,'{symbol}'); cd_symbol.Scope='{scope}'; cd_symbol.Type='double'; cd_symbol.Size='1';")
             # Algebraic solvers may call OutputCode repeatedly at one sample.
             # Unit Delay commits each explicit state once, outside that function.
-            body = statements(p['c'],inputs,output_values,states,next_states)
+            body = statements(p['c'], inputs, output_values, states, next_states,
+                              enabled=enable_inputs.get('enabled'))
             lines += [f"set_param({handle},'OutputCode',{_quoted(body)});",
                       f"{h}=get_param({handle},'PortHandles');"]
             for i, (key, initial) in enumerate(p['c']['states'].items()):

@@ -1,0 +1,28 @@
+{
+  "name": "Measured load and supervisory controller",
+  "elements": [
+    {"id": "Vin", "kind": "V", "pins": {"a": [0, 0], "b": [0, 3]}, "label": "$V_{in}$", "label_pos": "left"},
+    {"id": "RL", "kind": "R", "pins": {"a": [3, 3], "b": [3, 0]}, "label": "$R_L$", "label_pos": "left"}
+  ],
+  "wires": [[[0, 3], [3, 3]], [[0, 0], [3, 0]]],
+  "netlist": {"Vin.a": "GND", "RL.b": "GND", "Vin.b": "OUT", "RL.a": "OUT"},
+  "regions": [
+    {"id": "control", "from": [4.8, 1.45], "to": [12.5, 4.65], "fill": "green", "border": "solid",
+     "label": "Supervisory control", "label_pos": "above", "corner_radius": 0.15, "inner_shadow": true,
+     "border_width": 1.1, "font_weight": "bold"}
+  ],
+  "blocks": [
+    {"id": "sense", "from": [5.4, 2.5], "to": [6.8, 3.5], "icon": "monitor", "text": "Monitor", "fill": "white"},
+    {"id": "limit", "from": [9, 2.4], "to": [11.9, 3.6], "text": "Current limit", "fill": "yellow",
+     "corner_radius": 0.1, "inner_shadow": true, "border_width": 0.8, "font_weight": "bold"}
+  ],
+  "callouts": [
+    {"id": "sample", "style": "line", "from": [3, 3], "to": [5.4, 3], "color": "black",
+     "from_anchor": {"element": "RL", "pin": "a"}, "to_anchor": {"block": "sense", "side": "w"},
+     "label": "$v_o$"},
+    {"id": "limit_signal", "style": "line", "from": [6.8, 3], "to": [9, 3], "color": "black",
+     "from_anchor": {"block": "sense", "side": "e"}, "to_anchor": {"block": "limit", "side": "w"},
+     "label": "sample"}
+  ],
+  "annotations": [{"at": [1.5, -0.6], "text": "Power stage", "font_weight": "bold"}]
+}

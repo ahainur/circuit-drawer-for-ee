@@ -107,7 +107,7 @@ class TemplateError(ValueError):
 def save_template(layout: Layout, name: str, title: str = "",
                   aliases: tuple[str, ...] = (), description: str = "",
                   profile: str = "ieee-single", directory: Path | None = None,
-                  reserved: set[str] = frozenset(), force: bool = False) -> Path:
+                  reserved: set[str] = frozenset(), force: bool = False, base_dir=None) -> Path:
     """Write a validated table as a template.  Refuses tables that fail the
     validator for ``profile`` and names taken by hand-written templates."""
     name = name.strip().lower()
@@ -125,6 +125,8 @@ def save_template(layout: Layout, name: str, title: str = "",
     if path.exists() and not force:
         raise TemplateError(f"模板 {name} 已存在：{path}（覆盖请加 --force）")
     table = layout.to_dict()
+    from ..figure_images import copy_assets
+    copy_assets(table, base_dir, folder)
     table["name"] = name
     meta = {"name": name, "title": title or name, "aliases": list(aliases),
             "description": description, "checked_profile": get_profile(profile).name}

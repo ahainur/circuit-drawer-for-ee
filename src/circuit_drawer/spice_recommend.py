@@ -53,7 +53,9 @@ def requirements(value):
 
 def parameter_values(simulation):
     """Editable parameter paths, excluding the structural probe description."""
-    result = {"ground": simulation["ground"]}
+    if not isinstance(simulation, dict):
+        return {}
+    result = {"ground": simulation.get("ground")}
     def visit(obj, prefix):
         for key, value in obj.items():
             path = prefix + "." + key
@@ -61,9 +63,10 @@ def parameter_values(simulation):
                 visit(value, path)
             else:
                 result[path] = value
-    visit(simulation["components"], "components")
-    visit(simulation["transient"], "transient")
-    result["probes"] = simulation["probes"]
+    for section in ("components", "transient"):
+        if isinstance(simulation.get(section), dict):
+            visit(simulation[section], section)
+    result["probes"] = simulation.get("probes")
     return result
 
 
@@ -299,10 +302,27 @@ class RecommendationWorkflow:
     max_rounds = 3
 
     def __init__(self, layout, profile="ieee-single", requested=None, description="", base_dir=None,
-                 *, use_formula=True, should_stop=None, preview_simulation=True):
+                 *, use_formula=True, should_stop=None, preview_simulation=True, example_mode=False, example_case=None):
         self.layout = Layout.from_dict(layout.to_dict())
+        self.original = layout
+        self.example_mode = example_mode
+        self.example_name = None
+        if example_mode:
+            from .simulation_examples import match, overlay
+            matched = match(self.layout, profile, example_case)
+            if matched:
+                self.example_name, settings = matched
+                for key, value in settings.items():
+                    self.layout.extra[key] = overlay(value, self.layout.extra.get(key, {}))
         self.profile, self.base_dir = profile, base_dir
-        self.tuning = "modules" in layout.extra or "closed_loop" in layout.extra
+        self.tuning = "modules" in self.layout.extra or "closed_loop" in self.layout.extra
+        if example_mode and self.tuning and "modules" not in self.layout.extra:
+            try:
+                spice.make_deck(self.layout, profile, base_dir)
+            except ValueError:
+                self.tuning = False  # a partial operating point needs a complete parameter proposal
+        self.repair_bindings = (example_mode and not self.tuning and
+                                isinstance(self.layout.extra.get("closed_loop"), dict) and "control" in self.layout.extra["closed_loop"])
         self.catalog, self.control = {}, None
         if self.tuning:
             # Tuning starts from a runnable operating point; it never invents bindings or probes.
@@ -311,7 +331,7 @@ class RecommendationWorkflow:
         else:
             spice.connected_layout(self.layout, profile)
             self.full = self.layout
-            if "simulation" in layout.extra:
+            if "simulation" in self.layout.extra:
                 try:
                     spice.make_deck(self.layout, profile, base_dir)
                     _, self.catalog, _ = tuning_parameters(self.layout, profile, base_dir)
@@ -328,15 +348,27 @@ class RecommendationWorkflow:
 
     def system_prompt(self):
         from .ai.prompt import simulation_parameter_prompt
-        return simulation_parameter_prompt(self.topology, INPUTS, tuning=self.tuning,
-                                           incremental=bool(self.catalog),
-                                           kinds={e.kind for e in self.full.elements})
+        prompt = simulation_parameter_prompt(self.topology, INPUTS, tuning=self.tuning,
+                                            incremental=bool(self.catalog),
+                                            kinds={e.kind for e in self.full.elements})
+        if self.example_name:
+            prompt += (f"\n已按实际器件和连接匹配示例工况 {self.example_name}，当前值已叠加用户填写的值。"
+                       "复用适用值，只为用户目标或缺项提出修改。示例完全适用时返回 updates:{}、"
+                       "requirements、reasons:{} 及非空 assumptions，仍要交给用户采用。")
+        if self.repair_bindings:
+            prompt += ("\n现有闭环工况不完整。随完整 simulation 可提供 bindings:{inputs:{...},outputs:{...}} 修正测量与驱动映射，"
+                       "两项均需完整。不得更换控制器。在 reasons.bindings 说明绑定依据。")
+        if self.example_mode and self.catalog and not self.example_name:
+            prompt += "\n已填写的工况完全适用时，可以返回 updates:{}、reasons:{}、requirements 和非空 assumptions 供用户确认。"
+        return prompt
 
     def first_message(self, description):
         graph = {"elements": [{"id": e.id, "kind": e.kind, "pins": list(e.pins), "opts": e.opts}
                                for e in self.full.elements], "netlist": self.full.netlist,
                  "simulation": self.full.extra.get("simulation"), "model_mapping": self.layout.extra.get("model_mapping")}
         graph["component_ids"] = [e.id for e in self.full.elements if e.kind != "port"]
+        if self.repair_bindings:
+            graph["closed_loop"] = self.layout.extra["closed_loop"]
         if not self.tuning:
             graph["component_fields"] = self.component_contract(self.full.extra.get("simulation") or {})
         if self.catalog:
@@ -370,6 +402,8 @@ class RecommendationWorkflow:
     def _check(self, data):
         patch = self.tuning or isinstance(data, dict) and "updates" in data
         allowed = {"updates" if patch else "simulation", "requirements", "reasons", "assumptions", "method"}
+        if self.repair_bindings and not patch:
+            allowed.add("bindings")
         if not isinstance(data, dict) or set(data) - allowed:
             raise spice.SpiceError(f"parameter-fields: 只能返回 {sorted(allowed)}；不能修改坐标、接线、模型映射或控制结构")
         req = requirements(data.get("requirements", {}))
@@ -379,8 +413,16 @@ class RecommendationWorkflow:
         data["requirements"] = req
         candidate = Layout.from_dict(self.layout.to_dict())
         if patch:
-            candidate, values = self._tuned(data.get("updates"))
+            if self.example_mode and self.catalog and data.get("updates") == {}:
+                values = {}
+            else:
+                candidate, values = self._tuned(data.get("updates"))
         else:
+            if "bindings" in data:
+                bindings = data["bindings"]
+                spice._keys(bindings, ("inputs", "outputs"), label="bindings")
+                candidate.extra["closed_loop"].update(deepcopy(bindings))
+                data["closed_loop"] = deepcopy(candidate.extra["closed_loop"])
             candidate.extra["simulation"] = deepcopy(data.get("simulation"))
             simulation = candidate.extra["simulation"]
             if isinstance(simulation, dict) and isinstance(simulation.get("components"), dict):
@@ -403,11 +445,15 @@ class RecommendationWorkflow:
         reasons = data.get("reasons")
         missing = [k for k in values if not isinstance(reasons, dict) or
                    not isinstance(reasons.get(k), str) or not reasons[k].strip()]
+        if "bindings" in data and not (isinstance(reasons, dict) and isinstance(reasons.get("bindings"), str) and reasons["bindings"].strip()):
+            missing.append("bindings")
         if missing:
             raise spice.SpiceError("parameter-reasons: 缺少以下 reasons 键的非空理由：" + ", ".join(missing))
         assumptions = data.get("assumptions")
         if not isinstance(assumptions, list) or not assumptions or any(not isinstance(x, str) or not x.strip() for x in assumptions):
             raise spice.SpiceError("parameter-assumptions: assumptions 必须列出至少一项明确的工况或模型假设")
+        if self.example_name:
+            data["assumptions"].insert(0, f"匹配示例工况 {self.example_name}，复用其连接对应的参数与测量通道。")
         if self.preview_simulation:
             data["verification"] = quick_check(candidate, self.profile, self.base_dir,
                                                **({"should_stop": self.should_stop} if self.should_stop else {}))
@@ -439,13 +485,51 @@ class RecommendationWorkflow:
         if "vout" in req and "v_out_V" in data["verification"].get("channels", {}):
             measured = data["verification"]["channels"]["v_out_V"]["mean"]
             data["verification"]["voltage_error_pct"] = 100 * (measured - req["vout"]) / req["vout"]
+        if self.example_mode:
+            for key in ("simulation", "closed_loop"):
+                if key in candidate.extra:
+                    data[key] = deepcopy(candidate.extra[key])
+            old = parameter_values(self.original.extra.get("simulation"))
+            reasons = reasons or {}
+            tuned = [p for p in data.get("parameters", []) if not p["path"].startswith("simulation.")]
+            rows = []
+            for path, value in parameter_values(data["simulation"]).items():
+                reason = reasons.get("simulation." + path) or reasons.get(path)
+                if not reason:
+                    reason = "沿用当前值" if old.get(path) == value else "沿用匹配工况"
+                rows.append({"path": path, "label": parameter_label(path, self.layout, data["simulation"]),
+                             "before": old.get(path), "value": value, "reason": reason})
+            original_loop = self.original.extra.get("closed_loop")
+            if not isinstance(original_loop, dict):
+                original_loop = {}
+            for param in tuned:
+                if param["path"].startswith("closed_loop.") and not original_loop:
+                    param["before"] = None
+            rows.extend(tuned)
+            loop = data.get("closed_loop") or {}
+            if loop != original_loop:
+                def control_name(section):
+                    control = section.get("control")
+                    return control.get("name", "内嵌控制表") if isinstance(control, dict) else control
+
+                reason = reasons.get("bindings") or "采用与此电路匹配的控制表及测量、驱动绑定"
+                if control_name(loop) != control_name(original_loop):
+                    rows.append({"path": "closed_loop.control", "label": "闭环控制表",
+                                 "before": control_name(original_loop), "value": control_name(loop), "reason": reason})
+                for section, label in (("inputs","控制输入"), ("outputs","控制输出")):
+                    previous, following = original_loop.get(section), loop.get(section) or {}
+                    if not isinstance(previous, dict):
+                        previous = {}
+                    for key in dict.fromkeys([*previous, *following]):
+                        if previous.get(key) != following.get(key):
+                            rows.append({"path": f"closed_loop.{section}.{key}", "label": f"{label} · {key}",
+                                         "before": previous.get(key), "value": following.get(key), "reason": reason})
+            data["parameters"] = rows
+            return Proposal(data)
         if patch:
             return Proposal(data)
         before = self.layout.extra.get("simulation")
-        try:
-            old = parameter_values(before) if isinstance(before, dict) else {}
-        except (KeyError, TypeError, AttributeError):
-            old = {}  # an incomplete old configuration must not prevent repair
+        old = parameter_values(before)
         data["parameters"] = [{"path": k, "label": parameter_label(k, self.layout, data["simulation"]),
                                "before": old.get(k), "value": v, "reason": reasons[k]} for k, v in values.items()]
         return Proposal(data)

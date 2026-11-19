@@ -44,8 +44,13 @@ def engine_version(engine):
     return next((line.strip(" *") for line in lines if "ngspice-" in line.lower()), "")
 
 
-def waveform_result(path, run_id, window=None, signals=None):
-    """Integrate full-resolution data. Decimation applies only to display samples."""
+def waveform_result(path, run_id, window=None, signals=None, power_quality=None):
+    """Integrate full-resolution data. Decimation applies only to display samples.
+
+    ``power_quality`` ({voltage, current, frequency, harmonics?, current_sign?})
+    adds PF, displacement factor, mean power and THD over whole fundamental
+    cycles ending at the window's end (see power_quality.py).
+    """
     from bisect import bisect_left, bisect_right
     from .waveforms import column_defaults, parse_csv, samples
 
@@ -110,7 +115,13 @@ def waveform_result(path, run_id, window=None, signals=None):
                           "window_samples": [[window[0], points[0]],
                               *[p for p in samples(data, signal, window, budget=1200) if window[0] < p[0] < window[1]],
                               [window[1], points[-1]]]})
-    return {"metrics": metrics, "waveforms": waveforms}
+    out = {"metrics": metrics, "waveforms": waveforms}
+    if power_quality is not None:
+        from .power_quality import metrics as pq_metrics
+        extra, detail = pq_metrics(data, power_quality, window, run_id)
+        metrics.extend(extra)
+        out["power_quality"] = detail
+    return out
 
 
 def assess_waveforms(result, table, requirements):
@@ -176,7 +187,7 @@ def assess_waveforms(result, table, requirements):
                     window=[begin, b], frequency=frequency)
 
 
-def run_candidate(workspace, candidate_id, tool, *, options=None, should_stop=None, drawing_version=None):
+def run_candidate(workspace, candidate_id, tool, *, options=None, should_stop=None, drawing_version=None, reviewed_circuit=None):
     """Each result belongs to one immutable candidate and one unique directory."""
     from .spice import SpiceCancelled
 
@@ -198,6 +209,10 @@ def run_candidate(workspace, candidate_id, tool, *, options=None, should_stop=No
     if candidate.kind == "control" and tool in ("simulate", "export_simulation"):
         from .control.circuit import resolve
         circuit_table, source, binding_notes = resolve(candidate.table, candidate.base_dir)
+        if reviewed_circuit:
+            from .agent_tools import _digest, _json
+            if _digest(_json(circuit_table)) != reviewed_circuit:
+                raise ValueError("关联电路在确认工况后已改变，请重新确认参数")
         base_dir = source.parent
         circuit_profile = circuit_table.get("profile") or "ieee-double"
     if tool in ("simulate", "modes"):
@@ -227,7 +242,8 @@ def run_candidate(workspace, candidate_id, tool, *, options=None, should_stop=No
         result["files"] = [file_record(path, run_id) for path in export["files"]]
         csv = next(path for path in export["files"] if Path(path).suffix == ".csv"
                    and Path(path).name != "device_states.csv")
-        result.update(waveform_result(csv, run_id, options.get("window"), options.get("signals")))
+        result.update(waveform_result(csv, run_id, options.get("window"), options.get("signals"),
+                                      options.get("power_quality")))
         if tool == "modes" and export.get("ready"):
             from .modes import Mode
             from .pipeline import render_modes

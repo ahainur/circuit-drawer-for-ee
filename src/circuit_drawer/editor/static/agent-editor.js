@@ -14,7 +14,8 @@
   const canonical = value => JSON.stringify(normalize(value), (_, x) => x && typeof x === 'object' && !Array.isArray(x)
     ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x);
   const file = () => control ? state?.file || '' : editorFilePath;
-  const busy = () => control ? !!drag : !!(selectionBusy || drag || wireDraft || boxDraft || instanceDrag || linkDrag || resizing || definitionEdit);
+  const busy = () => !!(window.CircuitFigure?.busy() || window.CircuitFigureOutput?.busy() ||
+    (control ? drag : selectionBusy || drag || wireDraft || boxDraft || instanceDrag || linkDrag || resizing || definitionEdit));
   const redraw = () => control ? draw() : render();
   const open = () => {
     document.body.classList.add('agent-open');
@@ -35,10 +36,17 @@
   async function apply(command) {
     if (busy()) throw new Error(window.CircuitAgentText('finish_edit'));
     const before = canonical(current());
+    const beforeTable = JSON.stringify(current()), beforeProfile = profile;
     if (['undo_candidate','undo_task_changes'].includes(command.action)) {
       const stack = control ? undoStack : history;
       const count = command.undo_count || 1;
-      if (stack.length < count || canonical(JSON.parse(stack.at(-count))) !== canonical(command.table)) {
+      if (stack.length < count || canonical(JSON.parse(control ? controlHistoryTable(stack.at(-count)) : historyTable(stack.at(-count)))) !== canonical(command.table)) {
+        throw new Error(window.CircuitAgentText('undo_conflict'));
+      }
+      if (!control && command.profile && (stack.at(-count).profile || profile) !== command.profile) {
+        throw new Error(window.CircuitAgentText('undo_conflict'));
+      }
+      if (control && command.profile && controlHistoryProfile(stack.at(-count)) !== command.profile) {
         throw new Error(window.CircuitAgentText('undo_conflict'));
       }
       for (let i = 0; i < count; i++) undo();
@@ -46,17 +54,24 @@
       commit(copy(command.table)); clearSel(); fit(); showSelection();
     } else {
       pushHistory(); layout = copy(command.table); ++layoutGeneration;
+      if (command.profile) { profile = command.profile; document.getElementById('profile').value = profile; }
       selected = null; clearGroupSelection(); changed(false); fitView(); render();
     }
+    window.CircuitFigure?.adopted(beforeTable, beforeProfile, command);
     if (!command.action.startsWith('undo')) {
       transactionLabels.set(before + '\n' + canonical(current()), command.undo_label);
       if (transactionLabels.size > 200) transactionLabels.delete(transactionLabels.keys().next().value);
     }
     return snapshot();
   }
+  function selection() {
+    if (!control) return [];
+    return [...[...sel.blocks].map(id => 'block:' + id), ...[...sel.texts].map(i => 'text:' + i),
+      ...(sel.link == null ? [] : ['link:' + sel.link]), ...(sel.region == null ? [] : ['region:' + sel.region])];
+  }
   function snapshot() {
     const previous = (control ? undoStack : history).at(-1);
-    const label = previous && transactionLabels.get(canonical(JSON.parse(previous)) + '\n' + canonical(current()));
+    const label = previous && transactionLabels.get(canonical(JSON.parse(control ? controlHistoryTable(previous) : historyTable(previous))) + '\n' + canonical(current()));
     const button = document.getElementById(control ? 'undoBtn' : 'undo');
     if (label) button.title = label;
     else if (button.title.startsWith('Agent · ')) button.title = window.cdI18n?.translate('撤销') || 'Undo';
@@ -139,6 +154,6 @@
     clone.removeAttribute('id'); clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
     return {markup: clone.outerHTML, bounds, view: copy(view)};
   }
-  window.CircuitAgentEditor = {kind: control ? 'control' : 'circuit', snapshot, busy, apply, open, close, mount,
+  window.CircuitAgentEditor = {kind: control ? 'control' : 'circuit', snapshot, selection, busy, apply, open, close, mount,
     ready: () => !!current(), renderPreview, redraw};
 })();

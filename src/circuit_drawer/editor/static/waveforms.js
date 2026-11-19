@@ -7,6 +7,7 @@
   const colors = ["#c8102e","#2457d6","#17845a","#8753a0","#b66b0a","#237c89"];
   let info = null, active = 0, revision = 0, gesture = null, box = null, tool = null, selNote = null;
   let selLabel=null, selectedPart="body", previewTarget="overview", viewZoom="fit", nudges=Promise.resolve();
+  let updateComposition=null;
   const CM=40; // SVG user units per paper cm; the viewport scales uniformly.
   panel.innerHTML = `<div class="wave-toolbar"><strong>波形与模态</strong>
     <button id="waveImport">导入 CSV…</button>
@@ -14,7 +15,7 @@
     <button id="waveNote_text">文字</button><button id="waveNote_arrow">箭头</button><button id="waveNote_dot">关键点</button><button id="waveNote_dimension">区间尺寸线</button>
     <button id="waveNoteDelete" disabled>删除所选</button></span><button id="waveAI" disabled>AI 标注…</button><button id="waveSave">保存对应关系</button>
     <button id="waveUndo">撤销</button><button id="waveTruePreview">真实出图预览</button><button id="waveXY" disabled>XY / 状态平面…</button>
-    <button id="waveExport" class="primary">导出波形与模态…</button><button id="waveClose">收起</button></div>
+    <button id="waveExport" class="primary">导出波形与模态…</button><button id="waveCompose">加入组合图</button><button id="waveClose">收起</button></div>
     <div class="wave-paper-toolbar"><label>纸面尺寸 <select id="wavePaperTarget"><option value="overview">总览中的波形</option><option value="standalone">独立波形图</option></select></label>
     <label>查看比例 <select id="waveViewZoom"><option value="fit">适合画布</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
     <span id="wavePaperSize"></span><span class="hint">数学文字为编辑示意，最终字体用“真实出图预览”核对。</span></div>
@@ -53,14 +54,26 @@
   window.openWaveforms=async (options={}) => {
     if (!layout) return;
     panel.hidden=false;
+    updateComposition=options.onCompose || null;
+    $('waveCompose').textContent=updateComposition ? '更新组合子图' : '加入组合图';
+    panel.classList.toggle('wave-publication', !!options.publication);
+    if (options.publication) {
+      previewTarget='standalone';
+      $('wavePaperTarget').value=previewTarget;
+    }
     try {
       if (options.source) await importCsv({source:options.source}, options.isCurrent);
+      else if (options.config) installed(await request('/api/waveform-view', options.config));
       else if (layout.waveform?.source) installed(await request("/api/waveform-view",layout.waveform),false);
       else { info=null; controls(); draw(); note("先导入仿真或测量 CSV。第一行是列名，随后是数值数据。"); }
     } catch (e) { info=null; controls(); draw(); note(e.message,true); }
   };
   $("waveforms").onclick=()=>window.openWaveforms();
   $("waveClose").onclick=()=>{panel.hidden=true;};
+  $('waveCompose').onclick=()=> {
+    if(updateComposition) updateComposition(clone(layout.waveform));
+    else window.CircuitFigureOutput?.addWaveform(layout.waveform);
+  };
   $("waveUndo").onclick=()=>undo();
   $("wavePaperTarget").onchange=async()=> {
     previewTarget=$("wavePaperTarget").value;
@@ -180,6 +193,7 @@
 
   $("waveImport").onclick=()=> {
     showDialog("导入波形 CSV", `<p>选择文件，或填写本机 CSV 路径。首行为列名；支持逗号、分号及制表符分隔。</p>
+      <p>Simulink／PLECS 导出包中的波形脚本可生成数值 CSV。导入后可选通道、加标注，并加入多工况组合图。</p>
       <p><input id="waveCsvFile" type="file" accept=".csv,.tsv,.txt"></p>
       <div class="export-row"><input id="waveCsvPath" type="text" placeholder="CSV 路径（相对电路 JSON 所在目录）" value="${esc(layout.waveform?.source || '')}"></div>
       <div class="export-row"><label>时间列 <input id="waveTimeColumn" placeholder="留空使用第一列"></label>
@@ -203,7 +217,7 @@
 
   function controls() {
     const cfg=layout.waveform;
-    $("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=$("waveAI").disabled=$("waveXY").disabled=!info;
+    $("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=$("waveAI").disabled=$("waveXY").disabled=$('waveCompose').disabled=!info;
     if(!info) {$("waveSettings").textContent="导入 CSV 后，可选通道、时间范围和对应模态。";return;}
     const factor=units[cfg.display_unit];
     const number=t=>Number((t/factor).toPrecision(12));

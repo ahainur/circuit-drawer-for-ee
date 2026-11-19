@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{name}: {title}")
             return 0
         if a.cmd == "export":
-            Path(a.out).write_text(json.dumps(template(a.template), indent=1, ensure_ascii=False)
+            Path(a.out).write_text(json.dumps(template(a.template, asset_dir=Path(a.out).parent), indent=1, ensure_ascii=False)
                                    + "\n", encoding="utf-8")
             print(a.out)
             return 0
@@ -125,16 +125,22 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"error: {path} does not exist; pass --template to start from one",
                           file=sys.stderr)
                     return 2
-                path.write_text(json.dumps(template(a.template), indent=1, ensure_ascii=False)
+                path.write_text(json.dumps(template(a.template, asset_dir=path.parent), indent=1, ensure_ascii=False)
                                 + "\n", encoding="utf-8")
             serve(path, a.profile, a.port, Path(a.out) if a.out else None, not a.no_browser)
             return 0
         if a.cmd == "save-template":
             path = save_template(load(a.table), a.name, a.title, a.profile,
-                                 reserved=set(TEMPLATES), force=a.force)
+                                 reserved=set(TEMPLATES), force=a.force, base_dir=Path(a.table).resolve().parent)
             print(f"saved control template {a.name.lower()} -> {path}")
             return 0
         raw = load(a.source)
+        base_dir = Path(given).resolve().parent if Path(given).is_file() else None
+        if base_dir is None:
+            from .library import user_templates
+            saved = user_templates().get(given)
+            if saved:
+                base_dir = saved[1].parent
         if a.cmd in ("loop", "design"):
             rep = check(raw, get_profile(str(raw.get("profile") or "ieee-double")))
             if not rep.ok:
@@ -150,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
                 keep = {k: v for k, v in old.items() if k in ("delay", "port")} \
                     if isinstance(old, dict) else {}
                 raw["loop"].setdefault("tf", {})[a.block] = {**res["tf"], **keep}
+                from ..figure_images import copy_assets
+                copy_assets(raw, base_dir, Path(a.write).parent)
                 Path(a.write).write_text(json.dumps(raw, indent=1, ensure_ascii=False) + "\n",
                                          encoding="utf-8")
                 print(a.write)
@@ -175,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             rep = check(raw, prof)
             print(json.dumps(rep.to_dict(), indent=1, ensure_ascii=False))
             return 0 if rep.ok else 1
-        res = render(raw, a.profile, a.out, a.name, a.formats, a.mono, a.grid)
+        res = render(raw, a.profile, a.out, a.name, a.formats, a.mono, a.grid, base_dir=base_dir)
         for w in res.report.warnings:
             print(f"warning: {w}", file=sys.stderr)
         for path in res.files.values():

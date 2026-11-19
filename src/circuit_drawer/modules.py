@@ -185,6 +185,11 @@ def _translate(lay, prefix, offset, bindings):
             for field in ("from", "to", "at"):
                 if field in obj:
                     obj[field] = pt(obj[field])
+            for end in ("from_anchor", "to_anchor"):
+                if key == "callouts" and end in obj:
+                    anchor = obj[end]
+                    owner = "element" if "element" in anchor else "block"
+                    anchor[owner] = prefix + anchor[owner]
             if "via" in obj:
                 obj["via"] = [pt(p) for p in obj["via"]]
             if "id" in obj:
@@ -566,11 +571,119 @@ def _label_box(e):
     return (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
 
 
+def _dock_panel_ports(drawing, groups, terminals, ports_at, faces, pairs, scale, prof, collapsed_frames):
+    """Terminate folded external nets on the actual printed edge of their layer."""
+    from .geometry import Box, LABEL_GAP, PORT_R, footprint
+    from .regions import RegionError, parse_region
+    if not terminals or not groups:
+        return
+    peers = defaultdict(list)
+    for a, b, _ in pairs:
+        peers[a].append(b)
+        peers[b].append(a)
+    root = _root_ends([e for e in drawing.elements if "/" not in e.id])
+    for index, raw in enumerate(drawing.extra.get("regions", [])):
+        members = groups.get(raw.get("id")) if isinstance(raw, dict) else None
+        if not members:
+            continue
+        try:
+            panel = parse_region(raw, index, drawing, scale, prof)
+        except RegionError:
+            continue  # The normal validator reports an invalid panel.
+        lead = members[0]
+        foreground = None
+        if lead in collapsed_frames:
+            ax, ay, bx, by = collapsed_frames[lead]
+            foreground = Box(ax * scale.x, ay * scale.y, bx * scale.x, by * scale.y)
+        for k, name in enumerate(members[1:], 1):
+            if k > len(panel.layers):
+                break
+            x0, y0, x1, y1 = panel.rect(k)
+            dx, dy = panel.layers[k-1][:2]
+            by_side = defaultdict(list)
+            for port, el in terminals.get(name, {}).items():
+                side = faces[name, port]
+                # An edge under the front layer cannot host a visible terminal.
+                if dx * side[0] <= 0:
+                    side = (0, 1 if dy > 0 else -1) if dy else (1 if dx > 0 else -1, 0)
+                along = 1 if side[0] else 0
+                aim = el.pins["p"][along]
+                adjacent = peers[f"{name}.{port}"]
+                shared_bus = (lead, port) in ports_at and f"{lead}.{port}" in adjacent
+                if shared_bus:
+                    aim = ports_at[lead, port][along]
+                else:
+                    neighbour = next((root[r][0] for r in adjacent if r in root), None)
+                    if neighbour is not None:
+                        aim = neighbour[along]
+                by_side[side].append((aim, port, el, shared_bus))
+            for (sx, sy), entries in by_side.items():
+                lo, hi = (y0, y1) if sx else (x0, x1)
+                # A terminal must stay on the straight part of a rounded edge.
+                axis_scale = scale.y if sx else scale.x
+                inset = min((PORT_R + panel.corner_radius)/axis_scale, (hi-lo)/(2*len(entries)))
+                pitch = min(PORT_PITCH, (hi-lo-2*inset)/max(1,len(entries)-1))
+                last = lo + inset - pitch
+                for i, (aim, port, el, shared_bus) in enumerate(sorted(entries, key=lambda item: (item[0], item[1]))):
+                    last = max(last + pitch, min(aim, hi - inset - (len(entries)-1-i)*pitch))
+                    at = ((x1 if sx > 0 else x0), last) if sx else (last, (y1 if sy > 0 else y0))
+                    el.pins["p"] = ports_at[name, port] = tuple(round(v, 4) for v in at)
+                    # A direct tie to the front layer continues its common rail.
+                    faces[name, port] = (-sx, -sy) if shared_bus else (sx, sy)
+                    el.label_pos = ("left" if sx > 0 else "right") if sx else ("below" if sy > 0 else "above")
+                    box = footprint(el, scale, prof).labels[0]
+                    outside = foreground is not None and box.overlaps(foreground)
+                    if outside:
+                        # A thin strip cannot contain the name. Straddle its edge,
+                        # clear of both the external lead and the facing device.
+                        el.label_pos = "above" if sx else "right"
+                        el.opts["label_offset"] = [sx * LABEL_GAP / scale.x, sy * LABEL_GAP / scale.y]
+                    elif shared_bus:
+                        # Leave the terminal's own conductor clear.
+                        if sx:
+                            el.opts["label_offset"] = [0, (LABEL_GAP + (box.y1-box.y0)/2)/scale.y]
+                        else:
+                            el.opts["label_offset"] = [(LABEL_GAP + (box.x1-box.x0)/2)/scale.x, 0]
+
+
+def _separate_exposed_labels(terminals, drawing, scale, prof):
+    """Only the generated names of hidden cells can move to another side."""
+    from .geometry import footprint, text_clearance
+    from .schema import LABEL_SIDES
+    if len(terminals) < 2:
+        return
+    labels = {e.id: footprint(e, scale, prof).labels[0] for e in terminals}
+    gaps = {e.id: text_clearance(e.opts.get("label_size"), prof) for e in terminals}
+    obstacles = None
+    for el in terminals:
+        def collides(box):
+            return any(box.overlaps(other, max(gaps[el.id], gaps[key]))
+                       for key, other in labels.items() if key != el.id)
+        if not collides(labels[el.id]):
+            continue
+        if obstacles is None:
+            fixed = [footprint(e, scale, prof) for e in drawing.elements if e.id not in labels]
+            obstacles = [box for fp in fixed for box in (*fp.bodies, *fp.labels)]
+        old = el.label_pos
+        for side in LABEL_SIDES:
+            el.label_pos = side
+            box = footprint(el, scale, prof).labels[0]
+            if not collides(box) and not any(box.overlaps(other, gaps[el.id]) for other in obstacles):
+                labels[el.id] = box
+                break
+        else:
+            el.label_pos = old
+
+
 def _bodies(lay, s, prof):
     out = []
     for e in lay.elements:
         if e.kind == "port":
-            if (box := _label_box(e)) is not None:
+            if e.label and e.opts.get("label_offset"):
+                from .geometry import footprint
+                box = footprint(e, s, prof).labels[0]
+                out.append((box.x0/s.x, box.y0/s.y, box.x1/s.x, box.y1/s.y))
+            elif (box := _label_box(e)) is not None:
                 out.append(box)
             continue
         xs = [p[0] for p in e.pins.values()]; ys = [p[1] for p in e.pins.values()]
@@ -882,8 +995,12 @@ class _Index:
         return self._points_near(self._ends, p, q)
 
 
+# A perpendicular wire crossing costs half a bend on unconstrained module routes.
+ROUTE_CROSSING_COST = 0.5
+
+
 def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, clearance=ROUTE_STEP * .75,
-                budget=None, insulated=(), min_run=0.0, check_cancelled=None, source_wires=()):
+                budget=None, insulated=(), min_run=0.0, check_cancelled=None, source_wires=(), crossing_cost=ROUTE_CROSSING_COST, port_exits=None):
     """Visibility-grid fallback for ports picked inside a user's old drawing.
 
     Unlike the library's two-bend paths, this can navigate around several
@@ -910,6 +1027,11 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
         # unrelated module lane widths that multiply nearly identical cells.
         lead = math.ceil(min_run * 10000) / 10000
         offsets = {0, -clearance, clearance, -lead, lead}
+        if crossing_cost is None:
+            # Leave exterior tracks for a return that cannot cross an existing signal.
+            reach = 2 * (lead + clearance)
+            xs.update((min(xs) - reach, max(xs) + reach))
+            ys.update((min(ys) - reach, max(ys) + reach))
     xs = sorted({round(x + offset, 4) for x in xs for offset in offsets})
     ys = sorted({round(y + offset, 4) for y in ys for offset in offsets})
     ix, iy = {x: i for i, x in enumerate(xs)}, {y: i for i, y in enumerate(ys)}
@@ -944,7 +1066,7 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
                 continue
             if not _leaves(path, a, fa, sa) or not _leaves(path, b, fb, sb):
                 continue
-            cost = _cost(path, a_end, b_end, wires, pins, bodies, same, clearance, index)
+            cost = _cost(path, a_end, b_end, wires, pins, bodies, same, clearance, index, crossing_cost, port_exits)
             if cost is not None and (best is None or cost < best[0]):
                 best = cost, path
         if best is not None:
@@ -1029,7 +1151,7 @@ def _grid_route(a_end, b_end, wires, pins, bodies, same, target_wires=(), *, cle
             # Edge cost is direction-independent; the reverse visit reuses it.
             edge = (p, q) if p < q else (q, p)
             if edge not in cache:
-                cache[edge] = _cost([p, q], a_end, b_end, wires, pins, bodies, same, clearance, index)
+                cache[edge] = _cost([p, q], a_end, b_end, wires, pins, bodies, same, clearance, index, crossing_cost, port_exits)
             extra = cache[edge]
             if extra is None:
                 continue
@@ -1069,7 +1191,17 @@ def _trim(path, same):
     return path
 
 
-def _cost(path, a_end, b_end, wires, pins, bodies, same=(), clearance=0, index=None):
+def _on_port_exit(p, q, point, face):
+    """Both ends lie on the short outward ray through the actual terminal."""
+    if face is None:
+        return False
+    axis = 0 if face[0] else 1
+    return all(abs(end[1 - axis] - point[1 - axis]) < EPS
+               and (end[axis] - point[axis]) * face[axis] >= -EPS for end in (p, q))
+
+
+def _cost(path, a_end, b_end, wires, pins, bodies, same=(), clearance=0, index=None,
+          crossing_cost=ROUTE_CROSSING_COST, port_exits=None):
     """``index``: an ``_Index`` over the same wires, pins and bodies; it only
     narrows each scan to nearby candidates, every predicate is unchanged."""
     (a, fa, sa), (b, fb, sb) = a_end, b_end
@@ -1091,7 +1223,10 @@ def _cost(path, a_end, b_end, wires, pins, bodies, same=(), clearance=0, index=N
                     if overlap > EPS and EPS < abs(p[across] - c[across]) < clearance - EPS:
                         return None
         boxes = index.bodies_near(p, q) if index else bodies
-        if any(_overlap(p, q, *w) for w in near) or any(_through(p, q, box) for box in boxes):
+        if any(_overlap(p, q, *w) for w in near) or any(
+                _through(p, q, box) and not (port_exits and
+                    any(_on_port_exit(p, q, point, face) for point, face in port_exits.get(box, ())))
+                for box in boxes):
             return None
         if any(_on(x, p, q) for x in (index.pins_near(p, q) if index else pins) if x not in (a, b)
                and not (x in ends and any(_on(x, *w) for w in same))):
@@ -1109,10 +1244,12 @@ def _cost(path, a_end, b_end, wires, pins, bodies, same=(), clearance=0, index=N
             if _on(v, *w, interior=True) and not (v in ends and _same_wire(w, same)):
                 return None
     crossings = sum(1 for p, q in segs for w in (index.wires_near(p, q) if index else wires) if _cross(p, q, *w))
+    if crossing_cost is None and crossings:
+        return None
     length = sum(abs(p[0] - q[0]) + abs(p[1] - q[1]) for p, q in segs)
     soft = sum(0 if f is None or e not in ends or _leaves(path, e, f, True) else 1
                for e, f in ((a, fa), (b, fb)))
-    return (len(segs) - 1) + 0.5 * crossings + 0.3 * soft + 0.05 * length
+    return (len(segs) - 1) + (crossing_cost or 0) * crossings + 0.3 * soft + 0.05 * length
 
 
 def _same_wire(wire, same):
@@ -1718,6 +1855,8 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
         # visible port only on the SAME net; otherwise retain a named terminal.
         representatives = {member: lead for lead, group in groups.items()
                            if group.get("style", "stack") == "stack" for member in group["members"]}
+        exposed_terminals = []
+        panel_terminals = defaultdict(dict)
         for name in names:
             if name not in omit:
                 continue
@@ -1755,6 +1894,9 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                     elif sh.at is None and peer in ports_at:
                         el.pins["p"] = (ports_at[peer][0], el.pins["p"][1])
                     el.label = _tex_name(f"{name}.{port}")
+                    exposed_terminals.append(el)
+                    if contact is None:
+                        panel_terminals[name][port] = el
                     out.elements.append(el)
                     out.netlist[ref] = net
                     ports_at[(name, port)], faces[(name, port)] = el.pins["p"], sh.faces[port]
@@ -1770,6 +1912,52 @@ def assemble(source: Layout, scale: Scale | None = None, prof=None) -> Assembly:
                 out.text(tuple(at), text)
         if not sheets:
             _place_parts(out, spec.get("parts", []), resolve.pairs, ports_at, faces)
+        # Member-fitted source regions can follow whole instances through folding.
+        # Resolve their frames only in this derived drawing, preserving source IDs.
+        from .geometry import REGION_FIT_PAD, region_fit_box
+        # Panels of folded-away devices vanish with their devices in the derived view.
+        # Keep unknown IDs for validation and keep every authored member in the source.
+        invisible_members = {sh.prefix + e.id for sh in shapes.values() for e in sh.lay.elements}
+        invisible_members.difference_update(e.id for e in out.elements)
+        for region in list(out.extra.get("regions", [])):
+            if not isinstance(region, dict) or region.get("fit") != "members":
+                continue
+            members = region.get("members", [])
+            if not isinstance(members, list) or not all(isinstance(name, str) for name in members):
+                continue  # The region validator reports malformed source values.
+            if any(name in invisible_members for name in members):
+                members = [name for name in members if name not in invisible_members]
+                if not members:
+                    out.extra["regions"].remove(region)
+                    continue
+                region["members"] = members
+            module_members = [name for name in members if name in shapes]
+            if not module_members:
+                continue
+            boxes = [frames[name] for name in module_members if name in frames]
+            ordinary = [name for name in members if name not in module_members]
+            if ordinary:
+                box = region_fit_box(out, ordinary, scale, prof)
+                boxes.append([box.x0 + REGION_FIT_PAD, box.y0 + REGION_FIT_PAD,
+                              box.x1 - REGION_FIT_PAD, box.y1 - REGION_FIT_PAD])
+            if not boxes:
+                out.extra["regions"].remove(region)
+                continue
+            region["from"] = [min(b[0] for b in boxes) - REGION_FIT_PAD,
+                              min(b[1] for b in boxes) - REGION_FIT_PAD]
+            region["to"] = [max(b[2] for b in boxes) + REGION_FIT_PAD,
+                            max(b[3] for b in boxes) + REGION_FIT_PAD]
+            region.pop("fit")
+            prefixes = tuple(shapes[name].prefix for name in module_members)
+            region["members"] = ordinary + [e.id for e in out.elements if e.id.startswith(prefixes)]
+        if panel_terminals:
+            panels = {key: u.get('instances', []) for key, u in usages.items() if isinstance(u, dict) and
+                      u.get('purpose') == 'instances' and u.get('style', 'stack') == 'stack'}
+            panels.update({f"{name}/group": [name, *g["members"]] for name, g in groups.items()
+                           if g.get("style", "stack") == "stack"})
+            collapsed_frames = {n: frame for n, frame in frames.items() if shown(shapes[n]) == "collapsed"}
+            _dock_panel_ports(out, panels, panel_terminals, ports_at, faces, resolve.pairs, scale, prof, collapsed_frames)
+        _separate_exposed_labels(exposed_terminals, out, scale, prof)
         ends = _root_ends([e for e in out.elements if "/" not in e.id])
         ends.update({f"{n}.{p}": (q, faces[(n, p)], True) for (n, p), q in ports_at.items()})
         drawn_nets = defaultdict(list)

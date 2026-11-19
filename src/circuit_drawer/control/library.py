@@ -62,7 +62,7 @@ def _write(path: Path, data: dict, force: bool) -> Path:
 # ---- templates ---------------------------------------------------------------
 def save_template(raw: dict, name: str, title: str = "", profile: str | None = None,
                   directory: Path | None = None, reserved=frozenset(),
-                  force: bool = False) -> Path:
+                  force: bool = False, base_dir=None) -> Path:
     """Write a table that passes the checker as a named template."""
     name = _name(name)
     if name in reserved:
@@ -74,6 +74,8 @@ def save_template(raw: dict, name: str, title: str = "", profile: str | None = N
     table = copy.deepcopy(raw)
     table["name"], table["title"] = name, title or table.get("title") or name
     folder = Path(directory) if directory else user_dir()
+    from ..figure_images import copy_assets
+    copy_assets(table, base_dir, folder)
     return _write(folder / f"{name}.json", table, force)
 
 
@@ -118,6 +120,23 @@ def extract(raw: dict, ids: list[str]) -> dict:
     """The chosen blocks with the links that touch only them, the texts near
     them and the regions around them, moved so their corner is at (0, 0)."""
     part, corner = _cut(raw, ids, None, False)
+    # Record the exact ports exposed by cutting this subgraph. A partial
+    # drawing can still be saved when some links have not been connected.
+    from .ai_structure import structural_links
+    try:
+        edges = structural_links(raw, raw.get("profile") or "double")[0]
+    except ValueError:
+        edges = raw.get("links", [])
+    ports = {"inputs": set(), "outputs": set()}
+    chosen = set(ids)
+    for edge in edges:
+        src, dst = edge.get("from"), edge.get("to")
+        if _ref_block(src) in chosen and _ref_block(dst) not in chosen:
+            ports["outputs"].add(src)
+        if _ref_block(dst) in chosen and _ref_block(src) not in chosen:
+            ports["inputs"].add(dst)
+    if any(ports.values()):
+        part["interface"] = {key: sorted(values) for key, values in ports.items()}
     return shift(part, -corner[0], -corner[1])
 
 

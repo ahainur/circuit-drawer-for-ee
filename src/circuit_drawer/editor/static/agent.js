@@ -14,10 +14,13 @@
   const canonical = value => JSON.stringify(value, (_, x) => x && typeof x === 'object' && !Array.isArray(x)
     ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x);
   const el = id => document.getElementById(id);
+  const tr = text => window.cdI18n?.translate(text) || text;
+  let exampleCase;
   let task = null, taskId = new URLSearchParams(location.search).get('task') || '', documentId = '', version = 1;
   let lastDocument = '', draft = '', startFrom = 'current', busy = false, polling = false, requestQueue = Promise.resolve();
+  let references, scopeId = '', scope = new Set();
   let nodes, params = {}, beforeAfter = 'overlay', previewKey = '', previewFrame, previewGeneration = 0, pendingAck = null;
-  let renderKey = '', resultKey = '', lastAnnouncement = '', focusNext = false;
+  let renderKey = '', actionsKey = '', resultKey = '', lastAnnouncement = '', focusNext = false;
   let resultsTab = 'summary', waveRange = 'window';
   const allowed = name => !busy && (task?.allowed_actions || []).includes(name);
   const button = (action, primary = false, label = action) => `<button type="button" data-action="${escape(action)}" ${allowed(action) ? '' : 'disabled'} class="${primary ? 'primary' : ''}">${escape(t(label))}</button>`;
@@ -45,6 +48,14 @@
       return result;
     };
     const pending = requestQueue.then(work); requestQueue = pending.catch(() => {}); return pending;
+  }
+  async function applyCommand(command) {
+    const current = context();
+    if (command.version !== current.version || command.file !== current.file || editor.busy()) {
+      throw new Error(t('stale'));
+    }
+    await editor.apply(command);
+    return context();
   }
   function notify(text) { const target = el('agentNotice'); if (target) target.textContent = text; }
   // One line per step: icon, title, state/time. Tool name and detail move out of the way.
@@ -97,8 +108,12 @@
   }
   const sectionName = section => { const key = 'section.' + section, text = t(key); return text === key ? section : text; };
   function changeValue(c) {
+    if (c.object_id?.startsWith('closed_loop.inputs.') || c.object_id?.startsWith('closed_loop.outputs.')) {
+      const binding = value => value == null ? tr('待填写') : typeof value === 'object' ? JSON.stringify(value) : String(value);
+      return `<span class="change-value"><span class="before">${escape(binding(c.before))}</span> → ${escape(binding(c.after))}</span>`;
+    }
     const show = v => v != null && typeof v === 'object' && !Array.isArray(v) && !v.label && !v.name ? t('setting_changed') : valueSummary(v);
-    return `<span class="change-value">${c.before != null ? `<span class="before">${escape(show(c.before))}</span> → ` : ''}${escape(show(c.after))}</span>`;
+    return `<span class="change-value">${c.before != null ? `<span class="before">${escape(show(c.before))}</span> → ` : `<span class="before">${escape(tr('待填写'))}</span> → `}${escape(show(c.after))}</span>`;
   }
   function controlSettings(change, path = [], before = change.before, after = change.after) {
     // Long descriptive metadata stays in the raw disclosure below the parameter table.
@@ -132,7 +147,7 @@
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group).push({...c, name: rest.length ? rest.join(' · ') : sectionName(c.label)});
     }
-    const table = settings.length ? `<div class="table-scroll changes"><table class="params"><tbody>${[...groups].map(([group, list]) => `<tr class="group"><th colspan="2">${escape(group)}</th></tr>${list.map(c => `<tr>
+    const table = settings.length ? `<div class="table-scroll changes"><table class="params"><thead><tr><th>${escape(tr('参数'))}</th><th>${escape(tr('当前值'))} → ${escape(tr('建议值'))}</th></tr></thead><tbody>${[...groups].map(([group, list]) => `<tr class="group"><th colspan="2">${escape(group)}</th></tr>${list.map(c => `<tr>
       <td>${escape(c.name)}${c.reason ? `<div class="reason">${escape(c.reason)}</div>` : ''}</td><td class="value">${changeValue(c)}</td></tr>`).join('')}`).join('')}</tbody></table></div>` : '';
     const raw = `<details class="raw" data-keep="raw-changes"><summary>${escape(t('raw_changes'))}</summary><pre class="log">${escape(compact(changes.map(c => ({kind:c.kind, object:c.label, before:c.before, after:c.after}))))}</pre></details>`;
     return drawing + table + raw;
@@ -146,7 +161,8 @@
       ${candidate.state === 'stale' ? `<p role="alert">${escape(t('stale'))}</p>` : ''}
       ${candidate.validation.issues.length ? `<details><summary>${escape(t('issues'))}</summary><pre class="log">${escape(JSON.stringify(candidate.validation.issues, null, 2))}</pre></details>` : ''}
       ${changesHTML(candidate.changes)}
-      ${candidate.assumptions?.length ? `<details><summary>${escape(t('assumptions'))}</summary>${candidate.assumptions.map(item => `<p>${escape(item)}</p>`).join('')}</details>` : ''}`;
+      ${(candidate.review_questions || []).map(q => `<p class="agent-confirm">${escape(q.block)} · ${escape(q.question)}</p>`).join('')}
+      ${candidate.assumptions?.length ? `<details ${task.task_mode === 'example' ? 'open' : ''}><summary>${escape(t('assumptions'))}</summary>${candidate.assumptions.map(item => `<p>${escape(item)}</p>`).join('')}</details>` : ''}`;
     // Adopted, undone or discarded candidates shrink to their title line.
     return pending ? `<section class="card waiting" id="agentCandidate" tabindex="-1"><h3>${escape(t('candidate', candidate.number))} · ${escape(t('candidate.' + candidate.state))}</h3><div class="body">${body}</div></section>`
       : `<details class="card past" id="agentCandidate" tabindex="-1" data-keep="past-candidate"><summary>${escape(t('candidate', candidate.number))} · ${escape(t('candidate.' + candidate.state))} · ${escape(summaryText(candidate.changes))}</summary><div class="body">${body}</div></details>`;
@@ -173,8 +189,15 @@
     for (const [id, key] of Object.entries({agentNew:'new_task', agentHistory:'history', agentPresets:'presets', agentStartLabel:'start_from'})) {
       el(id).textContent = t(key);
     }
+    if (el('agentTaskMode')) {
+      el('agentTaskModeLabel').textContent = tr('任务方式');
+      ['按任务描述','只画图','示例仿真'].forEach((label,i) => el('agentTaskMode').options[i].textContent = tr(label));
+    }
+    el('agentResetLayout').textContent = tr('恢复布局');
+    if (el('agentCheckSimulation')) el('agentCheckSimulation').textContent = tr('检查仿真参数');
     el('agentStartFrom').options[0].textContent = t('current');
     el('agentStartFrom').options[1].textContent = t('blank');
+    if (el('agentStartFrom').options[2]) el('agentStartFrom').options[2].textContent = t('selection');
     el('agentInput').placeholder = t('task_input');
     el('agentInput').setAttribute('aria-label', t('task_input'));
     el('agentClose').setAttribute('aria-label', t('close'));
@@ -183,6 +206,7 @@
     const key = canonical({status:task?.status, candidates:task?.candidates, questions:task?.questions, detail:task?.detail,
       steps:task?.steps, error:task?.error, retry:task?.retry_after_s, queued:task?.queued, requests:task?.requests, actions:task?.allowed_actions, history:task?.history, language:language(), busy});
     if (key !== renderKey) {
+      if (taskId && task?.readiness?.ready) el('agentReadiness').hidden = true;
       renderKey = key;
       const body = el('agentBody'), scroll = body.scrollTop, opened = [...body.querySelectorAll('details[open][data-keep]')].map(d => d.dataset.keep);
       const focused = document.activeElement?.dataset.param;
@@ -225,17 +249,29 @@
       });
       const submitParams = body.querySelector('[data-action="submit_params"]');
       if (submitParams) submitParams.disabled = !allowed('submit_params') || !validParams();
+      if (task?.readiness && !task.readiness.ready) showReadiness(task.readiness);
       wireActions(body);
     }
     el('agentSubmit').disabled = !allowed(taskId ? 'supplement' : 'start') || !el('agentInput').value.trim();
     el('agentSubmit').textContent = t(taskId ? 'send' : 'start');
     el('agentNew').disabled = el('agentHistory').disabled = busy;
     el('agentStartOptions').hidden = !!taskId;
+    el('agentRefs').hidden = !!taskId;
+    if (!taskId && (references?.pending || startFrom === 'selection' && !editor.selection().length)) el('agentSubmit').disabled = true;
+    const last = task?.candidates?.at(-1);
+    if (!last || last.candidate_id !== scopeId || last.state !== 'pending') scope.clear();
+    scopeId = last?.candidate_id || '';
+    updateScope();
     const actions = el('agentActions');
-    actions.innerHTML = taskId ? ['adopt','discard','revise','regenerate','undo_candidate','undo_task_changes','readopt','stop']
+    const actionsHTML = taskId ? ['adopt','discard','revise','regenerate','undo_candidate','undo_task_changes','readopt','stop']
       .filter(a => task.allowed_actions.includes(a) || a === 'adopt' && task.status === 'waiting_candidate')
       .map(a => button(a, a === 'adopt')).join('') : '';
-    actions.hidden = !actions.innerHTML; wireActions(actions);
+    if (actionsHTML !== actionsKey) {
+      actionsKey = actionsHTML;
+      actions.innerHTML = actionsHTML;
+      wireActions(actions);
+    }
+    actions.hidden = !actionsHTML;
     const candidate = task?.candidates?.at(-1), waiting = task?.status === 'waiting_candidate';
     el('agentBanner').hidden = !waiting && !['running','planning'].includes(task?.status);
     el('agentBanner').innerHTML = waiting ? `<strong>${escape(t('candidate', candidate.number))} · ${escape(t('candidate.' + candidate.state))}</strong>
@@ -265,24 +301,31 @@
     busy = true; render(); notify('');
     try {
       const input = el('agentInput').value;
+      if (action === 'start') {
+        if (references?.pending) throw new Error(t('reference_pending'));
+        const taskMode = el('agentTaskMode')?.value;
+        if (taskMode) Object.assign(extra,{task_mode:taskMode, example_case:exampleCase});
+        if (startFrom === 'selection') extra.selection = editor.selection();
+        if (references?.images.length) Object.assign(extra, {images:references.images, reference_use:el('agentRefUse').value});
+      } else if (action === 'regenerate' && task?.start_from === 'selection' && editor.selection().length) {
+        extra.selection = editor.selection();
+      } else if (action === 'revise' && scope.size) {
+        Object.assign(extra, {selection:[...scope], candidate_id:scopeId});
+      }
       let response = await request(action, {prompt:input, text:input, params, start_from:startFrom, ...extra});
       if (response.waveform_source) {
         if (context().version !== response.source_version) throw new Error(t('stale'));
         await window.openWaveforms({source:response.waveform_source, isCurrent:() => context().version === response.source_version});
       }
       if (response.command) {
-        const current = context(), command = response.command;
-        if (current.version !== command.version || current.file !== command.file || editor.busy()) {
-          throw new Error(t('stale'));
-        }
-        await editor.apply(command);
-        const applied = context();
+        const command = response.command;
+        const applied = await applyCommand(command);
         saveAck({token:command.token, applied});
         response = await request('ack', pendingAck);
         saveAck(null);
       }
       task = response; taskId = response.task_id || taskId;
-      if (action === 'start') { params = {}; sessionStorage.setItem('agent-task-id', taskId); }
+      if (action === 'start') { el('agentReadiness').hidden = true; references?.clear(); el('agentRefs').open = false; params = {}; sessionStorage.setItem('agent-task-id', taskId); }
       if (['start','supplement','revise'].includes(action)) { el('agentInput').value = ''; draft = ''; }
       focusNext = ['start','submit_params','use_defaults','revise'].includes(action);
       renderKey = ''; previewKey = '';
@@ -290,7 +333,7 @@
     finally { busy = false; render(); }
   }
   async function poll() {
-    if (polling || busy || !resultPage && !editor.ready()) return;
+    if (polling || busy || !resultPage && (!editor.ready() || !taskId && !pendingAck && !document.body.classList.contains('agent-open'))) return;
     polling = true;
     try {
       if (pendingAck) { task = await request('ack', pendingAck); saveAck(null); }
@@ -302,6 +345,19 @@
     finally { polling = false; }
   }
   function draftChanged() { draft = el('agentInput').value; poll(); }
+  function updateScope() {
+    const row = el('agentScope');
+    if (!row) return;
+    row.hidden = !scope.size;
+    row.firstElementChild.textContent = t('scope_objects', [...scope].join(', '));
+    for (const mark of el('agentPreview')?.querySelectorAll('[data-agent-object]') || [])
+      mark.classList.toggle('selected-for-edit', scope.has(mark.dataset.agentObject));
+  }
+  function chooseTarget(key, additive) {
+    if (!additive) scope.clear();
+    if (additive && scope.has(key)) scope.delete(key); else scope.add(key);
+    updateScope();
+  }
   function clearPreview() {
     ++previewGeneration; previewKey = '';
     el('agentPreview')?.remove();
@@ -333,16 +389,29 @@
     if (!layer) { layer = document.createElement('div'); layer.id = 'agentPreview'; layer.className = 'agent'; nodes.canvas.append(layer); }
     layer.innerHTML = `<div class="agent-preview-scene">${picture.markup}</div>`;
     const scene = layer.firstElementChild;
+    if (editor.kind === 'control' && beforeAfter !== 'before') scene.onclick = event => {
+      const obj = event.target.closest('[data-block],[data-link],[data-text],[data-region]');
+      if (!obj) return;
+      const kind = ['block','link','text','region'].find(name => obj.hasAttribute('data-' + name));
+      chooseTarget(kind + ':' + obj.getAttribute('data-' + kind), event.shiftKey);
+    };
     if (beforeAfter === 'overlay') for (const change of candidate.changes) {
-      const key = change.object_type + ':' + change.object_id, box = (change.kind === 'remove' ? removed?.bounds : picture.bounds)?.[key];
+      const base = change.kind === 'remove' ? candidate.before_table : candidate.preview;
+      const index = base[change.section]?.findIndex?.((obj, i) => String(obj?.id ?? i) === change.object_id);
+      const id = editor.kind === 'control' && ['region','link','text'].includes(change.object_type) ? index : change.object_id;
+      const key = change.object_type + ':' + id, box = (change.kind === 'remove' ? removed?.bounds : picture.bounds)?.[key];
       if (!box) continue;
       const mark = document.createElement('button'); mark.className = 'agent-mark ' + change.kind;
       mark.dataset.agentObject = key; mark.title = `${t(change.kind)} ${change.label}`; mark.setAttribute('aria-label', mark.title);
       mark.style.cssText = `left:${box[0]-4}px;top:${box[1]-4}px;width:${Math.max(10,box[2]+8)}px;height:${Math.max(10,box[3]+8)}px`;
       if (change.kind === 'remove') mark.textContent = '× ' + change.label;
-      mark.onclick = () => { notify(`${change.label} · ${compact(change.kind === 'remove' ? change.before : change.after)}`); mark.focus(); };
+      mark.onclick = event => {
+        if (editor.kind === 'control' && change.kind !== 'remove' && /^(block|link|region|text):/.test(key))
+          chooseTarget(key, event.shiftKey);
+        notify(`${change.label} · ${compact(change.kind === 'remove' ? change.before : change.after)}`); mark.focus(); };
       scene.append(mark);
     }
+    updateScope();
   }
   async function locate(key) {
     if (beforeAfter !== 'overlay') {
@@ -450,25 +519,53 @@
     el('agentResultContent').innerHTML = `<h2>${escape(t('results'))}</h2><div class="row">${resultsTabs()}</div>${resultsHTML()}`;
     wireResults(el('agentResultContent'));
   }
+  function showReadiness(report) {
+    const box = el('agentReadiness'); box.hidden = false;
+    box.textContent = tr(report.ready ? '仿真就绪' : '仿真待补项');
+    for (const item of report.issues.length ? report.issues : [{message:tr('打开仿真参数')}]) {
+      const b = document.createElement('button'); b.type='button'; b.textContent=tr(item.message);
+      b.onclick=() => openSpiceForElement(null,item.target ? item : null); box.append(b);
+    }
+  }
   async function init() {
     if (resultPage) { await poll(); setInterval(poll, 1500); return; }
+    // Install the toolbar and canvas wrapper before the first fit/drag uses their size.
+    nodes = editor.mount();
     while (!editor?.ready()) await new Promise(resolve => setTimeout(resolve, 50));
     documentId = sessionStorage.getItem('agent-document-id') || crypto.randomUUID();
     sessionStorage.setItem('agent-document-id', documentId);
     version = (Number(sessionStorage.getItem('agent-document-version')) || 0) + 1;
+    window.CircuitAgentSession = {context, request, applyCommand};
     taskId = sessionStorage.getItem('agent-task-id') || '';
     const savedAck = JSON.parse(sessionStorage.getItem('agent-pending-ack') || 'null');
     if (savedAck?.taskId === taskId) pendingAck = {token:savedAck.token, applied:savedAck.applied};
-    nodes = editor.mount();
-    nodes.panel.innerHTML = `<div class="header row"><strong id="agentTaskTitle" class="grow"></strong><button id="agentNew">${escape(t('new_task'))}</button><button id="agentHistory">${escape(t('history'))}</button><button id="agentClose" aria-label="${escape(t('close'))}">×</button></div>
-      <div id="agentBody"></div><div id="agentNotice" role="status"></div><div id="agentActions" class="row actions"></div>
-      <div class="composer"><div id="agentStartOptions" class="row"><label><span id="agentStartLabel">${escape(t('start_from'))}</span><select id="agentStartFrom"><option value="current">${escape(t('current'))}</option><option value="blank">${escape(t('blank'))}</option></select></label><button id="agentPresets">${escape(t('presets'))}</button></div>
-      <textarea id="agentInput" aria-label="${escape(t('task_input'))}" placeholder="${escape(t('task_input'))}" rows="3"></textarea><div class="row"><span class="grow"></span><button id="agentSubmit" class="primary" disabled>${escape(t('start'))}</button></div></div><div id="agentLive" class="sr-only" aria-live="polite"></div>`;
+    nodes.panel.innerHTML = `<div class="header row"><strong id="agentTaskTitle" class="grow"></strong><button id="agentNew">${escape(t('new_task'))}</button><button id="agentHistory">${escape(t('history'))}</button><button id="agentResetLayout" type="button">${escape(tr('恢复布局'))}</button><button id="agentClose" aria-label="${escape(t('close'))}">×</button></div>
+      <div id="agentBody"></div><div id="agentReadiness" hidden></div><div id="agentNotice" role="status"></div><div id="agentActions" class="row actions"></div>
+      <div class="composer"><div class="agent-compose-fields"><div id="agentStartOptions" class="row"><label><span id="agentStartLabel">${escape(t('start_from'))}</span><select id="agentStartFrom"><option value="current">${escape(t('current'))}</option><option value="blank">${escape(t('blank'))}</option>${editor.kind === 'control' ? '<option value="selection">'+escape(t('selection'))+'</option>' : ''}</select></label><button id="agentPresets">${escape(t('presets'))}</button>
+      ${editor.snapshot().table.algorithm ? '' : `<label><span id="agentTaskModeLabel">${escape(tr('任务方式'))}</span><select id="agentTaskMode"><option value="">${escape(tr('按任务描述'))}</option><option value="draw">${escape(tr('只画图'))}</option><option value="example">${escape(tr('示例仿真'))}</option></select></label>`}
+      </div><details id="agentRefs"><summary>${escape(t('optional_reference'))}</summary><select id="agentRefUse" aria-label="${escape(t('optional_reference'))}"><option value="structure">${escape(t('sketch'))}</option><option value="style">${escape(t('style_reference'))}</option></select><div data-reference-images></div></details>
+      <div id="agentScope" class="row" hidden><span></span><button type="button">${escape(t('clear_scope'))}</button></div>
+      <textarea id="agentInput" aria-label="${escape(t('task_input'))}" placeholder="${escape(t('task_input'))}" rows="3"></textarea></div><div class="row">${editor.kind === 'circuit' ? `<button type="button" id="agentCheckSimulation">${escape(tr('检查仿真参数'))}</button>` : ''}<span class="grow"></span><button id="agentSubmit" class="primary" disabled>${escape(t('start'))}</button></div></div><div id="agentLive" class="sr-only" aria-live="polite"></div>`;
     const banner = document.createElement('div'); banner.id = 'agentBanner'; banner.className = 'agent row'; banner.hidden = true; nodes.column.prepend(banner);
     const results = document.createElement('section'); results.id = 'agentResults'; results.className = 'agent'; results.tabIndex = 0; results.hidden = true; nodes.column.append(results);
+    window.CircuitPanelLayout.attachAgent(nodes);
+    el('agentRefs').ontoggle = () => {
+      if (el('agentRefs').open && !references)
+        references = createReferenceImages(el('agentRefs'), 'agentImageFiles', 'agentReferenceThumbs', render, render);
+    };
+    if (el('agentTaskMode')) el('agentTaskMode').onchange = () => { exampleCase = undefined; };
+    if (el('agentCheckSimulation')) el('agentCheckSimulation').onclick = async () => {
+      const current = context();
+      try {
+        const report = await api('/api/simulation-readiness', {layout:current.table,profile:current.profile});
+        if (context().version !== current.version) return;
+        showReadiness(report);
+      } catch (err) { notify(err.message); }
+    };
+    el('agentScope').lastElementChild.onclick = () => { scope.clear(); updateScope(); };
     el('agentInput').oninput = draftChanged;
     el('agentStartFrom').onchange = e => {
-      startFrom = e.target.value;
+      startFrom = e.target.value; render();
       nodes.panel.querySelector('fieldset[data-prompt-library]')?.remove();
       delete el('agentInput').dataset.promptLibrary;
     };
@@ -476,7 +573,9 @@
     el('agentClose').onclick = () => { editor.close(); clearPreview(); };
     el('agentNew').onclick = async () => {
       if (task && ['running','planning'].includes(task.status)) { notify(t('stop_first')); return; }
-      taskId = ''; params = {}; sessionStorage.removeItem('agent-task-id'); renderKey = ''; clearPreview(); await poll();
+      taskId = ''; params = {}; exampleCase = undefined;
+      if (el('agentTaskMode')) el('agentTaskMode').value = '';
+      el('agentReadiness').hidden = true; sessionStorage.removeItem('agent-task-id'); renderKey = ''; clearPreview(); await poll();
     };
     el('agentHistory').onclick = async () => {
       const data = await request('status', {task_id:undefined, prompt:draft});
@@ -491,7 +590,9 @@
           await new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = '/prompt-library.js'; script.onload = resolve; script.onerror = reject; document.head.append(script); });
         } catch { notify(t('presets_pending')); return; }
       }
-      window.CircuitPromptLibrary.mount({textarea:el('agentInput'), domain:editor.kind, mode:startFrom === 'blank' ? 'create' : 'edit', table:() => editor.snapshot().table, api, busy:() => busy});
+      window.CircuitPromptLibrary.mount({textarea:el('agentInput'), domain:editor.snapshot().table.algorithm ? 'algorithm' : editor.kind, mode:startFrom === 'blank' ? 'create' : 'edit', table:() => editor.snapshot().table, api, busy:() => busy,
+        onScenario:(mode, scenario) => { el('agentTaskMode').value = mode; exampleCase = scenario; }});
+      window.CircuitPanelLayout?.attachLibrary(el('agentInput').closest('.composer').querySelector('[data-prompt-library]'));
     };
     document.addEventListener('keydown', e => {
       const key = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
@@ -508,7 +609,7 @@
     document.addEventListener('editor-language-change', () => { renderKey = ''; resultKey = ''; render(); });
     window.addEventListener('circuit-drawer:layout-changed', () => { if (editor.ready()) context(); });
     window.addEventListener('circuit-drawer:agent-visibility', () => {
-      if (nodes.panel.hidden) clearPreview(); else render();
+      if (nodes.panel.hidden) clearPreview(); else { render(); poll(); }
     });
     new ResizeObserver(() => { if (task?.status === 'waiting_candidate') { previewKey = ''; render(); } }).observe(nodes.canvas);
     await poll(); setInterval(poll, 800);

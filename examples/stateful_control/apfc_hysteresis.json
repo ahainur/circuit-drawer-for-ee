@@ -1,0 +1,486 @@
+{
+ "name": "apfc_hysteresis",
+ "elements": [
+  {
+   "id": "Vac",
+   "kind": "vac",
+   "pins": {
+    "a": [
+     0.0,
+     1.5
+    ],
+    "b": [
+     0.0,
+     3.5
+    ]
+   },
+   "label": "$v_{ac}$",
+   "label_pos": "left"
+  },
+  {
+   "id": "D1",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.0,
+     3.0
+    ],
+    "b": [
+     2.0,
+     4.5
+    ]
+   },
+   "label": "$D_1$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D2",
+   "kind": "D",
+   "pins": {
+    "a": [
+     2.0,
+     0.0
+    ],
+    "b": [
+     2.0,
+     1.5
+    ]
+   },
+   "label": "$D_2$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D3",
+   "kind": "D",
+   "pins": {
+    "a": [
+     4.0,
+     3.0
+    ],
+    "b": [
+     4.0,
+     4.5
+    ]
+   },
+   "label": "$D_3$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D4",
+   "kind": "D",
+   "pins": {
+    "a": [
+     4.0,
+     0.0
+    ],
+    "b": [
+     4.0,
+     1.5
+    ]
+   },
+   "label": "$D_4$",
+   "label_pos": "right"
+  },
+  {
+   "id": "L1",
+   "kind": "L",
+   "pins": {
+    "a": [
+     5.0,
+     4.5
+    ],
+    "b": [
+     6.5,
+     4.5
+    ]
+   },
+   "label": "$L$",
+   "label_pos": "above"
+  },
+  {
+   "id": "S1",
+   "kind": "nmos",
+   "pins": {
+    "d": [
+     7.0,
+     3.0
+    ],
+    "s": [
+     7.0,
+     1.0
+    ]
+   },
+   "label": "$S$",
+   "label_pos": "right"
+  },
+  {
+   "id": "D5",
+   "kind": "D",
+   "pins": {
+    "a": [
+     7.5,
+     4.5
+    ],
+    "b": [
+     9.0,
+     4.5
+    ]
+   },
+   "label": "$D_5$",
+   "label_pos": "above"
+  },
+  {
+   "id": "Co",
+   "kind": "C",
+   "pins": {
+    "a": [
+     10.0,
+     3.0
+    ],
+    "b": [
+     10.0,
+     1.5
+    ]
+   },
+   "label": "$C_o$",
+   "label_pos": "right"
+  },
+  {
+   "id": "RL",
+   "kind": "R",
+   "pins": {
+    "a": [
+     11.5,
+     4.5
+    ],
+    "b": [
+     11.5,
+     0.0
+    ]
+   },
+   "label": "$R_L$",
+   "label_pos": "right"
+  }
+ ],
+ "wires": [
+  [
+   [
+    2.0,
+    1.5
+   ],
+   [
+    2.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    4.0,
+    1.5
+   ],
+   [
+    4.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    0.0,
+    3.5
+   ],
+   [
+    1.0,
+    3.5
+   ],
+   [
+    1.0,
+    2.7
+   ],
+   [
+    2.0,
+    2.7
+   ]
+  ],
+  [
+   [
+    0.0,
+    1.5
+   ],
+   [
+    1.0,
+    1.5
+   ],
+   [
+    1.0,
+    2.0
+   ],
+   [
+    4.0,
+    2.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    4.5
+   ],
+   [
+    5.0,
+    4.5
+   ]
+  ],
+  [
+   [
+    6.5,
+    4.5
+   ],
+   [
+    7.0,
+    4.5
+   ]
+  ],
+  [
+   [
+    7.0,
+    4.5
+   ],
+   [
+    7.5,
+    4.5
+   ]
+  ],
+  [
+   [
+    7.0,
+    4.5
+   ],
+   [
+    7.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    7.0,
+    1.0
+   ],
+   [
+    7.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    9.0,
+    4.5
+   ],
+   [
+    10.0,
+    4.5
+   ]
+  ],
+  [
+   [
+    10.0,
+    4.5
+   ],
+   [
+    11.5,
+    4.5
+   ]
+  ],
+  [
+   [
+    10.0,
+    4.5
+   ],
+   [
+    10.0,
+    3.0
+   ]
+  ],
+  [
+   [
+    10.0,
+    1.5
+   ],
+   [
+    10.0,
+    0.0
+   ]
+  ],
+  [
+   [
+    2.0,
+    0.0
+   ],
+   [
+    11.5,
+    0.0
+   ]
+  ]
+ ],
+ "hops": [
+  [
+   2.0,
+   2.0
+  ]
+ ],
+ "annotations": [],
+ "netlist": {
+  "Co.a": "OUT",
+  "Co.b": "GND",
+  "D1.a": "AC_L",
+  "D1.b": "RECT",
+  "D2.a": "GND",
+  "D2.b": "AC_L",
+  "D3.a": "AC_N",
+  "D3.b": "RECT",
+  "D4.a": "GND",
+  "D4.b": "AC_N",
+  "D5.a": "SW",
+  "D5.b": "OUT",
+  "L1.a": "RECT",
+  "L1.b": "SW",
+  "RL.a": "OUT",
+  "RL.b": "GND",
+  "S1.d": "SW",
+  "S1.s": "GND",
+  "Vac.a": "AC_N",
+  "Vac.b": "AC_L"
+ },
+ "simulation": {
+  "version": 1,
+  "ground": "D2.a",
+  "components": {
+   "Vac": {
+    "dc": "0",
+    "wave": {
+     "kind": "sine",
+     "offset": "0",
+     "amplitude": "311",
+     "frequency": "50",
+     "delay": "0",
+     "phase": "0"
+    }
+   },
+   "D1": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "D2": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "D3": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "D4": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "D5": {
+    "is": "1n",
+    "n": "1",
+    "rs": "0.01",
+    "model": "generic_diode"
+   },
+   "L1": {
+    "value": "5m",
+    "initial": "0"
+   },
+   "S1": {
+    "ron": "0.05",
+    "roff": "1G",
+    "frequency": "50k",
+    "duty": "0.5",
+    "delay": "0",
+    "rise": "50n",
+    "fall": "50n",
+    "model": "ideal_switch"
+   },
+   "Co": {
+    "value": "470u",
+    "initial": "400"
+   },
+   "RL": {
+    "value": "400"
+   }
+  },
+  "transient": {
+   "step": "1u",
+   "stop": "100m",
+   "max_step": "0.5u"
+  },
+  "probes": [
+   {
+    "name": "v_ac",
+    "kind": "voltage",
+    "positive": "Vac.b",
+    "negative": "Vac.a"
+   },
+   {
+    "name": "i_ac",
+    "kind": "current",
+    "element": "Vac"
+   },
+   {
+    "name": "v_rect",
+    "kind": "voltage",
+    "positive": "D1.b",
+    "negative": "D2.a"
+   },
+   {
+    "name": "i_L",
+    "kind": "current",
+    "element": "L1"
+   },
+   {
+    "name": "v_o",
+    "kind": "voltage",
+    "positive": "RL.a",
+    "negative": "D2.a"
+   },
+   {
+    "name": "gate",
+    "kind": "drive",
+    "element": "S1"
+   }
+  ]
+ },
+ "closed_loop": {
+  "control": "apfc_hysteresis.control.json",
+  "inputs": {
+   "vrect": {
+    "probe": "v_rect"
+   },
+   "il": {
+    "probe": "i_L"
+   },
+   "vo": {
+    "probe": "v_o"
+   },
+   "vref": {
+    "value": 400
+   }
+  },
+  "outputs": {
+   "pfc.gate": {
+    "switches": [
+     "S1"
+    ],
+    "modulation": "gate"
+   }
+  },
+  "note": "APFC: sampled hysteresis current loop inside a voltage PI, written as one C block"
+ }
+}

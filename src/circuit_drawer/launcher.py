@@ -187,6 +187,8 @@ class Session:
         self.url = f"http://127.0.0.1:{self.server.server_port}/"
 
     def close(self):
+        from .editor.figure_documents import close
+        close(self.editor)
         for job in self.editor.jobs.values():
             job.cancel.set()
         self.server.shutdown()
@@ -196,7 +198,7 @@ class Session:
 
 def create_circuit(template: str | None, path: Path):
     """Never replace an existing drawing when creating a new one."""
-    layout = Layout(path.stem) if template is None else from_template(template)
+    layout = Layout(path.stem) if template is None else from_template(template, asset_dir=path.parent)
     with path.open("x", encoding="utf-8") as stream:
         json.dump(layout.to_dict(), stream, ensure_ascii=False, indent=1)
         stream.write("\n")
@@ -205,7 +207,7 @@ def create_circuit(template: str | None, path: Path):
 def create_control(template_name: str | None, path: Path):
     """Use the same launcher and settings for an ordinary control JSON file."""
     from .control import template
-    table = template(template_name) if template_name else {
+    table = template(template_name, asset_dir=path.parent) if template_name else {
         "kind": "control", "name": path.stem, "profile": "ieee-double",
         "blocks": [], "links": [], "texts": [], "regions": []}
     with path.open("x", encoding="utf-8") as stream:

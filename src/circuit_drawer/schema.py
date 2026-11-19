@@ -85,6 +85,7 @@ ELEMENT_OPTS: tuple[Field, ...] = (
     Field("scale_width", "number", "symbol size across the pin axis (PMSM: circle size, at least enclosing the phase pins)", range=SIZE_RANGE, default=1),
     Field("scale", "number", "legacy uniform symbol size; scale_length/scale_width override it",
           range=SIZE_RANGE, default=1),
+    Field("font_weight", "enum", "printed label weight", ("normal", "bold"), default="normal"),
     Field("label_size", "number", "font size in pt of the label, current and ratio text; "
           "default the profile font", range=FONT_RANGE),
     Field("current", "text", 'current arrow on the lead, e.g. "$i_L$"', kinds=frozenset(TWO_TERMINAL)),
@@ -126,6 +127,7 @@ OPTS = {f.name: f for f in ELEMENT_OPTS}
 ANNOTATION_FIELDS: tuple[Field, ...] = (
     Field("arrow", "enum", "makes it a reference current arrow on a wire at at",
           ("right", "left", "up", "down")),
+    Field("font_weight", "enum", "printed annotation weight", ("normal", "bold"), default="normal"),
     Field("side", "enum", "side of an arrow's text", LABEL_SIDES, default="above"),
     Field("size", "number", "font size in pt", range=FONT_RANGE),
     Field("color", "ink", "ink of the text and its arrow", owner="bad-color"),
@@ -139,23 +141,27 @@ def control_appearance_fields() -> dict[str, tuple[Field, ...]]:
     Imports are lazy so the circuit schema does not depend on control parsing
     at import time. The same declarations feed the prompt and link validator.
     """
-    from .control.model import BLOCK_TYPES, fill_names
+    from .control.model import BLOCK_TYPES, LABEL_GAP, MAX_LABEL_GAP, fill_names
     from .regions import BORDERS, CALLOUT_DASHES, FILLS, INKS, REGION_BORDER_COLORS
     blocks = frozenset(BLOCK_TYPES)
+    weight = ANNOTATION["font_weight"]
     return {
         "blocks": (
             Field("fill", "fill", "block/contact fill; transparent also allowed", fill_names(),
                   default="white; tag: TAG_STYLE", kinds=blocks, owner="control-appearance"),
-            Field("border", "ink", "outline and inner symbol strokes", tuple(INKS),
+            Field("border", "ink", "outline and inner symbol strokes; none hides only the frame on type block", (*INKS, "none"),
                   default="black; tag: TAG_STYLE", kinds=blocks, owner="control-appearance"),
             Field("color", "ink", "text/sign ink; switch toggle arrow defaults to red", tuple(INKS),
-                  default="black; tag: TAG_STYLE", kinds=blocks, owner="control-appearance")),
-        "links": (
+                  default="black; tag: TAG_STYLE", kinds=blocks, owner="control-appearance"),
+            *box_appearance_fields()),
+        "links": (weight,
+            Field("label_gap", "number", "printed gap from a signal line to its label (cm)",
+                  range=(0, MAX_LABEL_GAP), default=LABEL_GAP, kinds=frozenset({"link"})),
             Field("color", "ink", "line, arrowhead and label ink", tuple(INKS), default="black",
                   kinds=frozenset({"link"}), owner="control-appearance"),
             Field("dash", "enum", "signal line pattern", CALLOUT_DASHES, default="solid",
                   kinds=frozenset({"link"}))),
-        "texts": (Field("color", "ink", "free text ink", tuple(INKS), default="black",
+        "texts": (weight, Field("color", "ink", "free text ink", tuple(INKS), default="black",
                         kinds=frozenset({"text"}), owner="control-appearance"),),
         "regions": (
             Field("fill", "fill", "background tint", FILLS, default="gray",
@@ -163,13 +169,48 @@ def control_appearance_fields() -> dict[str, tuple[Field, ...]]:
             Field("border", "enum", "region outline", BORDERS, default="none; transparent: dashed",
                   kinds=frozenset({"region"})),
             Field("border_color", "fill", "palette edge or ink colour (none is forbidden)", REGION_BORDER_COLORS,
-                  default="fill; transparent: gray", kinds=frozenset({"region"}), owner="bad-region"))}
+                  default="fill; transparent: gray", kinds=frozenset({"region"}), owner="bad-region"),
+            *box_appearance_fields())}
+
+
+def box_appearance_fields() -> tuple[Field, ...]:
+    from .figure_style import BOX_FIELDS
+    return (Field("corner_radius", "number", BOX_FIELDS["corner_radius"], range=(0, 1), default=0,
+                  owner="bad-region"),
+            Field("shadow", "bool", BOX_FIELDS["shadow"], default=False, owner="bad-region"),
+            Field("inner_shadow", "bool", BOX_FIELDS["inner_shadow"], default=False, owner="bad-region"),
+            Field("border_width", "number", BOX_FIELDS["border_width"], range=(0.1, 3), owner="bad-region"),
+            ANNOTATION["font_weight"])
+
+
+def figure_field_reference() -> str:
+    from .figure_style import STYLE_LIMITS
+    from .figure_composition import COMPOSITION_KEYS, PANEL_KEYS, PRESETS, KINDS
+    from .figure_images import FIELDS
+    lines = ["Saved figure paper settings (preserve on ordinary drawing edits):"]
+    lines += [f"figure.{key}: finite number {lo}..{hi}" for key, (lo, hi) in STYLE_LIMITS.items()]
+    lines += [f"regions and rectangular blocks {f.name}: {f.doc}" for f in box_appearance_fields()]
+    lines += [f"figure.compositions: saved project source references; fields {sorted(COMPOSITION_KEYS)}",
+              f"composition preset: {PRESETS}; subfigures fields {sorted(PANEL_KEYS)}; kinds {KINDS}",
+              "Compositions are authored by the composition workspace. Preserve their provenance signatures."]
+    lines += [f"images: imported artwork list, fields {sorted(FIELDS)}. Each entry has a unique id, name, "
+              "from/to rectangle in drawing coordinates, positive integer pixel_size [w,h], foreground boolean "
+              "(default true), and source/mono_source content-addressed figure-assets/<sha256>.png paths. "
+              "Aspect ratio is preserved inside the rectangle. Preserve existing asset paths and pixel_size. "
+              "Create artwork using the import/paste workspace before referencing it. Artwork has no circuit ports."]
+    return "\n".join(lines)
+
+
+ALGORITHM_DOCUMENT = Field("algorithm", "bool", "control-document marker for publication algorithm steps; "
+                           "preserve on edits; procedural iteration links are allowed; numerical controller "
+                           "sections belong in a separate control document", default=False)
 
 
 def control_appearance_reference() -> str:
     from .control.model import fill_aliases
     from .regions import COLOR_ALIASES, INK_ALIASES
-    lines = []
+    lines = [f"{ALGORITHM_DOCUMENT.name} ({ALGORITHM_DOCUMENT.type}); default {ALGORITHM_DOCUMENT.default}. "
+             + ALGORITHM_DOCUMENT.doc]
     for section, fields in control_appearance_fields().items():
         for f in fields:
             values = "|".join(f.values)
@@ -216,7 +257,7 @@ def element_problems(layout) -> list[tuple[str, str]]:
             elif msg := allowed[key].problem(value):
                 out.append(("bad-option", f"{el.id}: opts.{msg}"))
     for i, ann in enumerate(layout.annotations):
-        for name in ("arrow", "side", "size"):
+        for name in ("arrow", "side", "size", "font_weight"):
             value = getattr(ann, name)
             if name == "side" and not ann.arrow:
                 continue

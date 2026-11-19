@@ -411,7 +411,7 @@ def main(argv: list[str] | None = None) -> int:
             target = Path(a.out)
             if target.exists() and not a.force:
                 raise ValueError(f"{target} 已存在；用新文件名或 --force")
-            layout = from_template(a.template, " ".join(a.options))
+            layout = from_template(a.template, " ".join(a.options), asset_dir=target.parent)
             target.parent.mkdir(parents=True, exist_ok=True)
             layout.save(target)
             print(a.out)
@@ -425,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
                           f"from one", file=sys.stderr)
                     return 2
                 get_profile(a.profile)
-                from_template(a.template, " ".join(a.options)).save(path)
+                from_template(a.template, " ".join(a.options), asset_dir=path.parent).save(path)
             get_profile(a.profile)
             serve(path, a.profile, a.port, Path(a.out) if a.out else None,
                   not a.no_browser, a.provider, a.model)
@@ -438,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
             path = templates.save(Layout.load(a.layout), a.name, title=a.title,
                                   aliases=tuple(a.alias), profile=a.profile,
                                   directory=Path(a.dir) if a.dir else None,
-                                  force=a.force)
+                                  force=a.force, base_dir=Path(a.layout).resolve().parent)
             saved = templates.SavedTemplate(path)
             print(f"saved template {saved.NAME} -> {path}")
             if a.name != saved.NAME:
@@ -489,11 +489,11 @@ def main(argv: list[str] | None = None) -> int:
             for file in result["files"]:
                 print(file)
             return 0
-        layout = (from_template(a.template, " ".join(a.options)) if a.cmd == "draw"
+        layout = (from_template(a.template, " ".join(a.options), asset_dir=Path(a.out)) if a.cmd == "draw"
                   else Layout.load(a.layout))
         name = a.name or (None if a.cmd == "draw" else Path(a.layout).stem.removesuffix(".layout"))
         res = render(layout, a.profile, a.out, name, a.formats, a.grid, a.mono,
-                     base_dir=None if a.cmd == "draw" else Path(a.layout).resolve().parent)
+                     base_dir=Path(a.out) if a.cmd == "draw" else Path(a.layout).resolve().parent)
         for w in res.report.issues:
             print(w, file=sys.stderr)
         for path in res.files.values():
@@ -520,7 +520,7 @@ def _modes(a: argparse.Namespace) -> int:
     if src.suffix.lower() == ".json" and src.exists():
         layout = Layout.load(src)
     else:
-        layout = from_template(a.template, " ".join(a.options))
+        layout = from_template(a.template, " ".join(a.options), asset_dir=Path(a.out))
     modes = None
     if a.mode_file:
         raw = json.loads(Path(a.mode_file).read_text(encoding="utf-8"))
@@ -554,7 +554,7 @@ def _modes(a: argparse.Namespace) -> int:
         if not only or any(not 1 <= n <= count for n in only):
             raise ValueError(f"--only 的编号要在 1～{count} 之间（用 --list 查看全部模态）")
     results = render_modes(layout, a.profile, a.out, a.name, a.formats, style, modes, only,
-                           not a.no_sheet, base_dir=src.resolve().parent if src.suffix.lower() == ".json" else None)
+                           not a.no_sheet, base_dir=src.resolve().parent if src.suffix.lower() == ".json" else Path(a.out))
     print("checked: loop connections and device directions only; bias and operating "
           "conditions are not checked", file=sys.stderr)
     for r in results:

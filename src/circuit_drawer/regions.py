@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .layout import Layout, Point
+from .figure_style import BOX_FIELDS, box_style, font_weight
 
 # Print-friendly tints: light enough that black lines and 8 pt text on top
 # stay crisp on paper, distinct enough to tell neighbouring modules apart.
@@ -74,7 +75,7 @@ CALLOUT_APPEARANCE_FIELDS = {
 }
 CALLOUT_KEYS = frozenset({"id", "from", "to", "style", "color", "label", "label_pos", "size",
                          "bend", "wave_amplitude", "wave_cycles", "via", "label_at", "dash",
-                         "head", "isolation", "detail", "corner"}) | CALLOUT_APPEARANCE_FIELDS.keys()
+                         "head", "isolation", "detail", "corner", "font_weight", "from_anchor", "to_anchor"}) | CALLOUT_APPEARANCE_FIELDS.keys()
 TRANSPARENCY_NOTE = "块箭头使用了透明填充：PDF 保留透明度；转 EPS 或部分印刷流程会拍平透明度，请核对转换后的遮挡效果。"
 
 STACK_MAX = 6               # more panels than this reads as noise
@@ -161,6 +162,11 @@ class Region:
     # and the model and later exports read the module split from here
     members: list[str] = field(default_factory=list)
     id: str | None = None
+    corner_radius: float = 0
+    shadow: bool = False
+    inner_shadow: bool = False
+    border_width: float | None = None
+    font_weight: str = "normal"
 
     def rect(self, k: int = 0) -> tuple[float, float, float, float]:
         """The front rectangle (k = 0) or the k-th panel behind it."""
@@ -195,6 +201,7 @@ class Callout:
     fill_opacity: float = 1.0
     foreground: bool = False
     over_parts: bool = False
+    font_weight: str = "normal"
     corner: str = "sharp"          # rounding of via corners on line arrows
 
 
@@ -203,12 +210,16 @@ def parse_region(d: Any, i: int, layout=None, s=None, prof=None, *, schema_only=
     if not isinstance(d, dict):
         raise RegionError(f"{name} must be an object")
     try:
+        decoration = box_style(d)
+    except ValueError as exc:
+        raise RegionError(f"{name}: {exc}") from None
+    try:
         if "fit" in d:
             if d["fit"] != "members":
                 raise RegionError('fit only accepts "members"')
             members = d.get("members")
             if not isinstance(members, list) or not members or not all(isinstance(m, str) for m in members):
-                raise RegionError('fit="members" requires a non-empty members list of element ids')
+                raise RegionError('fit="members" requires a non-empty members list of element or module instance ids')
             if layout is None and not schema_only:
                 raise RegionError('fit="members" needs a circuit layout to resolve member geometry')
             if schema_only:
@@ -273,17 +284,40 @@ def parse_region(d: Any, i: int, layout=None, s=None, prof=None, *, schema_only=
             f = fills[k - 1] if k - 1 < len(fills) else base
             layers.append((dx * k, dy * k, f if k - 1 < len(fills) or fill == "none" else f"{base}@{k}"))
     return Region(x0, y0, x1, y1, fill, border, bc, label, pos, size, layers, name,
-                  list(members), d.get("id"))
+                  list(members), d.get("id"), *decoration)
 
 
-def parse_callout(d: Any, i: int) -> Callout:
+def callout_endpoint(raw, key, layout):
+    point = _point(raw.get(key), key)
+    anchor_key = key + "_anchor"
+    if anchor_key not in raw:
+        return point
+    anchor = raw[anchor_key]
+    if raw.get("style") != "line" or not isinstance(anchor, dict) or layout is None:
+        raise RegionError(f"{anchor_key} needs a line callout and its drawing")
+    if set(anchor) == {"element", "pin"} and all(isinstance(v, str) for v in anchor.values()):
+        part = next((e for e in layout.elements if e.id == anchor["element"]), None)
+        if part and anchor["pin"] in part.pins:
+            return part.pins[anchor["pin"]]
+    if set(anchor) == {"block", "side"} and all(isinstance(v, str) for v in anchor.values()):
+        from .blocks import safe_blocks
+        block = next((b for b in safe_blocks(layout) if b.id == anchor["block"]), None)
+        if block:
+            x, y = (block.x0 + block.x1) / 2, (block.y0 + block.y1) / 2
+            sides = {"n": (x, block.y1), "s": (x, block.y0), "w": (block.x0, y), "e": (block.x1, y)}
+            if anchor["side"] in sides:
+                return sides[anchor["side"]]
+    raise RegionError(f"{anchor_key} must reference an existing element/pin or block/side (n, e, s, w)")
+
+
+def parse_callout(d: Any, i: int, layout=None) -> Callout:
     name = f"callouts[{i}]" + (f" ({d['id']})" if isinstance(d, dict) and d.get("id") else "")
     if not isinstance(d, dict):
         raise RegionError(f"{name} must be an object")
     if unknown := set(d) - CALLOUT_KEYS:
         raise RegionError(f"{name}: 未知项 {sorted(unknown)}；可用 {sorted(CALLOUT_KEYS)}")
     try:
-        a, b = _point(d.get("from"), "from"), _point(d.get("to"), "to")
+        a, b = (callout_endpoint(d, key, layout) for key in ("from", "to"))
     except RegionError as exc:
         raise RegionError(f"{name}: {exc}") from None
     if math.dist(a, b) < MIN_CALLOUT:
@@ -378,9 +412,13 @@ def parse_callout(d: Any, i: int) -> Callout:
         elif not isinstance(value, bool):
             raise RegionError(f"{name}: {key} 必须是 true 或 false")
         appearance[key] = value
+    try:
+        weight = font_weight(d)
+    except ValueError as exc:
+        raise RegionError(f"{name}: {exc}") from None
     return Callout(a, b, style, color, label, pos, _num(size) if size is not None else None, name,
                    bend=bend, wave_amplitude=amplitude, wave_cycles=int(cycles), via=via, label_at=label_at,
-                   dash=dash, head=head, isolation=isolation, detail=detail, corner=corner, **appearance)
+                   dash=dash, head=head, isolation=isolation, detail=detail, corner=corner, font_weight=weight, **appearance)
 
 
 def _sections(layout: Layout, key: str) -> list:
@@ -395,7 +433,7 @@ def regions_of(layout: Layout, s=None, prof=None) -> list[Region]:
 
 
 def callouts_of(layout: Layout) -> list[Callout]:
-    return [parse_callout(d, i) for i, d in enumerate(_sections(layout, "callouts"))]
+    return [parse_callout(d, i, layout) for i, d in enumerate(_sections(layout, "callouts"))]
 
 
 def problems(layout: Layout, s=None, prof=None, *, schema_only=False) -> list[str]:
@@ -412,7 +450,7 @@ def problems(layout: Layout, s=None, prof=None, *, schema_only=False) -> list[st
                 if key == "regions":
                     parse(d, i, layout, s, prof, schema_only=schema_only)
                 else:
-                    parse(d, i)
+                    parse(d, i, layout)
             except RegionError as exc:
                 out.append(str(exc))
     return out
@@ -426,7 +464,7 @@ def safe_regions(layout: Layout, s=None, prof=None) -> tuple[list[Region], list[
         v = layout.extra.get(key)
         for i, d in enumerate(v if isinstance(v, list) else []):
             try:
-                dst.append(parse(d, i, layout, s, prof) if key == "regions" else parse(d, i))
+                dst.append(parse(d, i, layout, s, prof) if key == "regions" else parse(d, i, layout))
             except RegionError:
                 pass
     return regs, calls

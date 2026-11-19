@@ -48,6 +48,7 @@ class View:
     profile: Profile
     report: object = None
     bounds: Box | None = None
+    base_dir: Path | None = None
 
     def tikz(self, scale, mono=False):
         from .control.emit import body, _n
@@ -55,7 +56,7 @@ class View:
         unit = _n(self.report.geometry.s)
         return (rf"\begin{{scope}}[shift={{({_n(origin[0])}cm,{_n(origin[1])}cm)}}, "
                 rf"x={unit}cm,y={unit}cm,line join=round]" + "\n"
-                + body(self.report, self.profile, mono) + "\\end{scope}\n")
+                + body(self.report, self.profile, mono, base_dir=self.base_dir) + "\\end{scope}\n")
 
 
 def prepare(layout, profile, scale, base_dir=None):
@@ -76,6 +77,8 @@ def prepare(layout, profile, scale, base_dir=None):
         raise ValueError("closed_loop.control：" + str(exc)) from None
     block = next(b for b in safe_blocks(layout) if b.id == cfg["block"])
     view = View(block, cfg.get("display", "collapsed"), raw, profile)
+    source = layout.extra["closed_loop"]["control"]
+    view.base_dir = (Path(base_dir or ".") / source).resolve().parent if isinstance(source, str) else Path(base_dir or ".")
     if view.display == "collapsed":
         return view
     frame = block_rect(block, scale)
@@ -102,11 +105,11 @@ def preview(view, scale):
     """A vector preview of the same checked ink, cached independently of position."""
     frame = block_rect(view.block, scale)
     return _preview(json.dumps(view.raw, sort_keys=True), view.profile,
-                    round(frame.x1 - frame.x0, 8), round(frame.y1 - frame.y0, 8))
+                    round(frame.x1 - frame.x0, 8), round(frame.y1 - frame.y0, 8), str(view.base_dir))
 
 
 @lru_cache(maxsize=16)
-def _preview(source, profile, width, height):
+def _preview(source, profile, width, height, base_dir=None):
     from .blocks import Block
     from .compile import build
     from .control.check import check, extent
@@ -114,7 +117,7 @@ def _preview(source, profile, width, height):
     raw = json.loads(source)
     report = check(raw, profile)
     view = View(Block("control", 0, 0, width, height), "expanded", raw, profile,
-                report, extent(report.diagram, report.geometry, profile))
+                report, extent(report.diagram, report.geometry, profile), base_dir)
     cjk = any(has_wide(t) for t in texts(view))
     tex = preamble(profile, cjk).replace("border=1pt", "border=0pt").replace(
         r"\usepackage{circuitikz}", "\\usepackage{circuitikz}\n\\usetikzlibrary{arrows.meta}")

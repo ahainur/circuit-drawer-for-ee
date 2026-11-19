@@ -126,8 +126,12 @@ class Annotation:
     size: float | None = None     # font size in pt; None = the profile's 8 pt
     color: str | None = None      # ink name or #rrggbb for the text and its arrow
 
+    font_weight: str = "normal"
+
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"at": list(self.at), "text": self.text}
+        if self.font_weight != "normal":
+            d["font_weight"] = self.font_weight
         if self.arrow:
             d["arrow"] = self.arrow
             d["side"] = self.side
@@ -253,7 +257,7 @@ class Layout:
             hops=[_pt(p) for p in d.get("hops", [])],
             annotations=[Annotation(_pt(a["at"]), a["text"], a.get("arrow"),
                                     a.get("side", "above"), a.get("size"),
-                                    a.get("color") or None)
+                                    a.get("color") or None, a.get("font_weight", "normal"))
                          for a in d.get("annotations", [])],
             netlist=dict(d.get("netlist", {})),
             modes=[dict(m) for m in d.get("modes", [])],

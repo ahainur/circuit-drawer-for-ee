@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import math
 
-from ..emit import _region, preamble
+from ..emit import _region, preamble, _box_decoration, weighted
+from ..figure_style import paper_profile
 from ..geometry import has_wide, unscaled
+from ..glyphs import tikz as glyph_tikz
 from ..profiles import Profile
 from ..regions import LINE_HEAD, ink_tikz
 from .check import CONTACT_R, SUM_R, TOGGLE_FRAC, Label, Report
@@ -43,13 +45,15 @@ def _font(pt: float) -> str:
 
 def _texts(dia: Diagram) -> list[str]:
     out = [b.text or "" for b in dia.blocks] + [b.label or "" for b in dia.blocks]
+    out += [text for b in dia.blocks for text in b.port_labels.values()]
     out += [lk.label or "" for lk in dia.links] + [t.text for t in dia.texts]
     out += [r.label or "" for r in dia.regions]
     return out
 
 
-def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False) -> str:
+def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False, *, base_dir=None) -> str:
     dia, g = rep.diagram, rep.geometry
+    prof = paper_profile(prof, dia.raw)
     cjk = any(has_wide(t) for t in _texts(dia))
     out = [preamble(prof, cjk).replace(r"\usepackage{circuitikz}",
                                        "\\usepackage{circuitikz}\n\\usetikzlibrary{arrows.meta}")]
@@ -58,15 +62,18 @@ def emit(rep: Report, prof: Profile, mono: bool = False, grid: bool = False) -> 
                rf"line width={prof.line_pt}pt, line join=round]" "\n")
     if grid:
         out.append(_grid(rep))
-    out.append(body(rep, prof, mono))
+    out.append(body(rep, prof, mono, base_dir=base_dir))
     out.append("\\end{tikzpicture}\n" + ("\\end{CJK}\n" if cjk else "") + "\\end{document}\n")
     return "".join(out)
 
 
-def body(rep: Report, prof: Profile, mono: bool = False) -> str:
+def body(rep: Report, prof: Profile, mono: bool = False, *, base_dir=None) -> str:
     """The checked diagram, also used inside a circuit's controller frame."""
     dia, g = rep.diagram, rep.geometry
+    prof = paper_profile(prof, dia.raw)
     s, out = g.scale, []
+    from ..figure_images import tex as image_tex
+    out.append(image_tex(dia.raw, s, base_dir, mono=mono, foreground=False))
     if dia.regions:
         out.append("% ---- regions (background) ----\n")
         out += [_region(r, s, prof, mono) for r in dia.regions]
@@ -89,6 +96,7 @@ def body(rep: Report, prof: Profile, mono: bool = False) -> str:
                        rf"{{${'-' if sign == '-' else '+'}$}};" "\n")
     out.append("% ---- text ----\n")
     out += [_label(lb, g.s, mono) for lb in g.labels if not lb.owner.endswith(" sign")]
+    out.append(image_tex(dia.raw, s, base_dir, mono=mono))
     return "".join(out)
 
 
@@ -96,7 +104,7 @@ def _label(lb: Label, s: float, mono: bool) -> str:
     c = ((lb.box.x0 + lb.box.x1) / 2 / s, (lb.box.y0 + lb.box.y1) / 2 / s)
     col = f", text={ink_tikz(lb.color, mono)}" if lb.color else ""
     return (rf"\node[inner sep=0pt, align=center, font={_font(lb.pt)}{col}] at {_p(c)} "
-            rf"{{{lb.text}}};" "\n")
+            rf"{{{weighted(lb.text, lb.font_weight)}}};" "\n")
 
 
 def _link(lk, path, blocks: dict[str, Block], s: float, mono: bool = False) -> str:
@@ -130,7 +138,7 @@ def _fill_tex(value: str, mono: bool) -> str:
 
 def _block(b: Block, s: float, prof: Profile, mono: bool) -> str:
     fill = _fill_tex(b.fill, mono) if b.fill is not None else "white"
-    edge = f", draw={ink_tikz(b.border, mono)}" if b.border else ""
+    edge = ", draw=none" if b.border == "none" else f", draw={ink_tikz(b.border, mono)}" if b.border else ""
     stroke = f"[{edge[2:]}]" if edge else ""
     if b.type in CIRCLE_TYPES:
         c, r = _p(b.at), f"{_n(SUM_R)}cm"
@@ -149,15 +157,25 @@ def _block(b: Block, s: float, prof: Profile, mono: bool) -> str:
     if b.type == "switch":
         return _switch(b, s, prof, mono)
     x0, y0, x1, y1 = b.rect()
+    from ..geometry import Scale
+    corners, shadow, inset = _box_decoration(b.rect(), b, Scale(s, s))
     rect = f"{_p((x0, y0))} rectangle {_p((x1, y1))}"
     if b.type == "tag":
         fill, border, _ = TAG_STYLE[b.style]
         fill = b.fill or fill
         border = b.border or border
         fill_tex = _fill_tex(fill, mono)
-        return (rf"\filldraw[fill={fill_tex}, draw={ink_tikz(border, mono)}, "
-                rf"line width={_n(prof.line_pt * TAG_FRAME)}pt] {rect};" "\n")
-    out = rf"\draw[fill={fill}{edge}] {rect};" "\n"
+        return shadow + (rf"\filldraw[{corners}fill={fill_tex}, draw={ink_tikz(border, mono)}, "
+                rf"line width={_n(b.border_width or prof.line_pt * TAG_FRAME)}pt] {rect};" "\n") + inset
+    if b.type == "compare":
+        (cx, cy), (w, h) = b.at, b.size
+        k = 1 if b.point == "e" else -1
+        flat, tip = cx - k * w / 2, cx + k * w / 2
+        return (rf"\draw[fill={fill}{edge}] {_p((flat, cy - h / 2))} -- {_p((flat, cy + h / 2))} -- "
+                rf"{_p((tip, cy))} -- cycle;" "\n")
+    if b.border_width is not None:
+        edge += f", line width={_n(b.border_width)}pt"
+    out = shadow + rf"\draw[{corners}fill={fill}{edge}] {rect};" "\n" + inset
     if b.type == "limiter":
         (cx, cy), (w, h) = b.at, b.size
         ax, ay = w * LIMIT_AXES, h * LIMIT_AXES
@@ -168,6 +186,10 @@ def _block(b: Block, s: float, prof: Profile, mono: bool) -> str:
         fx = w * LIMIT_FLAT
         out += (rf"\draw{stroke} {_p((cx - fx, cy - ky))} -- {_p((cx - kx, cy - ky))} -- "
                 rf"{_p((cx + kx, cy + ky))} -- {_p((cx + fx, cy + ky))};" "\n")
+    if b.icon:
+        ink = ink_tikz("black" if b.border == "none" else (b.border or "black"), mono)
+        out += glyph_tikz({"kind": b.icon, "from": [x0, y0], "to": [x1, y1]}, f"color={ink}",
+                          b.icon_color, mono)
     return out
 
 

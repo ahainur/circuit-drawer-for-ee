@@ -283,7 +283,7 @@ def _checked_for_simulation(layout, profile, report=None, *, connections=()):
             drawing.extra.pop("drawing_scale", None)
         # Retain valid regions/arrows so detail-wired is still checked, even
         # when a different decoration had a syntax/colour error.
-        for key, parse in (("callouts", lambda d, i: parse_callout(d, i)),
+        for key, parse in (("callouts", lambda d, i: parse_callout(d, i, layout)),
                            ("regions", lambda d, i: parse_region(d, i, layout, rep.scale, profile))):
             valid = []
             raw = drawing.extra.get(key, [])
@@ -842,13 +842,13 @@ def native_metadata(layout: Layout, profile="ieee-single", base_dir=None) -> Dec
     return _make_deck(layout, profile, base_dir, native=True)
 
 
-def gate_drives(layout, nets, loop=None):
+def gate_drives(layout, nets, loop=None, *, partial=False):
     """Resolve explicit electrical gates and optional PWM-controlled V drivers."""
     components = layout.extra["simulation"]["components"]
     elements = {e.id: e for e in layout.elements}
     gates, sources = {}, {}
     for e in layout.elements:
-        if e.kind not in PWM_SWITCHES:
+        if e.kind not in PWM_SWITCHES or partial and e.id not in components:
             continue
         cfg = components[e.id]
         if not isinstance(cfg, dict):
@@ -878,7 +878,7 @@ def gate_drives(layout, nets, loop=None):
             driver = elements.get(source)
             if driver is None or driver.kind != "V" or source in sources:
                 raise SpiceError(f"{e.id}: gate_source 必须为独占的 V 元件 ID")
-            if not isinstance(components[source], dict):
+            if not isinstance(components.get(source), dict):
                 raise SpiceError(f"{source}: 仿真参数必须为对象")
             if "wave" in components[source]:
                 raise SpiceError(f"{source}: 已绑定内部栅极驱动，请将源激励设为 DC，避免重复配置 wave")
@@ -889,6 +889,82 @@ def gate_drives(layout, nets, loop=None):
                        "voltage": voltage * (-1 if e.kind == "pmos" else 1),
                        "threshold": threshold, "polarity": -1 if e.kind == "pmos" else 1}
     return gates, sources
+
+
+def component_values(e, cfg, external_gate=False):
+    """Validate numeric device values for both the parameter editor and the deck."""
+    fields = [k for k, _, _ in FIELDS[e.kind] if not external_gate or k not in PWM_FIELDS]
+    defaults = {k: d for k, _, d in OPTIONAL_FIELDS.get(e.kind, [])}
+    optional = [k for k in defaults if not external_gate or k not in PWM_FIELDS]
+    required_keys, optional_keys = component_fields(e.kind, external_gate)
+    _keys(cfg, required_keys, optional_keys, label=e.id)
+    val = {k: number(cfg[k], f"{e.id}.{k}") for k in fields}
+    for k in optional:
+        val[k] = number(cfg.get(k, defaults[k]), f"{e.id}.{k}")
+        if k in POSITIVE_OPTIONAL and val[k] <= 0:
+            raise SpiceError(f"{e.id}.{k} 必须大于 0")
+        if k != "phase_shift" and val[k] < 0:
+            raise SpiceError(f"{e.id}.{k} 不能小于 0")
+    for k, v in val.items():
+        if k in optional:
+            continue
+        if k not in ("initial", "dc", "delay", "rs", "vce0", "vf") and v <= 0:
+            raise SpiceError(f"{e.id}.{k} 必须大于 0")
+        if k in ("delay", "rs", "vce0", "vf") and v < 0:
+            raise SpiceError(f"{e.id}.{k} 不能小于 0")
+    if external_gate:
+        # These fields describe a disabled internal command generator.
+        val.update({k: number(v, k) for k, _, v in FIELDS[e.kind] if k in PWM_FIELDS})
+        val.update(phase_shift=0, phase_ramp=0)
+    if e.kind in PWM_SWITCHES:
+        if not 0 < val["duty"] < 1:
+            raise SpiceError(f"{e.id}: 占空比 {val['duty']:g} 超出范围，应大于 0、小于 1")
+        if val["ron"] >= val["roff"]:
+            raise SpiceError(f"{e.id}: 导通电阻 Ron = {val['ron']:g} Ω 必须小于关断电阻 Roff = {val['roff']:g} Ω")
+    return val
+
+
+def transient_values(settings):
+    _keys(settings, ("step", "stop", "max_step"), optional=("node_capacitance",), label="transient")
+    tr = {k: number(v, f"transient.{k}") for k, v in settings.items()}
+    if tr.get("node_capacitance", 0) < 0:
+        raise SpiceError("transient.node_capacitance 必须 ≥ 0；0 表示禁用数值稳定电容")
+    if not 0 < tr["max_step"] <= tr["step"] < tr["stop"]:
+        raise SpiceError("时间设置要求 0 < 最大积分步长 ≤ 输出采样间隔 < 结束时间")
+    if tr["stop"] / tr["max_step"] > 1_000_000:
+        raise SpiceError("本次仿真超过 100 万个积分步长；请缩短时长或增大步长")
+    return tr
+
+
+def probe_definition(probe, i, ids, nets, used):
+    if not isinstance(probe, dict):
+        raise SpiceError("每个 probe 必须是对象")
+    kind = probe.get("kind")
+    fields = ("positive", "negative") if kind == "voltage" else ("element",)
+    if kind == "motor":
+        fields += ("quantity",)
+    target = ids.get(probe.get("element")) if isinstance(probe.get("element"), str) else None
+    winding = ("winding",) if kind == "current" and target and target.kind == "transformer" else ()
+    _keys(probe, ("name", "kind", *fields, *winding), label=f"probe[{i}]")
+    label = probe["name"]
+    if not isinstance(label, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,40}", label) or label.lower() in used:
+        raise SpiceError("通道名称必须是互不重复的英文字母/数字/下划线，以字母开头")
+    used.add(label.lower())
+    if kind == "voltage":
+        if any(not isinstance(probe[k], str) or probe[k] not in nets for k in fields):
+            raise SpiceError(f"{label}: 测量引脚已不存在，请重新选择")
+    elif kind == "motor":
+        if target is None or target.kind != "pmsm":
+            raise SpiceError(f"{label}: motor 测量通道的 element 必须是 PMSM 元件 ID")
+        quantity = probe["quantity"]
+        if not isinstance(quantity, str) or quantity not in pmsm.QUANTITIES:
+            raise SpiceError(f"{label}: quantity 必须为 {', '.join(pmsm.QUANTITIES)}")
+    elif kind in ("current", "drive"):
+        if target is None or (kind == "current" and target.kind not in CURRENT_PROBE_KINDS) or (kind == "drive" and target.kind not in GATED):
+            raise SpiceError(f"{label}: 电流通道支持 D/L/V/vac/igbt/scr/transformer；驱动通道支持 nmos/pmos/igbt/scr")
+    else:
+        raise SpiceError(f"不支持的 probe.kind: {kind}")
+    return label, kind, target
 
 
 def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
@@ -906,14 +982,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
         raise SpiceError("ground 必须指向当前电路的一个引脚，例如 Vin.a")
     ids = {e.id: e for e in devices}
     _keys(sim["components"], ids, label="components（必须与元件逐一对应）")
-    _keys(sim["transient"], ("step", "stop", "max_step"), optional=("node_capacitance",), label="transient")
-    tr = {k: number(v, f"transient.{k}") for k, v in sim["transient"].items()}
-    if tr.get("node_capacitance", 0) < 0:
-        raise SpiceError("transient.node_capacitance 必须 ≥ 0；0 表示禁用数值稳定电容")
-    if not 0 < tr["max_step"] <= tr["step"] < tr["stop"]:
-        raise SpiceError("时间设置要求 0 < 最大积分步长 ≤ 输出采样间隔 < 结束时间")
-    if tr["stop"] / tr["max_step"] > 1_000_000:
-        raise SpiceError("本次仿真超过 100 万个积分步长；请缩短时长或增大步长")
+    tr = transient_values(sim["transient"])
     loop = None
     if closed is not None:
         from .closed_loop import ClosedLoopError, load
@@ -979,31 +1048,9 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             lines.extend(_pmsm_lines(name, {pin: node(f"{e.id}.{pin}") for pin in "abc"}, val))
             continue
         external_gate = e.id in gates and gates[e.id]["mode"] == "external"
-        fields = [k for k, _, _ in FIELDS[e.kind] if not external_gate or k not in PWM_FIELDS]
-        defaults = {k: d for k, _, d in OPTIONAL_FIELDS.get(e.kind, [])}
-        optional = [k for k in defaults if not external_gate or k not in PWM_FIELDS]
-        required_keys, optional_keys = component_fields(e.kind, external_gate)
-        _keys(cfg, required_keys, optional_keys, label=e.id)
-        val = {k: number(cfg[k], f"{e.id}.{k}") for k in fields}
-        for k in optional:
-            val[k] = number(cfg.get(k, defaults[k]), f"{e.id}.{k}")
-            if k in POSITIVE_OPTIONAL and val[k] <= 0:
-                raise SpiceError(f"{e.id}.{k} 必须大于 0")
-            if k != "phase_shift" and val[k] < 0:
-                raise SpiceError(f"{e.id}.{k} 不能小于 0")
+        val = component_values(e, cfg, external_gate)
         body = (BODY_DIODE if all(val.get(k, v) == v for k, v in BODY_DIODE_VALUES.items()) else
                 f"IS={val['diode_is']:.15g} N={val['diode_n']:.15g} RS={val['diode_rs']:.15g}")
-        for k, v in val.items():
-            if k in optional:
-                continue
-            if k not in ("initial", "dc", "delay", "rs", "vce0", "vf") and v <= 0:
-                raise SpiceError(f"{e.id}.{k} 必须大于 0")
-            if k in ("delay", "rs", "vce0", "vf") and v < 0:
-                raise SpiceError(f"{e.id}.{k} 不能小于 0")
-        if external_gate:
-            # These fields describe a disabled internal command generator.
-            val.update({k: number(v, k) for k, _, v in FIELDS[e.kind] if k in PWM_FIELDS})
-            val.update(phase_shift=0, phase_ramp=0)
         n = lambda pin: node(f"{e.id}.{pin}")
         s = lambda key: f"{val[key]:.15g}"
         name = names[e.id]
@@ -1084,6 +1131,8 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 raise SpiceError(f"{e.id}: {e.kind} 仅支持 {model} 模型")
             is_vco = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'vco'
             is_sps = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'sps'
+            # A direct gate output drives the switch from controller samples; its PWM fields are unused.
+            is_gate = loop and e.id in loop.driven and loop.outputs[loop.driven[e.id]].get('modulation') == 'gate'
             paired_pwm = (loop and e.id in loop.driven and not is_vco and not is_sps
                           and bool(loop.outputs[loop.driven[e.id]]['complement']))
             timing = {**val, 'frequency': loop.outputs[loop.driven[e.id]]['frequency_max'], 'duty': .5} if is_vco else val
@@ -1092,17 +1141,13 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
             period = 1 / timing["frequency"]
             # Duty is measured between the 50% rising/falling threshold crossings.
             width = timing["duty"] * period - (val["rise"] + val["fall"]) / 2
-            if not 0 < val["duty"] < 1:
-                raise SpiceError(f"{e.id}: 占空比 {val['duty']:g} 超出范围，应大于 0、小于 1")
-            if val["ron"] >= val["roff"]:
-                raise SpiceError(f"{e.id}: 导通电阻 Ron = {val['ron']:g} Ω 必须小于关断电阻 Roff = {val['roff']:g} Ω")
-            if not paired_pwm and not (width > 0 and width + val["rise"] + val["fall"] < period):
+            if not paired_pwm and not is_gate and not (width > 0 and width + val["rise"] + val["fall"] < period):
                 raise SpiceError(f"{e.id}: 上升 / 下降时间（{val['rise']:g} s / {val['fall']:g} s）相对开关周期 "
                                  f"{period:g} s 和占空比 {val['duty']:g} 过长，导通或关断段放不下")
             is_averaged = loop and any(e.id in (upper, lower) for upper, (lower, _) in loop.averaged.items())
             # An averaged leg has no carrier edges to sample. Physical switches
             # (including independent load switches) still need PWM resolution.
-            if not is_averaged and not is_vco and not is_sps and not paired_pwm and not external:
+            if not is_averaged and not is_vco and not is_sps and not is_gate and not paired_pwm and not external:
                 check_pwm_timing(e.id, val, tr)
             if e.kind == "scr":
                 if loop and e.id in loop.driven:
@@ -1236,37 +1281,17 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
     commands, vectors, columns, used, exprs = [], [], ["time_s"], set(), {}
     diode_currents, current_feedback = [], {}
     for i, probe in enumerate(probes):
-        if not isinstance(probe, dict):
-            raise SpiceError("每个 probe 必须是对象")
-        kind = probe.get("kind")
-        fields = ("positive", "negative") if kind == "voltage" else ("element",)
-        if kind == "motor":
-            fields += ("quantity",)
-        target = ids.get(probe.get("element")) if isinstance(probe.get("element"), str) else None
-        winding = ("winding",) if kind == "current" and target and target.kind == "transformer" else ()
-        _keys(probe, ("name", "kind", *fields, *winding), label=f"probe[{i}]")
-        label = probe["name"]
-        if not isinstance(label, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,40}", label) or label.lower() in used:
-            raise SpiceError("通道名称必须是互不重复的英文字母/数字/下划线，以字母开头")
-        used.add(label.lower())
+        label, kind, target = probe_definition(probe, i, ids, rep.nets, used)
         if kind == "voltage":
-            if any(not isinstance(probe[k], str) or probe[k] not in rep.nets for k in fields):
-                raise SpiceError(f"{label}: 测量引脚已不存在，请重新选择")
             a, b = node(probe["positive"]), node(probe["negative"])
             expr = " - ".join("0" if x == "0" else f"v({x})" for x in (a, b))
             unit = "V"
         elif kind == "motor":
-            if target is None or target.kind != "pmsm":
-                raise SpiceError(f"{label}: motor 测量通道的 element 必须是 PMSM 元件 ID")
             quantity = probe["quantity"]
-            if not isinstance(quantity, str) or quantity not in pmsm.QUANTITIES:
-                raise SpiceError(f"{label}: quantity 必须为 {', '.join(pmsm.QUANTITIES)}")
             expr = f"v(cd_{names[target.id]}_{quantity})"
             unit = pmsm.QUANTITIES[quantity]["unit"]
         elif kind in ("current", "drive"):
-            e = ids.get(probe["element"]) if isinstance(probe["element"], str) else None
-            if e is None or (kind == "current" and e.kind not in CURRENT_PROBE_KINDS) or (kind == "drive" and e.kind not in GATED):
-                raise SpiceError(f"{label}: 电流通道支持 D/L/V/vac/igbt/scr/transformer；驱动通道支持 nmos/pmos/igbt/scr")
+            e = target
             expr = f"i({names[e.id]})" if kind == "current" else f"v(ctl_{names[e.id]})"
             if loop and kind == "current" and e.id in {*loop.averaged, *(lo for lo, _ in loop.averaged.values())}:
                 raise SpiceError(f"{label}: {e.id} 按闭环 average 模型仿真，没有单管电流；改测桥臂所接电感的电流")
@@ -1285,8 +1310,6 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                 part = "p" if probe["winding"] == "primary" else probe["winding"]
                 expr = f"i(V{part}_{names[e.id]})"
             unit = "A" if kind == "current" else "1"
-        else:
-            raise SpiceError(f"不支持的 probe.kind: {kind}")
         exprs[label] = expr
         vector = f"cd_probe_{i}"
         commands.append(f"let {vector} = 0*time + ({expr})")
@@ -1309,7 +1332,7 @@ def _make_deck(layout: Layout, profile, base_dir, *, native=False) -> Deck:
                       if dvdt_limits else [])
     run_commands = ["run"]
     sps_timing = None
-    if loop and loop.digital:
+    if loop and loop.digital and not native:
         from .digital_spice import commands as digital_commands
         try:
             run_commands = digital_commands(loop, tr["stop"])
@@ -1403,7 +1426,11 @@ def run_deck(deck: Deck, engine: str, stage: Path, timeout: float, *, should_sto
         # errors and the complete output time range are still checked.
         checked_log = re.sub(r"(?im)^(?:run )?simulation interrupted\s*$", "", log)
     if proc.returncode or re.search(r"(?im)^\s*(?:error\b|fatal\b|syntax error\b)|timestep too small|simulation interrupted", checked_log):
-        raise SpiceError("ngspice 仿真失败：\n" + log[-3500:] + _convergence_hint(deck, log))
+        hint = ""
+        if deck.digital_loop and re.search(r"argument out of range|Can't evaluate", log):
+            hint = ("\n控制脚本计算出错：C 代码或控制器在某一拍出现除以 0 或函数定义域错误"
+                    "（如负数开方、负底数的分数次幂）；请在代码里先判断除数和参数范围。")
+        raise SpiceError("ngspice 仿真失败：\n" + log[-3500:] + hint + _convergence_hint(deck, log))
     if deck.sps_timing:
         if 'CD_SPS_COMPLETE' not in log:
             raise SpiceError('SPS 时序运行未完成，未发布仿真结果')

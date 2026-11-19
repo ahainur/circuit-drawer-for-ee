@@ -1,0 +1,5 @@
+[
+  {"id":"algorithm_sequence","title":{"zh-CN":"顺序算法步骤","zh-TW":"順序演算法步驟","en":"Sequential algorithm"},"mode":"create","domains":["algorithm"],"body":"从空白生成自上而下的算法流程图，首尾圆角框，中间处理步骤为矩形，各步骤用竖直箭头连接。步骤内容按我接下来提供的文字和公式填写。","fields":[]},
+  {"id":"algorithm_iteration","title":{"zh-CN":"条件与迭代","zh-TW":"條件與迭代","en":"Conditions and iteration"},"mode":"create","domains":["algorithm"],"body":"生成带条件和迭代的算法流程图。用处理框说明每个计算步骤，用条件文字标记分支箭头，把返回边放在框图外侧。请先确认初始化、判断条件、更新规则和结束条件。","fields":[]},
+  {"id":"algorithm_refine","title":{"zh-CN":"整理公式与阅读顺序","zh-TW":"整理公式與閱讀順序","en":"Refine equations and reading order"},"mode":"edit","domains":["algorithm"],"body":"整理当前算法图的文字和公式，每框保留一个核心操作，长句适当换行。保持所有步骤与条件分支，先给修改候选。","fields":[]}
+]

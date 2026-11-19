@@ -388,9 +388,19 @@ def _needed(pl: Plan, outputs: list[str]) -> set[str]:
 
 # ---- reference simulation (double precision) ------------------------------------
 def simulate(pl: Plan, inputs: dict[str, list[float]], *, quantizer=None) -> dict[str, list[float]]:
+    """Sample k reads inputs[k] and returns outputs[k]; C blocks run the checked
+    subset (control.c_subset) and commit next_<state> after their body."""
     from .custom_c import is_step
-    if any(is_step(st) for st in pl.steps):
-        raise CodeError("Python／ngspice 不执行 C 代码方块；请使用原生离散导出")
+    runners = {}
+    for st in pl.steps:
+        if is_step(st):
+            from .c_subset import CSubsetError, Runner
+            if quantizer:
+                raise CodeError(f"{st.id}：C 代码方块按 double 计算，不使用定点量化")
+            try:
+                runners[st.id] = Runner(st.data["c"], st.data["names"], [o.split(".", 1)[1] for o in st.data["outs"]])
+            except CSubsetError as exc:
+                raise CodeError(f"{st.id}：C 代码超出 Python／ngspice 可执行子集：{exc}") from None
     n = len(next(iter(inputs.values()))) if inputs else 0
     state: dict[str, Any] = {}
     out: dict[str, list[float]] = {o: [] for o in pl.outputs}
@@ -398,6 +408,14 @@ def simulate(pl: Plan, inputs: dict[str, list[float]], *, quantizer=None) -> dic
         v = {i: inputs[i][k] for i in pl.inputs}
         v.update({st.id: state.get(st.id + "#z", 0.0) for st in pl.steps if st.delay})
         for st in pl.steps:
+            if st.id in runners:
+                from .c_subset import CSubsetError
+                try:
+                    values = runners[st.id]([v[s] for s in st.srcs])
+                except CSubsetError as exc:
+                    raise CodeError(f"{st.id} 第 {k} 拍：{exc}") from None
+                v.update(zip(st.data["outs"], values))
+                continue
             if st.kind == "fn":
                 from .functions import evaluate
                 res = evaluate(st.data["fn"], {n: v[s] for n, s in zip(st.data["names"], st.srcs)})

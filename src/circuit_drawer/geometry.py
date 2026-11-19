@@ -27,6 +27,17 @@ from .profiles import Profile
 
 EPS = 1e-4
 
+
+def image_box(item, scale):
+    """Fit imported artwork inside its saved rectangle without stretching it."""
+    x0, y0 = item["from"][0] * scale.x, item["from"][1] * scale.y
+    x1, y1 = item["to"][0] * scale.x, item["to"][1] * scale.y
+    width, height = item["pixel_size"]
+    factor = min((x1 - x0) / width, (y1 - y0) / height)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    return Box(cx - width * factor / 2, cy - height * factor / 2,
+               cx + width * factor / 2, cy + height * factor / 2)
+
 # Half thickness of each two-terminal symbol across its axis (cm).
 HALF_HEIGHT = {"R": 0.15, "L": 0.13, "C": 0.22, "D": 0.17, "scr": 0.215, "V": 0.25, "vac": 0.25, "I": 0.25,
                "battery": 0.23}
@@ -221,7 +232,7 @@ def has_wide(text: str | None) -> bool:
     return bool(text) and any(is_wide(c) for c in text)
 
 
-def text_size(tex: str, font_pt: float = 8.0) -> tuple[float, float]:
+def text_size(tex: str, font_pt: float = 8.0, weight: str = "normal") -> tuple[float, float]:
     """Rough width/height in cm of a short math label such as ``$L_{m}$``."""
     if tex in (r"$\vdots$", r"$\cdots$"):
         # Conservative 8 pt math-glyph bounds, including breathing room.
@@ -251,7 +262,7 @@ def text_size(tex: str, font_pt: float = 8.0) -> tuple[float, float]:
             base += 1
         i += 1
     k = font_pt / 8.0
-    w = (0.19 * base + WIDE_GLYPH * wide + 0.13 * sub + 0.04) * k
+    w = (0.19 * base + WIDE_GLYPH * wide + 0.13 * sub + 0.04) * k * (1.08 if weight == "bold" else 1)
     h = (0.36 if has_sub else 0.30) * k
     return w, h
 
@@ -489,7 +500,7 @@ def _two_terminal(el: Element, s: Scale, prof: Profile) -> Footprint:
             outer = fp.bodies[1]            # a label on the gate side clears the gate lead
     fp.label_side = _side_for(a, b, pos)
     if el.label:
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         cx, cy = {"above": (mx, max(body.y1, outer.y1) + LABEL_GAP + h / 2),
                   "below": (mx, min(body.y0, outer.y0) - LABEL_GAP - h / 2),
                   "left": (min(body.x0, outer.x0) - LABEL_GAP - w / 2, my),
@@ -531,7 +542,7 @@ def _diagonal(el: Element, a: Point, b: Point, fp: Footprint, prof: Profile) -> 
         n = (-u[1], u[0])
         if n[0] * want[0] + n[1] * want[1] < 0:
             n = (-n[0], -n[1])
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         d = hh + LABEL_GAP + abs(n[0]) * w / 2 + abs(n[1]) * h / 2
         fp.labels.append(centred(mx + n[0] * d, my + n[1] * d, w, h))
         fp.extra["label_at"] = (mx + n[0] * d, my + n[1] * d)
@@ -584,7 +595,7 @@ def _switch(el: Element, s: Scale, prof: Profile) -> Footprint:
           for b in (-SW_HALF_H * kl, SW_HALF_H * kl)]
     fp.bodies.append(Box(min(xs), min(ys), max(xs), max(ys)))
     if el.label:
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         d = SW_LABEL_DX * kw + abs(side[0]) * w / 2 + abs(side[1]) * h / 2
         lx, ly = cx + side[0] * d, cy + side[1] * d
         # Explicit positions are page directions. Along the pin axis, retain
@@ -616,7 +627,7 @@ def _port(el: Element, s: Scale, prof: Profile) -> Footprint:
     fp = Footprint(leads=[])
     if el.label:
         x, y = scaled(el.pins["p"], s)
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         d = PORT_R + LABEL_GAP
         cx, cy = {"left": (x - d - w / 2, y), "right": (x + d + w / 2, y),
                   "above": (x, y + d + h / 2), "below": (x, y - d - h / 2)}[el.label_pos or "left"]
@@ -654,7 +665,7 @@ def _pmsm(el: Element, s: Scale, prof: Profile) -> Footprint:
                           "motor_marks": [("M", (centre[0], centre[1]+radius*.23), radius*.7),
                                           (r"$3\sim$", (centre[0], centre[1]-radius*.4), radius*.38)]})
     if el.label:
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         at = {"above": (centre[0], body.y1+LABEL_GAP+h/2),
               "below": (centre[0], body.y0-LABEL_GAP-h/2),
               "left": (body.x0-LABEL_GAP-w/2, centre[1]),
@@ -778,7 +789,7 @@ def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
     if "ratio_at" in fp.extra:
         fp.extra["ratio_at"] = world(fp.extra["ratio_at"])
     if el.label:
-        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof))
+        w, h = text_size(el.label, font_of(el.opts.get("label_size"), prof), el.opts.get("font_weight", "normal"))
         boxes = fp.bodies + fp.labels
         x0, x1 = min(b.x0 for b in boxes), max(b.x1 for b in boxes)
         y0, y1 = min(b.y0 for b in boxes), max(b.y1 for b in boxes)
@@ -810,7 +821,7 @@ def module_ellipsis(first, last, scale):
 
 
 def annotation_box(ann, s: Scale, prof: Profile) -> Box:
-    w, h = text_size(ann.text, font_of(ann.size, prof))
+    w, h = text_size(ann.text, font_of(ann.size, prof), ann.font_weight)
     x, y = scaled(ann.at, s)
     if ann.arrow:
         d = ARROW_GAP
@@ -863,10 +874,37 @@ def region_rect(r, s: Scale, k: int = 0) -> Box:
     return Box(x0 * s.x, y0 * s.y, x1 * s.x, y1 * s.y)
 
 
+# Printed offsets keep shadows subtle at either column width. Two opaque
+# vector layers survive SVG and monochrome conversion without raster filters.
+BOX_SHADOW_LAYERS = ((0.08, 0.90), (0.04, 0.83))
+
+
+def box_decoration(box: Box, radius: float, shadow: bool, s: Scale, *, inner=False, border_width=None):
+    radius = min(radius, (box.x1 - box.x0) / 2, (box.y1 - box.y0) / 2)
+    width, height = box.x1 - box.x0, box.y1 - box.y0
+    band = min(.028, width / 9, height / 9)
+    inset = []
+    if inner and band > 0:
+        for i, opacity in enumerate((.22, .13, .07, .03)):
+            depth = (i + .5) * band
+            inset.append({"depth": depth, "radius": max(0, radius - depth),
+                          "width": band, "opacity": opacity})
+    return {"radius_cm": radius, "rx": radius / s.x, "ry": radius / s.y,
+            "scale": [s.x, s.y], "inset": inset,
+            "stroke": border_width * 2.54 / 72.27 / s.x if border_width is not None else None,
+            "shadows": [{"dx": offset / s.x, "dy": -offset / s.y,
+                         "gray": gray} for offset, gray in BOX_SHADOW_LAYERS] if shadow else []}
+
+
+def decorated_extent(box: Box, shadow: bool) -> Box:
+    offset = BOX_SHADOW_LAYERS[0][0] if shadow else 0
+    return Box(box.x0, box.y0 - offset, box.x1 + offset, box.y1)
+
+
 def region_label_box(r, s: Scale, prof: Profile) -> Box | None:
     if not r.label:
         return None
-    w, h = text_size(r.label, font_of(r.size, prof))
+    w, h = text_size(r.label, font_of(r.size, prof), r.font_weight)
     b, g = region_rect(r, s), REGION_LABEL_GAP
     cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
     x, y = {"below": (cx, b.y0 - g - h / 2), "above": (cx, b.y1 + g + h / 2),
@@ -895,7 +933,7 @@ def block_text_box(b, s: Scale, prof: Profile) -> Box | None:
     block carries an icon."""
     if not b.text:
         return None
-    w, h = text_size(b.text, font_of(b.size, prof))
+    w, h = text_size(b.text, font_of(b.size, prof), b.font_weight)
     r = block_rect(b, s)
     if getattr(b, "icon", None):
         from .blocks import CAPTION_GAP      # an icon fills the box: caption underneath
@@ -1044,7 +1082,7 @@ def callout_label_box(c, s: Scale, prof: Profile) -> Box | None:
     from .regions import CALLOUT_LABEL_GAP
     if not c.label:
         return None
-    w, h = text_size(c.label, font_of(c.size, prof))
+    w, h = text_size(c.label, font_of(c.size, prof), c.font_weight)
     if c.label_pos == "inline":
         pts = callout_shape(c, s)
         lengths = [math.dist(p, q) for p, q in zip(pts, pts[1:])]

@@ -1,0 +1,95 @@
+{
+ "kind": "control",
+ "name": "buck_current_hysteresis",
+ "title": "Synchronous buck: sampled current hysteresis (C block)",
+ "profile": "ieee-double",
+ "blocks": [
+  {
+   "id": "il",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.75,
+    0.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$i_L$"
+  },
+  {
+   "id": "iref",
+   "type": "tag",
+   "style": "ref",
+   "at": [
+    0.75,
+    -0.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$I_{ref}$"
+  },
+  {
+   "id": "cc",
+   "type": "block",
+   "at": [
+    3.5,
+    0
+   ],
+   "size": [
+    2,
+    2
+   ],
+   "text": "Hysteresis",
+   "label": "C, 1 MHz",
+   "label_pos": "above"
+  }
+ ],
+ "links": [
+  {
+   "from": "il.e",
+   "to": "cc.w+0.5"
+  },
+  {
+   "from": "iref.e",
+   "to": "cc.w-0.5"
+  },
+  {
+   "from": "cc.e",
+   "to": [
+    6,
+    0
+   ],
+   "open": true,
+   "label": "$g_{S1}$"
+  }
+ ],
+ "functions": {
+  "cc": {
+   "fn": "c",
+   "in": {
+    "current": "w+0.5",
+    "reference": "w-0.5"
+   },
+   "out": {
+    "high": "e"
+   },
+   "c": {
+    "states": {
+     "on": 0
+    },
+    "body": "/* Constant-current synchronous buck: the inductor current is compared with\n   the reference once per sample (code.fs = 1 MHz) and the switch state is held\n   inside a +/- band. S1 follows high, S2 its complement with dead time. */\nconst double band = 0.2;\nif (current < reference - band) next_on = 1.0;\nelse if (current > reference + band) next_on = 0.0;\nhigh = next_on;\n"
+   }
+  }
+ },
+ "code": {
+  "fs": 1000000,
+  "arith": "double",
+  "outputs": [
+   "cc.high"
+  ]
+ }
+}

@@ -7,9 +7,14 @@ from pathlib import Path
 import shutil
 import sys
 
+# Bundled MiKTeX tools run offline using the pinned DLLs and portable configuration.
+POPPLER_OFFLINE_FLAGS = ("--miktex-disable-installer", "--miktex-disable-maintenance", "--miktex-disable-diagnose")
+
 _TOOLS = {
     "pdflatex": ("tex/bin/windows", ("pdflatex",)),
     "pdftocairo": ("poppler/bin", ("pdftocairo",)),
+    "pdffonts": ("poppler/bin", ("pdffonts",)),
+    "pdfinfo": ("poppler/bin", ("pdfinfo",)),
     "ngspice": ("ngspice/bin", ("ngspice_con", "ngspice")),
 }
 
@@ -60,7 +65,7 @@ def latex_environment(executable: str) -> dict[str, str] | None:
 def poppler_environment(executable: str) -> dict[str, str] | None:
     """Isolate the bundled MiKTeX converter from host configuration and caches."""
     root = runtime_root()
-    if root is None or Path(executable).resolve() != (root / "poppler/bin/pdftocairo.exe").resolve():
+    if root is None or Path(executable).resolve().parent != (root / "poppler/bin").resolve():
         return None
     cache = (Path(os.environ.get("LOCALAPPDATA", str(Path.home() / ".config")))
              / "CircuitDrawer" / "runtime-cache" / "poppler")

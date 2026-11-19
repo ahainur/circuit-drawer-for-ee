@@ -16,25 +16,33 @@ a caption under the box ("BESS", "Rack").
 
     {"id": "bess", "from": [0, 0], "to": [1, 1], "icon": "battery", "text": "BESS"}
 
+The software / data icons (``python``, ``database``, ``script``, ``chip``,
+``monitor``, ``neural``) are line art too; ``"icon_color": true`` fills them
+in colour, as co-simulation figures often show a Python script or a store of
+simulation data.
+
+    {"id": "py", "from": [0, 0], "to": [1, 1], "icon": "python", "icon_color": true, "text": "Python Script"}
+
 Like regions, blocks are stored as a plain top-level list (``Layout.extra``)
 and the corners stay exactly as written.
 """
 
 from __future__ import annotations
+from .figure_style import BOX_FIELDS, box_style
 
 import math
 from dataclasses import dataclass, replace
 from typing import Any
 
-from .glyphs import KINDS as GLYPH_KINDS
+from .glyphs import COLORED as COLORED_ICONS, KINDS as GLYPH_KINDS
 from .layout import Layout
 from .regions import INKS, PALETTE, RegionError, _point, canon, ink_canon, valid_color, valid_ink
 
 # "white" hides a grey region behind the box, as block diagrams print it;
 # "none" leaves only the outline; palette tints as for regions.
 FILLS = ("white", "none") + tuple(PALETTE)
-BORDERS = ("solid", "dashed", "dotted")
-KEYS = ("id", "from", "to", "text", "fill", "border", "color", "size", "icon")
+BORDERS = ("solid", "dashed", "dotted", "none")
+KEYS = ("id", "from", "to", "text", "fill", "border", "color", "size", "icon", "icon_color", *BOX_FIELDS)
 ICONS = GLYPH_KINDS      # every glyph mark, converters and devices included
 CAPTION_GAP = 0.08       # printed cm between an icon block's box and its caption
 MIN_SIDE = 0.2           # layout units: a smaller box cannot hold a word
@@ -59,12 +67,22 @@ class Block:
     size: float | None = None
     name: str = "block"
     icon: str | None = None   # a glyph mark drawn in the box; the text then sits under it
+    icon_color: bool = False  # software / data icons: coloured fills instead of line art
+    corner_radius: float = 0
+    shadow: bool = False
+    inner_shadow: bool = False
+    border_width: float | None = None
+    font_weight: str = "normal"
 
 
 def parse_block(d: Any, i: int) -> Block:
     name = f"blocks[{i}]" + (f" ({d['id']})" if isinstance(d, dict) and isinstance(d.get("id"), str) else "")
     if not isinstance(d, dict):
         raise BlockError(f"{name} must be an object")
+    try:
+        decoration = box_style(d)
+    except ValueError as exc:
+        raise BlockError(f"{name}: {exc}") from None
     unknown = sorted(set(d) - set(KEYS))
     if unknown:
         raise BlockError(f"{name}: unknown key {', '.join(unknown)}; a block accepts {', '.join(KEYS)}")
@@ -100,8 +118,13 @@ def parse_block(d: Any, i: int) -> Block:
     icon = d.get("icon")
     if icon is not None and icon not in ICONS:
         raise BlockError(f"{name}: icon must be one of {list(ICONS)}")
+    icon_color = d.get("icon_color", False)
+    if not isinstance(icon_color, bool):
+        raise BlockError(f"{name}: icon_color must be true or false")
+    if icon_color and icon not in COLORED_ICONS:
+        raise BlockError(f"{name}: icon_color needs one of the colour icons {list(COLORED_ICONS)}")
     return Block(bid.strip(), x0, y0, x1, y1, text, fill, border, color,
-                 float(size) if size is not None else None, name, icon)
+                 float(size) if size is not None else None, name, icon, icon_color, *decoration)
 
 
 def _items(layout: Layout) -> list:

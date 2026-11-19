@@ -18,7 +18,8 @@ from ..geometry import (_CMD, EPS, WIDE_GLYPH, Box, Scale, centred, font_of, is_
                         region_label_box, region_rect, text_size)
 from ..profiles import Profile
 from ..regions import LINE_HEAD
-from .model import (BOX_TYPES, CIRCLE_TYPES, POLE, SIDES, TAG_STYLE, Block, Diagram, End, Link,
+from .model import (BOX_TYPES, CIRCLE_TYPES, LABEL_GAP, POLE, PORT_LABEL_KEY, SELECT, SIDES, TAG_STYLE, Block,
+                    Diagram, End, Link,
                     parse_lenient)
 
 SUM_R = 0.16           # cm: radius of a sum / multiply / divide circle
@@ -28,14 +29,17 @@ SIGN_LIFT = 0.16       # cm off the incoming line, so the sign clears the arrow
 SIGN_BOX = 0.2         # cm: a + / - glyph's square, smaller than text_size reads it
 TEXT_PAD = 0.08        # cm of clear space inside a box left and right of its text
 TEXT_PAD_Y = 0.05      # cm above and below: the height estimate already includes subscripts
-LABEL_GAP = 0.08       # cm between a box or a line and its label
 THROW_LABEL_GAP = 0.2  # cm from a contact centre to its letter
 TOGGLE_FRAC = 0.55     # toggle arc radius as a fraction of the nearest throw's distance
+PORT_LABEL_GAP = 0.06  # cm inside a box between its edge and a port label
+COMPARE_TEXT = 0.5     # a comparator's text must fit this fraction of its width and height
+OPPOSITE = {"w": "e", "e": "w", "n": "s", "s": "n"}
 BLOCK_CLEARANCE = 0.1  # cm two blocks must keep apart
 MAX_SCALE = 1.0        # cm per layout unit: never stretch beyond the drawn size
 FIT_ROUNDS = 6         # scale refinements to absorb the fixed-size symbols and text
 # the run into an arrowhead must show the head (LINE_HEAD) plus some line
 MIN_ARROW_RUN = LINE_HEAD + 0.1
+AUTO_WIRE_GAP = 0.20       # cm of visible whitespace between automatic signal lines and block edges
 AUTO_ROUTE_MIN_RUN = 0.35  # cm: legible straight runs between automatic route bends
 PT_CM = 2.54 / 72.27
 LEAD = 1.2             # baseline skip / font size, as the preamble sets it
@@ -109,11 +113,11 @@ def line_size(tex: str, pt: float) -> tuple[float, float]:
     return w, h
 
 
-def text_box_size(text: str, pt: float) -> tuple[float, float]:
+def text_box_size(text: str, pt: float, weight: str = "normal") -> tuple[float, float]:
     """Printed width and height (cm) of text with ``\\\\`` line breaks."""
     lines = [ln.strip() for ln in text.split(r"\\")]
     sizes = [line_size(ln, pt) for ln in lines]
-    w = max(s[0] for s in sizes)
+    w = max(s[0] for s in sizes) * (1.08 if weight == "bold" else 1)
     return w, (len(lines) - 1) * pt * LEAD * PT_CM + max(s[1] for s in sizes)
 
 
@@ -132,6 +136,7 @@ class Label:
     pt: float
     owner: str
     color: str | None = None
+    font_weight: str = "normal"
 
 
 @dataclass
@@ -166,6 +171,11 @@ class Report:
 
 
 # ---- ports -------------------------------------------------------------------
+def wire_clearance(block: Block, prof: Profile) -> float:
+    """Centreline to frame distance for 2 mm of clear printed paper between inks."""
+    return AUTO_WIRE_GAP + (prof.line_pt + (block.border_width or prof.line_pt)) * PT_CM / 2
+
+
 def port_point(b: Block, port: str, offset: float, s: float) -> tuple[float, float]:
     """A port's position in layout units, or ControlError-style ValueError."""
     x, y = b.at
@@ -176,10 +186,20 @@ def port_point(b: Block, port: str, offset: float, s: float) -> tuple[float, flo
             return b.at
         if port in b.throws:
             return b.throws[port]
-        raise ValueError(f"{b.id} has ports {[POLE] + list(b.throws)}, not {port!r}")
+        if port == SELECT and b.select:
+            return select_point(b)
+        names = [POLE] + list(b.throws) + ([SELECT] if b.select else [])
+        raise ValueError(f"{b.id} has ports {names}, not {port!r}")
+    if b.type == "compare":
+        flat = OPPOSITE[b.point]
+        if port == b.point and offset:
+            raise ValueError(f"{b.id}.{port}: a comparator's tip takes no offset")
+        if port not in (flat, b.point):
+            raise ValueError(f"{b.id}: a comparator's inputs enter its flat side {flat!r} and "
+                             f"its output leaves the tip {b.point!r}, not {port!r}")
     if port not in SIDES:
         raise ValueError(f"{b.id} has ports {list(SIDES)}, not {port!r}")
-    dx, dy = SIDE_DIR[port]
+    dx, dy = SIDE_DIR[b.port_side(port)]
     if b.type in CIRCLE_TYPES:
         if offset:
             raise ValueError(f"{b.id}.{port}: a {b.type} port takes no offset")
@@ -195,12 +215,43 @@ def port_point(b: Block, port: str, offset: float, s: float) -> tuple[float, flo
     return (x + offset, y + dy * h / 2)
 
 
+def select_point(b: Block) -> tuple[float, float]:
+    """A switch's select input: the middle of its blade in the drawn position."""
+    q = b.throws[b.on]
+    return ((b.at[0] + q[0]) / 2, (b.at[1] + q[1]) / 2)
+
+
+def port_label_at(b: Block, key: str) -> tuple[str, tuple[float, float]]:
+    """(side, point in layout units) of a ``port_labels`` key: the port on that side."""
+    m = PORT_LABEL_KEY.match(key)
+    side, off = b.port_side(m.group(1)), float(m.group(2) or 0)
+    x, y = b.at
+    w, h = b.size
+    dx, dy = SIDE_DIR[side]
+    return side, ((x + dx * w / 2, y + off) if dx else (x + off, y + dy * h / 2))
+
+
+def text_centre(b: Block) -> tuple[float, float]:
+    """Where a box's text sits (layout units): a comparator's at its centroid."""
+    if b.type == "compare":
+        return (b.at[0] - SIDE_DIR[b.point][0] * b.size[0] / 6, b.at[1])
+    return b.at
+
+
 def on_boundary(b: Block, p: tuple[float, float], s: float) -> str | None:
     """The port name a bare point sits on, if it touches this block."""
     if b.type == "switch":
-        for name, q in [(POLE, b.at), *b.throws.items()]:
+        for name, q in [(POLE, b.at), *b.throws.items(), *([(SELECT, select_point(b))] if b.select else [])]:
             if math.dist(p, q) < EPS:
                 return name
+        return None
+    if b.type == "compare":
+        if math.dist(p, port_point(b, b.point, 0, s)) < EPS:
+            return b.point
+        flat = OPPOSITE[b.point]
+        x, _ = port_point(b, flat, 0, s)
+        if abs(p[0] - x) < EPS and abs(p[1] - b.at[1]) <= b.size[1] / 2 + EPS:
+            return flat
         return None
     if b.type in CIRCLE_TYPES:
         for side in SIDES:
@@ -210,14 +261,14 @@ def on_boundary(b: Block, p: tuple[float, float], s: float) -> str | None:
     x0, y0, x1, y1 = b.rect()
     if y0 - EPS <= p[1] <= y1 + EPS:
         if abs(p[0] - x0) < EPS:
-            return "w"
+            return b.port_name("w")
         if abs(p[0] - x1) < EPS:
-            return "e"
+            return b.port_name("e")
     if x0 - EPS <= p[0] <= x1 + EPS:
         if abs(p[1] - y0) < EPS:
-            return "s"
+            return b.port_name("s")
         if abs(p[1] - y1) < EPS:
-            return "n"
+            return b.port_name("n")
     return None
 
 
@@ -262,15 +313,15 @@ def geometry(dia: Diagram, s: float, prof: Profile) -> Geometry:
     for lk, path in zip(dia.links, g.paths):
         if path is not None and lk.label:
             pt = font_of(lk.font, prof)
-            w, h = text_box_size(lk.label, pt)
+            w, h = text_box_size(lk.label, pt, lk.font_weight)
             (x, y), _ = point_along(path, lk.label_at)
-            g.labels.append(Label(beside((x * s, y * s), lk.label_pos, w, h, LABEL_GAP),
-                                  lk.label, pt, lk.name, lk.color))
+            g.labels.append(Label(beside((x * s, y * s), lk.label_pos, w, h, lk.label_gap),
+                                  lk.label, pt, lk.name, lk.color, lk.font_weight))
     for t in dia.texts:
         pt = font_of(t.font, prof)
-        w, h = text_box_size(t.text, pt)
+        w, h = text_box_size(t.text, pt, t.font_weight)
         g.labels.append(Label(anchored((t.at[0] * s, t.at[1] * s), t.anchor, w, h),
-                              t.text, pt, t.name, t.color))
+                              t.text, pt, t.name, t.color, t.font_weight))
     return g
 
 
@@ -282,20 +333,29 @@ def _block_geometry(b: Block, s: float, prof: Profile, g: Geometry) -> None:
         g.bodies[b.id] = body
         if b.text and b.type != "limiter":
             pt = font_of(b.font, prof)
-            w, h = text_box_size(b.text, pt)
+            w, h = text_box_size(b.text, pt, b.font_weight)
             ink = b.color or (TAG_STYLE[b.style][2] if b.type == "tag" else None)
-            g.labels.append(Label(centred(cx, cy, w, h), b.text, pt, b.id, ink))
+            tx, ty = text_centre(b)
+            g.labels.append(Label(centred(tx * s, ty * s, w, h), b.text, pt, b.id, ink, b.font_weight))
+        for key, text in b.port_labels.items():
+            pt = font_of(b.font, prof)
+            w, h = text_box_size(text, pt, b.font_weight)
+            side, (px, py) = port_label_at(b, key)
+            dx, dy = SIDE_DIR[side]
+            # just inside the box, against the side its port is on
+            at = (px * s - dx * (PORT_LABEL_GAP + w / 2), py * s - dy * (PORT_LABEL_GAP + h / 2))
+            g.labels.append(Label(centred(*at, w, h), text, pt, f"{b.id} port", b.color, b.font_weight))
         if b.label:
             pt = font_of(b.font, prof)
-            w, h = text_box_size(b.label, pt)
+            w, h = text_box_size(b.label, pt, b.font_weight)
             edge = {"above": (cx, body.y1), "below": (cx, body.y0),
                     "left": (body.x0, cy), "right": (body.x1, cy)}[b.label_pos]
             g.labels.append(Label(beside(edge, b.label_pos, w, h, LABEL_GAP), b.label, pt,
-                                  f"{b.id} label", b.color))
+                                  f"{b.id} label", b.color, b.font_weight))
     elif b.type in CIRCLE_TYPES:
         g.bodies[b.id] = centred(cx, cy, 2 * SUM_R, 2 * SUM_R)
         for side, sign in b.signs.items():
-            (dx, dy) = SIDE_DIR[side]
+            (dx, dy) = SIDE_DIR[b.port_side(side)]
             # beside the incoming arrow: above it for w/e inputs, left of it for n/s
             px, py = (0.0, SIGN_LIFT) if dx else (-SIGN_LIFT, 0.0)
             at = (cx + dx * (SUM_R + SIGN_GAP) + px, cy + dy * (SUM_R + SIGN_GAP) + py)
@@ -303,11 +363,11 @@ def _block_geometry(b: Block, s: float, prof: Profile, g: Geometry) -> None:
             g.labels.append(Label(centred(*at, SIGN_BOX, SIGN_BOX), sign, prof.font_pt, f"{b.id} sign", b.color))
         if b.label:
             pt = font_of(b.font, prof)
-            w, h = text_box_size(b.label, pt)
+            w, h = text_box_size(b.label, pt, b.font_weight)
             edge = {"above": (cx, cy + SUM_R), "below": (cx, cy - SUM_R),
                     "left": (cx - SUM_R, cy), "right": (cx + SUM_R, cy)}[b.label_pos]
             g.labels.append(Label(beside(edge, b.label_pos, w, h, LABEL_GAP), b.label, pt,
-                                  f"{b.id} label", b.color))
+                                  f"{b.id} label", b.color, b.font_weight))
     else:  # switch: contacts are the body; letters sit beyond each throw
         pts = [b.at, *b.throws.values()]
         xs, ys = [p[0] * s for p in pts], [p[1] * s for p in pts]
@@ -352,13 +412,17 @@ def _path(lk: Link, blocks: dict[str, Block], s: float, errors: list[str]):
 # ---- scale -------------------------------------------------------------------
 def extent(dia: Diagram, g: Geometry, prof: Profile) -> Box | None:
     """Printed bounding box (cm) of everything drawn."""
-    boxes = list(g.bodies.values()) + [lb.box for lb in g.labels]
+    from ..geometry import decorated_extent
+    boxes = [decorated_extent(g.bodies[b.id], b.shadow) for b in dia.blocks] + [lb.box for lb in g.labels]
+    from ..figure_images import safe_items
+    from ..geometry import image_box
+    boxes += [image_box(item, g.scale) for item in safe_items(dia.raw)]
     for path in g.paths:
         if path:
             xs, ys = [p[0] * g.s for p in path], [p[1] * g.s for p in path]
             boxes.append(Box(min(xs), min(ys), max(xs), max(ys)))
     for r in dia.regions:
-        boxes += [region_rect(r, g.scale, k) for k in range(len(r.layers) + 1)]
+        boxes += [decorated_extent(region_rect(r, g.scale, k), r.shadow) for k in range(len(r.layers) + 1)]
         lb = region_label_box(r, g.scale, prof)
         if lb is not None:
             boxes.append(lb)
@@ -383,7 +447,17 @@ def fit_scale(dia: Diagram, prof: Profile) -> float:
 # ---- the checker -------------------------------------------------------------
 def check(raw: Any, prof: Profile) -> Report:
     dia, errors = parse_lenient(raw)
+    from ..figure_style import paper_profile
+    try:
+        prof = paper_profile(prof, dia.raw)
+    except ValueError as exc:
+        errors.append(str(exc))
     warnings: list[str] = []
+    from ..figure_images import items as image_items
+    try:
+        image_items(dia.raw)
+    except ValueError as exc:
+        errors.append(str(exc))
     s = fit_scale(dia, prof)
     g = geometry(dia, s, prof)
     errors += g.errors
@@ -399,7 +473,7 @@ def check(raw: Any, prof: Profile) -> Report:
     _connections(dia, g, errors, warnings)
     _overlaps(dia, g, prof, errors, warnings)
     _fit_text(dia, g, prof, errors)
-    _regions(dia, g, errors, warnings)
+    _regions(dia, g, prof, errors, warnings)
     if isinstance(raw, dict) and "loop" in raw:
         from .loop import parse_loop
         errors += parse_loop(raw["loop"], dia)[1]
@@ -573,21 +647,60 @@ def _collinear(a, b) -> bool:
 
 def _fit_text(dia: Diagram, g: Geometry, prof: Profile, errors: list[str]) -> None:
     for b in dia.blocks:
-        if b.type not in ("block", "tag") or not b.text:
+        _fit_port_labels(b, g, errors)
+        if b.type not in ("block", "tag", "compare") or not b.text:
             continue
         body = g.bodies[b.id]
-        w, h = text_box_size(b.text, font_of(b.font, prof))
+        w, h = text_box_size(b.text, font_of(b.font, prof), b.font_weight)
         need_w, need_h = w + 2 * TEXT_PAD, h + 2 * TEXT_PAD_Y
-        if need_w > body.x1 - body.x0 + EPS or need_h > body.y1 - body.y0 + EPS:
+        room = COMPARE_TEXT if b.type == "compare" else 1.0   # a triangle holds text near its centroid
+        if need_w > room * (body.x1 - body.x0) + EPS or need_h > room * (body.y1 - body.y0) + EPS:
             errors.append(f"{b.id}: text {b.text!r} needs about {need_w / g.s:.2f} x "
                           f"{need_h / g.s:.2f} units at this scale, the box is "
                           f"{b.size[0]:g} x {b.size[1]:g}")
 
 
-def _regions(dia: Diagram, g: Geometry, errors: list[str], warnings: list[str]) -> None:
+def _fit_port_labels(b: Block, g: Geometry, errors: list[str]) -> None:
+    """Port labels sit inside their box and stay on its own port side."""
+    if not b.port_labels:
+        return
+    body = g.bodies[b.id]
+    mine = [lb for lb in g.labels if lb.owner == f"{b.id} port"]
+    for (key, text), lb in zip(b.port_labels.items(), mine):
+        side = key[0]
+        if b.type == "compare" and side != OPPOSITE[b.point]:
+            errors.append(f"{b.id}: port_labels.{key}: a comparator labels the inputs on its flat side "
+                          f"{OPPOSITE[b.point]!r}")
+            continue
+        box = lb.box
+        if b.type == "compare":
+            cx, cy = b.at[0] * g.s, b.at[1] * g.s
+            width, height = b.size[0] * g.s, b.size[1] * g.s
+            direction = SIDE_DIR[b.point][0]
+            inside = all(direction * (x-cx) <= width/2 - width*abs(y-cy)/(height/2) + EPS
+                         for x in (box.x0, box.x1) for y in (box.y0, box.y1))
+            if not inside:
+                errors.append(f"{b.id}: port label {text!r} ({key}) does not fit inside the triangle; enlarge the comparator or move the offset inward")
+        if box.x0 < body.x0 - EPS or box.x1 > body.x1 + EPS or box.y0 < body.y0 - EPS or box.y1 > body.y1 + EPS:
+            errors.append(f"{b.id}: port label {text!r} ({key}) does not fit inside the box; "
+                          f"enlarge the box or move the offset inward")
+    for i, a in enumerate(mine):
+        for c in mine[i + 1:]:
+            if a.box.overlaps(c.box):
+                errors.append(f"{b.id}: port labels {a.text!r} and {c.text!r} overlap; space their offsets")
+
+
+def _regions(dia: Diagram, g: Geometry, prof: Profile, errors: list[str], warnings: list[str]) -> None:
     ids = {b.id for b in dia.blocks}
-    for r in dia.regions:
+    for i, r in enumerate(dia.regions):
         rect = region_rect(r, g.scale)
+        if r.members:
+            for previous in dia.regions[:i]:
+                if previous.members and set(r.members).isdisjoint(previous.members):
+                    here = (rect, region_label_box(r, g.scale, prof))
+                    there = (region_rect(previous, g.scale), region_label_box(previous, g.scale, prof))
+                    if any(a.overlaps(b) for a in here if a for b in there if b):
+                        warnings.append(f"independent regions {previous.name} and {r.name} overlap")
         if r.border != "none":
             edges = [((rect.x0, rect.y0), (rect.x1, rect.y0)), ((rect.x0, rect.y1), (rect.x1, rect.y1)),
                      ((rect.x0, rect.y0), (rect.x0, rect.y1)), ((rect.x1, rect.y0), (rect.x1, rect.y1))]

@@ -1,6 +1,6 @@
 """Tiny, verified spacing fixes on a model-written table.
 
-Only one thing is repaired: a two-terminal part whose pins are a hair too
+For ordinary drawings this repairs a two-terminal part whose pins are a hair too
 close (``too-short`` by at most MAX_NUDGE units).  One pin is moved outward
 along the part's own axis, together with the wire vertices sitting on it;
 the whole table is then re-validated and the change is kept only if it
@@ -16,11 +16,64 @@ import re
 
 from ..layout import TWO_TERMINAL, Layout
 from ..profiles import Profile
+from ..schema import LABEL_SIDES
 from ..validate import check
 
 MAX_NUDGE = 0.1     # layout units
 GRID = 0.05
 _SHORT = re.compile(r"^(\S+): pin distance .* by at least ([\d.]+) units")
+
+# At most eight four-sided labels per model reply. Large drawings can still
+# report the other conflicts for the next correction round.
+PORT_LABEL_TRIALS = 32
+_LABEL_ERRORS = {"text-on-line", "text-on-symbol", "text-overlap"}
+_OWNER = re.compile(r"label of ([A-Za-z][A-Za-z0-9_/-]*)(?=\s|（|$)")
+_DEFINITION = re.compile(r"^模块定义 ([A-Za-z][A-Za-z0-9_-]*)：")
+
+
+def nudge_module_port_labels(layout, prof, report, should_stop):
+    """Try only the printed side of public ports named by a label error."""
+    spec = layout.extra["modules"]
+    notes = []
+    trials = 0
+    while report.errors and all(issue.code in _LABEL_ERRORS for issue in report.errors):
+        definitions = spec.get("definitions", {})
+        instances = {inst["id"]: inst["definition"] for inst in spec["instances"]}
+        targets = set()
+        for issue in report.errors:
+            definition = _DEFINITION.match(issue.message)
+            for ref in _OWNER.findall(issue.message):
+                instance, sep, port = ref.partition("/")
+                if sep and instance in instances:
+                    targets.add((instances[instance], port))
+                elif definition and not sep:
+                    targets.add((definition[1], ref))
+        errors = set(map(str, report.errors))
+        for name, port in sorted(targets):
+            definition = definitions.get(name, {})
+            if port + ".p" not in definition.get("ports", {}).values():
+                continue
+            elements = definition["layout"]["elements"]
+            index = next(i for i, el in enumerate(elements) if el["id"] == port)
+            for side in LABEL_SIDES:
+                if side == elements[index].get("label_pos"):
+                    continue
+                if trials >= PORT_LABEL_TRIALS or should_stop():
+                    return layout, report, notes
+                trial = copy.deepcopy(layout)
+                trial.extra["modules"]["definitions"][name]["layout"]["elements"][index]["label_pos"] = side
+                trials += 1
+                after = check(trial, prof)
+                if set(map(str, after.errors)) < errors:
+                    layout, report, spec = trial, after, trial.extra["modules"]
+                    notes.append(f"{name}/{port}: label_pos → {side}")
+                    break
+            else:
+                continue
+            break
+        else:
+            break
+    return layout, report, notes
 
 
 def _same(p, q) -> bool:

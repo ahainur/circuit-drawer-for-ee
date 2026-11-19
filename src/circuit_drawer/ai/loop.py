@@ -614,7 +614,7 @@ class CircuitWorkflow:
         return first_message(description, self.structure)
 
     def evaluate(self, reply, *, should_stop=lambda: False):
-        from .nudge import nudge
+        from .nudge import nudge, nudge_module_port_labels
         data = extract_table(reply)
         try:
             lay = Layout.from_dict(data)
@@ -679,6 +679,8 @@ class CircuitWorkflow:
             lay.extra["electrical"] = deepcopy(carried["electrical"])
             lay.extra["electrical"] = synchronize(lay, prof.name)
         rep = check(lay, prof)
+        if "modules" in lay.extra and rep.errors:
+            lay, rep, fixes = nudge_module_port_labels(lay, prof, rep, should_stop)
         errors = [f"{i.code}: {i.message}" for i in rep.errors] + _missing_netlist(lay)
         double = get_profile("ieee-double")
         passes_double = (bool(errors) and prof.name != double.name and
@@ -793,7 +795,7 @@ def generate(description: str, profile: str = "ieee-single",
         att = Attempt(n, errors, lay, reply, fixes)
         gen.attempts.append(att)
         if fixes:
-            log(f"第 {n} 轮：代码微调了 {len(fixes)} 处间距：" + "；".join(fixes))
+            log(f"第 {n} 轮：已校正 {len(fixes)} 处排版：" + "；".join(fixes))
         passes_double = result.passes_double
         if not errors or passes_double:
             gen.selected, gen.passes_double = att, passes_double

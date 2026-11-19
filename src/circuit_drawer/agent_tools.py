@@ -263,7 +263,7 @@ class AgentWorkspace:
             stage = Path(temporary) / "result"
             if candidate.kind == "control":
                 from .control.render import render
-                result = render(candidate.table, candidate.profile, stage, "figure", tuple(formats))
+                result = render(candidate.table, candidate.profile, stage, "figure", tuple(formats), base_dir=candidate.base_dir)
             else:
                 from .pipeline import render
                 result = render(Layout.from_dict(candidate.table), candidate.profile, stage,
@@ -279,10 +279,11 @@ class AgentWorkspace:
         return {**manifest, "manifest": str(destination / "manifest.json")}
 
     def simulate_candidate(self, candidate_id: str, window: list[float] | None = None,
-                           signals: list[str] | None = None) -> dict:
+                           signals: list[str] | None = None, power_quality: dict | None = None) -> dict:
         """Run ngspice and measure full-resolution samples in an explicit window."""
         from .agent_results import run_candidate
-        return run_candidate(self, candidate_id, "simulate", options={"window": window, "signals": signals})
+        return run_candidate(self, candidate_id, "simulate",
+                             options={"window": window, "signals": signals, "power_quality": power_quality})
 
     def identify_modes(self, candidate_id: str) -> dict:
         """Use the existing instrumented solver to identify fixed-PWM switching modes."""

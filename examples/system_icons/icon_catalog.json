@@ -1,0 +1,918 @@
+{
+ "name": "icon_catalog",
+ "title": "全部方框图标：左线稿、右彩色",
+ "elements": [],
+ "wires": [],
+ "blocks": [
+  {
+   "id": "ac_line",
+   "from": [
+    0.0,
+    0.0
+   ],
+   "to": [
+    1.1,
+    1.1
+   ],
+   "icon": "ac",
+   "text": "ac"
+  },
+  {
+   "id": "pv_line",
+   "from": [
+    3.2,
+    0.0
+   ],
+   "to": [
+    4.3,
+    1.1
+   ],
+   "icon": "pv",
+   "text": "pv"
+  },
+  {
+   "id": "wind_line",
+   "from": [
+    6.4,
+    0.0
+   ],
+   "to": [
+    7.5,
+    1.1
+   ],
+   "icon": "wind",
+   "text": "wind"
+  },
+  {
+   "id": "wind_color",
+   "from": [
+    7.8,
+    0.0
+   ],
+   "to": [
+    8.9,
+    1.1
+   ],
+   "icon": "wind",
+   "icon_color": true
+  },
+  {
+   "id": "battery_line",
+   "from": [
+    9.6,
+    0.0
+   ],
+   "to": [
+    10.7,
+    1.1
+   ],
+   "icon": "battery",
+   "text": "battery"
+  },
+  {
+   "id": "fuelcell_line",
+   "from": [
+    12.8,
+    0.0
+   ],
+   "to": [
+    13.9,
+    1.1
+   ],
+   "icon": "fuelcell",
+   "text": "fuelcell"
+  },
+  {
+   "id": "fuelcell_color",
+   "from": [
+    14.2,
+    0.0
+   ],
+   "to": [
+    15.3,
+    1.1
+   ],
+   "icon": "fuelcell",
+   "icon_color": true
+  },
+  {
+   "id": "pylon_line",
+   "from": [
+    16.0,
+    0.0
+   ],
+   "to": [
+    17.1,
+    1.1
+   ],
+   "icon": "pylon",
+   "text": "pylon"
+  },
+  {
+   "id": "xfmr_line",
+   "from": [
+    0.0,
+    -2.2
+   ],
+   "to": [
+    1.1,
+    -1.1
+   ],
+   "icon": "xfmr",
+   "text": "xfmr"
+  },
+  {
+   "id": "xfmr_color",
+   "from": [
+    1.4,
+    -2.2
+   ],
+   "to": [
+    2.5,
+    -1.1
+   ],
+   "icon": "xfmr",
+   "icon_color": true
+  },
+  {
+   "id": "dcsource_line",
+   "from": [
+    3.2,
+    -2.2
+   ],
+   "to": [
+    4.3,
+    -1.1
+   ],
+   "icon": "dcsource",
+   "text": "dcsource"
+  },
+  {
+   "id": "square_line",
+   "from": [
+    6.4,
+    -2.2
+   ],
+   "to": [
+    7.5,
+    -1.1
+   ],
+   "icon": "square",
+   "text": "square"
+  },
+  {
+   "id": "acdc_line",
+   "from": [
+    0.0,
+    -4.4
+   ],
+   "to": [
+    1.1,
+    -3.3
+   ],
+   "icon": "acdc",
+   "text": "acdc"
+  },
+  {
+   "id": "dcdc_line",
+   "from": [
+    3.2,
+    -4.4
+   ],
+   "to": [
+    4.3,
+    -3.3
+   ],
+   "icon": "dcdc",
+   "text": "dcdc"
+  },
+  {
+   "id": "dcac_line",
+   "from": [
+    6.4,
+    -4.4
+   ],
+   "to": [
+    7.5,
+    -3.3
+   ],
+   "icon": "dcac",
+   "text": "dcac"
+  },
+  {
+   "id": "mosfet_line",
+   "from": [
+    9.6,
+    -4.4
+   ],
+   "to": [
+    10.7,
+    -3.3
+   ],
+   "icon": "mosfet",
+   "text": "mosfet"
+  },
+  {
+   "id": "igbt_line",
+   "from": [
+    12.8,
+    -4.4
+   ],
+   "to": [
+    13.9,
+    -3.3
+   ],
+   "icon": "igbt",
+   "text": "igbt"
+  },
+  {
+   "id": "diode_line",
+   "from": [
+    16.0,
+    -4.4
+   ],
+   "to": [
+    17.1,
+    -3.3
+   ],
+   "icon": "diode",
+   "text": "diode"
+  },
+  {
+   "id": "capacitor_line",
+   "from": [
+    0.0,
+    -6.6
+   ],
+   "to": [
+    1.1,
+    -5.5
+   ],
+   "icon": "capacitor",
+   "text": "capacitor"
+  },
+  {
+   "id": "toroid_line",
+   "from": [
+    3.2,
+    -6.6
+   ],
+   "to": [
+    4.3,
+    -5.5
+   ],
+   "icon": "toroid",
+   "text": "toroid"
+  },
+  {
+   "id": "toroid_color",
+   "from": [
+    4.6,
+    -6.6
+   ],
+   "to": [
+    5.7,
+    -5.5
+   ],
+   "icon": "toroid",
+   "icon_color": true
+  },
+  {
+   "id": "breaker_line",
+   "from": [
+    6.4,
+    -6.6
+   ],
+   "to": [
+    7.5,
+    -5.5
+   ],
+   "icon": "breaker",
+   "text": "breaker"
+  },
+  {
+   "id": "breaker_color",
+   "from": [
+    7.8,
+    -6.6
+   ],
+   "to": [
+    8.9,
+    -5.5
+   ],
+   "icon": "breaker",
+   "icon_color": true
+  },
+  {
+   "id": "heatsink_line",
+   "from": [
+    9.6,
+    -6.6
+   ],
+   "to": [
+    10.7,
+    -5.5
+   ],
+   "icon": "heatsink",
+   "text": "heatsink"
+  },
+  {
+   "id": "heatsink_color",
+   "from": [
+    11.0,
+    -6.6
+   ],
+   "to": [
+    12.1,
+    -5.5
+   ],
+   "icon": "heatsink",
+   "icon_color": true
+  },
+  {
+   "id": "fan_line",
+   "from": [
+    12.8,
+    -6.6
+   ],
+   "to": [
+    13.9,
+    -5.5
+   ],
+   "icon": "fan",
+   "text": "fan"
+  },
+  {
+   "id": "fan_color",
+   "from": [
+    14.2,
+    -6.6
+   ],
+   "to": [
+    15.3,
+    -5.5
+   ],
+   "icon": "fan",
+   "icon_color": true
+  },
+  {
+   "id": "motor_line",
+   "from": [
+    0.0,
+    -8.8
+   ],
+   "to": [
+    1.1,
+    -7.7
+   ],
+   "icon": "motor",
+   "text": "motor"
+  },
+  {
+   "id": "motor_color",
+   "from": [
+    1.4,
+    -8.8
+   ],
+   "to": [
+    2.5,
+    -7.7
+   ],
+   "icon": "motor",
+   "icon_color": true
+  },
+  {
+   "id": "generator_line",
+   "from": [
+    3.2,
+    -8.8
+   ],
+   "to": [
+    4.3,
+    -7.7
+   ],
+   "icon": "generator",
+   "text": "generator"
+  },
+  {
+   "id": "generator_color",
+   "from": [
+    4.6,
+    -8.8
+   ],
+   "to": [
+    5.7,
+    -7.7
+   ],
+   "icon": "generator",
+   "icon_color": true
+  },
+  {
+   "id": "ev_line",
+   "from": [
+    6.4,
+    -8.8
+   ],
+   "to": [
+    7.5,
+    -7.7
+   ],
+   "icon": "ev",
+   "text": "ev"
+  },
+  {
+   "id": "ev_color",
+   "from": [
+    7.8,
+    -8.8
+   ],
+   "to": [
+    8.9,
+    -7.7
+   ],
+   "icon": "ev",
+   "icon_color": true
+  },
+  {
+   "id": "charger_line",
+   "from": [
+    9.6,
+    -8.8
+   ],
+   "to": [
+    10.7,
+    -7.7
+   ],
+   "icon": "charger",
+   "text": "charger"
+  },
+  {
+   "id": "charger_color",
+   "from": [
+    11.0,
+    -8.8
+   ],
+   "to": [
+    12.1,
+    -7.7
+   ],
+   "icon": "charger",
+   "icon_color": true
+  },
+  {
+   "id": "home_line",
+   "from": [
+    12.8,
+    -8.8
+   ],
+   "to": [
+    13.9,
+    -7.7
+   ],
+   "icon": "home",
+   "text": "home"
+  },
+  {
+   "id": "home_color",
+   "from": [
+    14.2,
+    -8.8
+   ],
+   "to": [
+    15.3,
+    -7.7
+   ],
+   "icon": "home",
+   "icon_color": true
+  },
+  {
+   "id": "factory_line",
+   "from": [
+    16.0,
+    -8.8
+   ],
+   "to": [
+    17.1,
+    -7.7
+   ],
+   "icon": "factory",
+   "text": "factory"
+  },
+  {
+   "id": "factory_color",
+   "from": [
+    17.4,
+    -8.8
+   ],
+   "to": [
+    18.5,
+    -7.7
+   ],
+   "icon": "factory",
+   "icon_color": true
+  },
+  {
+   "id": "rack_line",
+   "from": [
+    0.0,
+    -11.0
+   ],
+   "to": [
+    1.1,
+    -9.9
+   ],
+   "icon": "rack",
+   "text": "rack"
+  },
+  {
+   "id": "bulb_line",
+   "from": [
+    3.2,
+    -11.0
+   ],
+   "to": [
+    4.3,
+    -9.9
+   ],
+   "icon": "bulb",
+   "text": "bulb"
+  },
+  {
+   "id": "bulb_color",
+   "from": [
+    4.6,
+    -11.0
+   ],
+   "to": [
+    5.7,
+    -9.9
+   ],
+   "icon": "bulb",
+   "icon_color": true
+  },
+  {
+   "id": "phone_line",
+   "from": [
+    6.4,
+    -11.0
+   ],
+   "to": [
+    7.5,
+    -9.9
+   ],
+   "icon": "phone",
+   "text": "phone"
+  },
+  {
+   "id": "phone_color",
+   "from": [
+    7.8,
+    -11.0
+   ],
+   "to": [
+    8.9,
+    -9.9
+   ],
+   "icon": "phone",
+   "icon_color": true
+  },
+  {
+   "id": "plug_line",
+   "from": [
+    9.6,
+    -11.0
+   ],
+   "to": [
+    10.7,
+    -9.9
+   ],
+   "icon": "plug",
+   "text": "plug"
+  },
+  {
+   "id": "plug_color",
+   "from": [
+    11.0,
+    -11.0
+   ],
+   "to": [
+    12.1,
+    -9.9
+   ],
+   "icon": "plug",
+   "icon_color": true
+  },
+  {
+   "id": "wpt_line",
+   "from": [
+    12.8,
+    -11.0
+   ],
+   "to": [
+    13.9,
+    -9.9
+   ],
+   "icon": "wpt",
+   "text": "wpt"
+  },
+  {
+   "id": "wpt_color",
+   "from": [
+    14.2,
+    -11.0
+   ],
+   "to": [
+    15.3,
+    -9.9
+   ],
+   "icon": "wpt",
+   "icon_color": true
+  },
+  {
+   "id": "bolt_line",
+   "from": [
+    16.0,
+    -11.0
+   ],
+   "to": [
+    17.1,
+    -9.9
+   ],
+   "icon": "bolt",
+   "text": "bolt"
+  },
+  {
+   "id": "bolt_color",
+   "from": [
+    17.4,
+    -11.0
+   ],
+   "to": [
+    18.5,
+    -9.9
+   ],
+   "icon": "bolt",
+   "icon_color": true
+  },
+  {
+   "id": "meter_line",
+   "from": [
+    0.0,
+    -13.2
+   ],
+   "to": [
+    1.1,
+    -12.1
+   ],
+   "icon": "meter",
+   "text": "meter"
+  },
+  {
+   "id": "meter_color",
+   "from": [
+    1.4,
+    -13.2
+   ],
+   "to": [
+    2.5,
+    -12.1
+   ],
+   "icon": "meter",
+   "icon_color": true
+  },
+  {
+   "id": "thermometer_line",
+   "from": [
+    3.2,
+    -13.2
+   ],
+   "to": [
+    4.3,
+    -12.1
+   ],
+   "icon": "thermometer",
+   "text": "thermometer"
+  },
+  {
+   "id": "thermometer_color",
+   "from": [
+    4.6,
+    -13.2
+   ],
+   "to": [
+    5.7,
+    -12.1
+   ],
+   "icon": "thermometer",
+   "icon_color": true
+  },
+  {
+   "id": "chip_line",
+   "from": [
+    6.4,
+    -13.2
+   ],
+   "to": [
+    7.5,
+    -12.1
+   ],
+   "icon": "chip",
+   "text": "chip"
+  },
+  {
+   "id": "chip_color",
+   "from": [
+    7.8,
+    -13.2
+   ],
+   "to": [
+    8.9,
+    -12.1
+   ],
+   "icon": "chip",
+   "icon_color": true
+  },
+  {
+   "id": "monitor_line",
+   "from": [
+    9.6,
+    -13.2
+   ],
+   "to": [
+    10.7,
+    -12.1
+   ],
+   "icon": "monitor",
+   "text": "monitor"
+  },
+  {
+   "id": "monitor_color",
+   "from": [
+    11.0,
+    -13.2
+   ],
+   "to": [
+    12.1,
+    -12.1
+   ],
+   "icon": "monitor",
+   "icon_color": true
+  },
+  {
+   "id": "python_line",
+   "from": [
+    0.0,
+    -15.4
+   ],
+   "to": [
+    1.1,
+    -14.3
+   ],
+   "icon": "python",
+   "text": "python"
+  },
+  {
+   "id": "python_color",
+   "from": [
+    1.4,
+    -15.4
+   ],
+   "to": [
+    2.5,
+    -14.3
+   ],
+   "icon": "python",
+   "icon_color": true
+  },
+  {
+   "id": "database_line",
+   "from": [
+    3.2,
+    -15.4
+   ],
+   "to": [
+    4.3,
+    -14.3
+   ],
+   "icon": "database",
+   "text": "database"
+  },
+  {
+   "id": "database_color",
+   "from": [
+    4.6,
+    -15.4
+   ],
+   "to": [
+    5.7,
+    -14.3
+   ],
+   "icon": "database",
+   "icon_color": true
+  },
+  {
+   "id": "script_line",
+   "from": [
+    6.4,
+    -15.4
+   ],
+   "to": [
+    7.5,
+    -14.3
+   ],
+   "icon": "script",
+   "text": "script"
+  },
+  {
+   "id": "script_color",
+   "from": [
+    7.8,
+    -15.4
+   ],
+   "to": [
+    8.9,
+    -14.3
+   ],
+   "icon": "script",
+   "icon_color": true
+  },
+  {
+   "id": "neural_line",
+   "from": [
+    9.6,
+    -15.4
+   ],
+   "to": [
+    10.7,
+    -14.3
+   ],
+   "icon": "neural",
+   "text": "neural"
+  },
+  {
+   "id": "neural_color",
+   "from": [
+    11.0,
+    -15.4
+   ],
+   "to": [
+    12.1,
+    -14.3
+   ],
+   "icon": "neural",
+   "icon_color": true
+  },
+  {
+   "id": "cloud_line",
+   "from": [
+    12.8,
+    -15.4
+   ],
+   "to": [
+    13.9,
+    -14.3
+   ],
+   "icon": "cloud",
+   "text": "cloud"
+  },
+  {
+   "id": "cloud_color",
+   "from": [
+    14.2,
+    -15.4
+   ],
+   "to": [
+    15.3,
+    -14.3
+   ],
+   "icon": "cloud",
+   "icon_color": true
+  },
+  {
+   "id": "gear_line",
+   "from": [
+    16.0,
+    -15.4
+   ],
+   "to": [
+    17.1,
+    -14.3
+   ],
+   "icon": "gear",
+   "text": "gear"
+  },
+  {
+   "id": "gear_color",
+   "from": [
+    17.4,
+    -15.4
+   ],
+   "to": [
+    18.5,
+    -14.3
+   ],
+   "icon": "gear",
+   "icon_color": true
+  }
+ ]
+}

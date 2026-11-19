@@ -5,6 +5,18 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 
 class AgentRoutes:
+    def _generate_icon(self, req):
+        from .agent import safe_text
+        from .ai.icons import generate
+        from .ai.loop import ModelError
+        self._settings_guard()
+        if self.headers.get_content_type() != "application/json":
+            raise ValueError("图标生成请求必须使用 JSON")
+        try:
+            return generate(self.agent_tasks.editor, req)
+        except (ModelError, OSError) as exc:
+            raise ValueError(safe_text(exc)) from exc
+
     def _agent(self, req):
         return self.agent_tasks.request(req)
 

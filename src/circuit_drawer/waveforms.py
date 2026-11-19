@@ -618,10 +618,12 @@ def chart_labels(cfg: dict, width: float, font_pt: float, names: list) -> list[d
     return labels
 
 
-def paper(cfg: dict, profile: str, target="overview", names=None) -> dict:
+def paper(cfg: dict, profile: str, target="overview", names=None, *, width_cm=None) -> dict:
     """Printed geometry and defaults. Screen zoom never changes these values."""
     prof = get_profile(chart_profile(cfg, profile, target))
-    width = prof.width_cm - 1.6
+    width = prof.width_cm - 1.6 if width_cm is None else width_cm - CHART_LEFT_CM - CHART_RIGHT_CM
+    if width <= 0:
+        raise ValueError("波形子图宽度不足以容纳坐标轴，请减少列数或增大纸面宽度")
     rows, offset = [], 0.
     for group in axis_groups(cfg["channels"]):
         keys, legend_height = legend(group, width, prof.font_pt)
@@ -708,11 +710,11 @@ def _notes_tex(notes: list, x, y, prof) -> list[str]:
     return out
 
 
-def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None) -> str:
+def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, width_cm=None) -> str:
     """``names`` is the table's mode order; with slice_style "shade" each
     interval gets a band and its "Mode k" tag, k as in the mode files."""
     prof = get_profile(profile)
-    sizes = paper(cfg, profile, "standalone", names)
+    sizes = paper(cfg, profile, "standalone", names, width_cm=width_cm)
     width, height = sizes["width_cm"], sizes["row_cm"]
     left, right = cfg["window"]
     factor = UNITS[cfg["display_unit"]]

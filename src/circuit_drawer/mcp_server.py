@@ -85,13 +85,17 @@ def create_server(workspace: str | Path, output_dir: str | Path = "agent-output"
 
     @server.tool(annotations=measured)
     def simulate_candidate(candidate_id: str, window: list[float] | None = None,
-                           signals: list[str] | None = None) -> dict[str, Any]:
+                           signals: list[str] | None = None,
+                           power_quality: dict[str, Any] | None = None) -> dict[str, Any]:
         """Run installed ngspice and return measured waveforms, metrics, files and provenance.
 
         window uses seconds. Default is the last 10% of the available time range,
         without assuming steady state. Signals accept actual CSV columns or unique probe IDs.
+        power_quality {voltage, current, frequency, harmonics?, current_sign?} adds PF,
+        displacement factor, mean power and voltage/current THD over whole fundamental
+        cycles ending at the window end; current_sign -1 reverses the recorded current.
         """
-        return operations.simulate_candidate(candidate_id, window, signals)
+        return operations.simulate_candidate(candidate_id, window, signals, power_quality)
 
     @server.tool(annotations=measured)
     def identify_modes(candidate_id: str) -> dict[str, Any]:

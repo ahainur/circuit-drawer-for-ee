@@ -59,7 +59,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .closed_loop import CONTINUOUS_NOTE, MIN_PULSE_EDGES, ClosedLoopError, Loop, pwm_drives
+from .closed_loop import (C_NOTE, CONTINUOUS_NOTE, GATE_THRESHOLD, MIN_PULSE_EDGES, ClosedLoopError, Loop,
+                           gate_timing, pwm_drives)
 
 MODES = ("continuous", "discrete")
 COLUMN = 170          # px between columns of control blocks (a PLECS PID block is 88 px wide)
@@ -263,11 +264,15 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
     fixed value."""
     if mode not in MODES:
         raise ClosedLoopError(f"闭环控制器导出模式须为 {list(MODES)}，不是 {mode!r}")
-    if loop.digital:
+    if loop.digital and not loop.digital.implicit:
         raise ClosedLoopError("digital 的逐拍量化模型请使用 ngspice 导出。Simulink/PLECS 的当前原生控制方块尚未实现该舍入与延迟模型")
     pl = loop.plan
     panel = Panel(mode, pl.ts if mode == "discrete" else None)
     b = _Builder(panel)
+    enabled = None
+    if loop.digital and loop.digital.implicit:
+        # Enable between sample hits so native solvers see the new value at Ts.
+        enabled = (b.add("step", "first_sample", {"time": pl.ts / 2}, 0, 1), 1)
     sig: dict[str, tuple[str, int]] = {}
     for bid in pl.inputs:
         cfg = loop.inputs[bid]
@@ -298,8 +303,10 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
             if st.data["fn"] == "c":
                 if mode != "discrete":
                     raise ClosedLoopError("C 代码方块需要离散控制器导出；请选择 discrete，采样率使用 code.fs")
-                name = b.add("c",st.id,{**st.data,"ts":pl.ts},len(x),len(st.data["outs"]),st.id)
-                for i, source in enumerate(x,1):
+                sources = x + ([enabled] if enabled else [])
+                name = b.add("c", st.id, {**st.data, "ts": pl.ts, "enabled": bool(enabled)},
+                             len(sources), len(st.data["outs"]), st.id)
+                for i, source in enumerate(sources, 1):
                     b.link(source,(name,i))
                 for i, signal in enumerate(st.data["outs"],1):
                     sig[signal] = (name,i)
@@ -340,6 +347,9 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
         if cfg.get("modulation") == "vco":
             _vco(b, panel, bid, cfg, switches, duty)
             continue
+        if cfg.get("modulation") == "gate":
+            _gate(b, panel, bid, cfg, switches, duty)
+            continue
         bridge = bool(cfg["complement"])
         if cfg["model"] == "average":
             panel.warnings.append(f"{bid}：桥臂 {cfg['switches'] + cfg['complement']} 的 average 模型在原生库里没有对应方块，"
@@ -349,7 +359,9 @@ def build(loop: Loop, mode: str, switches: dict[str, tuple[str, dict]], probes: 
     for lk in panel.links:
         if lk.src[0].startswith("?"):
             lk.src = placeholders[lk.src[0][1:]]
-    panel.warnings += [w for w in loop.warnings if mode == "continuous" or w != CONTINUOUS_NOTE]
+    panel.warnings += [w for w in loop.warnings if (mode == "continuous" or w != CONTINUOUS_NOTE) and w != C_NOTE]
+    if loop.digital and loop.digital.implicit:
+        panel.warnings.append(C_NOTE)
     _layout(panel)
     return panel
 
@@ -419,6 +431,33 @@ def _vco(b: _Builder, panel: Panel, out: str, cfg: dict,
             panel.exports[switches[sw][0]] = gate
     panel.warnings.append(f"{out}：VCO 使用 Hz 限幅、共享连续相位和秒死区；原生开关采用理想边沿，"
                           "与 ngspice 的有限 rise/fall 边沿存在差别。")
+
+
+def _gate(b: _Builder, panel: Panel, out: str, cfg: dict,
+          switches: dict[str, tuple[str, dict]], command: tuple[str, int]) -> None:
+    """A sampled switch state straight onto the gates, as closed_loop.gate_lines:
+    on above the threshold, the complement group on at or below it, every turn-on
+    delayed by dead_time. The command is already held by the discrete block."""
+    _edge, dead = gate_timing(cfg, switches, panel.ts)
+    threshold = b.const(GATE_THRESHOLD)
+    high = b.many("compare", f"{out}_high_gate", [command, threshold])
+    enabled = (b.add("step", f"{out}_enable", {"time": panel.ts}, 0, 1), 1)
+    for suffix, group in (("high", cfg["switches"]), ("low", cfg["complement"])):
+        if not group:
+            continue
+        gate = high
+        if suffix == "low":
+            gate = b.sum(f"{out}_low_gate", [(1, b.const(1)), (-1, high)])
+        gate = b.many("product", f"{out}_{suffix}_enabled", [gate, enabled], {"ops": "**"})
+        if dead:
+            delayed = b.one("pulse_delay", f"{out}_{suffix}_delay", gate, {"seconds": dead})
+            gate = b.many("minmax", f"{out}_{suffix}_dead", [gate, delayed], {"op": "min"})
+        for sw in group:
+            panel.exports[switches[sw][0]] = gate
+    panel.warnings.append(f"{out}：直接门极输出，命令大于 {GATE_THRESHOLD:g} 时 {', '.join(cfg['switches'])} 导通"
+                          + (f"，{', '.join(cfg['complement'])} 取反" if cfg['complement'] else "")
+                          + (f"，开通延迟 {dead:g} s 作死区" if dead else "")
+                          + "；原生开关为理想边沿，ngspice 用开关 rise/fall 时间的边沿。")
 
 
 def _modulator(b: _Builder, panel: Panel, sw: str, drive: tuple[str, dict], duty: tuple[str, int], out: str,

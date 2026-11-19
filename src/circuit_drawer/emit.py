@@ -7,6 +7,7 @@ lets ``x``/``y`` units carry the scale, so the .tex stays easy to hand-edit.
 from __future__ import annotations
 
 import math
+import re
 
 from .geometry import (EPS, SW_LABEL_DX, Footprint, Scale, axis_sizes, block_text_box, callout_label_box,
                        callout_shape, callout_visible_paths, font_of, footprint, has_wide, isolation_bars,
@@ -14,6 +15,7 @@ from .geometry import (EPS, SW_LABEL_DX, Footprint, Scale, axis_sizes, block_tex
                        scaled, sw_k, unscaled)
 from .layout import PIN_NAMES, SWITCHES, TWO_TERMINAL, Element, Layout, Point
 from .profiles import Profile
+from .figure_style import paper_profile
 from .regions import (LINE_HEAD, Callout, Region, ink_rgb, ink_tikz, rgb, safe_regions, tikz_rgb,
                       valid_ink)
 from .validate import Report, extent
@@ -40,7 +42,8 @@ def preamble(prof: Profile, cjk: bool = False) -> str:
     """``cjk`` loads CJKutf8 for Chinese text; the caller closes the CJK
     environment before ``\\end{document}``."""
     lead = prof.font_pt * 1.2
-    head = rf"""\documentclass[border=1pt]{{standalone}}
+    margin = "1pt" if abs(prof.margin_mm - 10 * 2.54 / 72.27) < 1e-9 else f"{_n(prof.margin_mm)}mm"
+    head = rf"""\documentclass[border={margin}]{{standalone}}
 \usepackage{{mathptmx}}  % Times text and math
 \usepackage{{amsmath}}
 \usepackage{{circuitikz}}
@@ -74,6 +77,7 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
     coloured, the rest grey, plus current arrows.  Coordinates do not change.
     ``mono`` draws regions and callouts in greys (always so for a
     black-and-white mode style)."""
+    prof = paper_profile(prof, layout.extra)
     electrical = layout.extra.get("electrical")
     if "modules" in layout.extra:
         from .modules import checked
@@ -96,6 +100,8 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
     out.append(rf"\begin{{circuitikz}}[x={_n(s.x)}cm, y={_n(s.y)}cm, "
                rf"line width={prof.line_pt}pt, cute inductors, "
                rf"european resistors, american voltages]" "\n")
+    from .figure_images import tex as image_tex
+    out.append(image_tex(layout.extra, s, base_dir, mono=mono, foreground=False))
     if grid:
         out.append(_grid(layout, prof, s))
     if regions or any(c.style == "block" and not c.foreground for c in callouts):
@@ -194,6 +200,7 @@ def emit(layout: Layout, prof: Profile, report: Report, grid: bool = False,
     if any(c.foreground for c in callouts):
         out.append("% ---- foreground block arrows (explicit) ----\n")
         out += [_callout(c, s, prof, mono) for c in callouts if c.foreground]
+    out.append(image_tex(layout.extra, s, base_dir, mono=mono))
     out.append("\\end{circuitikz}\n" + ("\\end{CJK}\n" if cjk else "") + "\\end{document}\n")
     return "".join(out)
 
@@ -208,18 +215,57 @@ def _label_node(box, text: str, size, s: Scale, prof: Profile) -> str:
     return rf"\node[inner sep=0pt] at {_p(at)} {{{sized(text, pt)}}};" "\n"
 
 
+def weighted(text, weight):
+    if weight != "bold" or not text:
+        return text
+    # Keep Greek, math italics and indices in the existing mathptmx family.
+    # gbsn supplies bx for Chinese text.
+    def line(value):
+        value = re.sub(r"(?<!\\)\$(.+?)(?<!\\)\$", lambda m: r"$\pmb{" + m[1] + "}$", value)
+        value = re.sub(r"\\\((.+?)\\\)", lambda m: r"\(\pmb{" + m[1] + r"}\)", value)
+        return r"{\fontseries{bx}\selectfont " + value + "}"
+    return r"\\".join(line(value) for value in text.split(r"\\"))
+
+
+def _box_decoration(rect, obj, s):
+    from .geometry import Box, box_decoration
+    x0, y0, x1, y1 = rect
+    style = box_decoration(Box(x0 * s.x, y0 * s.y, x1 * s.x, y1 * s.y), obj.corner_radius, obj.shadow, s, inner=obj.inner_shadow)
+    corners = f"rounded corners={_n(style['radius_cm'])}cm, " if style['radius_cm'] else ""
+    layers = []
+    for layer in style["shadows"]:
+        dx, dy, gray = layer["dx"], layer["dy"], layer["gray"]
+        layers.append(rf"\fill[{corners}black!{_n((1-gray)*100)}] "
+                      rf"{_p((x0+dx, y0+dy))} rectangle {_p((x1+dx, y1+dy))};" "\n")
+    inset = []
+    for band in style["inset"]:
+        dx, dy = band["depth"] / s.x, band["depth"] / s.y
+        inset.append(rf"\draw[black,opacity={_n(band['opacity'])},line width={_n(band['width'])}cm,"
+                     rf"rounded corners={_n(band['radius'])}cm] "
+                     rf"{_p((x0+dx, y0+dy))} rectangle {_p((x1-dx, y1-dy))};" "\n")
+    return corners, "".join(layers), "".join(inset)
+
+
 def _region(r: Region, s: Scale, prof: Profile, mono: bool, mode_style: str = "") -> str:
     """Panels behind first (farthest back first), then the front one."""
     lines = []
-    width = f"line width={_n(prof.line_pt * 0.8)}pt"
+    width = f"line width={_n(r.border_width or prof.line_pt * 0.8)}pt"
     for k in range(len(r.layers), 0, -1):
         x0, y0, x1, y1 = r.rect(k)
         fill = r.layers[k - 1][2]
-        lines.append(rf"\filldraw[fill={tikz_rgb(fill, mono)}, "
+        corners, shadow, inset = _box_decoration(r.rect(k), r, s)
+        if shadow:
+            lines.append(shadow)
+        lines.append(rf"\filldraw[{corners}fill={tikz_rgb(fill, mono)}, "
                      rf"draw={tikz_rgb(fill, mono, edge=True)}, {width}] "
                      rf"{_p((x0, y0))} rectangle {_p((x1, y1))};")
+        if inset:
+            lines.append(inset)
     x0, y0, x1, y1 = r.rect()
-    opts = []
+    corners, shadow, inset = _box_decoration(r.rect(), r, s)
+    if shadow:
+        lines.append(shadow)
+    opts = [corners.rstrip(", ")] if corners else []
     if r.fill != "none":
         opts.append(f"fill={tikz_rgb(r.fill, mono)}")
     if r.border != "none":
@@ -230,10 +276,10 @@ def _region(r: Region, s: Scale, prof: Profile, mono: bool, mode_style: str = ""
     cmd = "\\filldraw" if r.fill != "none" and r.border != "none" else (
         "\\fill" if r.fill != "none" else "\\draw")
     lines.append(rf"{cmd}[{', '.join(opts)}] {_p((x0, y0))} rectangle {_p((x1, y1))};")
-    out = "\n".join(lines) + "\n"
+    out = "\n".join(lines) + "\n" + inset
     box = region_label_box(r, s, prof)
     if box is not None:
-        out += _label_node(box, r.label, r.size, s, prof)
+        out += _label_node(box, weighted(r.label, r.font_weight), r.size, s, prof)
     return out
 
 
@@ -241,20 +287,24 @@ def _block(b: Block, s: Scale, prof: Profile, mono: bool, content: str | None = 
     """A function block: box in the circuit's line width, centred text."""
     ink = "{rgb,255:red,%d;green,%d;blue,%d}" % ink_rgb(b.color, mono)
     fill = block_fill(b, mono)
-    opts = [f"draw={ink}", f"line width={_n(prof.line_pt)}pt" + BORDER_STYLE[b.border]]
+    opts = ["draw=none"] if b.border == "none" else [
+        f"draw={ink}", f"line width={_n(b.border_width or prof.line_pt)}pt" + BORDER_STYLE[b.border]]
     if fill is not None:
         opts.insert(0, "fill={rgb,255:red,%d;green,%d;blue,%d}" % fill)
-    out = (rf"\{'filldraw' if fill is not None else 'draw'}[{', '.join(opts)}] "
+    corners, shadow, inset = _box_decoration((b.x0, b.y0, b.x1, b.y1), b, s)
+    out = shadow + (rf"\{'filldraw' if fill is not None else 'draw'}[{corners}{', '.join(opts)}] "
            rf"{_p((b.x0, b.y0))} rectangle {_p((b.x1, b.y1))};" "\n")
+    out += inset
     if content is not None:
         return out + content
     if b.icon:
-        out += glyph_tikz({"kind": b.icon, "from": [b.x0, b.y0], "to": [b.x1, b.y1]}, f"color={ink}")
+        out += glyph_tikz({"kind": b.icon, "from": [b.x0, b.y0], "to": [b.x1, b.y1]}, f"color={ink}",
+                          b.icon_color, mono)
     box = block_text_box(b, s, prof)
     if box is not None:
         text = b.text if mono or b.color == "black" else \
             r"\textcolor[RGB]{%d,%d,%d}{%s}" % (*ink_rgb(b.color), b.text)
-        out += _label_node(box, text, b.size, s, prof)
+        out += _label_node(box, weighted(text, b.font_weight), b.size, s, prof)
     return out
 
 
@@ -299,7 +349,7 @@ def _callout(c: Callout, s: Scale, prof: Profile, mono: bool, weight: float = 1.
     if box is not None:
         text = c.label if mono or c.style == "block" else \
             r"\textcolor[RGB]{%d,%d,%d}{%s}" % (*ink_rgb(c.color), c.label)
-        out += _label_node(box, text, c.size, s, prof)
+        out += _label_node(box, weighted(text, c.font_weight), c.size, s, prof)
     return out
 
 
@@ -496,6 +546,9 @@ def _wave_path(points, s: Scale, color: str | None = None) -> str:
 def _element_body(el: Element, s: Scale, prof: Profile, parts: dict | None = None,
                   ink: str | None = None, conducting_diode: bool = False) -> str:
     fp = footprint(el, s, prof)
+    if el.opts.get("font_weight") == "bold":
+        el = Element(el.id, el.kind, el.pins, weighted(el.label, "bold"), el.label_pos,
+                     {**el.opts, **{k: weighted(el.opts[k], "bold") for k in ("current", "ratio") if el.opts.get(k)}})
     if ink:
         def inked(t):
             return rf"\textcolor{{{ink}}}{{{t}}}" if t else t
@@ -641,7 +694,7 @@ def sized(text: str, pt: float | None) -> str:
 
 def _annotation(a, prof: Profile, mono: bool = False) -> str:
     pt = font_of(a.size, prof) if a.size else None
-    text = sized(a.text, pt)
+    text = sized(weighted(a.text, a.font_weight), pt)
     col = (", color=" + ink_tikz(a.color, mono)) if a.color and valid_ink(a.color) else ""
     if not a.arrow:
         return rf"\node[{col[2:]}] at {_p(a.at)} {{{text}}};" "\n" if col else \

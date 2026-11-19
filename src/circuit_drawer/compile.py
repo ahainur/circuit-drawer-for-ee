@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .runtime import find_tool, latex_environment, poppler_environment
+from .runtime import POPPLER_OFFLINE_FLAGS, find_tool, latex_environment, poppler_environment
 
 FORMATS = ("tex", "pdf", "svg", "png")
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -46,7 +46,7 @@ def convert_pdf(pdf: Path, target: Path, png_dpi: int = 600) -> None:
         raise CompileError("pdftocairo not found (install poppler-utils)")
     env = poppler_environment(executable)
     # The offline MiKTeX subset includes the converter and its DLLs, without maintenance tools.
-    flags = ("--miktex-disable-installer", "--miktex-disable-maintenance", "--miktex-disable-diagnose") if env else ()
+    flags = POPPLER_OFFLINE_FLAGS if env else ()
     with tempfile.TemporaryDirectory() as tmp:
         tmpd = Path(tmp)
         shutil.copyfile(pdf, tmpd / "input.pdf")
@@ -77,6 +77,8 @@ def _export_pdf(pdf: Path, out_dir: Path, stem: str,
 
 def build(tex: str, out_dir: Path, stem: str,
           formats: tuple[str, ...] = FORMATS, png_dpi: int = 600) -> dict[str, Path]:
+    from .figure_images import unpack_tex
+    tex, assets = unpack_tex(tex)
     if "→" in tex:
         # pdfLaTeX's text arrow requires a TS1 font outside the bundled subset.
         tex = tex.replace(r"\begin{document}",
@@ -84,6 +86,10 @@ def build(tex: str, out_dir: Path, stem: str,
     out_dir.mkdir(parents=True, exist_ok=True)
     made: dict[str, Path] = {}
     if "tex" in formats:
+        for name, data in assets.items():
+            asset = out_dir / name
+            asset.write_bytes(data)
+            made[name] = asset
         tex_path = out_dir / f"{stem}.tex"
         tex_path.write_text(tex, encoding="utf-8")
         made["tex"] = tex_path
@@ -91,6 +97,8 @@ def build(tex: str, out_dir: Path, stem: str,
         return made
     with tempfile.TemporaryDirectory() as tmp:
         tmpd = Path(tmp)
+        for name, data in assets.items():
+            (tmpd / name).write_bytes(data)
         (tmpd / "fig.tex").write_text(tex, encoding="utf-8")
         pdf = _compile(tmpd / "fig.tex")
         made.update(_export_pdf(pdf, out_dir, stem, formats, png_dpi))

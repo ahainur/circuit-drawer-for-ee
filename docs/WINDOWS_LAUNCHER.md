@@ -2,14 +2,14 @@
 
 ## 一、首次安装
 
-1、64 位 Windows 10／11 用户下载 `CircuitDrawer-Setup-2.0.0.exe`，双击并按向导安装。安装界面可选简体中文或英文，采用当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、64 位 Windows 10／11 用户下载 `CircuitDrawer-Setup-2.1.0.exe`，双击并按向导安装。安装界面可选简体中文或英文，采用当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、安装目录使用 ASCII 字符，允许空格。图纸和导出目录可包含中文。安装后从桌面或开始菜单打开 Circuit Drawer，包内已经提供 Python、TinyTeX、Poppler、ngspice 和 AI 依赖。绘图、出图和 ngspice 仿真可离线完成。
 
 3、安装包尚未签名，Windows 可能显示“未知发布者”或“Windows 已保护你的电脑”。核对来源和校验和后，可选择“更多信息 → 仍要运行”。将下面命令输出的 SHA256 与同一发布页 `SHA256SUMS.txt` 的对应条目比较。
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-2.0.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
 ```
 
 4、升级或卸载前先保存图纸，关闭启动器和正在运行的 Circuit Drawer 命令行任务。升级时运行新版安装程序。通过 Windows“设置 → 应用”卸载 Circuit Drawer，用户图纸和设置会保留。新图默认从用户目录选择保存位置，请将文档保存在自己的图纸目录。

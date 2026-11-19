@@ -83,7 +83,7 @@ function createReferenceImages(form, inputId, thumbsId, onChange, onPending) {
 
   area.querySelector('[data-ref-choose]').onclick = () => input.click();
   input.onchange = () => { const files = [...input.files]; input.value = ''; add(files); };
-  const dialog = form.closest('dialog');
+  const dialog = form.closest('dialog') || form;
   dialog.addEventListener('paste', event => {
     if (!form.isConnected) return;
     const files = [...(event.clipboardData?.items || [])]
@@ -102,5 +102,6 @@ function createReferenceImages(form, inputId, thumbsId, onChange, onPending) {
     if (!form.isConnected || !event.dataTransfer.types.includes('Files')) return;
     event.preventDefault(); area.classList.remove('dragover'); add([...event.dataTransfer.files]);
   });
-  return {get images() { return items.map(item => item.url); }, get pending() { return pending > 0; }};
+  return {get images() { return items.map(item => item.url); }, get pending() { return pending > 0; },
+    clear() { items.length = 0; errors.replaceChildren(); render(); }};
 }

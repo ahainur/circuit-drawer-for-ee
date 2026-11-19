@@ -220,6 +220,7 @@ window.addEventListener('pointercancel', endCanvasPan, true);
 window.addEventListener('blur', () => { spacePan = false; endCanvasPan(); });
 window.addEventListener('keyup', ev => { if (ev.code === 'Space') spacePan = false; }, true);
 window.addEventListener('keydown', ev => {
+  if (document.body.classList.contains('figure-open')) return;
   if (ev.code !== 'Space' || ev.ctrlKey || ev.metaKey || ev.altKey ||
       ev.target.closest('input, textarea, select, button, a, [contenteditable="true"], [role="menu"]') ||
       document.querySelector('dialog[open]')) return;

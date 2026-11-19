@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "circuit-drawer-for-ee"
-version = "2.0.0"
+version = "2.1.0"
 description = "Paper-ready power electronics circuit figures (CircuitikZ) from hand-placed, validated coordinates"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,3 +35,8 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 circuit_drawer = ["assets/*.ico", "assets/*.png", "assets/*.svg", "editor/static/*.html", "editor/static/*.js", "editor/static/*.css", "templates/saved_tables/*.json", "module_library/*.json", "ai/examples/*.json", "ai/presets/*.json", "control/templates/*.json", "control/static/*.html"]
+
+[tool.setuptools.data-files]
+"share/circuit-drawer/examples/spice" = ["examples/spice/boost.json", "examples/spice/single_phase_full_bridge.json"]
+"share/circuit-drawer/examples/closed_loop" = ["examples/closed_loop/grid_inverter_dq.json", "examples/closed_loop/grid_dq.control.json", "examples/closed_loop/pmsm_foc.json", "examples/closed_loop/pmsm_foc.control.json"]
+"share/circuit-drawer/examples/stateful_control" = ["examples/stateful_control/apfc_hysteresis.json", "examples/stateful_control/apfc_hysteresis.control.json"]

@@ -43,7 +43,7 @@ from .sps import DEFAULT_SAMPLES, FIELDS as SPS_FIELDS, Timing as SpsTiming
 
 KEYS = ("control", "inputs", "outputs", "note")
 INPUT_KEYS = ("probe", "value", "ramp", "filter")
-MODULATIONS = ("pwm", "vco", "sps")
+MODULATIONS = ("pwm", "vco", "sps", "gate")
 VCO_FIELDS = ("frequency_min", "frequency_max")  # Hz, explicit positive ordered limits
 OUTPUT_KEYS = ("switches", "complement", "dead_time", "model", "modulation", *VCO_FIELDS, *SPS_FIELDS)
 MODELS = ("switching", "average")
@@ -59,6 +59,9 @@ DELAY_MATCH_ULPS = 8       # equivalent SI spellings can round a few float steps
 # plateau of this fraction of the period, taken from its slopes.
 PLATEAU = 1e-6
 CONTINUOUS_NOTE = "控制器按连续时间模型仿真：不含采样、计算延迟和定点舍入"
+C_NOTE = ("C 代码方块按 code.fs 逐拍执行：t = k·Ts（k ≥ 1）读取同刻输入、计算并立即输出，"
+          "next_ 状态在本拍末提交一次；第一拍之前控制输出为 0，直接门极组全关断。")
+GATE_THRESHOLD = 0.5       # a direct gate command above this turns the switch group on
 
 
 class ClosedLoopError(ValueError):
@@ -244,6 +247,8 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
         elif set(cfg).intersection(SPS_FIELDS):
             raise ClosedLoopError(f"{what}：{', '.join(SPS_FIELDS)} 仅用于 SPS 相移调制")
         model = cfg.get("model", "average" if comp and modulation == "pwm" else "switching")
+        if modulation == "gate" and model != "switching":
+            raise ClosedLoopError(f"{what}：直接门极输出只支持 switching 模型")
         if modulation == "vco" and model != "switching":
             raise ClosedLoopError(f"{what}：VCO 变频调制只支持 switching 模型")
         if modulation == "sps" and model != "switching":
@@ -252,7 +257,7 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
             raise ClosedLoopError(f"{what}.model 须为 {list(MODELS)}；average 用于桥臂，"
                                   f"switches 与 complement 一一对应（上管、下管）")
         loop.outputs[bid] = {"switches": list(sws), "complement": list(comp), "dead_time": dead,
-                             "model": model, **({'modulation': modulation, **bounds} if bounds else {})}
+                             "model": model, **({'modulation': modulation, **bounds} if modulation != "pwm" else {})}
 
     for st in pl.steps:
         if st.kind in ("sos", "pi"):
@@ -260,8 +265,8 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
             loop.tf[st.id] = tf.zpk
             if tf.delay:
                 loop.warnings.append(f"{st.id}：传递函数里的延迟 {tf.delay:g} s 未仿真")
+    from .control.custom_c import is_step
     if "digital" in raw:
-        from .control.custom_c import is_step
         if any(is_step(st) for st in pl.steps):
             raise ClosedLoopError("C 代码方块使用 code.fs 固定采样；暂不支持 digital 延迟与量化设置")
         from .control.digital import NOTE, parse, prepare
@@ -272,8 +277,19 @@ def load(section: Any, base_dir: str | Path | None, components: dict, kinds: dic
             raise ClosedLoopError("SPS 的输出单位为 rad，不能使用占空比 digital.pwm_bits；请移除此设置")
         loop.plan = prepare(pl, loop.digital)
         loop.warnings = [NOTE]
+    elif any(is_step(st) for st in pl.steps):
+        from .control.digital import Digital, prepare
+        loop.digital = Digital(implicit=True)
+        loop.plan = prepare(pl, loop.digital)
+        loop.warnings = [C_NOTE]
     else:
         loop.warnings.append(CONTINUOUS_NOTE)
+    gates = [bid for bid, cfg in loop.outputs.items() if cfg.get("modulation") == "gate"]
+    if gates and not loop.digital:
+        raise ClosedLoopError(f"closed_loop.outputs.{gates[0]}：直接门极输出需要采样控制器，"
+                              "请使用 C 代码方块或控制表 digital 设置；门极只在采样时刻切换")
+    if gates and loop.digital.pwm_bits:
+        raise ClosedLoopError("直接门极输出是开关状态，不能使用占空比 digital.pwm_bits；请移除此设置")
     return loop
 
 
@@ -461,7 +477,9 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
             out.append(f"Vcl_{bid} {node(bid)} 0 DC {_g(cfg['value'])}")
     for st in pl.steps:
         if loop.digital:
-            out.append(f"V{node(st.id)} {node(st.id)} 0 DC 0")
+            # each value the control script computes is a held source
+            for signal in st.data["outs"] if st.kind == "fn" else [st.id]:
+                out.append(f"V{node(signal)} {node(signal)} 0 DC 0")
             continue
         x = [f"v({node(s)})" for s in st.srcs]
         if st.kind == "fn":
@@ -514,6 +532,9 @@ def lines(loop: Loop, probe_exprs: dict[str, str], switches: dict[str, tuple[str
         if cfg.get('modulation') == 'vco':
             out += vco_lines(index, cfg, switches, duty, tr)
             continue
+        if cfg.get('modulation') == 'gate':
+            out += gate_lines(index, cfg, switches, duty, tr, pl.ts)
+            continue
         if cfg["model"] == "average":
             # the leg itself is written by spice.make_deck (average_leg);
             # the drive nodes keep drive probes working
@@ -549,6 +570,59 @@ def pwm_drives(cfg, switches):
             name, values = switches[sw]
             drives.append((sw, (name, {**values, **timing}), is_lower))
     return drives
+
+
+def gate_timing(cfg, switches, ts):
+    """Shared by ngspice and native export: (edge, dead) after the pulse checks."""
+    group = [switches[sw][1] for sw in cfg['switches'] + cfg['complement']]
+    edge = max((val['rise'] + val['fall']) / 2 for val in group)
+    dead = cfg['dead_time']
+    if dead + MIN_PULSE_EDGES * edge >= ts:
+        raise ClosedLoopError(f"直接门极输出：死区 {dead:g} s 加 {MIN_PULSE_EDGES} 个开关边沿已不短于一个采样周期 "
+                              f"{ts:g} s，一拍宽的门极脉冲会被吞掉；请降低 code.fs、缩短死区或开关边沿")
+    return edge, dead
+
+
+def gate_lines(index, cfg, switches, signal, tr, ts):
+    """A sampled 0/1 switch state, held between samples by the control script.
+
+    The held state is filtered with tau = edge / EDGE_SPAN, so each
+    command step becomes an exponential gate edge whose 10-90 % time is the
+    switch's mean rise/fall time. Both groups start off until the first sample.
+    Each group filters its own target, including the complementary target. With
+    dead time, min(raw, delayed) delays every turn-on and none of the turn-offs,
+    the same matched-line delay as VCO. A switch's own PWM fields are unused.
+    """
+    edge, dead = gate_timing(cfg, switches, ts)
+    if tr['max_step'] > ts / 10:
+        raise ClosedLoopError(f"直接门极输出：transient.max_step 须 ≤ 采样周期的 1/10（{ts / 10:g} s），"
+                              "门极边沿和死区才有足够积分点")
+    prefix = f'cd_gate_{index}'
+    enable = prefix + '_enable'
+    out = [f'* gate output: held switch state from v({signal}), edges {_g(edge)} s (10-90 %), '
+           f'dead time {_g(dead)} s on turn-on, enabled at {_g(ts)} s',
+           f'V{enable} {enable} 0 DC 0']
+    for polarity, members in (('high', cfg['switches']), ('low', cfg['complement'])):
+        if not members:
+            continue
+        raw = prefix + '_' + polarity
+        state = raw + '_state'
+        target = f'v({signal})' if polarity == 'high' else f'v({enable}) - v({signal})'
+        # Unit resistance keeps the RC matrix well scaled at nanosecond edges.
+        out += [f'B{state} {state}_target 0 V = {target}',
+                f'R{state} {state}_target {state} 1',
+                f'C{state} {state} 0 {_g(edge / EDGE_SPAN)} IC=0',
+                f'B{raw} {raw} 0 V = min(max(v({state}), 0), 1)']
+        drive = f'v({raw})'
+        if dead:
+            delayed = raw + '_delayed'
+            out += [f'T{raw} {raw} 0 {delayed} 0 Z0=1 TD={_g(dead)} IC=0,0,0,0',
+                    f'R{delayed} {delayed} 0 1']
+            drive = f'min(v({raw}), max(0, v({delayed})))'
+        for sw in members:
+            name = switches[sw][0]
+            out.append(f'Bctl_{name} ctl_{name} 0 V = {drive}')
+    return out
 
 
 def vco_lines(index, cfg, switches, signal, tr):

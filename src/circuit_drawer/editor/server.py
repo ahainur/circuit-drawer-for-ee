@@ -53,7 +53,7 @@ def _callout_geometry(c, s, prof) -> dict:
                             callout_label_box, callout_shape, callout_visible_paths, isolation_bars)
     from ..regions import callout_rgb
     lab = callout_label_box(c, s, prof)
-    out = {"shape": [_pt(p, s) for p in callout_shape(c, s)],
+    out = {"from": list(c.start), "to": list(c.end), "shape": [_pt(p, s) for p in callout_shape(c, s)],
            "fill": "#%02x%02x%02x" % callout_rgb(c, edge=False),
            "edge": "#%02x%02x%02x" % callout_rgb(c), "style": c.style,
            "label": _box(lab, s) if lab else None,
@@ -85,7 +85,7 @@ def callout_preview(req: dict) -> dict:
     if any(v <= 0 or not math.isfinite(v) for v in scale):
         raise ValueError("scale must contain positive finite numbers")
     s = Scale(*scale)
-    c = parse_callout(req["callout"], 0)
+    c = parse_callout(req["callout"], 0, Layout.from_dict(req["layout"]) if req.get("layout") else None)
     if "handle" in req:
         if c.style != "line" or c.via:
             raise ValueError("only a line arrow has a bend handle")
@@ -130,6 +130,11 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
     """Validation report plus every footprint, in layout units, so the page
     draws exactly the boxes the validator checks."""
     prof = get_profile(profile)
+    from ..figure_style import paper_profile
+    try:
+        prof = paper_profile(prof, layout.extra)
+    except ValueError:
+        pass  # The common checker reports malformed saved figure settings.
     source_layout = layout
     electrical = layout.extra.get("electrical")
     from ..validate import check_with_assembly
@@ -152,12 +157,37 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
             root_decorations = {}
             source_table, view_table = layout.to_dict(), assembly.view.to_dict()
             for section in ("regions", "blocks", "callouts", "annotations", "glyphs"):
-                source = source_table.get(section, [])
+                # Assembly rounds translated coordinates to four places, even
+                # at the origin. Match the displayed copy, never round the file.
+                source = []
+                for raw in source_table.get(section, []):
+                    item = dict(raw)
+                    for key in ("from", "to", "at"):
+                        if key in item:
+                            item[key] = [round(v, 4) for v in item[key]]
+                    if "via" in item:
+                        item["via"] = [[round(v, 4) for v in p] for p in item["via"]]
+                    source.append(item)
                 unused = list(range(len(source)))
                 mapping = {}
                 # the expanded view drops a group region's derived "stack": compare without it
                 bare = lambda d: {k: v for k, v in d.items() if k != "stack"} if isinstance(d, dict) else d
-                same = lambda a, b: bare(a) == bare(b)
+                def same(a, b):
+                    if bare(a) == bare(b):
+                        return True
+                    if section != "regions" or not isinstance(a, dict) or not isinstance(b, dict) or a.get("fit") != "members":
+                        return False
+                    members = a.get("members", [])
+                    module_members = [name for name in members if name in assembly.instances]
+                    if not module_members:
+                        return False
+                    prefixes = tuple(name + "/" for name in module_members)
+                    expanded = [name for name in members if name not in module_members]
+                    expanded += [e.id for e in assembly.view.elements if e.id.startswith(prefixes)]
+                    derived = {"fit", "from", "to", "members", "stack"}
+                    return (expanded == b.get("members")
+                            and {k: v for k, v in a.items() if k not in derived}
+                            == {k: v for k, v in b.items() if k not in derived})
                 for j, item in enumerate(view_table.get(section, [])):
                     k = next((k for k in unused if source[k] == item or same(source[k], item)), None)
                     if k is not None:
@@ -279,6 +309,13 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
             else:
                 passes_double = wide_report.ok
     out = rep.to_dict()
+    from ..figure_images import safe_items
+    from ..geometry import image_box
+    out["images"] = []
+    for image in safe_items(source_layout.extra):
+        box = image_box(image, rep.scale)
+        out["images"].append({"id": image["id"], "bounds": [box.x0/rep.scale.x,
+            box.y0/rep.scale.y, box.x1/rep.scale.x, box.y1/rep.scale.y]})
     from ..layout import EXTRA_WINDINGS
     out["transformer_windings"] = EXTRA_WINDINGS
     from ..schema import OPTS
@@ -349,23 +386,19 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
     return out
 
 
-def _icon_shapes(kind, box):
+def _icon_shapes(kind, box, colored: bool = False):
     """A pictorial icon's primitives in layout units for the canvas sketch,
-    the same ones the TeX emitter draws (glyphs.icon_shapes); None for no
-    icon or a converter / device mark, which the page sketches itself."""
-    from ..glyphs import ICONS, icon_shapes
-    if kind not in ICONS:
-        return None
-    return [{"kind": p[0], "points": p[1]} if p[0] == "line" else
-            {"kind": "rect", "from": p[1], "to": p[2]} if p[0] == "rect" else
-            {"kind": p[0], "at": p[1], "r": p[2]} for p in icon_shapes(kind, box)]
+    from glyphs.icon_primitives; unknown kinds return None. Converter and
+    device previews use the shared line/text marks."""
+    from ..glyphs import icon_primitives
+    return icon_primitives(kind, box, colored)
 
 
 def _region_geometry(layout: Layout, s, prof) -> dict:
     """Colours and label boxes of every region and callout, by index (None
     for an entry that fails its schema), so the page draws what the emitter
     prints without its own palette or text metrics."""
-    from ..geometry import region_fit_box, region_label_box
+    from ..geometry import region_fit_box, region_label_box, region_rect, block_rect, box_decoration
     from ..regions import RegionError, css_rgb, parse_callout, parse_region
     regions, callouts = [], []
     for key, parse, dst in (("regions", parse_region, regions),
@@ -373,7 +406,7 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
         items = layout.extra.get(key)
         for i, d in enumerate(items if isinstance(items, list) else []):
             try:
-                x = parse(d, i, layout, s, prof) if key == "regions" else parse(d, i)
+                x = parse(d, i, layout, s, prof) if key == "regions" else parse(d, i, layout)
             except RegionError:
                 dst.append(None)
                 continue
@@ -385,7 +418,8 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
                     fit = [b.x0, b.y0, b.x1, b.y1]
                 except RegionError:
                     pass
-                dst.append({"rects": [list(x.rect(k)) for k in range(len(x.layers) + 1)],
+                dst.append({"decoration": box_decoration(region_rect(x, s), x.corner_radius, x.shadow, s, inner=x.inner_shadow, border_width=x.border_width),
+                            "rects": [list(x.rect(k)) for k in range(len(x.layers) + 1)],
                             "fit": fit, "fills": [css_rgb(x.fill) if x.fill != "none" else None]
                             + [css_rgb(f) for _, _, f in x.layers],
                             "edges": [css_rgb(x.border_color or (x.fill if x.fill != "none" else "gray"),
@@ -410,11 +444,12 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
             continue
         fill = block_defs.fill_rgb(b)
         text = block_text_box(b, s, prof)
-        block_info.append({"rect": [b.x0, b.y0, b.x1, b.y1],
+        block_info.append({"decoration": box_decoration(block_rect(b, s), b.corner_radius, b.shadow, s, inner=b.inner_shadow, border_width=b.border_width),
+                           "rect": [b.x0, b.y0, b.x1, b.y1],
                            "fill": "#%02x%02x%02x" % fill if fill else None,
                            "edge": "#%02x%02x%02x" % block_ink(b.color), "border": b.border,
                            "text": _box(text, s) if text else None,
-                           "icon": _icon_shapes(b.icon, (b.x0, b.y0, b.x1, b.y1))})
+                           "icon": _icon_shapes(b.icon, (b.x0, b.y0, b.x1, b.y1), b.icon_color)})
     from ..regions import (BORDERS, CALLOUT_LABEL_POS, FILLS, INKS, PALETTE, REGION_LABEL_POS, REGION_BORDER_COLORS, canon,
                            CALLOUT_DASHES, CALLOUT_HEADS, CALLOUT_STYLES, CALLOUT_CORNERS, CALLOUT_BORDER_WIDTH,
                            MAX_BEND, MAX_WAVE_CYCLES, STACK_MAX, WAVE_AMPLITUDE,
@@ -423,10 +458,13 @@ def _region_geometry(layout: Layout, s, prof) -> dict:
     glyph_info = [_icon_shapes(g["kind"], (min(g["from"][0], g["to"][0]), min(g["from"][1], g["to"][1]),
                                            max(g["from"][0], g["to"][0]), max(g["from"][1], g["to"][1])))
                   for g in safe_glyphs(layout)]
+    from ..glyphs import LABELS as ICON_LABELS, MENU_GROUPS as ICON_MENU
     return {"regions": regions, "callouts": callouts, "blocks": block_info, "glyph_icons": glyph_info,
+            "icon_menu": {"labels": ICON_LABELS, "groups": [[g, list(ks)] for g, ks in ICON_MENU]},
             "glyph_options": list(GLYPH_KINDS),
+            "glyph_library": {kind: _icon_shapes(kind, (0, 0, 1, 1)) for kind in GLYPH_KINDS},
             "block_options": {"fills": list(block_defs.FILLS), "borders": list(block_defs.BORDERS),
-                              "icons": list(block_defs.ICONS)},
+                              "icons": list(block_defs.ICONS), "color_icons": list(block_defs.COLORED_ICONS)},
             "region_options": {"fills": list(FILLS), "borders": list(BORDERS),
                                "border_colors": list(REGION_BORDER_COLORS),
                                "border_palette": {k: css_rgb(canon(k), edge=True) for k in REGION_BORDER_COLORS},
@@ -590,6 +628,7 @@ PLAIN_ROUTES = {
     "/api/directories": "_directories",
     "/api/generate": "_generate",
     "/api/save-as": "_save_as_route",
+    "/api/figure-document": "_figure_document_route",
     "/api/clarify": "_clarify",
     "/api/match": "_match",
     "/api/from-template": "_from_template",
@@ -598,6 +637,10 @@ PLAIN_ROUTES = {
 }
 PLAIN_GET_ROUTES = {"/api/ai-settings": "_get_ai_settings"}
 LAYOUT_ROUTES = {
+    "/api/figure-output": "_figure_output",
+    "/api/figure-check": "_figure_check",
+    "/api/figure-edit": "_figure_edit",
+    "/api/figure-preview": "_figure_preview",
     "/api/wire-merge": "_wire_merge",
     "/api/scale-drawing": "_scale_drawing",
     "/api/symbol-style": "_symbol_style",
@@ -640,6 +683,7 @@ LAYOUT_ROUTES = {
     "/api/waveform-save": "_waveform_save",
     "/api/waveform-export": "_waveform_export",
     "/api/spice-info": "_spice_info",
+    "/api/simulation-readiness": "_simulation_readiness",
     "/api/emi-info": "_emi_info",
     "/api/emi-prepare": "_emi_prepare",
     "/api/emi-run": "_emi_run",
@@ -766,6 +810,8 @@ class Job:
                 res["passes_double"] = check(best, get_profile("ieee-double")).ok
             if best is None:
                 self.state, self.error = "error", ("模型没有给出通过结构校验的框图" if self.workflow else "模型没有给出可读的坐标表")
+                if self.attempts and self.attempts[-1]["errors"]:
+                    self.error += "\n" + "\n".join(self.attempts[-1]["errors"])
             else:
                 self.state, self.result = "done", res
         except Cancelled:
@@ -973,7 +1019,7 @@ class Editor:
                 if self.path.split("?", 1)[0] == "/" and "agent-preview" in self.path:
                     self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
                     return
-                if self.path in ("/agent.js", "/agent.css", "/agent-editor.js"):
+                if self.path in ("/agent.js", "/agent.css", "/panel-layout.js", "/paper-style.js", "/agent-editor.js", "/figure.js", "/figure.css", "/figure-agent.js", "/system-symbols.js", "/figure-output.js", "/figure-images.js", "/algorithm.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/css; charset=utf-8" if self.path.endswith(".css") else "text/javascript; charset=utf-8")
                     return
@@ -986,7 +1032,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "index.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-workspace.js", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js")
                                else "text/css; charset=utf-8")
@@ -1097,6 +1143,13 @@ class Editor:
                 except (KeyError, ValueError, TypeError) as exc:
                     self._json({"error": f"{type(exc).__name__}: {exc}"}, 400)
 
+            def _figure_document_route(self, req: dict) -> None:
+                from .figure_documents import request
+                try:
+                    self._json(request(editor, req))
+                except (OSError, ValueError) as exc:
+                    self._json({"error": str(exc)}, 400)
+
             def _clarify(self, req: dict) -> None:
                 from ..ai.clarify import options
                 self._json(options(req.get("description", "")) or {})
@@ -1115,7 +1168,7 @@ class Editor:
             def _from_template(self, req: dict) -> None:
                 try:
                     from ..pipeline import from_template
-                    lay = from_template(req["name"], req.get("options", ""))
+                    lay = from_template(req["name"], req.get("options", ""), asset_dir=editor.path.parent)
                     self._json({"layout": lay.to_dict()})
                 except (KeyError, ValueError) as exc:
                     self._json({"error": str(exc)}, 400)
@@ -1293,6 +1346,30 @@ class Editor:
                                            None if mode is None else int(mode),
                                            req.get("style"), bool(req.get("mono")), base_dir=editor.path.parent)}
 
+            def _figure_output(self, lay, prof, req):
+                if req.get("action") == "generate-icon":
+                    return self._generate_icon(req)
+                from .figure_output import request
+                return request(lay.to_dict(), prof, editor.path, editor.out_dir, req)
+
+            def _figure_check(self, lay, prof, req):
+                from .figure import inspect
+                report = analyse(lay, prof, editor.path.parent)
+                return {"report": report, "figure": inspect(lay, prof, report, req.get("advice"))}
+
+            def _figure_edit(self, lay, prof, req):
+                from .figure import apply
+                raw = apply(lay, prof, req)
+                candidate = Layout.from_dict(raw)
+                report = analyse(candidate, prof, editor.path.parent)
+                if req.get("action") in ("move-decoration", "move-end") and not report["ok"]:
+                    raise ValueError("\n".join(issue["message"] for issue in report["issues"] if issue["level"] == "error"))
+                return {"layout": raw, "report": report}
+
+            def _figure_preview(self, lay, prof, req):
+                from .figure import preview
+                return preview(lay, prof, bool(req.get("mono")), editor.path.parent)
+
             def _mode(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..modes import overlay
                 rep = _checked(lay, prof, "校验未通过，先修正标红的问题再看模态")
@@ -1374,7 +1451,7 @@ class Editor:
                 aliases = tuple(a for a in re.split(r"[,，\s]+", req.get("aliases", "")) if a)
                 path = templates.save(lay, req.get("name", ""), title=req.get("title", ""),
                                       aliases=aliases, profile=prof,
-                                      force=bool(req.get("force")))
+                                      force=bool(req.get("force")), base_dir=editor.path.parent)
                 return {"saved": str(path), "name": req["name"].strip().lower()}
 
             # ---- waveforms: the CSV is referenced from layout.extra["waveform"]
@@ -1518,6 +1595,10 @@ class Editor:
                         "available": executable() is not None, "note": LIMIT_NOTE, "recommendation_inputs": INPUTS,
                         **({"module": module_devices(lay, prof)} if "modules" in lay.extra else {})}
 
+            def _simulation_readiness(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..simulation_readiness import inspect
+                return inspect(lay, prof, editor.path.parent)
+
             def _spice_preset(self, lay: Layout, prof: str, req: dict) -> dict:
                 from ..spice import example_settings
                 return {"simulation": example_settings(lay, req.get("preset"), prof)}
@@ -1649,5 +1730,7 @@ def serve(path: Path, profile: str = "ieee-single", port: int = 8765,
     except KeyboardInterrupt:
         pass
     finally:
+        from .figure_documents import close
+        close(editor)
         httpd.server_close()
 

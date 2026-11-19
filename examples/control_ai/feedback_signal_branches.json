@@ -1,0 +1,280 @@
+{
+ "kind": "control",
+ "name": "feedback_signal_branches",
+ "blocks": [
+  {
+   "id": "request",
+   "type": "tag",
+   "text": "Ref",
+   "size": [
+    0.8,
+    0.6
+   ],
+   "at": [
+    0.4,
+    -1.26
+   ]
+  },
+  {
+   "id": "error",
+   "type": "sum",
+   "signs": {
+    "w": "+",
+    "s": "-"
+   },
+   "at": [
+    2.06,
+    -1.26
+   ]
+  },
+  {
+   "id": "compensator",
+   "type": "block",
+   "text": "C(s)",
+   "size": [
+    0.8,
+    0.6
+   ],
+   "at": [
+    3.72,
+    -1.26
+   ]
+  },
+  {
+   "id": "command",
+   "type": "block",
+   "text": "Drive",
+   "size": [
+    0.92,
+    0.6
+   ],
+   "at": [
+    5.48,
+    -1.26
+   ]
+  },
+  {
+   "id": "gain",
+   "type": "block",
+   "text": "K",
+   "size": [
+    0.8,
+    0.6
+   ],
+   "at": [
+    7.24,
+    -1.26
+   ]
+  },
+  {
+   "id": "disturbance",
+   "type": "sum",
+   "signs": {
+    "w": "+",
+    "s": "-"
+   },
+   "port_sides": {
+    "s": "n",
+    "n": "s"
+   },
+   "at": [
+    9.0,
+    -1.26
+   ]
+  },
+  {
+   "id": "plant",
+   "type": "block",
+   "text": "Plant",
+   "size": [
+    0.92,
+    0.6
+   ],
+   "at": [
+    11.0,
+    -1.26
+   ]
+  },
+  {
+   "id": "estimate",
+   "type": "block",
+   "text": "Sensor",
+   "size": [
+    1.04,
+    0.6
+   ],
+   "port_sides": {
+    "s": "n",
+    "n": "e",
+    "e": "s"
+   },
+   "at": [
+    13.06,
+    -1.26
+   ]
+  },
+  {
+   "id": "measurement",
+   "type": "tag",
+   "text": "Value",
+   "size": [
+    0.92,
+    0.6
+   ],
+   "at": [
+    12.0,
+    -2.52
+   ],
+   "port_sides": {
+    "w": "n",
+    "n": "w"
+   }
+  },
+  {
+   "id": "sensor_input",
+   "type": "tag",
+   "text": "Input",
+   "size": [
+    0.92,
+    0.6
+   ],
+   "at": [
+    7.64,
+    0.0
+   ]
+  },
+  {
+   "id": "observer",
+   "type": "block",
+   "text": "Observer",
+   "size": [
+    1.28,
+    0.6
+   ],
+   "at": [
+    11.0,
+    0.0
+   ]
+  }
+ ],
+ "links": [
+  {
+   "from": "command.e",
+   "to": "gain.w"
+  },
+  {
+   "from": "compensator.e",
+   "to": "command.w"
+  },
+  {
+   "from": "plant.e",
+   "to": "estimate.w"
+  },
+  {
+   "from": [
+    12.0,
+    -1.26
+   ],
+   "to": "measurement.w"
+  },
+  {
+   "from": "error.e",
+   "to": "compensator.w"
+  },
+  {
+   "from": "request.e",
+   "to": "error.w"
+  },
+  {
+   "from": "gain.e",
+   "to": "disturbance.w"
+  },
+  {
+   "from": "disturbance.e",
+   "to": "plant.w"
+  },
+  {
+   "from": "sensor_input.e",
+   "to": "disturbance.s",
+   "via": [
+    [
+     9.0,
+     0.0
+    ]
+   ]
+  },
+  {
+   "from": [
+    9.0,
+    0.0
+   ],
+   "to": "observer.w"
+  },
+  {
+   "from": "observer.e",
+   "to": "estimate.s",
+   "color": "green",
+   "dash": "dashed",
+   "label": "$q$",
+   "via": [
+    [
+     13.06,
+     0.0
+    ]
+   ],
+   "label_gap": 0.14
+  },
+  {
+   "from": [
+    11.99,
+    0.0
+   ],
+   "to": "command.n",
+   "color": "green",
+   "dash": "dashed",
+   "label": "$q$",
+   "via": [
+    [
+     11.99,
+     0.5293
+    ],
+    [
+     5.48,
+     0.5293
+    ]
+   ]
+  },
+  {
+   "from": "estimate.e",
+   "to": "error.s",
+   "via": [
+    [
+     13.06,
+     -3.0493
+    ],
+    [
+     2.06,
+     -3.0493
+    ]
+   ]
+  }
+ ],
+ "regions": [],
+ "texts": [],
+ "title": "Feedback with a shared measurement",
+ "profile": "ieee-double",
+ "control_ai": {
+  "inputs": [
+   "request",
+   "sensor_input"
+  ],
+  "outputs": [
+   "measurement"
+  ],
+  "stateful": [
+   "observer",
+   "plant"
+  ],
+  "dynamic_links": []
+ }
+}

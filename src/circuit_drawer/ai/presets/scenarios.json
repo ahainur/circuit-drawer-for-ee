@@ -1,0 +1,117 @@
+[
+  {
+    "id": "boost",
+    "title": {
+      "zh-CN": "Boost 升压",
+      "en": "Boost converter",
+      "zh-TW": "Boost 升壓"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "category": "dc",
+    "example_case": "boost",
+    "body": "绘制由直流源、电感、开关、二极管、输出电容和负载组成的 Boost 升压电路。",
+    "fields": [],
+    "capability": {
+      "zh-CN": "24 V 输入，50 kHz，30 Ω。输出电压、电感电流和 PWM。可用 ngspice 运行，支持导出 Simulink、PLECS 和 PSIM。",
+      "en": "24 V input, 50 kHz, 30 Ω. Output voltage, inductor current and PWM. Runs in ngspice. Exports to Simulink, PLECS and PSIM.",
+      "zh-TW": "24 V 輸入，50 kHz，30 Ω。輸出電壓、電感電流和 PWM。可用 ngspice 執行，支援匯出 Simulink、PLECS 和 PSIM。"
+    },
+    "control_body": "绘制 Boost 的电压反馈与 PWM 控制结构，标明占空比输出和功率级反馈接口。"
+  },
+  {
+    "id": "single_phase_full_bridge",
+    "title": {
+      "zh-CN": "单相全桥逆变",
+      "en": "Single-phase full-bridge inverter",
+      "zh-TW": "單相全橋逆變"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "category": "inverter",
+    "example_case": "single_phase_full_bridge",
+    "body": "绘制直流母线、两组互补桥臂及跨两个桥臂中点的电阻负载。以双极性方波驱动对角开关，观察桥间输出电压。",
+    "fields": [],
+    "capability": {
+      "zh-CN": "12 V 母线，6 Ω 负载，50 Hz。桥间电压、母线电流和上管驱动。可用 ngspice 运行，支持导出 Simulink、PLECS 和 PSIM。",
+      "en": "12 V bus, 6 Ω load, 50 Hz. Bridge voltage, bus current and upper gate. Runs in ngspice. Exports to Simulink, PLECS and PSIM.",
+      "zh-TW": "12 V 母線，6 Ω 負載，50 Hz。橋間電壓、母線電流和上管驅動。可用 ngspice 執行，支援匯出 Simulink、PLECS 和 PSIM。"
+    },
+    "control_body": "绘制单相全桥的 50 Hz 交替对角驱动控制，标明四个门极及负载电压测量接口。"
+  },
+  {
+    "id": "grid_inverter_dq",
+    "title": {
+      "zh-CN": "三相 dq 并网逆变",
+      "en": "Three-phase dq grid inverter",
+      "zh-TW": "三相 dq 併網逆變"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "category": "inverter",
+    "example_case": "grid_inverter_dq",
+    "body": "绘制三相两电平并网逆变器、三相滤波电感、电网和 dq 电流控制，明确采样及驱动绑定。",
+    "fields": [],
+    "capability": {
+      "zh-CN": "300 V 母线，10 kHz，三相各 5 mH。两相网压与三相电流。可用 ngspice 运行，支持导出 Simulink 和 PLECS。",
+      "en": "300 V DC, 10 kHz, 5 mH per phase. Two grid voltages and three phase currents. Runs in ngspice. Exports to Simulink and PLECS.",
+      "zh-TW": "300 V 母線，10 kHz，三相各 5 mH。兩相網壓與三相電流。可用 ngspice 執行，支援匯出 Simulink 和 PLECS。"
+    },
+    "control_body": "绘制三相并网逆变器的 dq 电流控制，包括电网同步角、电流变换、dq 调节和调制接口。"
+  },
+  {
+    "id": "boost_apfc",
+    "title": {
+      "zh-CN": "Boost APFC 采样滞环",
+      "en": "Boost APFC with sampled hysteresis",
+      "zh-TW": "Boost APFC 取樣滯環"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "category": "pfc",
+    "example_case": "boost_apfc",
+    "body": "绘制单相二极管整流桥、Boost 升压级和采样滞环 PFC 控制，测量输入电流对网压的跟随。",
+    "fields": [],
+    "capability": {
+      "zh-CN": "311 V 峰值，50 Hz 电网，400 Ω，演示 40 ms。网压、网流、母线电压及门极，整周期可分析 PF 和 THD。可用 ngspice 运行，支持导出 Simulink 和 PLECS。",
+      "en": "311 V peak, 50 Hz grid, 400 Ω, 40 ms. Line voltage/current, DC bus and gate and use whole cycles for PF and THD. Runs in ngspice. Exports to Simulink and PLECS.",
+      "zh-TW": "311 V 峰值，50 Hz 電網，400 Ω，示範 40 ms。網壓、網流、母線電壓及閘極，整週期可分析 PF 和 THD。可用 ngspice 執行，支援匯出 Simulink 和 PLECS。"
+    },
+    "control_body": "绘制 Boost APFC 的母线电压外环及采样滞环电流内环，标明交流电流、电压和直接门极反馈接口。"
+  },
+  {
+    "id": "pmsm_foc",
+    "title": {
+      "zh-CN": "PMSM FOC 永磁电机控制",
+      "en": "PMSM field-oriented control",
+      "zh-TW": "PMSM FOC 永磁馬達控制"
+    },
+    "mode": "create",
+    "domains": [
+      "circuit",
+      "control"
+    ],
+    "category": "motor",
+    "example_case": "pmsm_foc",
+    "body": "绘制三相逆变桥与永磁同步电机，使用 FOC 转速环及 dq 电流环，绑定相电流和电角度。",
+    "fields": [],
+    "capability": {
+      "zh-CN": "48 V 母线，10 kHz，负载转矩 0.1 N·m，演示 20 ms。机械转速、dq 电流、电角度和电磁转矩。可用 ngspice 运行，支持导出 Simulink 和 PLECS。",
+      "en": "48 V DC, 10 kHz, load torque 0.1 N·m, 20 ms demo. Mechanical speed, dq currents, electrical angle and torque. Runs in ngspice. Exports to Simulink and PLECS.",
+      "zh-TW": "48 V 母線，10 kHz，負載轉矩 0.1 N·m，示範 20 ms。機械轉速、dq 電流、電角度和電磁轉矩。可用 ngspice 執行，支援匯出 Simulink 和 PLECS。"
+    },
+    "control_body": "绘制 PMSM 的磁场定向控制，标明电角度、dq 电流反馈、调节器和三相调制接口。"
+  }
+]

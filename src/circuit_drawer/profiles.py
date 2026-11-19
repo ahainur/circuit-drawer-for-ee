@@ -25,6 +25,7 @@ class Profile:
     max_scale: float = 1.4   # wide profiles stop stretching here
     y_min_scale: float = 1.0  # height is not limited by the column
     y_max_scale: float = 1.2
+    margin_mm: float = 10 * 2.54 / 72.27  # historical standalone border of 1 TeX pt
 
 
 # IEEE Transactions: single column 3.5 in, double column 7.16 in.  Leave a

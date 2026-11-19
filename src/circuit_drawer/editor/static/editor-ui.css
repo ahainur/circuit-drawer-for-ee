@@ -136,3 +136,21 @@ main { grid-template-columns: 240px minmax(200px, 1fr) 304px; }
 #modeInfo { margin-top: 4px; }
 .mode-tag { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 11px; color: var(--muted); }
 .mode-warning { color: #b26b00; }
+#dlgBox:has(#spiceOverview), dialog:has(#spiceOverview) {width:min(94vw,980px);max-width:94vw}
+#spiceOverview {padding:8px 10px;border:1px solid var(--line);margin-bottom:10px;background:var(--panel)}
+#spiceOverview h3,#spiceOverview p {margin:3px 0}
+#spiceIssues {display:grid;gap:3px;max-height:145px;overflow:auto}
+#spiceIssues button {text-align:left;width:fit-content}
+#spiceWorkspace {display:grid;grid-template-columns:clamp(130px,var(--spice-list-width,200px),40%) 10px minmax(0,1fr);margin:8px 0;border:1px solid var(--line)}
+.spice-device-nav,.spice-device-edit {min-width:0;padding:8px}
+.spice-device-nav label,.spice-device-nav input,.spice-device-nav select {display:block;width:100%;box-sizing:border-box}
+.spice-device-nav select {margin-top:6px;min-height:120px}
+.spice-device-edit {max-height:325px;overflow:auto}
+#spiceWorkspace [hidden] {display:none!important}
+#spiceWorkspace .spice-component {border:0;padding-top:0}
+.spice-primary-actions {position:sticky;top:0;z-index:2;flex-wrap:wrap;padding:5px 0;background:var(--panel,Canvas)}
+@media(max-width:680px) {
+  #spiceWorkspace {grid-template-columns:minmax(0,1fr)}
+  #spiceListDivider {display:none}
+  #spiceDeviceList {height:78px;min-height:0}
+}

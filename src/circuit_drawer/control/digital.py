@@ -43,6 +43,7 @@ class Digital:
     pwm_bits: int | None = None
     word_bits: int | None = None
     fraction_bits: int | None = None
+    implicit: bool = False      # a C block alone: sampled at code.fs, no digital section
 
     @property
     def limits(self):
@@ -114,7 +115,7 @@ def prepare(pl, cfg: Digital):
     """Copy the existing discrete plan, applying the selected coefficient format."""
     pl = deepcopy(pl)
     for st in pl.steps:
-        if st.kind == "fn":
+        if st.kind == "fn" and st.data["fn"] != "c":
             raise LoopError(f"digital 暂支持标量控制器，{st.id} 的函数块需要连续模式")
         keys = {"pi": ("kp", "c0", "c1"), "gain": ("k",)}.get(st.kind, ())
         st.data.update(zip(keys, cfg.coefficients([st.data[k] for k in keys])))

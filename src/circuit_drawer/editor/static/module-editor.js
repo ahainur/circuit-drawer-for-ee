@@ -197,6 +197,7 @@ async function newEmptySubsystem(at) {
 }
 
 document.addEventListener("keydown", ev => {
+  if (document.body.classList.contains('figure-open')) return;
   if (ev.key !== "Enter" || ev.ctrlKey || ev.metaKey || ev.altKey || definitionEdit || dlg.open ||
       /INPUT|TEXTAREA|SELECT|BUTTON/.test(ev.target.tagName) || !focusedModuleId || checking ||
       wireDraft || boxDraft || pendingModule || selectionBusy || drag || moduleBox || instanceDrag || linkDrag || resizing) return;

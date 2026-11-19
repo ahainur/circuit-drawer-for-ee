@@ -399,7 +399,8 @@ def build_circuit(layout, profile='ieee-single', diode_current=DEFAULT_DIODE_CUR
                 # Native backends currently expand average legs into switches.
                 from .spice import check_pwm_timing
                 output = loop.outputs[loop.driven[e.id]]
-                if output.get('modulation') in ('sps', 'vco') or not output['complement']:
+                # a direct gate output has no carrier; gate_timing checks its pulses
+                if output.get('modulation') != 'gate' and (output.get('modulation') in ('sps', 'vco') or not output['complement']):
                     check_pwm_timing(e.id, values, tr)
                 # the gate comes from the control panel's carrier compare
                 s = Signal(f'signal_{len(circuit.signals) + 1}', 'control', {**values, 'switch': e.id}, (pos[0], pos[1] + 100))
@@ -550,7 +551,7 @@ def _controller(circuit, loop, mode, driven, probe_outputs, tr):
     from .spice import check_pwm_timing
     try:
         for output in loop.outputs.values():
-            if output.get('modulation') not in ('sps', 'vco') and output['complement']:
+            if output.get('modulation') not in ('sps', 'vco', 'gate') and output['complement']:
                 for switch, (_, timing), _ in pwm_drives(output, driven):
                     check_pwm_timing(switch, timing, tr)
         panel = build(loop, mode, driven, probe_outputs, references)
@@ -562,7 +563,7 @@ def _controller(circuit, loop, mode, driven, probe_outputs, tr):
     how = ('连续时间模型（与 ngspice 闭环一致，用于对照）' if mode == 'continuous' else
            f'离散模型（code.fs = {pl.fs:g} Hz，Ts = {pl.ts:g} s，{pl.method}；系数与 codegen 生成的 DSP 代码相同，按双精度，不含定点舍入）')
     circuit.notes.append(f'闭环控制：控制表 {loop.name} 的控制器按{how}导出为原生控制方块，排在图下方的控制面板；'
-                         'PWM 输出比较占空比与载波，VCO 输出积分 Hz 指令；simulation 里的固定 duty 不再使用。')
+                         'PWM 输出比较占空比与载波，VCO 输出积分 Hz 指令，直接门极输出按开关状态驱动；simulation 里的固定 duty 不再使用。')
     circuit.notes.extend('闭环控制：' + w for w in panel.warnings)
 
 
@@ -586,14 +587,19 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
     circuit = build_circuit(layout, profile, diode_current, control=control, base_dir=base_dir,
                             approximate_mosfet=approximate_mosfet)
     name = model_stem(stem)
+    waveform_script = None
     if target == 'simulink':
         from .simulink import emit
+        from .waveform_export import simulink_script
         filename = f'build_{name}.m'
         requirements = 'MATLAB + Simulink + Simscape（Foundation Library）；已使用 R2024b 验证。'
         if any(p.kind == 'PMSM' for p in circuit.parts):
             requirements += ' 本电路含 PMSM，另需 Simscape Electrical（ee_lib 蓝库）。'
-        how = f'在 MATLAB 中切换到本目录，执行 model = build_{name}; 然后 sim(model)。脚本保存 {name}.slx。'
+        how = (f'在 MATLAB 中切换到本目录，执行 model = build_{name}; out = sim(model); '
+               f'export_{name}_waveforms(out);。builder 保存 {name}.slx，波形脚本保存数值 CSV。'
+               '多采样率采用记录时刻的并集，模拟量线性插值，驱动量零阶保持；重复时刻取末值，时间为秒。')
         content = emit(circuit, name)
+        waveform_script = simulink_script(circuit, name)
         options = {}
     elif target == 'psim':
         from .psim import emit
@@ -607,13 +613,20 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
                    'connections': 'checked net labels'}
     else:
         from .plecs import emit
+        from .waveform_export import plecs_script
         filename = name + '.plecs'
         requirements = 'PLECS Standalone 独立版 4.9 或以上；不需要 PLECS Blockset。'
-        how = f'用 PLECS Standalone 打开 {filename}，运行仿真；测量量连接到 Scope 和顶层输出端口。'
+        how = (f'用 PLECS Standalone 打开 {filename}。Simulation → Simulation scripts 中选择 '
+               'Run and export waveforms，即可求解并保存数值 CSV；完成时控制台显示完整路径。'
+               '时间为秒，重复事件时刻取末值。脚本中的 destination 可指定文件夹。')
         resistance = number(numerical_resistance, 'PLECS 数值电容串联电阻')
         if resistance <= 0:
             raise SpiceError('PLECS 数值电容串联电阻必须大于 0 Ω；只作用于显式启用的 node_capacitance')
         content = emit(circuit, name, resistance)
+        waveform_script = plecs_script(circuit, name)
+        import base64
+        encoded = base64.b64encode(waveform_script.encode()).decode('ascii')
+        content = content.rstrip()[:-1] + f'\nScript {{ Name "Run and export waveforms" Script base64 "{encoded}" }}\n}}\n'
         options = {'numerical_capacitor_series_resistance_ohm': resistance}
     if circuit.control:
         options['closed_loop_controller'] = control
@@ -631,6 +644,8 @@ def export_simulation(layout, out_dir, stem='circuit', *, target, profile='ieee-
     outputs = {filename: content,
                f'{name}_{target}.manifest.json': json.dumps(manifest, ensure_ascii=False, indent=2) + '\n',
                f'{name}_{target}.README.txt': readme}
+    if waveform_script:
+        outputs[f'export_{name}_waveforms.m'] = waveform_script
     destination.mkdir(parents=True, exist_ok=True)
     for basename, text in outputs.items():
         (destination / basename).write_text(text, encoding='utf-8')

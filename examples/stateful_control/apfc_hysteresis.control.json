@@ -1,0 +1,134 @@
+{
+ "kind": "control",
+ "name": "apfc_hysteresis",
+ "title": "Boost APFC: voltage PI and sampled current hysteresis (C block)",
+ "profile": "ieee-double",
+ "blocks": [
+  {
+   "id": "vrect",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.75,
+    1.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$|v_s|$"
+  },
+  {
+   "id": "vo",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.75,
+    0.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$v_o$"
+  },
+  {
+   "id": "il",
+   "type": "tag",
+   "style": "meas",
+   "at": [
+    0.75,
+    -0.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$i_L$"
+  },
+  {
+   "id": "vref",
+   "type": "tag",
+   "style": "ref",
+   "at": [
+    0.75,
+    -1.5
+   ],
+   "size": [
+    1,
+    0.5
+   ],
+   "text": "$V_{ref}$"
+  },
+  {
+   "id": "pfc",
+   "type": "block",
+   "at": [
+    4,
+    0
+   ],
+   "size": [
+    2.5,
+    4
+   ],
+   "text": "PI + hysteresis",
+   "label": "C, 200 kHz",
+   "label_pos": "above"
+  }
+ ],
+ "links": [
+  {
+   "from": "vrect.e",
+   "to": "pfc.w+1.5"
+  },
+  {
+   "from": "vo.e",
+   "to": "pfc.w+0.5"
+  },
+  {
+   "from": "il.e",
+   "to": "pfc.w-0.5"
+  },
+  {
+   "from": "vref.e",
+   "to": "pfc.w-1.5"
+  },
+  {
+   "from": "pfc.e",
+   "to": [
+    7,
+    0
+   ],
+   "open": true,
+   "label": "$g_S$"
+  }
+ ],
+ "functions": {
+  "pfc": {
+   "fn": "c",
+   "in": {
+    "rectified": "w+1.5",
+    "voltage": "w+0.5",
+    "current": "w-0.5",
+    "reference": "w-1.5"
+   },
+   "out": {
+    "gate": "e"
+   },
+   "c": {
+    "states": {
+     "integral": 0.00827,
+     "on": 0
+    },
+    "body": "/* Boost APFC: a voltage PI sets the input-current amplitude g (A/V),\n   the inductor current follows g*|v_ac| inside a +/- band, checked once per sample.\n   Ts = 5 us (code.fs = 200 kHz). Retune kp, ki, band and the limits for another power stage. */\nconst double Ts = 5e-6, kp = 2.4e-4, ki = 3e-3, gmax = 0.05, band = 0.3;\ndouble e = reference - voltage;\ndouble g = fmin(fmax(kp*e + integral, 0.0), gmax);\nnext_integral = fmin(fmax(integral + ki*Ts*e, 0.0), gmax);\ndouble iref = g*rectified;\nif (current < iref - band) next_on = 1.0;\nelse if (current > iref + band) next_on = 0.0;\ngate = next_on;\n"
+   }
+  }
+ },
+ "code": {
+  "fs": 200000,
+  "arith": "double",
+  "outputs": [
+   "pfc.gate"
+  ]
+ }
+}

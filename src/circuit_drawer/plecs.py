@@ -914,12 +914,13 @@ def _control_panel(circuit, panel, origin, block, signal_wire, measurement_tags)
             outputs = {key.split('.',1)[1]:f'OutputSignal({i},0)' for i,key in enumerate(p['outs'])}
             old = {key:f'DiscState({i})' for i,key in enumerate(states)}
             next_ = {key:f'cd_next[{i}]' for i,key in enumerate(states)}
+            enabled = f"InputSignal({len(p['names'])},0)" if p.get('enabled') else None
             params = {'NumInputs':'['+' '.join(['1']*b.inputs)+']','NumOutputs':'['+' '.join(['1']*b.outputs)+']',
                       'NumContStates':0,'NumDiscStates':len(states),'NumZCSignals':0,'DirectFeedthrough':1,
                       'Ts':p['ts'],'Parameters':'','LangStandard':2,'GnuExtensions':1,'RuntimeCheck':2,
                       'Declarations':'#include <math.h>\n' + (f'static double cd_next[{len(states)}];' if states else ''),
                       'StartFcn':'\n'.join(f'{old[key]}={value:.17g};' for key,value in states.items()),
-                      'OutputFcn':statements(p['c'],inputs,outputs,old,next_),
+                      'OutputFcn':statements(p['c'], inputs, outputs, old, next_, enabled=enabled),
                       'UpdateFcn':'\n'.join(f'{old[key]}={next_[key]};' for key in states),
                       'DerivativeFcn':'','TerminateFcn':''}
             block('CScript',name,params,pos,'up')

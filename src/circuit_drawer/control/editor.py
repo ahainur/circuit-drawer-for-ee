@@ -25,10 +25,13 @@ from ..profiles import PROFILES, get_profile
 from . import library
 from ..regions import (BORDERS, CALLOUT_DASHES, COLOR_ALIASES, INKS, INK_ALIASES,
                        PALETTE, REGION_BORDER_COLORS, canon, css_rgb, ink_rgb)
-from .check import CONTACT_R, PT_CM, SUM_R, check, port_point
-from .model import (BOX_TYPES, CIRCLE_TYPES, POLE, SIDES, TAG_FILLS, TAG_STYLE,
+from .check import CONTACT_R, OPPOSITE, PT_CM, SUM_R, check, port_point, select_point
+from .model import (BOX_TYPES, CIRCLE_TYPES, POLE, SELECT, SIDES, TAG_FILLS, TAG_STYLE,
                     block_fill, fill_names, fill_options)
 from .render import TEMPLATES, Rejected, available, bode, render, template
+
+from ..glyphs import (COLORED as COLORED_ICONS, KINDS as GLYPH_KINDS, LABELS as ICON_LABELS,
+                      MENU_GROUPS as ICON_MENU, icon_primitives)
 
 STATIC = Path(__file__).with_name("static")
 MENU_STATIC = Path(__file__).parents[1] / "editor" / "static"
@@ -38,7 +41,9 @@ TEX_PREVIEW_DPI = 400  # one formula on its own is small; read it at twice the f
 
 def appearance_constants() -> dict:
     """UI values and aliases come from the same owners as the validator."""
-    return {"fills": {k: block_fill(k) for k in fill_names()}, "fill_colors": fill_options(),
+    return {"icons": list(GLYPH_KINDS), "color_icons": list(COLORED_ICONS),
+            "glyph_library": {kind: icon_primitives(kind, (0, 0, 1, 1)) for kind in GLYPH_KINDS},
+            "icon_menu": {"labels": ICON_LABELS, "groups": [[g, list(ks)] for g, ks in ICON_MENU]}, "fills": {k: block_fill(k) for k in fill_names()}, "fill_colors": fill_options(),
             "inks": INKS, "ink_aliases": INK_ALIASES, "color_aliases": COLOR_ALIASES,
             "palette": {k: css_rgb(k) for k in PALETTE},
             "palette_edges": {k: css_rgb(k, edge=True) for k in PALETTE},
@@ -59,7 +64,8 @@ def _box(b, s: float) -> list[float]:
 
 
 def _profile(raw: dict, profile: str | None):
-    return get_profile(profile or str(raw.get("profile") or "ieee-double"))
+    from ..figure_style import paper_profile
+    return paper_profile(get_profile(profile or str(raw.get("profile") or "ieee-double")), raw)
 
 
 def analyse(raw: dict, profile: str | None = None) -> dict:
@@ -71,24 +77,37 @@ def analyse(raw: dict, profile: str | None = None) -> dict:
     blocks = []
     for b in dia.blocks:
         d: dict[str, Any] = {"id": b.id, "type": b.type, "box": _box(g.bodies[b.id], s)}
+        from ..geometry import box_decoration
+        d["decoration"] = box_decoration(g.bodies[b.id], b.corner_radius, b.shadow, g.scale, inner=b.inner_shadow, border_width=b.border_width)
         if b.type in BOX_TYPES or b.type in CIRCLE_TYPES:
-            d["ports"] = {side: list(map(_r, port_point(b, side, 0, s))) for side in SIDES}
+            sides = (OPPOSITE[b.point], b.point) if b.type == "compare" else SIDES
+            d["ports"] = {side: list(map(_r, port_point(b, side, 0, s))) for side in sides}
         fill, border, ink = TAG_STYLE[b.style] if b.type == "tag" else ("white", "black", "black")
-        d.update(fill=block_fill(b.fill or fill), border=_ink_css(b.border or border),
+        d.update(fill=block_fill(b.fill or fill), border="none" if b.border == "none" else _ink_css(b.border or border),
                  ink=_ink_css(b.color or ink))
+        if b.icon:
+            d["icon"] = icon_primitives(b.icon, b.rect(), b.icon_color)
+            d["icon_name"], d["icon_box"] = b.icon, list(b.rect())
         if b.type == "switch":
-            d["ports"] = {POLE: list(b.at), **{k: list(p) for k, p in b.throws.items()}}
+            d["ports"] = {POLE: list(b.at), **{k: list(p) for k, p in b.throws.items()},
+                          **({SELECT: list(map(_r, select_point(b)))} if b.select else {})}
             d["on"] = b.on
         blocks.append(d)
     regions = []
     for r in dia.regions:
         lb = region_label_box(r, g.scale, prof)
-        regions.append({"rect": [r.x0, r.y0, r.x1, r.y1], "fill": css_rgb(r.fill) if r.fill != "none"
+        from ..geometry import region_rect, box_decoration
+        regions.append({"decoration": box_decoration(region_rect(r, g.scale), r.corner_radius, r.shadow, g.scale, inner=r.inner_shadow, border_width=r.border_width),
+                        "rect": [r.x0, r.y0, r.x1, r.y1], "fill": css_rgb(r.fill) if r.fill != "none"
                         else None, "border": r.border,
                         "edge": css_rgb(r.border_color or (r.fill if r.fill != "none" else "gray"),
                                         edge=True),
                         "label": r.label, "label_box": _box(lb, s) if lb else None})
-    return {**rep.to_dict(), "blocks": blocks, "constants": appearance_constants(),
+    from ..figure_images import safe_items
+    from ..geometry import image_box
+    images = [{"id": item["id"], "bounds": _box(image_box(item, g.scale), s)} for item in safe_items(raw)]
+    return {**rep.to_dict(), "images": images, "blocks": blocks, "constants": {**appearance_constants(), "font_pt":prof.font_pt,
+                                                            "line_cm":prof.line_pt*PT_CM},
             "paths": [[list(map(_r, p)) for p in path] if path else None for path in g.paths],
             "dots": [list(map(_r, p)) for p in g.dots],
             "labels": [{"box": _box(lb.box, s), "text": lb.text, "owner": lb.owner,
@@ -98,9 +117,9 @@ def analyse(raw: dict, profile: str | None = None) -> dict:
 
 
 def preview_png(raw: dict, profile: str | None, grid: bool, mono: bool,
-                dpi: int = PREVIEW_DPI) -> str:
+                dpi: int = PREVIEW_DPI, *, base_dir=None) -> str:
     with tempfile.TemporaryDirectory() as tmp:
-        res = render(raw, profile, tmp, "preview", ("pdf",), mono=mono, grid=grid)
+        res = render(raw, profile, tmp, "preview", ("pdf",), mono=mono, grid=grid, base_dir=base_dir)
         convert_pdf(res.files["pdf"], Path(tmp) / "preview.png", dpi)
         return base64.b64encode((Path(tmp) / "preview.png").read_bytes()).decode()
 
@@ -181,7 +200,11 @@ class Editor:
                 **self.lists()}
 
     def lists(self) -> dict:
-        return {"templates": available(self.library_dir),
+        templates = available(self.library_dir)
+        if json.loads(self.path.read_text(encoding="utf-8")).get("algorithm"):
+            templates = {name: title for name, title in templates.items()
+                         if template(name, self.library_dir).get("algorithm")}
+        return {"templates": templates,
                 "snippets": library.all_snippets(self.library_dir)}
 
     def save(self, raw: dict) -> dict:
@@ -198,7 +221,7 @@ class Editor:
         stem = self.path.stem
         with tempfile.TemporaryDirectory() as tmp:
             res = render(raw, req.get("profile") or self.profile, tmp, stem,
-                         tuple(dict.fromkeys(formats)), mono=bool(req.get("mono")))
+                         tuple(dict.fromkeys(formats)), mono=bool(req.get("mono")), base_dir=self.path.parent)
             out.mkdir(parents=True, exist_ok=True)
             files = []
             for src in res.files.values():
@@ -259,7 +282,7 @@ class Editor:
                 if self.path.split("?", 1)[0] == "/" and "agent-preview" in self.path:
                     self._send(200, (STATIC / "editor.html").read_bytes(), "text/html; charset=utf-8")
                     return
-                if self.path in ("/agent.js", "/agent.css", "/agent-editor.js"):
+                if self.path in ("/agent.js", "/agent.css", "/panel-layout.js", "/paper-style.js", "/agent-editor.js", "/figure-control.js", "/figure-agent.js", "/figure-output.js", "/figure.css", "/system-symbols.js", "/figure-images.js", "/algorithm.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/css; charset=utf-8" if self.path.endswith(".css") else "text/javascript; charset=utf-8")
                     return
@@ -273,7 +296,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "editor.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/digital-control.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/reference-images.js", "/digital-control.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js") else "text/css; charset=utf-8")
                 elif self.path == "/api/state":
@@ -303,6 +326,51 @@ class Editor:
                 from ..ai.presets import request
                 return request(req)
 
+            def _figure_output(self, req):
+                if req.get("action") == "generate-icon":
+                    return self._generate_icon(req)
+                from ..editor.figure_output import request
+                return request(req.get("table", req.get("layout")), req.get("profile") or editor.profile,
+                               editor.path, editor.out_dir, req)
+
+            def _figure_document(self, req):
+                from ..editor.figure_documents import request
+                return request(editor, req)
+
+            def _algorithm_steps(self, req):
+                from .algorithm import sequence
+                raw = sequence(req["table"], req.get("steps"), req.get("profile") or editor.profile)
+                png = preview_png(raw, req.get("profile") or editor.profile, False, False,
+                                  base_dir=editor.path.parent)
+                return {"table": raw, "png": png}
+
+            def _figure_preview(self, req):
+                from .check import extent
+                from ..compile import build
+                from .emit import emit
+                raw = req.get("table", req.get("layout"))
+                prof = _profile(raw, req.get("profile") or editor.profile)
+                rep = check(raw, prof)
+                if not rep.ok:
+                    raise Rejected(rep)
+                box = extent(rep.diagram, rep.geometry, prof)
+                if box is None:
+                    raise ValueError("图纸为空")
+                scale = rep.geometry.s
+                rect = f"({box.x0/scale:g},{box.y0/scale:g}) rectangle ({box.x1/scale:g},{box.y1/scale:g})"
+                tex = emit(rep, prof, mono=bool(req.get("mono")), base_dir=editor.path.parent)
+                tex = tex.replace(r"\end{tikzpicture}", "\\pgfresetboundingbox\n\\path[use as bounding box] " + rect + ";\n\\end{tikzpicture}")
+                with tempfile.TemporaryDirectory(prefix="control-paper-") as directory:
+                    files = build(tex, Path(directory), "preview", ("png",), png_dpi=200)
+                    png = base64.b64encode(files["png"].read_bytes()).decode()
+                border = prof.margin_mm/10
+                return {"png":png, "bounds_cm":[box.x0-border,box.y0-border,box.x1+border,box.y1+border]}
+
+            def _figure_check(self, req):
+                raw = req.get("table", req.get("layout"))
+                report = analyse(raw, req.get("profile") or editor.profile)
+                return {"report":report, "figure":{"shapes":[], "scale":[report["scale_cm_per_unit"]]*2}}
+
             def _check(self, req: dict) -> dict:
                 return analyse(req["table"], req.get("profile") or editor.profile)
 
@@ -317,7 +385,7 @@ class Editor:
 
             def _preview(self, req: dict) -> dict:
                 return {"png": preview_png(req["table"], req.get("profile") or editor.profile,
-                                           bool(req.get("grid")), bool(req.get("mono")))}
+                                           bool(req.get("grid")), bool(req.get("mono")), base_dir=editor.path.parent)}
 
             def _export(self, req: dict) -> dict:
                 return editor.export(req["table"], req)
@@ -327,7 +395,7 @@ class Editor:
                                              req.get("title", ""),
                                              req.get("profile") or editor.profile,
                                              editor.library_dir, set(TEMPLATES),
-                                             bool(req.get("force")))
+                                             bool(req.get("force")), base_dir=editor.path.parent)
                 return {"saved": str(path), **editor.lists()}
 
             def _save_snippet(self, req: dict) -> dict:
@@ -376,7 +444,10 @@ class Editor:
                 return editor.export_code(req["table"], req)
 
             def _template(self, req: dict) -> dict:
-                return {"table": template(req.get("name", ""), editor.library_dir)}
+                raw = template(req.get("name", ""), editor.library_dir, asset_dir=editor.path.parent)
+                if editor.state()["table"].get("algorithm") and not raw.get("algorithm"):
+                    raise ValueError("请选择算法流程图模板")
+                return {"table": raw}
 
             def _ai_status(self) -> dict:
                 from ..ai import provider_info
@@ -403,6 +474,9 @@ class Editor:
                 profile = req.get("profile") or editor.profile or "ieee-double"
                 profile = get_profile(profile).name
                 current = req.get("current")
+                if current is None and editor.state()["table"].get("algorithm"):
+                    from .algorithm import blank
+                    current = blank(editor.path.stem)
                 if current is not None:
                     if not isinstance(current, dict) or current.get("kind") != "control":
                         raise ValueError("当前图必须是控制框图")
@@ -434,6 +508,11 @@ class Editor:
 
 # POST path -> handler method; each takes the request body and returns the answer
 ROUTES = {
+    "/api/figure-document": "_figure_document",
+    "/api/algorithm-steps": "_algorithm_steps",
+    "/api/figure-output": "_figure_output",
+    "/api/figure-preview": "_figure_preview",
+    "/api/figure-check": "_figure_check",
     "/api/prompt-library": "_prompt_library",
     "/api/arrange": "_arrange",
 
@@ -477,5 +556,7 @@ def serve(path: Path, profile: str | None = None, port: int = 8766,
     except KeyboardInterrupt:
         pass
     finally:
+        from ..editor.figure_documents import close
+        close(editor)
         httpd.server_close()
 

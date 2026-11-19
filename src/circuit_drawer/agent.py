@@ -11,7 +11,7 @@ from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
 
-from .agent_tools import AgentWorkspace, _json, _kind
+from .agent_tools import AgentWorkspace, _digest, _json, _kind
 from .agent_results import file_record, run_candidate, utc_now
 
 
@@ -35,6 +35,12 @@ are possible, ask which source the user wants. Keep symbolic diagrams when value
 After adoption, simulate uses that bound power circuit and export_simulation exports
 the full connected model. Do not ask the user to copy code settings or wire bindings by hand.
 Always generate through the drawing AI, never substitute a template for an AI drawing request.
+For a publication drawing from words alone, plan an editable draft first. Keep unspecified values
+symbolic. Ask before drawing only when alternative interpretations change the core connections.
+For a research goal, ask in plain language which approach the author wants to communicate. Offer
+a short suggested interpretation they can accept or change. Preserve requested detail; keep
+background equipment or routine control stages brief when the author asks for a simplified view.
+Small layout/label choices can be reviewed on the draft. A selection edit needs one generate step and validation.
 Only plan requested outcomes. Every generate step waits for user adoption. A blank starting point
 also produces a candidate before replacing anything. Include validation after drawing changes.
 Drawing generation preserves existing simulation settings and leaves new drawings unconfigured.
@@ -45,7 +51,9 @@ suggestions. Ask about design inputs such as voltage, load and switching frequen
 simplified-device and solver assumptions in the parameter candidate for review, using the supported
 parameter schema; do not require another question for each model coefficient or PWM edge time.
 Do not invent measured results. options for render: {formats:["svg","pdf"]};
-for simulate/modes/metrics: {window:[start_seconds,end_seconds],signals:[actual CSV columns or configured probe IDs]}.
+for simulate/modes/metrics: {window:[start_seconds,end_seconds],signals:[actual CSV columns or configured probe IDs]};
+simulate/metrics also accept power_quality:{voltage:probe,current:probe,frequency:Hz,harmonics:2..200,current_sign:1|-1}
+for PF, displacement factor and THD over whole fundamental cycles ending at the window end, when the user asks for them.
 Omit unknown options, windows and signals. Generation detail must carry agreed simulation setup,
 measurements, numeric component values and all requirements needed by downstream tools.
 Metrics report target deviation and final-cycle repeatability for supported fixed-PWM signals.
@@ -161,9 +169,12 @@ class AgentTasks:
         self.documents = {}
         self.tasks = {}
 
-    def capabilities(self):
+    def capabilities(self, table=None):
         from .spice import executable
         ngspice = bool(executable())
+        if self.kind == "control" and table and table.get("algorithm"):
+            return [{"id": name, "label": name, "state": "available", "reason": "",
+                     "depends_on_drawing": False} for name in ("generate", "validate", "render")]
         return [{"id": name, "label": name, "state": "available" if available else "unavailable",
                  "reason": reason, "depends_on_drawing": name in ("modes", "loop")}
                 for name, available, reason in (
@@ -202,15 +213,48 @@ class AgentTasks:
             if action == "status" and not req.get("task_id"):
                 prompt = req.get("prompt", "")
                 return {"status": "draft", "allowed_actions": ["start"] if context and prompt.strip() else [],
-                        "capabilities": self.capabilities(),
+                        "capabilities": self.capabilities(context["table"] if context else None),
                         "history": [{"task_id": t.id, "title": t.title, "status": t.state}
-                                    for t in self.tasks.values() if context and t.document_id == context["document_id"]]}
+                                    for t in self.tasks.values() if context and t.document_id == context["document_id"]
+                                    and getattr(t, "task_kind", "drawing") == req.get("task_kind", "drawing")]}
             if action == "start":
                 if context is None or not isinstance(req.get("prompt"), str) or not req["prompt"].strip():
                     raise ValueError("请填写任务")
                 if any(t.document_id == context["document_id"] and t.state in ACTIVE for t in self.tasks.values()):
                     raise ValueError("请先停止当前运行中的 Agent 任务")
-                task = AgentTask(self, context, req["prompt"].strip(), req.get("start_from", "current"))
+                task_class = AgentTask
+                if req.get("task_kind") == "figure":
+                    from .agent_figure import FigureTask
+                    task_class = FigureTask
+                elif req.get("task_kind", "drawing") != "drawing":
+                    raise ValueError("未知任务类型")
+                start = req.get("start_from", "current")
+                selection = req.get("selection", [])
+                if start == "selection":
+                    if req.get("task_kind") == "figure":
+                        from .figure_candidates import figure_selection
+                        if req.get("selection_version") != context["version"]:
+                            raise ValueError("图纸已改变，请重新选择纸面对象")
+                        figure_selection(context["table"], selection)
+                    elif self.kind == "control":
+                        from .control.selection_edit import selected_objects
+                        selected_objects(context["table"], selection)
+                    else:
+                        raise ValueError("此入口需要控制图选区")
+                from .editor.server import _images
+                images = _images(req.get("images"))
+                purpose = req.get("reference_use", "structure")
+                if purpose not in ("structure", "style"):
+                    raise ValueError("未知参考图用途")
+                task = task_class(self, context, req["prompt"].strip(), start)
+                mode, case = req.get("task_mode"), req.get("example_case")
+                from .simulation_examples import CASES
+                if (mode not in (None, "draw", "example") or mode == "example" and context["table"].get("algorithm")
+                        or case is not None and (not isinstance(case, str) or case not in CASES)):
+                    raise ValueError("未知任务方式或示例工况")
+                task.task_mode, task.example_case = mode, case
+                task.selection = list(selection) if start == "selection" else []
+                task.images, task.reference_use = images, purpose
                 self.tasks[task.id] = task
                 task.launch(planning=True)
             else:
@@ -240,12 +284,15 @@ class AgentTasks:
 
 class AgentTask:
     def __init__(self, manager, context, prompt, start_from):
-        if start_from not in ("blank", "current"):
+        if start_from not in ("blank", "current", "selection"):
             raise ValueError("Invalid starting point")
         self.manager, self.document_id = manager, context["document_id"]
         self.id, self.title, self.prompt = uuid4().hex, prompt[:80], safe_text(prompt)
         self.requests = [{"text": self.prompt, "first_step": 0}]
         self.start_from, self.context = start_from, deepcopy(context)
+        self.task_mode, self.example_case, self.readiness = None, None, None
+        self.reviewed_circuit = None
+        self.selection, self.images, self.reference_use = [], [], "structure"
         self.state, self.steps, self.questions, self.detail = "draft", [], [], ""
         self.index, self.params, self.candidates, self.runs = 0, {}, [], []
         self.error, self.job, self.thread, self.command = None, None, None, None
@@ -269,7 +316,7 @@ class AgentTask:
                                                      context["file"] != self.context["file"]):
                 candidate["state"] = "stale"
                 candidate["stale_reason"] = "version_conflict"
-            if candidate["state"] == "adopted" and document_json(context["table"]) == document_json(json.loads(candidate["before_json"])):
+            if candidate["state"] == "adopted" and not candidate.get("confirm_only") and document_json(context["table"]) == document_json(json.loads(candidate["before_json"])):
                 candidate["state"] = "undone"
                 candidate["readopt_version"] = context["version"]
             if candidate["state"] == "undone" and context["version"] != candidate.get("readopt_version"):
@@ -286,7 +333,9 @@ class AgentTask:
         if self.state == "waiting_candidate":
             if alive:
                 return actions + ["stop"]
-            actions += ["discard", "revise", "regenerate", "stop"]
+            actions += ["discard", "regenerate", "stop"]
+            if self.candidates[-1]["state"] == "pending":
+                actions.append("revise")
             if self.candidates[-1]["state"] == "pending" and self.candidates[-1]["validation"]["passed"]:
                 actions += ["adopt"]
         if self.state in ("failed", "cancelled") and not alive:
@@ -299,9 +348,9 @@ class AgentTask:
         if self.candidates and not alive:
             candidate = self.candidates[-1]
             current = self.manager.documents[self.document_id]
-            if candidate["state"] == "adopted" and document_json(current["table"]) == document_json(candidate["preview"]):
+            if candidate["state"] == "adopted" and not candidate.get("confirm_only") and document_json(current["table"]) == document_json(candidate["preview"]):
                 actions += ["undo_candidate"]
-                adopted = [c for c in self.candidates if c["state"] == "adopted"]
+                adopted = [c for c in self.candidates if c["state"] == "adopted" and not c.get("confirm_only")]
                 if (current["version"] == candidate["result_version"] and
                         all(b["base_version"] == a["result_version"] for a, b in zip(adopted, adopted[1:]))):
                     actions += ["undo_task_changes"]
@@ -322,7 +371,8 @@ class AgentTask:
                 steps[self.index].update(activity=safe_text(self.job.activity), ai_round=self.job.current,
                                          rework_count=max(0, len(self.job.attempts) - 1))
         result = {"task_id": self.id, "title": self.title, "prompt": self.prompt, "editor": self.manager.kind,
-                  "start_from": self.start_from, "status": self.state, "current_step": self.index,
+                  "start_from": self.start_from, "task_mode": self.task_mode, "readiness": self.readiness,
+                  "status": self.state, "current_step": self.index,
                   "elapsed_ms": round((now - self.started) * 1000), "waiting_ms": round(waiting * 1000),
                   "steps": steps, "allowed_actions": self.allowed(), "questions": self.questions,
                   "detail": self.detail, "params": self.params, "queued": self.queued, "requests": self.requests,
@@ -333,9 +383,12 @@ class AgentTask:
                   "candidates": [{k: v for k, v in c.items() if k != "before_json"} for c in self.candidates],
                   "runs": self.runs, "result": self.runs[-1] if self.runs else None,
                   "error": self.error, "log": self.log[-500:], "record": str(self.record),
-                  "capabilities": self.manager.capabilities()}
+                  "capabilities": self.manager.capabilities(self.context["table"])}
         result["followups"] = (["followup.export", "followup.revise", "followup.parameters"]
                                if self.manager.kind == "circuit" else ["followup.export", "followup.revise", "followup.loop"])
+        if self.manager.kind == "control" and self.context["table"].get("algorithm"):
+            result["followups"] = ["followup.export", "followup.revise"]
+        result.update(self.status_data())
         result = deepcopy(result)
         for run in result["runs"]:
             for item in run["files"]:
@@ -347,6 +400,9 @@ class AgentTask:
                                             allow_nan=False), encoding="utf-8")
             temporary.replace(self.record)
         return result
+
+    def status_data(self):
+        return {"task_kind": "drawing"}
 
     def launch(self, *, planning=False):
         if self.worker_active:
@@ -400,9 +456,42 @@ class AgentTask:
             self.requests[-1]["parameters"] = [{**q, "value": answers[q["id"]]} for q in self.questions]
             self.launch()
         elif action in ("adopt", "readopt", "undo_candidate", "undo_task_changes"):
+            if action == "adopt" and self.candidates[-1].get("confirm_only"):
+                candidate = self.candidates[-1]
+                current = self.manager.documents[self.document_id]
+                if current["version"] != candidate["base_version"] or current["file"] != self.context["file"]:
+                    raise ValueError("图纸已改变，请重新确认工况")
+                candidate.update(state="adopted", result_version=current["version"])
+                self.base, self.run_version = candidate["candidate_id"], current["version"]
+                self.steps[self.index]["status"] = "done"
+                self.index += 1
+                self.launch()
+                return self.status(persist=True)
             return self.prepare_command(action)
         elif action in ("discard", "revise", "regenerate"):
-            self.candidates[-1]["state"] = "discarded"
+            candidate = self.candidates[-1]
+            step = self.steps[self.index]
+            if action == "revise":
+                if req.get("candidate_id", candidate["candidate_id"]) != candidate["candidate_id"]:
+                    raise ValueError("候选已更新，请重新选择")
+                if req.get("selection"):
+                    if self.manager.kind != "control":
+                        raise ValueError("此入口需要控制图选区")
+                    from .control.selection_edit import selected_objects
+                    selected_objects(candidate["preview"], req["selection"])
+                    step["selection"] = list(req["selection"])
+                step["revision_base"] = candidate["candidate_id"]
+            elif action == "regenerate":
+                if self.start_from == "selection":
+                    from .control.selection_edit import selected_objects
+                    keys = req.get("selection", [] if candidate["state"] == "stale" else self.selection)
+                    selected_objects(self.manager.documents[self.document_id]["table"], keys)
+                    self.selection = list(keys)
+                else:
+                    self.start_from = "current"
+                step.pop("revision_base", None)
+                step.pop("selection", None)
+            candidate["state"] = "discarded"
             if action == "discard":
                 self.state, self.finished = "cancelled", time.monotonic()
             else:
@@ -455,7 +544,7 @@ class AgentTask:
                 self.command["version"] == current["version"] and self.command["file"] == current["file"]):
             return {**self.status(), "command": deepcopy(self.command)}
         table = json.loads(candidate["before_json"]) if action == "undo_candidate" else candidate["preview"]
-        adopted = [c for c in self.candidates if c["state"] == "adopted"]
+        adopted = [c for c in self.candidates if c["state"] == "adopted" and not c.get("confirm_only")]
         if action == "undo_task_changes":
             table = json.loads(adopted[0]["before_json"])
         self.command = {"token": uuid4().hex, "action": action, "table": table,
@@ -525,12 +614,12 @@ class AgentTask:
                     while cause.__cause__ is not None:
                         cause = cause.__cause__
                     status = getattr(cause, "status_code", getattr(cause, "code", None))
-                    if status != 429 or attempt == 3:
+                    if status not in (429, 500, 502, 503, 504) or attempt == 3:
                         raise
                     if messages is not None:
                         chat.messages = messages
                     headers = getattr(cause, "headers", None) or getattr(getattr(cause, "response", None), "headers", {})
-                    retry = headers.get("Retry-After", "1")
+                    retry = headers.get("Retry-After", str(1 if status == 429 else 2 ** (attempt + 1)))
                     try:
                         delay = max(0, float(retry))
                     except (TypeError, ValueError):
@@ -541,7 +630,7 @@ class AgentTask:
                     if not math.isfinite(delay):
                         delay = 1
                     with self.manager.lock:
-                        self.log.append(f"429 · Retry-After {delay:g} s · {attempt + 1}/3")
+                        self.log.append(f"{status} · Retry-After {delay:g} s · {attempt + 1}/3")
                         self.retry_at, self.retry_count = time.monotonic() + delay, attempt + 1
                     try:
                         if self.cancel.wait(delay):
@@ -556,15 +645,31 @@ class AgentTask:
         from .ai.loop import extract_table
         with self.manager.lock:
             self.pending_plan, self.state = True, "planning"
-        chat = self.chat(PLAN_SYSTEM)
+        system = PLAN_SYSTEM
+        if self.manager.kind == "control" and self.context["table"].get("algorithm"):
+            from .control.algorithm import PROMPT
+            system += "\n" + PROMPT
+        chat = self.chat(system)
         message = {"request": self.requests[-1]["text"], "request_history": self.requests[:-1],
                    "editor": self.manager.kind, "start_from": self.start_from,
                    "drawing_data": self.workspace.inspect_candidate(self.base)["table"],
-                   "parameters": self.params, "capabilities": self.manager.capabilities(),
+                   "parameters": self.params, "capabilities": self.manager.capabilities(self.context["table"]),
                    "previous_results": [{key: run.get(key) for key in
                                          ("run_id", "drawing_version", "engine", "metrics", "notes")}
                                         for run in self.runs]}
-        if self.manager.kind == "control":
+        if self.selection:
+            message["selected_objects"] = self.selection
+        if self.task_mode:
+            message["task_mode"] = self.task_mode
+            message["instruction_for_mode"] = (
+                "只画图。未填的设计参数保留为符号，不为数值仿真追问。需要澄清的结构问题标 purpose=structure。"
+                if self.task_mode == "draw" else
+                "示例仿真。先给可编辑图纸，再独立提议仿真工况，用户采用后运行。已有示例的数值可以作为假设。必须先澄清的拓扑问题标 purpose=structure。")
+        if self.start_from == "blank":
+            message["drawing_data"] = {"kind": self.manager.kind, "algorithm": bool(self.context["table"].get("algorithm"))}
+        if self.images:
+            message["reference_use"] = self.reference_use
+        if self.manager.kind == "control" and not self.context["table"].get("algorithm"):
             from .control.circuit import available_sources
             message["project_circuits"] = available_sources(self.workspace.root)
         completed = self.steps[:self.index] if remaining else []
@@ -573,7 +678,7 @@ class AgentTask:
                            instruction="Plan only the remaining work and the new requests. Completed results are retained.")
         prompt = _json(message)
         for attempt in range(2):
-            reply = chat.send(prompt)
+            reply = chat.send(prompt, images=self.images) if self.images and not attempt else chat.send(prompt)
             self.ensure_running()
             try:
                 plan = extract_table(reply)
@@ -591,6 +696,10 @@ class AgentTask:
             raise ValueError("Agent 计划须包含 1～12 个步骤")
         allowed = {"generate", "validate", "render", "simulate", "metrics", "export_simulation"} | (
             {"loop"} if self.manager.kind == "control" else {"parameters", "modes"})
+        if self.task_mode == "example":
+            allowed.add("parameters")
+        if self.manager.kind == "control" and self.context["table"].get("algorithm"):
+            allowed = {"generate", "validate", "render"}
         for step in steps:
             if not isinstance(step, dict) or step.get("tool") not in allowed or not isinstance(step.get("title"), str):
                 raise ValueError("Agent 计划包含当前编辑器不支持的操作")
@@ -602,6 +711,22 @@ class AgentTask:
                     not isinstance(q.get("label"), str) for q in questions) or
                 len({q["id"] for q in questions}) != len(questions)):
             raise ValueError("Invalid parameter questions")
+        needs_drawing = not remaining and (self.start_from == "blank" or not (
+            message["drawing_data"].get("elements") or message["drawing_data"].get("modules") or
+            message["drawing_data"].get("blocks")))
+        if self.task_mode == "draw":
+            steps = [s for s in steps if s["tool"] in ("generate", "validate", "render")]
+            if not steps or needs_drawing and not any(s["tool"] == "generate" for s in steps):
+                steps.insert(0, {"tool":"generate", "title":"绘制符号图"})
+            questions = [q for q in questions if q.get("purpose") == "structure"]
+        elif self.task_mode == "example" and not self.context["table"].get("algorithm"):
+            questions = [q for q in questions if q.get("purpose") == "structure"]
+            if needs_drawing and not any(s["tool"] == "generate" for s in steps):
+                steps.insert(0, {"tool":"generate", "title":"绘制电路"})
+            settings = next((s for s in steps if s["tool"] == "parameters"), {"tool":"parameters", "title":"确认示例仿真参数"})
+            run = next((s for s in steps if s["tool"] == "simulate"), {"tool":"simulate", "title":"运行已采用的工况"})
+            drawing = [s for s in steps if s["tool"] in ("generate", "validate", "render", "loop")]
+            steps = drawing + [settings, run] + [s for s in steps if s["tool"] in ("metrics", "modes", "export_simulation")]
         with self.manager.lock:
             self.ensure_running()
             if not completed:
@@ -629,8 +754,21 @@ class AgentTask:
         from .editor.server import Job, RecommendationJob
         before = self.workspace.inspect_candidate(self.base)["table"]
         current = None if self.start_from == "blank" and not self.candidates else before
+        if step.get("revision_base"):
+            current = self.workspace.inspect_candidate(step["revision_base"])["table"]
+        if self.manager.kind == "control" and current is None and before.get("algorithm"):
+            from .control.algorithm import blank
+            current = blank(before.get("name", "algorithm"))
         description = _json(self.requests) + "\n" + step["detail"] + "\n" + _json({
             "parameters": self.params, "parameter_definitions": self.questions})
+        if self.task_mode and step["tool"] == "generate":
+            description += "\n先绘制图纸。保留尚未给出数值的符号，数值仿真工况在独立候选中确认。"
+            if self.example_case and self.manager.kind == "circuit":
+                from .simulation_examples import drawing, guide
+                if self.task_mode == "example" and not (current and (current.get("elements") or current.get("modules"))):
+                    current = drawing(self.example_case)
+                    description += "\n以随程序提供的电路图作为可编辑起点，按用户需求修改。"
+                description += "\n可参考以下器件编号和连接，以用户编辑后的需求为准：" + _json(guide(self.example_case))
         if step.get("repair_error"):
             repair = ("仅修正下面的实际错误。逐项说明修改对象与理由。保留已存在且与错误无关的内容、"
                       "坐标、接线、参数和模态。\n" + step["repair_error"])
@@ -638,16 +776,22 @@ class AgentTask:
             current = before
             if step.get("labels_only"):
                 description += "\n本次是标签编译修复，仅修改已有对象的 label/text 字符串。"
+        if self.images:
+            description += ("\n参考图只用于配色和版式，以文字需求为准。" if self.reference_use == "style"
+                            else "\n参考图用于理解草图中的连接关系，以文字需求为准。")
         workflow = ControlWorkflow(self.context["profile"], current, self.manager.editor.library_dir,
-                                   description=description, base_dir=self.workspace.root) if self.manager.kind == "control" else None
+                                   description=description, base_dir=self.workspace.root,
+                                   selection=step.get("selection", self.selection),
+                                   original=self.start_from == "blank" and current is None) if self.manager.kind == "control" else None
         job_type = Job
         if step["tool"] == "parameters":
             from .spice_recommend import RecommendationWorkflow
             from .layout import Layout
-            workflow = RecommendationWorkflow(Layout.from_dict(before), self.context["profile"],
+            workflow = RecommendationWorkflow(Layout.from_dict(current if step.get("revision_base") else before), self.context["profile"],
                                               description=description, base_dir=self.workspace.root,
                                               use_formula=False, should_stop=self.cancel.is_set,
-                                              preview_simulation=False)
+                                              preview_simulation=False, example_mode=self.task_mode == "example",
+                                              example_case=self.example_case)
             job_type = RecommendationJob
         system = workflow.system_prompt() if workflow else system_prompt(self.context["profile"])
         # Parameter extraction uses the user's existing planning effort setting.
@@ -655,32 +799,64 @@ class AgentTask:
         editor = self.manager.editor
         self.job = job_type(description, self.context["profile"], 3, chat, editor.provider, editor.model,
                             "tweak" if current else "draw", current=current, workflow=workflow,
-                            base_dir=self.workspace.root)
+                            images=self.images if step["tool"] == "generate" else None, base_dir=self.workspace.root)
         while self.job.state == "running":
             if self.cancel.wait(.1):
                 self.job.cancel.set()
                 self.ensure_running()
         self.ensure_running()
-        if self.job.state != "done" or not self.job.result:
-            raise ValueError(self.job.error or "AI 生成已停止")
-        response = self.job.result
         self.log.append(safe_text(_json({"attempts": self.job.attempts,
                                          "requests": getattr(chat, "stats", [])})))
         if any(a.get("errors") for a in self.job.attempts):
             replies = [m.get("content") for m in getattr(chat, "messages", []) if m.get("role") == "assistant"]
             # Bound local diagnostics to the three-round retry budget; never record headers.
             self.log.append(_json({"ai_replies": [safe_text(_json(reply))[:16000] for reply in replies[-3:]]}))
+        if self.job.state != "done" or not self.job.result:
+            raise ValueError(self.job.error or "AI 生成已停止")
+        response = self.job.result
         proposed = response.get("table", response.get("layout"))
         parameter_proposal = response.get("proposal")
+        if self.task_mode and step["tool"] == "generate" and self.manager.kind == "circuit" and isinstance(proposed, dict):
+            for key in ("simulation", "closed_loop"):
+                if current and key in current:
+                    proposed[key] = deepcopy(current[key])
+                else:
+                    proposed.pop(key, None)
         if step["tool"] == "parameters":
             if not parameter_proposal:
                 raise ValueError(_json(response.get("rounds", [])))
             step["requirements"] = parameter_proposal.get("requirements", {})
-            proposed = deepcopy(before)
+            proposed = deepcopy(current if step.get("revision_base") else before)
             for key in ("simulation", "modules", "closed_loop"):
                 if key in parameter_proposal:
                     proposed[key] = parameter_proposal[key]
-        if document_json(before) == document_json(proposed):
+        self.review(step, before, proposed, parameter_proposal, self.job.attempts,
+                    getattr(workflow, "review_questions", []))
+
+    def review_bound_circuit(self, step):
+        from .control.circuit import resolve
+        from .layout import Layout
+        from .simulation_readiness import inspect
+        from .spice_recommend import parameter_label, parameter_values
+
+        control = self.workspace.inspect_candidate(self.base)["table"]
+        raw, source, notes = resolve(control, self.workspace.root)
+        layout = Layout.from_dict(raw)
+        report = inspect(layout, raw.get("profile") or "ieee-double", source.parent)
+        if not report["ready"]:
+            raise ValueError(f"{source.name} · 请在电路的 SPICE 参数页补齐工况：" +
+                             "；".join(i["message"] for i in report["issues"]))
+        simulation = raw["simulation"]
+        proposal = {"parameters": [{"path": key, "label": parameter_label(key, layout, simulation),
+                                    "before": value, "value": value, "reason": f"沿用关联电路 {source.name}"}
+                                   for key, value in parameter_values(simulation).items()],
+                    "assumptions": [f"使用 {source.name} 的已保存工况和当前控制图的输入、输出绑定。", *notes]}
+        self.reviewed_circuit = _digest(_json(raw))
+        self.review(step, control, control, proposal, [], [])
+
+    def review(self, step, before, proposed, parameter_proposal, attempts, questions):
+        same_table = document_json(before) == document_json(proposed)
+        if same_table and not (self.task_mode == "example" and parameter_proposal):
             self.log.append("No drawing changes returned by this generation step.")
             return
         if step.get("labels_only") and without_labels(before) != without_labels(proposed):
@@ -691,19 +867,30 @@ class AgentTask:
             changes = [{"kind": "setting", "object_type": "sim_setting", "section": "simulation",
                         "object_id": p["path"], "label": p.get("label", p["path"]),
                         "before": p.get("before"), "after": p["value"], "reason": p["reason"]}
-                       for p in parameter_proposal["parameters"] if p.get("before") != p["value"]]
+                       for p in parameter_proposal["parameters"] if self.task_mode == "example" or p.get("before") != p["value"]]
+            if step.get("revision_base"):
+                previous = next(c for c in self.candidates if c["candidate_id"] == step["revision_base"])
+                combined = {c["object_id"]: c for c in previous["changes"]}
+                for change in changes:
+                    path = change["object_id"]
+                    if path in combined:
+                        change["before"] = combined[path]["before"]
+                    combined[path] = change
+                changes = [c for c in combined.values() if c["before"] != c["after"]]
         report = validation(candidate["validation"])
         with self.manager.lock:
             self.ensure_running()
             self.candidates.append({"candidate_id": candidate["candidate_id"], "number": len(self.candidates) + 1,
                                     "editor": self.manager.kind, "state": "pending",
+                                    "confirm_only": same_table,
                                     "base_version": self.run_version, "current_version": self.run_version,
                                     "result_version": None, "undo_label": "Agent · " + step["title"],
                                     "summary": {k: sum(c["kind"] == v for c in changes) for k, v in
                                                 (("added", "add"), ("modified", "modify"), ("removed", "remove"), ("settings", "setting"))},
                                     "changes": changes, "validation": report,
-                                    "rework_count": max(0, len(self.job.attempts) - 1),
-                                    "rework_notes": [a.get("errors", []) for a in self.job.attempts],
+                                    "rework_count": max(0, len(attempts) - 1),
+                                    "rework_notes": [a.get("errors", []) for a in attempts],
+                                    "review_questions": questions,
                                     "assumptions": parameter_proposal.get("assumptions", []) if parameter_proposal else [],
                                     "requirements": parameter_proposal.get("requirements", {}) if parameter_proposal else {},
                                     "preview": proposed, "before_table": before, "before_json": _json(before), "stale_reason": None})
@@ -713,7 +900,9 @@ class AgentTask:
 
     def execute(self, step):
         tool, options = step["tool"], step["options"]
-        if tool in ("generate", "parameters"):
+        if tool == "parameters" and self.manager.kind == "control" and self.task_mode == "example":
+            self.review_bound_circuit(step)
+        elif tool in ("generate", "parameters"):
             self.generate(step)
         elif tool == "validate":
             report = validation(self.workspace.validate_candidate(self.base))
@@ -721,8 +910,16 @@ class AgentTask:
             if not report["passed"]:
                 raise ValueError(_json(report["issues"]))
         elif tool in ("simulate", "modes", "loop", "export_simulation"):
+            if tool == "simulate" and self.manager.kind == "circuit":
+                from .layout import Layout
+                from .simulation_readiness import inspect
+                raw = self.workspace.inspect_candidate(self.base)["table"]
+                self.readiness = inspect(Layout.from_dict(raw), self.context["profile"], self.workspace.root)
+                if not self.readiness["ready"]:
+                    raise ValueError("\n".join(x["message"] for x in self.readiness["issues"]))
             run = run_candidate(self.workspace, self.base, tool, options=options,
-                                should_stop=self.cancel.is_set, drawing_version=self.run_version)
+                                should_stop=self.cancel.is_set, drawing_version=self.run_version,
+                                **({"reviewed_circuit": self.reviewed_circuit} if self.reviewed_circuit else {}))
             with self.manager.lock:
                 self.ensure_running()
                 self.assess(run)
@@ -733,7 +930,8 @@ class AgentTask:
             if run is None:
                 raise ValueError("请先运行仿真，再读取波形指标")
             measured = waveform_result(run["waveforms"][0]["data_ref"]["file"], run["run_id"],
-                                       options.get("window"), options.get("signals"))
+                                       options.get("window"), options.get("signals"),
+                                       options.get("power_quality"))
             updated = {**deepcopy(run), **measured, "analysed_at": utc_now()}
             self.assess(updated)
             record = next(f["path"] for f in run["files"] if Path(f["path"]).name == "run.json")
@@ -799,7 +997,7 @@ class AgentTask:
                     self.ensure_running()
                     step["elapsed_ms"] = round((time.monotonic() - self.step_started) * 1000)
                     self.job = None
-                    if self.state == "waiting_candidate":
+                    if self.state in ("waiting_candidate", "waiting_export"):
                         return
                     step["status"] = "done"
                     self.index += 1

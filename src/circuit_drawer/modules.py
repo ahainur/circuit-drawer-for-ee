@@ -2193,7 +2193,6 @@ def _instance_issues(issues, source, assembly):
     Cross-instance/root interactions and non-element owners stay separate:
     equal-looking text must never hide a distinct wiring or placement error.
     """
-    from .validate import Issue
     spec = source.extra["modules"]
     definitions = _definitions(spec)
     refs, offsets = {}, {}
@@ -2219,7 +2218,7 @@ def _instance_issues(issues, source, assembly):
             continue
         names = list(dict.fromkeys(n for n, _, _ in targets))
         detail = "；".join(f"实例 {n}，定义 {d} 的 {e}" for n, d, e in targets)
-        annotated = Issue(issue.code, issue.message + f"（{detail}）", issue.level)
+        annotated = replace(issue, message=issue.message + f"（{detail}）")
         internal = len(names) == 1 and all(h in refs for h in hits) and not re.search(r"wire\[|annotation\[|regions\[|callouts\[|\btext ", issue.message)
         if internal:
             name = names[0]
@@ -2232,7 +2231,10 @@ def _instance_issues(issues, source, assembly):
                 index, affected, original = groups[key]
                 if name not in affected:
                     affected.append(name)
-                    out[index] = Issue(issue.code, original + "；受影响实例：" + "、".join(affected), issue.level)
+                    merged = replace(out[index], message=original + "；受影响实例：" + "、".join(affected))
+                    if hasattr(merged, "label_boxes"):
+                        merged.label_boxes = merged.label_boxes + getattr(issue, "label_boxes", [])
+                    out[index] = merged
                 continue
             groups[key] = (len(out), [name], annotated.message)
         out.append(annotated)
@@ -2255,7 +2257,7 @@ DRAWING_ONLY = frozenset({
     "not-orthogonal", "on-wire-allowed", "open-pin", "region-cuts-symbol", "region-fit-overrides", "short-wire",
     "shorted-pins", "text-on-block", "text-on-callout", "text-on-line", "text-on-symbol", "text-overlap",
     "too-close", "too-cramped", "drawing-scale-width", "too-short", "touches-lead", "unlisted-member", "unmarked-crossing",
-    "unused-hop", "winding-gap", "zero-length",
+    "unused-hop", "winding-gap", "winding-wide", "short-lead-margin", "text-clearance", "zero-length",
 })
 
 

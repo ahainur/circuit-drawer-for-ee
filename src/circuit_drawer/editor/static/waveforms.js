@@ -1,6 +1,8 @@
 /* CSV samples are read-only; display and interval settings live in layout.waveform. */
 (() => {
   "use strict";
+  // The startup dialog reports a missing script and offers a reload.
+  if (!window.editorHint || !window.createWaveformInsets) return;
   const panel = document.getElementById("wavePanel");
   const $ = id => document.getElementById(id);
   const units = {s:1, ms:1e-3, us:1e-6};
@@ -10,18 +12,22 @@
   let updateComposition=null;
   const CM=40; // SVG user units per paper cm; the viewport scales uniformly.
   panel.innerHTML = `<div class="wave-toolbar"><strong>波形与模态</strong>
-    <button id="waveImport">导入 CSV…</button>
+    <div class="wave-command-groups" role="toolbar" aria-label="波形与模态"><span class="wave-tool-group"><button id="waveImport">导入 CSV…</button><button aria-describedby="hint-waveInsert" id="waveInsert" aria-expanded="false" aria-controls="waveInsertMenu" disabled>插入 ▾</button>${editorHint("waveInsert")}</span>
     <span class="wave-tools" title="在波形上加文字、箭头、关键点圆圈和区间尺寸线；导出时一起出图">标注
     <button id="waveNote_text">文字</button><button id="waveNote_arrow">箭头</button><button id="waveNote_dot">关键点</button><button id="waveNote_dimension">区间尺寸线</button>
-    <button id="waveNoteDelete" disabled>删除所选</button></span><button id="waveAI" disabled>AI 标注…</button><button id="waveSave">保存对应关系</button>
-    <button id="waveUndo">撤销</button><button id="waveTruePreview">真实出图预览</button><button id="waveXY" disabled>XY / 状态平面…</button>
-    <button id="waveExport" class="primary">导出波形与模态…</button><button id="waveCompose">加入组合图</button><button id="waveClose">收起</button></div>
-    <div class="wave-paper-toolbar"><label>纸面尺寸 <select id="wavePaperTarget"><option value="overview">总览中的波形</option><option value="standalone">独立波形图</option></select></label>
-    <label>查看比例 <select id="waveViewZoom"><option value="fit">适合画布</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
-    <span id="wavePaperSize"></span><span class="hint">数学文字为编辑示意，最终字体用“真实出图预览”核对。</span></div>
+    <button id="waveNoteDelete" disabled>删除所选</button><button id="waveAI" disabled>AI 标注…</button></span><span class="wave-tool-group"><button id="waveSave">保存对应关系</button>
+    <button id="waveUndo">撤销</button></span><span class="wave-tool-group"><button id="waveTruePreview">真实出图预览</button><button id="waveXY" disabled>XY / 状态平面…</button>
+    <button id="waveExport" class="primary">导出波形与模态…</button><button id="waveCompose">加入组合图</button></span></div><button id="waveClose">收起</button></div>
+    <div id="waveInsertMenu" class="wave-row" hidden><button data-wave-insert="legend" draggable="true">当前曲线图例</button><button data-wave-insert="topology">拓扑示意…</button><button data-wave-insert="icon">系统图标…</button><button data-wave-insert="image">图片与个人图标…</button></div>
+    <div class="wave-paper-toolbar"><label>纸面尺寸 <select id="wavePaperTarget" aria-describedby="hint-wavePaper"><option value="overview">总览中的波形</option><option value="standalone">独立波形图</option></select></label>
+    <label>查看比例 <select id="waveViewZoom" aria-describedby="hint-wavePaper"><option value="fit">适合画布</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+    ${editorHint("wavePaper")}<span id="wavePaperSize"></span><span class="hint">数学文字为编辑示意，最终字体用“真实出图预览”核对。</span></div>
     <div class="wave-body"><div class="wave-chart-wrap"><svg id="waveChart" tabindex="0" role="img" aria-label="电压、电流波形及时间分界线"></svg></div>
     <div class="wave-sidebar"><div id="waveProperties"></div><div class="wave-settings" id="waveSettings"></div></div></div><div id="waveNotice" role="status" aria-live="polite"></div>`;
 
+  const artwork=window.createWaveformInsets({state:()=>({info,box,cfg:layout?.waveform}),cm:CM,
+    stamp:()=>JSON.stringify([editorFilePath,profile,revision,layout]), request,change,draw,properties,note,svgPoint,dataAt,
+    clearNotes:()=>{selNote=null;selLabel=null;if(tool) setTool(null);}});
   function note(text, bad=false) { $("waveNotice").textContent=text; $("waveNotice").className=bad?"bad":"ok"; }
   function request(path, cfg, extra={}) {
     return api(path, {layout:{...layout,waveform:cfg},profile,preview_target:previewTarget,...extra});
@@ -29,6 +35,7 @@
   function installed(result, remember=true) {
     if (remember) pushHistory();
     layout.waveform=clone(result.config); info=result;
+    artwork.sync(result.paper.insets);
     if(selNote!==null && !layout.waveform.notes?.[selNote]) selNote=null;
     active=Math.min(active,layout.waveform.intervals.length-1);
     controls(); draw(); properties();
@@ -53,6 +60,7 @@
   }
   window.openWaveforms=async (options={}) => {
     if (!layout) return;
+    artwork.reset();
     panel.hidden=false;
     updateComposition=options.onCompose || null;
     $('waveCompose').textContent=updateComposition ? '更新组合子图' : '加入组合图';
@@ -69,7 +77,7 @@
     } catch (e) { info=null; controls(); draw(); note(e.message,true); }
   };
   $("waveforms").onclick=()=>window.openWaveforms();
-  $("waveClose").onclick=()=>{panel.hidden=true;};
+  $("waveClose").onclick=()=>{panel.hidden=true;artwork.reset();};
   $('waveCompose').onclick=()=> {
     if(updateComposition) updateComposition(clone(layout.waveform));
     else window.CircuitFigureOutput?.addWaveform(layout.waveform);
@@ -182,9 +190,12 @@
   });
   window.addEventListener("circuit-drawer:layout-changed",async()=> {
     if(panel.hidden) return;
+    artwork.reset();
     selNote=null;selLabel=null;
     const id=++revision;
-    if(!layout.waveform?.source) {info=null;controls();draw();return;}
+    // A restored drawing must not accept edits through the previous drawing's form.
+    info=null; controls(); properties();
+    if(!layout.waveform?.source) {draw();return;}
     try {
       const result=await request("/api/waveform-view",layout.waveform);
       if(id===revision) installed(result,false);
@@ -196,8 +207,8 @@
       <p>Simulink／PLECS 导出包中的波形脚本可生成数值 CSV。导入后可选通道、加标注，并加入多工况组合图。</p>
       <p><input id="waveCsvFile" type="file" accept=".csv,.tsv,.txt"></p>
       <div class="export-row"><input id="waveCsvPath" type="text" placeholder="CSV 路径（相对电路 JSON 所在目录）" value="${esc(layout.waveform?.source || '')}"></div>
-      <div class="export-row"><label>时间列 <input id="waveTimeColumn" placeholder="留空使用第一列"></label>
-      <label>CSV 时间单位 <select id="waveTimeUnit"><option>s</option><option>ms</option><option>us</option></select></label></div>
+      <div class="export-row"><label>时间列 <input id="waveTimeColumn" aria-describedby="hint-waveInput" placeholder="留空使用第一列"></label>
+      <label>CSV 时间单位 <select id="waveTimeUnit" aria-describedby="hint-waveInput"><option>s</option><option>ms</option><option>us</option></select></label>${editorHint("waveInput")}</div>
       <p class="hint">UTF-8 编码，最多 64 MiB、100 万行。导入时在电路旁保存一份数据快照；同名同内容不重复复制。</p>
       <button id="waveCsvLoad" class="primary">载入 CSV</button><p id="waveImportState" role="status"></p>`);
     $("waveCsvLoad").onclick=async()=> {
@@ -217,31 +228,33 @@
 
   function controls() {
     const cfg=layout.waveform;
-    $("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=$("waveAI").disabled=$("waveXY").disabled=$('waveCompose').disabled=!info;
+    const lineNames={solid:'实线',dashed:'虚线',dashdot:'点划线',dotted:'点线'};
+    $("waveInsert").disabled=$("waveSave").disabled=$("waveExport").disabled=$("waveTruePreview").disabled=$("waveAI").disabled=$("waveXY").disabled=$('waveCompose').disabled=!info;
     if(!info) {$("waveSettings").textContent="导入 CSV 后，可选通道、时间范围和对应模态。";return;}
     const factor=units[cfg.display_unit];
     const number=t=>Number((t/factor).toPrecision(12));
     const names=(layout.modes || []).map(m=>m.name);
     $("waveSettings").innerHTML=`<div class="hint" id="waveFileSummary">${esc(cfg.source)}</div>
-      <div class="wave-row"><label>显示单位 <select id="waveUnit">${Object.keys(units).map(u=>`<option ${u===cfg.display_unit?'selected':''}>${u}</option>`).join('')}</select></label>
+      <fieldset class="wave-group"><legend><span>时间范围</span> ${editorHint("waveTime")}</legend><div class="wave-row"><label>显示单位 <select id="waveUnit" aria-describedby="hint-waveTime">${Object.keys(units).map(u=>`<option ${u===cfg.display_unit?'selected':''}>${u}</option>`).join('')}</select></label>
       <button id="waveZoomIn" title="缩小时间范围">放大</button><button id="waveZoomOut">缩小</button><button id="waveFull">全范围</button></div>
-      <label><input id="waveRelative" type="checkbox" ${cfg.relative_time?'checked':''}> 横轴以 t₀ 为零点</label>
+      <label><input id="waveRelative" aria-describedby="hint-waveTime" type="checkbox" ${cfg.relative_time?'checked':''}> 横轴以 t₀ 为零点</label>
       <div class="hint">下面的范围和分界输入使用 CSV 的绝对时间。</div>
-      <div class="wave-row"><label>起点 <input id="waveStart" type="number" step="any" value="${number(cfg.window[0])}"></label>
-      <label>终点 <input id="waveEnd" type="number" step="any" value="${number(cfg.window[1])}"></label><button id="waveRange">应用范围</button></div>
-      <div class="wave-row"><select id="wavePwm" aria-label="周期参考通道">${info.columns.filter(c=>c!==cfg.time_column).map(c=>`<option ${c===(cfg.period_column || info.columns.find(n=>/pwm|gate|drive/i.test(n)))?'selected':''}>${esc(c)}</option>`).join('')}</select>
-      <button id="wavePeriod">末尾一个 PWM 周期</button></div>
+      <div class="wave-row"><label>起点 <input id="waveStart" aria-describedby="hint-waveTime" type="number" step="any" value="${number(cfg.window[0])}"></label>
+      <label>终点 <input id="waveEnd" aria-describedby="hint-waveTime" type="number" step="any" value="${number(cfg.window[1])}"></label><button id="waveRange">应用范围</button></div></fieldset>
+      <fieldset class="wave-group"><legend><span>区间与模态</span> ${editorHint("waveBindings")}</legend>
+      <div class="wave-row"><select id="wavePwm" aria-describedby="hint-wavePeriod" aria-label="周期参考通道">${info.columns.filter(c=>c!==cfg.time_column).map(c=>`<option ${c===(cfg.period_column || info.columns.find(n=>/pwm|gate|drive/i.test(n)))?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <button id="wavePeriod" aria-describedby="hint-wavePeriod">末尾一个 PWM 周期</button>${editorHint("wavePeriod")}</div>
       <p class="hint">PWM 只用于建议分界时间；各区间的模态需自行选择。框选曲线区域可放大。</p>
       <div id="waveIntervals">${cfg.intervals.map((name,i)=>`<div class="wave-binding">
         <button data-interval="${i}" class="${i===active?'active':''}" title="显示这个区间的电路模态">t${i}→t${i+1}</button>
-        <select data-binding="${i}" aria-label="区间 ${i+1} 对应模态"><option value="">请选择模态</option>
+        <select aria-describedby="hint-waveBindings" data-binding="${i}" aria-label="区间 ${i+1} 对应模态"><option value="">请选择模态</option>
         ${name && !names.includes(name)?`<option selected value="${esc(name)}">已失效：${esc(name)}</option>`:''}
         ${names.map(n=>`<option ${name===n?'selected':''} value="${esc(n)}">${esc(n)}</option>`).join('')}</select></div>`).join('')}</div>
-      <div class="wave-row"><button id="waveSplit">拆分所选区间</button></div>
-      <details><summary>精确设置分界时间（${cfg.display_unit}）</summary>
+      <div class="wave-row"><button id="waveSplit" aria-describedby="hint-waveBindings">拆分所选区间</button></div>
+      <details><summary aria-describedby="hint-waveBindings">精确设置分界时间（${cfg.display_unit}）</summary>
       ${cfg.boundaries.map((t,i)=>`<div class="wave-row"><label>t${i} <input type="number" step="any" data-mark="${i}" value="${number(t)}" aria-label="t${i}"></label>
-      ${i>0 && i<cfg.boundaries.length-1?`<button data-remove="${i}" title="合并相邻区间，并清除其模态选择">删除分界</button>`:''}</div>`).join('')}</details>
-      <details><summary>通道、标签和单位</summary><div id="waveChannels">
+      ${i>0 && i<cfg.boundaries.length-1?`<button data-remove="${i}" title="合并相邻区间，并清除其模态选择">删除分界</button>`:''}</div>`).join('')}</details></fieldset>
+      <div class="wave-disclosure"><details><summary aria-describedby="hint-waveChannels">通道、标签和单位</summary><div id="waveChannels">
       ${info.columns.filter(c=>c!==cfg.time_column).map((column,i)=> {
         const c=cfg.channels.find(c=>c.column===column) || {
           ...(info.column_defaults?.[column] || {label:column,unit:''}),color:colors[i%colors.length]};
@@ -249,9 +262,15 @@
         <input type="text" data-field="label" value="${esc(c.label)}" aria-label="${esc(column)} 标签">
         <input type="text" data-field="unit" value="${esc(c.unit)}" aria-label="${esc(column)} 单位">
         <input type="color" value="${esc(c.color)}" aria-label="${esc(column)} 颜色"><small>${esc(column)}</small>
+        <label>线型 <button type="button" data-field="line" aria-label="${esc(column)} 线型" value="${c.line || 'solid'}">${lineNames[c.line || 'solid']}</button></label>
         <label style="grid-column:2/-1">纵轴分组 <select data-field="axis_group" aria-label="${esc(column)} 纵轴分组"><option value="">独立纵轴</option>
         ${[...new Set([...Array.from({length:6},(_,k)=>'axis'+(k+1)),...cfg.channels.map(c=>c.axis_group).filter(Boolean)])].map(group=>`<option value="${esc(group)}" ${group===c.axis_group?'selected':''}>${esc(/^axis[1-6]$/.test(group)?'同轴组 '+group.slice(4):group)}</option>`).join('')}</select></label></div>`;
-      }).join('')}</div><p class="hint">单位相同的通道选择相同组号，即可共用纵轴叠加显示。</p><button id="waveApplyChannels">应用通道设置</button></details>`;
+      }).join('')}</div><p class="hint">单位相同的通道选择相同组号，即可共用纵轴叠加显示。</p><button id="waveApplyChannels">应用通道设置</button></details>${editorHint("waveChannels")}</div>`;
+    for (const button of $("waveChannels").querySelectorAll('[data-field=line]')) button.onclick=()=>{
+      const keys=Object.keys(lineNames);
+      button.value=keys[(keys.indexOf(button.value)+1)%keys.length];
+      button.textContent=cdI18n.translate(lineNames[button.value]);
+    };
     $("waveUnit").onchange=()=>change({...clone(cfg),display_unit:$("waveUnit").value});
     $("waveRelative").onchange=()=>change({...clone(cfg),relative_time:$("waveRelative").checked});
     $("waveRange").onclick=()=>range(Number($("waveStart").value)*factor,Number($("waveEnd").value)*factor);
@@ -293,6 +312,7 @@
       const channels=[...$("waveChannels").children].filter(row=>row.querySelector('[type=checkbox]').checked).map(row=>({
         column:row.dataset.column,label:row.querySelector('[data-field=label]').value,
         unit:row.querySelector('[data-field=unit]').value,color:row.querySelector('[type=color]').value,
+        ...(row.querySelector('[data-field=line]').value!=='solid'?{line:row.querySelector('[data-field=line]').value}:{}),
         ...(row.querySelector('[data-field=axis_group]').value?{axis_group:row.querySelector('[data-field=axis_group]').value}:{})}));
       // Notes on a hidden channel stay in the table and come back with it.
       change({...clone(cfg),channels});
@@ -300,11 +320,12 @@
   }
   function properties() {
     const host=$("waveProperties"), cfg=layout?.waveform, n=cfg?.notes?.[selNote], p=info?.paper;
+    if(p && !n && !selLabel) {artwork.properties(host);return;}
     if(!p || (!n && !selLabel)) {host.innerHTML='<strong>标注属性</strong><p class="hint">点击文字、箭头、圆圈或 t / Mode 标签进行微调。</p>';return;}
     const offset=n?(n.offset || noteOffset(n)):(cfg.label_offsets?.[selLabel] || [0,0]);
-    const field=(id,title,value,lo,hi)=>`<label>${title}<input id="${id}" type="number" step="any" min="${lo}" max="${hi}" value="${value}"></label>`;
-    host.innerHTML=`<strong>${n?{text:'文字',arrow:'箭头',dot:'关键点',dimension:'区间尺寸线'}[n.kind]:esc(selLabel)}属性</strong>
-      ${n?`<label class="wave-note-text">文字（英文或 $数学$）<textarea id="wavePropText" rows="2" maxlength="120">${esc(n.text || '')}</textarea></label>
+    const field=(id,title,value,lo,hi)=>`<label>${title}<input id="${id}" aria-describedby="hint-waveOffsets" type="number" step="any" min="${lo}" max="${hi}" value="${value}"></label>`;
+    host.innerHTML=`<div class="help-row"><strong>${n?{text:'文字',arrow:'箭头',dot:'关键点',dimension:'区间尺寸线'}[n.kind]:esc(selLabel)}属性</strong>${editorHint("waveOffsets")}</div>
+      ${n?`<label class="wave-note-text">文字（中英文或 $数学$）<textarea id="wavePropText" rows="2" maxlength="120">${esc(n.text || '')}</textarea></label>
       <div class="wave-prop-grid"><label>颜色<input id="wavePropColor" type="color" value="${ink_css(n.color)}"></label>
       ${field('wavePropFont','字号 / pt',n.font_pt || p.font_pt,...p.note_limits.font_pt)}
       ${n.kind!=='text'?field('wavePropLine','线宽 / pt',n.line_pt || p.line_pt*(['arrow','dimension'].includes(n.kind)?p.arrow_weight:1),...p.note_limits.line_pt):''}
@@ -402,7 +423,7 @@
   }
   function draw(candidate=layout?.waveform, svg=$("waveChart")) {
     svg.replaceChildren();
-    $("waveNoteDelete").disabled=selNote===null;
+    $("waveNoteDelete").disabled=selNote===null && !artwork.current();
     if(!info || !candidate) {svg.setAttribute("viewBox","0 0 800 200");el("text",{x:30,y:80,fill:"#6b6b70"},svg).textContent="导入 CSV，查看波形并标注模态区间";return;}
     const p=info.paper, width=p.total_width_cm*CM, height=p.total_height_cm*CM;
     const left=p.left_cm*CM, right=left+p.width_cm*CM, top=p.top_cm*CM;
@@ -426,17 +447,18 @@
       const y0=top+row.offset_cm*CM, [lo,hi]=channel.axis.range;
       const y=v=>y0+rowHeight-(v-lo)/(hi-lo)*rowHeight;
       const axisRow={y0,lo,hi,y};channels.forEach(c=>rows[c.column]=axisRow);
+      if(p.plot_style?.font) el('rect',{x:left,y:y0,width:right-left,height:rowHeight,fill:p.background,'pointer-events':'none','data-plot-tint':i},svg);
       row.legend.forEach(key=> {
         const lx=left+key.at[0]*CM, ly=y0+rowHeight-key.at[1]*CM;
-        el('line',{x1:lx,y1:ly,x2:lx+p.legend_line_cm*CM,y2:ly,stroke:key.color,'stroke-width':p.line_pt*p.pt_cm*CM},svg);
+        el('line',{x1:lx,y1:ly,x2:lx+p.legend_line_cm*CM,y2:ly,stroke:key.color,'stroke-width':p.line_pt*p.pt_cm*CM,...artwork.dash(key.line,p)},svg);
         textAt(svg,lx+(p.legend_line_cm+p.legend_gap_cm)*CM,ly,'west',key.text,{'data-legend':true,'pointer-events':'none'});
       });
       if((candidate.slice_style || 'shade')==='shade') candidate.intervals.forEach((name,j)=> {
-        if(j%2===0) el("rect",{x:x(candidate.boundaries[j]),y:y0,width:x(candidate.boundaries[j+1])-x(candidate.boundaries[j]),height:rowHeight,
-          fill:"#ededed","pointer-events":"none"},svg);
+        if(j%2===0 && (!p.plot_style?.font || name!==null)) el("rect",{x:x(candidate.boundaries[j]),y:y0,width:x(candidate.boundaries[j+1])-x(candidate.boundaries[j]),height:rowHeight,
+          fill:p.plot_style?.font?"black":"#ededed","fill-opacity":p.plot_style?.font ? 0.07 : 1,"pointer-events":"none"},svg);
       });
+      artwork.drawGrid(svg,p,left,y0,right-left,rowHeight,times.map(t=>x(t*factor+origin)),channel.axis.ticks.map(y));
       channel.axis.ticks.forEach((value,k)=> {
-        el("line",{x1:left,y1:y(value),x2:right,y2:y(value),stroke:"#e4e4e4","stroke-width":.25*p.pt_cm*CM,"pointer-events":"none"},svg);
         textAt(svg,left-.1*CM,y(value),'east',channel.axis.labels[k],{"pointer-events":"none"});
       });
       const labelX=left-1.05*CM, labelY=y0+rowHeight/2;
@@ -446,7 +468,7 @@
       el("rect",{x:left,y:y0,width:right-left,height:rowHeight},clip);
       channels.forEach(c=> {
         const d=c.points.map(([t,v],j)=>`${j?'L':'M'}${x(t).toFixed(5)},${y(v).toFixed(5)}`).join(' ');
-        el("path",{d,fill:"none",stroke:c.color,"stroke-width":p.line_pt*p.pt_cm*CM,"stroke-linejoin":"round","clip-path":`url(#${clipId})`,"pointer-events":"none",'data-channel':c.column},svg);
+        el("path",{d,fill:"none",stroke:c.color,"stroke-width":p.line_pt*p.pt_cm*CM,...artwork.dash(c.line,p),"stroke-linejoin":"round","clip-path":`url(#${clipId})`,"pointer-events":"none",'data-channel':c.column},svg);
       });
       el("path",{d:`M${left},${y0} V${y0+rowHeight} H${right}`,fill:"none",stroke:"#111","stroke-width":.35*p.pt_cm*CM,"pointer-events":"none"},svg);
       times.forEach(t=> {
@@ -469,6 +491,7 @@
       el("title",{},t).textContent="拖动或方向键移开标签（分界线不动）";
     }
     drawNotes(svg,candidate,x);
+    artwork.draw(svg,candidate,box);
     if(gesture?.draft) el("line",{x1:gesture.px[0],y1:gesture.px[1],x2:gesture.now[0],y2:gesture.draft==='dimension'?gesture.px[1]:gesture.now[1],stroke:"#2457d6","stroke-dasharray":"3 3","pointer-events":"none"},svg);
     textAt(svg,(left+right)/2,box.bottom+.42*CM,'north',`Time ${candidate.relative_time?'t − t₀ ':''}[${candidate.display_unit==='us'?'μs':candidate.display_unit}]`);
     // Like TeX's minimum bounding box, include notes dragged into a margin.
@@ -556,6 +579,7 @@
     return {channel:name,point:[Number(t.toPrecision(12)),Number(v.toPrecision(6))]};
   }
   function setTool(kind) {
+    artwork.reset();
     selNote=null;selLabel=null;properties();
     tool=tool===kind?null:kind;
     ["text","arrow","dot","dimension"].forEach(k=>$(`waveNote_${k}`).classList.toggle("on",tool===k));
@@ -569,7 +593,7 @@
   }
   function editNote(i) {
     const candidate=clone(layout.waveform), n=candidate.notes[i];
-    const text=cdI18n.prompt("标注文字（英文或 $数学$，如 $i_L$ peak；留空删除文字）",n.text || "");
+    const text=cdI18n.prompt("标注文字（中英文或 $数学$，如 $i_L$ peak；留空删除文字）",n.text || "");
     if(text===null) return;
     if(text.trim()) n.text=text.trim(); else if(n.kind==="text") return removeNote(i); else delete n.text;
     change(candidate);
@@ -583,7 +607,7 @@
   $("waveNote_arrow").onclick=()=>setTool("arrow");
   $("waveNote_dot").onclick=()=>setTool("dot");
   $("waveNote_dimension").onclick=()=>setTool("dimension");
-  $("waveNoteDelete").onclick=()=>{if(selNote!==null) removeNote(selNote);};
+  $("waveNoteDelete").onclick=()=>{if(selNote!==null) removeNote(selNote); else artwork.remove();};
   $("waveChart").ondblclick=ev=> {
     const g=ev.target.closest("[data-note]");
     if(g) editNote(Number(g.dataset.note));
@@ -591,6 +615,7 @@
   panel.addEventListener("keydown",ev=> {
     if(/INPUT|SELECT|TEXTAREA/.test(ev.target.tagName) || ev.target.isContentEditable) return;
     if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z') {ev.preventDefault();undo();return;}
+    if(artwork.key(ev)) return;
     if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(ev.key) && (selNote!==null || selLabel)) {
       ev.preventDefault();const key=ev.key, fast=ev.shiftKey;
       nudges=nudges.then(()=>nudge(key,fast)).catch(e=>note(e.message,true));return;
@@ -600,6 +625,8 @@
   });
   $("waveChart").onpointerdown=ev=> {
     if(!info || ev.button!==0) return;
+    if(!tool && artwork.down(ev)) return;
+    artwork.deselect();
     const svg=$("waveChart"), p=svgPoint(ev), cfg=clone(layout.waveform);
     const base={px:p,now:p,x:ev.clientX,cfg,viewport:{box:svg.getAttribute('viewBox'),width:svg.style.width,ratio:svg.style.aspectRatio}};
     ev.currentTarget.setPointerCapture(ev.pointerId);
@@ -622,6 +649,7 @@
     draw();properties();
   };
   $("waveChart").onpointermove=ev=> {
+    if(artwork.move(ev)) return;
     if(!gesture) return;
     const g=gesture, p=svgPoint(ev); g.now=p;
     const dx=p[0]-g.px[0], dy=p[1]-g.px[1];
@@ -667,6 +695,7 @@
     }
   };
   $("waveChart").onpointerup=ev=> {
+    if(artwork.up(ev)) return;
     if(!gesture) return;
     const g=gesture;gesture=null;
     const moved=Math.hypot(g.now[0]-g.px[0],g.now[1]-g.px[1])>1e-6;
@@ -675,15 +704,15 @@
       if(g.draft==="dimension") {
         const b=dataAt(g.now,a.channel).point;
         if(a.point[0]===b[0]) {note("区间尺寸线需要不同的起止时间。",true);draw();return;}
-        const text=cdI18n.prompt("区间文字（英文或 $数学$，如 $D T_s$）","$\\Delta t$");
+        const text=cdI18n.prompt("区间文字（中英文或 $数学$，如 $D T_s$）","$\\Delta t$");
         if(text===null) {draw();return;}
         addNote({kind:'dimension',channel:a.channel,from:a.point,to:[b[0],a.point[1]],...(text.trim()?{text:text.trim()}:{})});
       } else if(g.draft==="arrow") {
         if(!moved) {note("箭头需要拖出一段：按住箭尾，拖到要指的点再松开。",true);draw();return;}
-        const text=cdI18n.prompt("箭尾文字（可留空；英文或 $数学$）","");
+        const text=cdI18n.prompt("箭尾文字（可留空；中英文或 $数学$）","");
         addNote({kind:"arrow",channel:a.channel,from:a.point,to:dataAt(g.now,a.channel).point,...(text?.trim()?{text:text.trim()}:{})});
       } else {
-        const text=cdI18n.prompt(g.draft==="text"?"标注文字（英文或 $数学$，如 $i_L$ peak）":"关键点文字（可留空，如 $I_{L,\\max}$）","");
+        const text=cdI18n.prompt(g.draft==="text"?"标注文字（中英文或 $数学$，如 $i_L$ peak）":"关键点文字（可留空，如 $I_{L,\\max}$）","");
         if(text===null || (g.draft==="text" && !text.trim())) {draw();return;}
         addNote({kind:g.draft,channel:a.channel,at:a.point,...(text.trim()?{text:text.trim()}:{})});
       }
@@ -714,11 +743,11 @@
       role:'img','aria-label':'XY trajectory',style:'display:block;width:100%;height:42vh;background:white;font-family:Times New Roman,serif'},host);
     const line=(a,b,color,width=p.line_pt)=>{const [x1,y1]=at(a),[x2,y2]=at(b);return el('line',{x1,y1,x2,y2,stroke:color,'stroke-width':width*p.pt_cm*CM},svg);};
     const label=(q,anchor,text,attrs={})=>textAt(svg,...at(q),anchor,text,{'font-size':p.font_pt*p.pt_cm*CM,...attrs});
+    const positions=view.axes.map((axis,i)=>axis.ticks.map(v=>(v-axis.range[0])/(axis.range[1]-axis.range[0])*(i?h:w)));
+    artwork.drawGrid(svg,p,p.left_cm*CM,p.top_cm*CM,w*CM,h*CM,
+      positions[0].map(x=>at([x,0])[0]),positions[1].map(y=>at([0,y])[1]));
     view.axes.forEach((axis,i)=> {
-      const [lo,hi]=axis.range, span=i?h:w;
-      axis.ticks.forEach((v,j)=> {
-        const pos=(v-lo)/(hi-lo)*span;
-        line(i?[0,pos]:[pos,0],i?[w,pos]:[pos,h],'#e4e4e4',.25);
+      positions[i].forEach((pos,j)=> {
         label(i?[-.1,pos]:[pos,-.04],i?'east':'north',axis.labels[j]);
       });
       if(i) {const [x,y]=at([-1.05,h/2]);el('text',{x,y,transform:`rotate(-90 ${x} ${y})`,'text-anchor':'middle','dominant-baseline':'central','font-size':p.font_pt*p.pt_cm*CM},svg).textContent=plain(view.titles[i]);}
@@ -749,11 +778,13 @@
     if(!info) return;
     const original=JSON.stringify(layout), originalProfile=profile, originalTarget=previewTarget;
     const base=clone(layout.waveform), columns=info.columns.filter(c=>c!==base.time_column);
+    const grid=info.xy?.paper.grid || {horizontal:"solid",vertical:"solid",...base.grid};
     const xy=base.xy || {x:columns[0],y:columns[1] || columns[0]}, options=value=>columns.map(c=>`<option value="${esc(c)}" ${c===value?'selected':''}>${esc(c)}</option>`).join('');
     showDialog('XY / 状态平面',`<p>按同一时刻配对两个通道；箭头表示时间前进方向。时间范围和模态分界沿用波形面板。</p>
-      <div class="wave-row"><label>横轴通道 <select id="waveXYX">${options(xy.x)}</select></label><label>纵轴通道 <select id="waveXYY">${options(xy.y)}</select></label></div>
-      <div class="wave-row"><label><input id="waveXYArrows" type="checkbox" ${xy.arrows!==false?'checked':''}> 显示轨迹方向</label>
-      <label><input id="waveXYModes" type="checkbox" ${xy.color_by_mode!==false?'checked':''}> 按已绑定模态着色</label></div>
+      <div class="wave-row"><label>横轴通道 <select id="waveXYX" aria-describedby="hint-waveXY">${options(xy.x)}</select></label><label>纵轴通道 <select id="waveXYY" aria-describedby="hint-waveXY">${options(xy.y)}</select></label></div>
+      <div class="wave-row"><label><input id="waveXYArrows" aria-describedby="hint-waveXY" type="checkbox" ${xy.arrows!==false?'checked':''}> 显示轨迹方向</label>
+      <label><input id="waveXYModes" aria-describedby="hint-waveXY" type="checkbox" ${xy.color_by_mode!==false?'checked':''}> 按已绑定模态着色</label>${editorHint("waveXY")}</div>
+      <div class="wave-row">${artwork.gridFields(grid,"hint-xyGrid")}${editorHint("waveGrid","hint-xyGrid")}</div>
       <p class="hint">起点为实心圆，终点为空心圆；未绑定区间显示灰色。此图展示数据轨迹，不自动判断稳定性。</p>
       <div id="waveXYPreview" style="max-height:48vh;overflow:auto;background:#eee;padding:10px"></div>
       <p id="waveXYState" role="status"></p><div class="wave-row"><button id="waveXYApply" class="primary">应用到当前图</button>
@@ -762,7 +793,11 @@
     const dialog=$('dlg'),host=$('waveXYPreview'),state=$('waveXYState');let serial=0;
     const current=()=>JSON.stringify(layout)===original && profile===originalProfile && previewTarget===originalTarget;
     const present=ticket=>dialog.open && host.isConnected && ticket===serial;
-    const candidate=()=>({...clone(base),xy:{x:$('waveXYX').value,y:$('waveXYY').value,arrows:$('waveXYArrows').checked,color_by_mode:$('waveXYModes').checked}});
+    const candidate=()=>{
+      const changed=artwork.gridChange(dialog,grid);
+      return {...clone(base),...(changed?{grid:changed}:{}),xy:{x:$('waveXYX').value,y:$('waveXYY').value,
+        arrows:$('waveXYArrows').checked,color_by_mode:$('waveXYModes').checked}};
+    };
     const fail=e=>{state.className='bad';state.textContent=e.message;};
     async function preview(cfg=candidate(),real=false) {
       const ticket=++serial;$('waveXYApply').disabled=true;$('waveXYExport').disabled=true;
@@ -779,6 +814,7 @@
       } catch(e) {if(present(ticket)) fail(e);return null;}
     }
     for(const id of ['waveXYX','waveXYY','waveXYArrows','waveXYModes']) $(id).onchange=()=>preview();
+    for(const select of dialog.querySelectorAll('[data-wave-grid-style]')) select.onchange=()=>preview();
     const apply=async(exportIt=false)=> {
       const r=await preview();if(!r) return;
       ++revision;installed(r);dialog.close();if(exportIt) $('waveExport').click();
@@ -800,10 +836,10 @@
   };
   $("waveExport").onclick=()=> {
     showDialog("导出波形与模态",`<p>独立波形图、用到的模态图各一份；勾选模态时另有带 t₀、t₁… 对应关系的总览。</p>
-      <div class="export-row"><label><input id="waveIncludeModes" type="checkbox" checked> 包含对应模态与总览</label></div>
+      <div class="export-row"><label><input id="waveIncludeModes" aria-describedby="hint-waveExport" type="checkbox" checked> 包含对应模态与总览</label>${editorHint("waveExport")}</div>
       ${layout.waveform.xy?'<div class="export-row"><label><input id="waveXYOnly" type="checkbox"> 仅导出 XY 图</label></div><p class="hint">已应用的 XY 图会另存一份；勾选后只输出 XY 图。</p>':''}
       <div class="export-row"><label><input id="waveShade" type="checkbox" ${(layout.waveform.slice_style || 'shade')==='shade'?'checked':''}> 波形按模态切片：区间交替灰底，上方标 Mode k</label></div>
-      <div class="export-row"><label>总览排版 <select id="waveArrange">${[["stack","竖排：波形下依次放各区间模态"],["side","并排：左波形、右模态（需双栏）"],["grid","上波形、下模态两列（双栏）"]].map(([v,t])=>`<option value="${v}" ${(layout.waveform.arrange || 'stack')===v?'selected':''}>${t}</option>`).join('')}</select></label></div>
+      <div class="export-row"><label>总览排版 <select id="waveArrange" aria-describedby="hint-waveExport">${[["stack","竖排：波形下依次放各区间模态"],["side","并排：左波形、右模态（需双栏）"],["grid","上波形、下模态两列（双栏）"]].map(([v,t])=>`<option value="${v}" ${(layout.waveform.arrange || 'stack')===v?'selected':''}>${t}</option>`).join('')}</select></label></div>
       <p class="hint">并排与两列排版时每个模态只画一次，图注列出它对应的全部区间；模态图按单栏宽度绘制，字号与波形一致。当前图幅：${/double|双栏/.test(profile)?'双栏':'单栏'}。</p>
       <div class="export-row">${['svg','png','pdf','tex'].map(f=>`<label><input type="checkbox" name="waveFormat" value="${f}" ${f==='svg'?'checked':''}> ${f==='tex'?'TeX 源码（可选）':f.toUpperCase()}</label>`).join('')}</div>
       <p class="hint">Word 可选 SVG / PNG；LaTeX 可选 PDF。TeX 为可独立编译的源码。只生成勾选的格式，编译中间文件不放入输出目录。</p>

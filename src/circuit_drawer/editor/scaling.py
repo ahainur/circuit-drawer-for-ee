@@ -1,7 +1,7 @@
 """Prepare source geometry for a checked editor scaling transaction."""
 from copy import deepcopy
 
-from ..drawing_scale import transform
+from ..drawing_scale import scale_point, transform
 from ..geometry import FONT_RANGE, font_of
 from ..layout import DECORATION_SECTIONS, Layout
 from ..profiles import get_profile
@@ -168,6 +168,6 @@ def prepare(source, selection, factor, profile, *, text=False):
                 raw[key][i] = item
         raw["drawing_scale"] = list(before.scale)
         if assembly:
-            point = lambda p: [round(c+(v-c)*factor,4) for c,v in zip(anchor,p)]
+            point = lambda p: scale_point(p, anchor, factor)
             scale_modules(raw,assembly,before.scale,chosen,parts | set(ids),factor,point,prof,text)
     return {"layout":raw,"plan":plan,"anchor":anchor,"factor":factor,"all":all_objects,"before_nets":before.nets}

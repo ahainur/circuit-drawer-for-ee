@@ -94,9 +94,9 @@
       `<div class="figure-export-checks"></div>
       <div class="figure-export-previews"><figure><figcaption>${tr('彩色')}</figcaption><img data-color alt="${tr('彩色预览')}"></figure>
         <figure><figcaption>${tr('黑白打印')}</figcaption><img data-mono alt="${tr('黑白打印预览')}"></figure></div>
-      <fieldset><legend>${tr('导出设置')}</legend><label>${tr('目标文件夹')} <input data-field="folder" value="${esc(pref.out_dir || 'figures')}"></label>
+      <fieldset><legend>${tr('导出设置')} ${editorHint("figureExport")}</legend><label>${tr('目标文件夹')} <input data-field="folder" value="${esc(pref.out_dir || 'figures')}"></label>
       <div>${['pdf', 'svg', 'png', 'tex'].map((format) => `<label><input type="checkbox" data-format="${format}" ${formats.includes(format) ? 'checked' : ''}> ${format.toUpperCase()}</label>`).join(' ')}</div>
-      <label>PNG DPI <input data-field="dpi" type="number" min="72" max="2400" step="1" value="${pref.png_dpi || 600}"></label>
+      <label>PNG DPI <input data-field="dpi" aria-describedby="hint-figureExport" type="number" min="72" max="2400" step="1" value="${pref.png_dpi || 600}"></label>
       <label><input data-field="remember" type="checkbox" checked> ${tr('导出成功后记住')}</label></fieldset>
       <footer>${button('inspect', '重新检查')}${button('fix-export', '修正后导出')}${button('export', '导出')}${button('close', '取消')}</footer>`,
     );
@@ -199,12 +199,12 @@
       `<div class="figure-compose-grid"><aside>
       <label>${tr('已有组合')} <select data-field="saved"><option value="">${tr('新建组合')}</option>${saved.map((c) => `<option value="${esc(c.id)}" ${c.id === composition.id ? 'selected' : ''}>${esc(c.id)}</option>`).join('')}</select></label>
       <label>${tr('名称')} <input data-field="id" value="${esc(composition.id)}" maxlength="80"></label>
-      <label>${tr('版式')} <select data-field="preset"><option value="vertical">${tr('上下')}</option><option value="horizontal">${tr('左右')}</option><option value="main_plus_two">${tr('主图与两小图')}</option><option value="grid_two">${tr('两列网格')}</option><option value="grid_three">${tr('三列网格')}</option></select></label>
+      <label>${tr('版式')} <select data-field="preset" aria-describedby="hint-figureComposition"><option value="vertical">${tr('上下')}</option><option value="horizontal">${tr('左右')}</option><option value="main_plus_two">${tr('主图与两小图')}</option><option value="grid_two">${tr('两列网格')}</option><option value="grid_three">${tr('三列网格')}</option></select></label>
       <label>${tr('对齐')} <select data-field="align"><option value="width">${tr('同排等宽')}</option><option value="height">${tr('同排等高')}</option></select></label>
       <label>${tr('间距')} mm <input data-field="gap" type="number" min="0" max="30" step="0.5"></label>
       <label>${tr('图注位置')} <select data-field="caption"><option value="below">${tr('下方')}</option><option value="above">${tr('上方')}</option></select></label>
       <label>${tr('图注字号')} pt <input data-field="font" type="number" min="5" max="24" step="0.5"></label>
-      <div data-panels></div>${button('add', '添加子图')}</aside>
+      <div data-panels></div>${button('add', '添加子图')} ${editorHint("figureComposition")}</aside>
       <section class="figure-composition-paper"><img data-preview alt="${tr('组合图预览')}" hidden><p data-sources></p></section></div>
       <footer>${button('preview', '预览组合')}${button('save', '保存组合')}${button('compose-export', '导出检查')}${button('close', '返回图纸')}</footer>`,
     );

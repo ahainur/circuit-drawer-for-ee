@@ -190,7 +190,8 @@ def _content(raw, profile, path, panel, mono, *, waveform_width=None):
             from .geometry import has_wide
             cjk = any(has_wide(item.get("label", item.get("text", "")))
                       for item in cfg["channels"] + cfg.get("notes", []))
-            tex = preamble(get_profile(profile), cjk) + wave_tex(data, cfg, profile, [m["name"] for m in lay.modes], width_cm=waveform_width)
+            tex = preamble(get_profile(profile), cjk) + wave_tex(data, cfg, profile, [m["name"] for m in lay.modes],
+                                                               width_cm=waveform_width, base_dir=path.parent, mono=mono)
             tex += ("\n\\end{CJK}" if cjk else "") + "\n\\end{document}\n"
             dimensions = paper(cfg, profile, target="standalone", names=[m["name"] for m in lay.modes], width_cm=waveform_width)
             return tex, [dimensions["total_width_cm"], dimensions["total_height_cm"]]

@@ -679,7 +679,7 @@ class CircuitWorkflow:
             lay.extra["electrical"] = deepcopy(carried["electrical"])
             lay.extra["electrical"] = synchronize(lay, prof.name)
         rep = check(lay, prof)
-        if "modules" in lay.extra and rep.errors:
+        if "modules" in lay.extra and rep.ok:
             lay, rep, fixes = nudge_module_port_labels(lay, prof, rep, should_stop)
         errors = [f"{i.code}: {i.message}" for i in rep.errors] + _missing_netlist(lay)
         double = get_profile("ieee-double")

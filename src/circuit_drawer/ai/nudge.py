@@ -26,21 +26,24 @@ _SHORT = re.compile(r"^(\S+): pin distance .* by at least ([\d.]+) units")
 # At most eight four-sided labels per model reply. Large drawings can still
 # report the other conflicts for the next correction round.
 PORT_LABEL_TRIALS = 32
-_LABEL_ERRORS = {"text-on-line", "text-on-symbol", "text-overlap"}
+_LABEL_COLLISIONS = {"text-on-line", "text-on-symbol", "text-overlap"}
 _OWNER = re.compile(r"label of ([A-Za-z][A-Za-z0-9_/-]*)(?=\s|（|$)")
 _DEFINITION = re.compile(r"^模块定义 ([A-Za-z][A-Za-z0-9_-]*)：")
 
 
 def nudge_module_port_labels(layout, prof, report, should_stop):
-    """Try only the printed side of public ports named by a label error."""
+    """Prefer a legible side for generated public ports when the drawing permits it."""
     spec = layout.extra["modules"]
     notes = []
     trials = 0
-    while report.errors and all(issue.code in _LABEL_ERRORS for issue in report.errors):
+    while report.ok:
+        collisions = [i for i in report.issues if i.code in _LABEL_COLLISIONS]
+        if not collisions:
+            break
         definitions = spec.get("definitions", {})
         instances = {inst["id"]: inst["definition"] for inst in spec["instances"]}
         targets = set()
-        for issue in report.errors:
+        for issue in collisions:
             definition = _DEFINITION.match(issue.message)
             for ref in _OWNER.findall(issue.message):
                 instance, sep, port = ref.partition("/")
@@ -48,7 +51,7 @@ def nudge_module_port_labels(layout, prof, report, should_stop):
                     targets.add((instances[instance], port))
                 elif definition and not sep:
                     targets.add((definition[1], ref))
-        errors = set(map(str, report.errors))
+        previous = set(map(str, collisions))
         for name, port in sorted(targets):
             definition = definitions.get(name, {})
             if port + ".p" not in definition.get("ports", {}).values():
@@ -64,7 +67,7 @@ def nudge_module_port_labels(layout, prof, report, should_stop):
                 trial.extra["modules"]["definitions"][name]["layout"]["elements"][index]["label_pos"] = side
                 trials += 1
                 after = check(trial, prof)
-                if set(map(str, after.errors)) < errors:
+                if after.ok and {str(i) for i in after.issues if i.code in _LABEL_COLLISIONS} < previous:
                     layout, report, spec = trial, after, trial.extra["modules"]
                     notes.append(f"{name}/{port}: label_pos → {side}")
                     break
@@ -141,3 +144,73 @@ def nudge(layout: Layout, prof: Profile) -> tuple[Layout, list[str]]:
         lay = best[0]
         notes.append(best[2])
     return lay, notes
+
+
+def fit_candidate_labels(source, prof):
+    """Offer a checked paper variant. Only label positions on flat source elements may change."""
+    from ..geometry import footprint
+    if source.get("modules"):
+        return None
+    lay = Layout.from_dict(source)
+    report = check(lay, prof)
+    best = copy.deepcopy(source)
+
+    def conflicts(result):
+        return [i for i in result.issues if i.level == "error" or i.code in _LABEL_COLLISIONS]
+
+    # Limit interactive work to three labels and two lines of additional clearance per label.
+    budget = 96
+    for _ in range(3):
+        issues = conflicts(report)
+        if not issues:
+            return best
+        if any(i.code not in _LABEL_COLLISIONS | {"too-short", "too-cramped", "winding-gap"} for i in issues):
+            return None
+        owners = list(dict.fromkeys(ref for i in issues for ref in _OWNER.findall(i.message)))
+        # A label outside the pin envelope can squeeze an entirely different component.
+        xs = [p[0] * report.scale.x for e in lay.elements for p in e.pins.values()]
+        if not xs:
+            return None
+        edges = []
+        for e in lay.elements:
+            if not e.label:
+                continue
+            for box in footprint(e, report.scale, prof).labels:
+                edges.append((max(min(xs)-box.x0, box.x1-max(xs)), e.id))
+        owners.extend(ref for margin, ref in sorted(edges, reverse=True) if margin > 0 and ref not in owners)
+
+        def score(r):
+            return ("labels" not in r.checked_stages, len(r.errors), len(conflicts(r)), -round(r.scale.x, 4))
+
+        best_score, winner = score(report), None
+        for ref in owners:
+            for side, direction in (("below", (0,-1)), ("above", (0,1)), ("left", (-1,0)), ("right", (1,0))):
+                for lines in (0, 1, 2):
+                    if not budget:
+                        break
+                    trial = copy.deepcopy(best)
+                    part = next((e for e in trial["elements"] if e["id"] == ref), None)
+                    if not part:
+                        break
+                    opts = part.setdefault("opts", {})
+                    part["label_pos"] = side
+                    opts.pop("label_offset", None)
+                    if lines:
+                        height = float(opts.get("label_size", prof.font_pt)) * 2.54 / 72.27
+                        opts["label_offset"] = [round(lines * d * height / scale, 3) for d,scale
+                                                in zip(direction, (report.scale.x, report.scale.y))]
+                    if not opts:
+                        part.pop("opts", None)
+                    budget -= 1
+                    candidate = Layout.from_dict(trial)
+                    tested = check(candidate, prof)
+                    if not conflicts(tested):
+                        return trial
+                    if score(tested) < best_score:
+                        winner, best_score = (trial, candidate, tested), score(tested)
+            if winner:
+                break
+        if not winner:
+            return None
+        best, lay, report = winner
+    return best if report.ok else None

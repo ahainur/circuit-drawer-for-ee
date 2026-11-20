@@ -296,7 +296,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "editor.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/theme-eda.css", "/ai-settings.js", "/reference-images.js", "/digital-control.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/menu.js", "/menu.css", "/hints.css", "/hints.js", "/theme-eda.css", "/ai-settings.js", "/reference-images.js", "/digital-control.js"):
                     self._send(200, (MENU_STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js") else "text/css; charset=utf-8")
                 elif self.path == "/api/state":

@@ -358,6 +358,10 @@ distinct times and equal values; it is a horizontal time span, not a mode bounda
 Preserve optional waveform.xy with x/y (CSV value-column names), arrows and
 color_by_mode (booleans, default true). It pairs values at the same time within
 the existing window, not independent samples or an inferred stability result.
+Keep waveform.insets, waveform.plot_style, waveform.grid and channels[].line unchanged on drawing edits.
+For an unframed waveform inset, set "border":false on that inset. Its background remains independently selectable.
+The waveform editor captures topology PDF snapshots and places chart legends, system symbols
+and personal image assets. Never fabricate a source hash or a sampled probe value.
 XY figures are configured with the waveform panel's "XY / 状态平面…" button;
 time-domain notes are not copied onto the XY plot. Omitting xy disables that plot.
 A request for a note on the waveform chart is
@@ -508,8 +512,8 @@ Element kinds and pins:
 Switch labels default to the diode side and follow rotation/mirroring (right
 of an upright unmirrored device). Explicit label_pos selects a page direction
 above/below/left/right; along the pin axis the label uses the corner on the
-diode side to avoid its own lead. For label collisions first change label_pos,
-leaving pins and wires unchanged; do not move a device just to move its text.
+diode side to avoid its own lead. Label collisions are optional paper advice.
+If asked to improve readability, change label_pos and preserve pins and wires.
 Only when the user requests a label position adjustment, use opts.label_offset=[dx,dy]
 relative to its normal label_pos anchor, in layout units (right/up positive).
 Example: "opts":{"label_offset":[0.3,0.2]}. Keep pins and wires unchanged.
@@ -560,6 +564,11 @@ for _token, _values in {"LABEL_POS": schema.LABEL_POS.accepted(),
     _FORMAT = _FORMAT.replace(f"@{_token}@", _values)
 
 _RULES = """\
+Plan for the requested paper width. For a cascaded converter, group stages and fold them into rows
+when needed. Leave the resonant branch and output rectifier space for labels and short return wires.
+When moving a label, try blank space inside the pin envelope first. Widening that envelope changes
+the printed scale of every part. Recheck the complete drawing and preserve unrelated connections.
+
 # Hard rules (enforced by the validator; any error rejects the whole table)
 An ellipsis display group needs at least three distinct existing instances,
 non-overlapping group membership and space between its first and last frames.
@@ -628,8 +637,8 @@ full electrical circuit determines the path; display changes only its projection
 5. A wire that crosses another one without connecting must list the crossing
    point in "hops", and the point must lie on a horizontal wire.
    Undeclared crossings are rejected.  Prefer routes with no crossing at all.
-6. Bodies keep 0.06 cm apart.  Labels, ratios and annotation text may not sit
-   on a symbol, on a line, or on other text.
+6. Bodies keep 0.06 cm apart. Prefer clear space for labels, ratios and
+   annotations. Text touching a symbol, wire or other text is print advice.
 7. The netlist is compared pairwise with the connectivity derived from the
    geometry; anything connected that should not be (or vice versa) is rejected.
    Use the same net name for every pin that is electrically the same node.
@@ -1166,7 +1175,7 @@ def wave_notes_system_prompt() -> str:
         'tail_offset is forbidden. The program draws a horizontal double-ended time-span dimension '
         'at the point value; use offset for its label. Shared-axis channels keep their original values and units. '
         f'Offsets must be finite and within +/-{MAX_OFFSET_CM:g} cm. '
-        'Labels use English or mathematical notation with paired $ delimiters, at most '
+        'Labels use the requested language (Chinese or English) or maths with paired $ delimiters, at most '
         '120 characters. A text note needs non-empty text. Use kind=arrow for arrows. '
         'Example {"notes":[{"point":"c1_s1_peak","kind":"dot","text":"$I_{L,\\\\max}$"},'
         '{"point":"c1_s1_rise","kind":"arrow","tail":"c1_s1_rise_start","text":"$V_{in}/L$"}]}.'
@@ -1192,6 +1201,7 @@ def tweak_message(instruction: str, table: dict, errors: list[str] | None = None
             "- Keep every element id, pin coordinate, label, wire, hop and annotation the "
             "change does not need to touch exactly as it is; do not tidy or re-space the rest.\n"
             "- Preserve region/block corner_radius and shadow unless the requested edit changes their appearance. Saved figure paper settings and composition provenance are carried over.\n"
+            "- Waveform paper settings (plot_style, grid, insets, curve line styles) and captured assets belong to the waveform editor and are carried over.\n"
             "- If a validator repair conflicts with an explicit preservation requirement, explain the conflict in 改动说明 and propose the adjustment for review; do not claim all requirements were met. The editor waits for the user's confirmation before adopting the candidate.\n"
             "- When you move a part, move the wire vertices on its pins with it and keep "
             "the wires orthogonal; when you add or remove a part, update the netlist.\n"
@@ -1239,6 +1249,7 @@ def regression_message(report_lines: list[str], best_lines: list[str],
 
 # how to fix each kind of problem, sent along with the report
 HINTS = {
+    "bad-waveform-inset": "Keep the source asset reference, existing CSV channel and unique inset id. Place it with at coordinates in [0,1]; use the waveform panel to capture or refresh a topology. Grid directions horizontal and vertical each accept none, solid or dashed.",
     "bad-image": "Keep a unique image id, finite increasing from/to rectangle, positive integer pixel_size, foreground boolean, and the actual imported figure-assets/<sha256>.png source/mono_source. Restore existing paths and dimensions from the source; import new artwork through the workspace.",
     "bad-figure": "Use finite figure font_pt 5..24, line_pt 0.1..3 and margin_mm 0..20. Preserve saved compositions, subfigure waveform snapshots (CSV hash, channels and notes), source signatures and grid_two/grid_three arrangements. Rectangular corner_radius is 0..1 cm, shadow and inner_shadow are booleans, border_width is 0.1..3 pt and font_weight is normal or bold.",
     "bad-drawing-scale": "drawing_scale needs two finite positive cm-per-layout-unit values within the declared range; omit the field to restore automatic fitting.",
@@ -1283,15 +1294,16 @@ HINTS = {
     "text-on-block": "Move the named text out of the block; text belonging in the box is the block's own text.",
     "isolation-on-label": "Move isolation or label_at so the isolation mark and the inline label are apart.",
     "bad-glyph": f"Each glyphs entry needs kind ({', '.join(GLYPH_KINDS)}) and from/to corners of a non-empty box; put the mark inside its block.",
+    "winding-wide": "This is optional print-spacing advice. Preserve all winding pins, wiring and electrical settings unless the user asks to move them.",
+    "short-lead-margin": "Optional print advice below half a line width. Preserve the circuit.",
     "too-short": "move one pin outward along the part's axis by the stated amount and "
                  "move the wire vertex on that pin with it",
-    "text-on-symbol": "change label_pos (left/right/above/below) to the free side, or "
-                      "move the parts further apart (vertical loads side by side need "
-                      "about 0.9 units between axes when labels sit between them)",
-    "text-on-line": "change label_pos to the side away from that wire, or move the wire",
+    "text-on-symbol": "Optional print advice. Keep the label or move it to a free side with label_pos.",
+    "text-on-line": "Optional print advice. Keep the label or change its side without moving the wire.",
     "callout-overlap-allowed": "user explicitly allowed this block arrow to cover parts/text; preserve over_parts unless asked to remove that permission",
     "transparency-export": "PDF preserves translucent fill; inspect flattening when converting to EPS or a print workflow",
-    "text-overlap": "move one of the two labels to another side",
+    "text-clearance": "Optional paper spacing. The label can stay where it is.",
+    "text-overlap": "Optional print advice. Keep the labels or move one to another side.",
     "line-through-body": "a wire crosses a symbol body: move the named wire segment "
                          "outside the body's extent, preserving its endpoints and net. "
                          "If a recent device move caused this, undo that move; a hop "

@@ -85,8 +85,8 @@ def safe_items(raw):
         return []
 
 
-def read(source, base_dir):
-    match = SOURCE.fullmatch(source) if isinstance(source, str) else None
+def read_asset(source, base_dir, pattern):
+    match = pattern.fullmatch(source) if isinstance(source, str) else None
     if not match or base_dir is None:
         raise ValueError("图片需要与JSON同目录的figure-assets文件夹")
     root = Path(base_dir).resolve()
@@ -98,15 +98,22 @@ def read(source, base_dir):
     data = path.read_bytes()
     if hashlib.sha256(data).hexdigest() != match[1]:
         raise ValueError("图片文件已改变，请重新导入")
+    return data
+
+
+def read(source, base_dir):
+    data = read_asset(source, base_dir, SOURCE)
     png_size(data)
     return data
 
 
-def _write(data, folder):
+def write_asset(data, folder, suffix=".png"):
+    if len(data) > MAX_BYTES:
+        raise ValueError("素材超过16 MiB")
     identifier = hashlib.sha256(data).hexdigest()
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / (identifier + ".png")
+    path = folder / (identifier + suffix)
     with tempfile.NamedTemporaryFile(dir=folder, suffix=".tmp", delete=False) as stream:
         temporary = Path(stream.name)
         stream.write(data)
@@ -114,7 +121,7 @@ def _write(data, folder):
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
-    return f"figure-assets/{identifier}.png"
+    return f"figure-assets/{identifier}{suffix}"
 
 
 def library_dir():
@@ -155,11 +162,35 @@ def icon_preferences(update=None):
 
 
 def copy_assets(raw, source_dir, destination):
-    """Copy every referenced image before publishing a template or a new project."""
+    """Copy the project's artwork and managed CSV snapshots, including saved panels."""
     sources = {item[key] for item in items(raw) for key in ("source", "mono_source")}
-    data = [read(source, source_dir) for source in sources]
-    for content in data:
-        _write(content, Path(destination) / "figure-assets")
+    from .figure_style import settings
+    from .waveform_insets import PDF_SOURCE, validate as validate_insets
+    from .waveforms import WaveStore, store_csv_snapshot
+    configs = [raw["waveform"]] if isinstance(raw.get("waveform"), dict) else []
+    configs.extend(p["waveform"] for comp in settings(raw).get("compositions", [])
+                   for p in comp["subfigures"] if "waveform" in p and not p.get("source"))
+    for cfg in configs:
+        validate_insets(cfg)
+        for inset in cfg.get("insets", []):
+            sources.update(inset[k] for k in ("source", "mono_source") if k in inset)
+        name = cfg.get("source")
+        if isinstance(name, str) and re.fullmatch(r"waveforms-data/[\w.-]+\.csv", name):
+            if source_dir is None:
+                raise ValueError("复制波形需要图纸所在的目录")
+            original = (Path(source_dir) / name).resolve()
+            target = (Path(destination) / name).resolve()
+            if not original.is_relative_to(Path(source_dir).resolve()) or not target.is_relative_to(Path(destination).resolve()):
+                raise ValueError("波形快照超出工程目录")
+            if original != target:
+                data = WaveStore._bytes(original)
+                if hashlib.sha256(data).hexdigest() != cfg.get("sha256"):
+                    raise ValueError("波形 CSV 已变化，请重新载入")
+                store_csv_snapshot(target, data, cfg["sha256"])
+    assets = [(Path(s).suffix, read_asset(s, source_dir, PDF_SOURCE) if PDF_SOURCE.fullmatch(s) else read(s, source_dir))
+              for s in sources]
+    for suffix, content in assets:
+        write_asset(content, Path(destination) / "figure-assets", suffix)
 
 
 def import_image(req, base_dir):
@@ -176,13 +207,13 @@ def import_image(req, base_dir):
         raise ValueError("请填写1到120字的图片名称")
     destination = library_dir() if base_dir is None else Path(base_dir)
     asset = {"name": name, "pixel_size": list(size),
-             "source": _write(data, destination / "figure-assets"),
-             "mono_source": _write(mono, destination / "figure-assets")}
+             "source": write_asset(data, destination / "figure-assets"),
+             "mono_source": write_asset(mono, destination / "figure-assets")}
     if base_dir is None or req.get("remember"):
         folder = library_dir()
         if destination != folder:
-            _write(data, folder / "figure-assets")
-            _write(mono, folder / "figure-assets")
+            write_asset(data, folder / "figure-assets")
+            write_asset(mono, folder / "figure-assets")
         identifier = Path(asset["source"]).stem
         _write_json(folder / (identifier + ".json"), asset)
     return asset
@@ -206,7 +237,7 @@ def use_library(identifier, base_dir):
     asset = json.loads((folder / (identifier + ".json")).read_text(encoding="utf-8"))
     for key in ("source", "mono_source"):
         data = read(asset[key], folder)
-        _write(data, Path(base_dir) / "figure-assets")
+        write_asset(data, Path(base_dir) / "figure-assets")
     asset["preview"] = base64.b64encode(read(asset["source"], folder)).decode()
     return asset
 
@@ -222,23 +253,30 @@ def tex(raw, scale, base_dir, *, mono=False, foreground=True):
         if list(png_size(data)) != item["pixel_size"]:
             raise ValueError(f"{item['id']} 图片尺寸与记录不符")
         filename = "cd_image_" + Path(source).name
-        encoded = base64.b64encode(data).decode()
         # build() materializes these bytes beside the portable TeX and in its staging folder.
-        output.append(f"% CD_IMAGE_BEGIN {filename}\n")
-        output.extend("% " + encoded[i:i + 120] + "\n" for i in range(0, len(encoded), 120))
-        output.append("% CD_IMAGE_END\n")
+        output.append(pack_tex(filename, data))
         box = image_box(item, scale)
         output.append(rf"\node[anchor=south west,inner sep=0pt,outer sep=0pt] at ({box.x0/scale.x:g},{box.y0/scale.y:g}) "
                       rf"{{\includegraphics[width={box.x1-box.x0:g}cm,height={box.y1-box.y0:g}cm]{{{filename}}}}};" + "\n")
     return "".join(output)
 
 
+def pack_tex(filename, data):
+    encoded = base64.b64encode(data).decode()
+    return (f"% CD_IMAGE_BEGIN {filename}\n" +
+            "".join("% " + encoded[i:i + 120] + "\n" for i in range(0, len(encoded), 120)) +
+            "% CD_IMAGE_END\n")
+
+
 def unpack_tex(tex):
     assets = {}
-    pattern = re.compile(r"^% CD_IMAGE_BEGIN (cd_image_[a-f0-9]{64}\.png)\n((?:% [A-Za-z0-9+/=]+\n)+)% CD_IMAGE_END\n", re.M)
+    pattern = re.compile(r"^% CD_IMAGE_BEGIN (cd_image_[a-f0-9]{64}\.(?:png|pdf))\n((?:% [A-Za-z0-9+/=]+\n)+)% CD_IMAGE_END\n", re.M)
     def unpack(match):
         data = base64.b64decode("".join(line[2:] for line in match[2].splitlines()), validate=True)
-        png_size(data)
+        if match[1].endswith(".png"):
+            png_size(data)
+        elif len(data) > MAX_BYTES or not data.startswith(b"%PDF-"):
+            raise ValueError("拓扑 PDF 快照内容无效")
         if hashlib.sha256(data).hexdigest() != match[1][9:-4]:
             raise ValueError("图片导出内容校验失败")
         assets[match[1]] = data

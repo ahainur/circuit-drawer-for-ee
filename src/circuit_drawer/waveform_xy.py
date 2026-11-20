@@ -70,6 +70,7 @@ def direction(points):
 
 
 def preview(data, cfg, profile, names):
+    from .waveform_insets import grid_settings
     from .waveforms import (COLORS, ROW_CM, CHART_LEFT_CM, CHART_RIGHT_CM, PT_CM, LEGEND_LINE_CM, LEGEND_GAP_CM,
                             axis, axis_title, column_defaults, legend, mode_tags)
     if 'xy' not in cfg:
@@ -104,7 +105,7 @@ def preview(data, cfg, profile, names):
         titles.append(axis_title(channel))
     return {'points':points,'axes':axes,'titles':titles,'segments':segments,'legend':labels,
             'ends':[at(points[0]),at(points[-1])],
-            'paper':{'width_cm':width,'height_cm':height,'left_cm':CHART_LEFT_CM,'right_cm':CHART_RIGHT_CM,
+            'paper':{'width_cm':width,'height_cm':height,'grid':grid_settings(cfg,xy=True),'left_cm':CHART_LEFT_CM,'right_cm':CHART_RIGHT_CM,
                      'top_cm':legend_height+.2,'bottom_cm':1.15,
                      'font_pt':prof.font_pt,'line_pt':prof.line_pt,'pt_cm':PT_CM,
                      'legend_line_cm':LEGEND_LINE_CM,'legend_gap_cm':LEGEND_GAP_CM,
@@ -112,6 +113,7 @@ def preview(data, cfg, profile, names):
 
 
 def tex(data,cfg,profile,names):
+    from .waveform_insets import tex_grid
     from .waveforms import LEGEND_LINE_CM,LEGEND_GAP_CM
     view = preview(data,cfg,profile,names)
     if view is None:
@@ -119,12 +121,11 @@ def tex(data,cfg,profile,names):
     p = view['paper']; width,height = p['width_cm'],p['height_cm']; prof=get_profile(profile)
     out=[r'\begin{tikzpicture}[x=1cm,y=1cm]',
          rf'\path[use as bounding box] (-{p["left_cm"]:g},-{p["bottom_cm"]:g}) rectangle ({width+p["right_cm"]:g},{height+p["top_cm"]:g});']
+    positions = [[(v-axis['range'][0])/(axis['range'][1]-axis['range'][0])*span for v in axis['ticks']]
+                 for axis, span in zip(view['axes'], (width, height))]
+    out.extend(tex_grid(p['grid'], width, height, *positions))
     for i,(axis,title) in enumerate(zip(view['axes'],view['titles'])):
-        low,high=axis['range']; span=height if i else width
-        for value,label in zip(axis['ticks'],axis['labels']):
-            pos=(value-low)/(high-low)*span
-            a,b=((0,pos),(width,pos)) if i else ((pos,0),(pos,height))
-            out.append(rf'\draw[gray!25,line width=.25pt] ({a[0]:g},{a[1]:g}) -- ({b[0]:g},{b[1]:g});')
+        for pos,label in zip(positions[i],axis['labels']):
             anchor='east' if i else 'north'; x,y=(-.1,pos) if i else (pos,-.04)
             out.append(rf'\node[anchor={anchor}] at ({x:g},{y:g}) {{{label}}};')
         if i:

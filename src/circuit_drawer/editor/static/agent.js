@@ -20,7 +20,7 @@
   let lastDocument = '', draft = '', startFrom = 'current', busy = false, polling = false, requestQueue = Promise.resolve();
   let references, scopeId = '', scope = new Set();
   let nodes, params = {}, beforeAfter = 'overlay', previewKey = '', previewFrame, previewGeneration = 0, pendingAck = null;
-  let renderKey = '', actionsKey = '', resultKey = '', lastAnnouncement = '', focusNext = false;
+  let bannerKey='', renderKey = '', actionsKey = '', resultKey = '', lastAnnouncement = '', focusNext = false;
   let resultsTab = 'summary', waveRange = 'window';
   const allowed = name => !busy && (task?.allowed_actions || []).includes(name);
   const button = (action, primary = false, label = action) => `<button type="button" data-action="${escape(action)}" ${allowed(action) ? '' : 'disabled'} class="${primary ? 'primary' : ''}">${escape(t(label))}</button>`;
@@ -108,11 +108,24 @@
   }
   const sectionName = section => { const key = 'section.' + section, text = t(key); return text === key ? section : text; };
   function changeValue(c) {
+    if (c.section === 'netlist') {
+      const refs = new Set([...Object.keys(c.before||{}),...Object.keys(c.after||{})]);
+      const touched = [...refs].filter(k=>c.before?.[k]!==c.after?.[k]);
+      return escape(t('net_changes',touched.length))+'<div>'+touched.slice(0,6).map(k=>escape(k+' → '+(c.after?.[k] || '—'))).join(', ')+'</div>';
+    }
+    if (c.section === 'modes') {
+      const names = list=>(list||[]).map(v=>v.name||v.title).filter(Boolean).join(', ') || '—';
+      return escape(names(c.before))+' → '+escape(names(c.after));
+    }
+    if (c.before && c.after && [c.before,c.after].every(v=>typeof v==='object' && !Array.isArray(v))) {
+      const keys=[...new Set([...Object.keys(c.before),...Object.keys(c.after)])].filter(k=>canonical(c.before[k])!==canonical(c.after[k]));
+      return keys.slice(0,6).map(k=>escape(k+' · '+valueSummary(c.before[k])+' → '+valueSummary(c.after[k]))).join('<br>');
+    }
     if (c.object_id?.startsWith('closed_loop.inputs.') || c.object_id?.startsWith('closed_loop.outputs.')) {
       const binding = value => value == null ? tr('待填写') : typeof value === 'object' ? JSON.stringify(value) : String(value);
       return `<span class="change-value"><span class="before">${escape(binding(c.before))}</span> → ${escape(binding(c.after))}</span>`;
     }
-    const show = v => v != null && typeof v === 'object' && !Array.isArray(v) && !v.label && !v.name ? t('setting_changed') : valueSummary(v);
+    const show = v => v && typeof v === 'object' && !Array.isArray(v) && !v.label && !v.name ? Object.keys(v).slice(0,5).join(', ') || '—' : valueSummary(v);
     return `<span class="change-value">${c.before != null ? `<span class="before">${escape(show(c.before))}</span> → ` : `<span class="before">${escape(tr('待填写'))}</span> → `}${escape(show(c.after))}</span>`;
   }
   function controlSettings(change, path = [], before = change.before, after = change.after) {
@@ -152,6 +165,115 @@
     const raw = `<details class="raw" data-keep="raw-changes"><summary>${escape(t('raw_changes'))}</summary><pre class="log">${escape(compact(changes.map(c => ({kind:c.kind, object:c.label, before:c.before, after:c.after}))))}</pre></details>`;
     return drawing + table + raw;
   }
+
+  function issueText(issue) {
+    const message = issue.message || String(issue);
+    return typeof zh === 'function' && language() !== 'en' ? tr(zh(message)) : message;
+  }
+  function issueGroups(report) {
+    const issues = report.issues || [], open = new Map();
+    for (const item of issues) if (item.code === 'open-pin') open.set(item.message.split(' at (')[0], item);
+    const groups = [], grouped = new Set();
+    for (const item of issues) {
+      const pair = item.code === 'netlist-open' && /^net (.+?) is drawn in 2 separate pieces: ([^ ,|]+) \| ([^ ,|]+); join them with a wire$/.exec(item.message);
+      if (pair && open.has(pair[2]) && open.has(pair[3])) {
+        groups.push({item, text:t('join_pins',pair[2],pair[3],pair[1]), refs:[pair[2],pair[3]].map(s => s.slice(0,s.lastIndexOf('.')))});
+        [item,open.get(pair[2]),open.get(pair[3])].forEach(i => grouped.add(i));
+      }
+    }
+    for (const item of issues) if (!grouped.has(item)) groups.push({item, text:issueText(item)});
+    return groups;
+  }
+  function reportHTML(c) {
+    const r = c.validation, issues = r.issues;
+    const ids = (c.preview.elements || []).map(e => e.id);
+    const prior = c.comparison;
+    const missing = r.checked_stages && ['connections','labels'].filter(s => !r.checked_stages.includes(s));
+    const groups = issueGroups(r).map(({item, text, refs}) => {
+      const tokens = (item.message || '').match(/[\w/-]+/g) || [];
+      const buttons = (refs || ids.filter(id => tokens.includes(id))).map(id =>
+        `<button type="button" data-locate="${escape('element:'+id)}">${escape(t('locate_part',id))}</button>`).join('');
+      const hint = refs ? '' : {
+        'open-pin':'hint_wire', 'netlist-open':'hint_wire', 'text-on-line':'hint_label','text-on-symbol':'hint_label','text-overlap':'hint_label',
+        'too-short':'hint_pin','winding-gap':'hint_winding','body-overlap':'hint_space'
+      }[item.code];
+      return `<li class="review-${escape(item.level)}"><strong>${escape(t(item.level === 'error' ? 'must_fix' : 'notice'))}</strong> ${escape(text)}${hint ? `<p>${escape(t(hint))}</p>` : ''}
+        <div class="row">${buttons}${item.level === 'error' && allowed('revise') && c.profiles && Object.keys(c.profiles).length ? `<button data-fix-issue="${issues.indexOf(item)}">${escape(t('fix_one'))}</button>` : ''}</div></li>`;
+    }).join('');
+    const previous = prior && task.candidates.find(x=>x.number===prior.number);
+    const why = previous && changeCause(previous.preview,c.preview,prior.validation,r);
+    const delta = prior && (comparisonHTML(prior,r)+(why?'<p>'+escape(why)+'</p>':''));
+    return `${groups ? `<ul class="review-issues">${groups}</ul>` : ''}${missing?.length ? `<p>${escape(t('unchecked',missing.map(s=>t('stage.'+s)).join(' / ')))}</p>` : ''}${delta || ''}
+      ${issues.length ? `<details data-keep="raw-issues"><summary>${escape(t('technical'))}</summary><pre class="log">${escape(compact(issues))}</pre></details>` : ''}`;
+  }
+  function comparisonHTML(prior, next) {
+    const old = prior.validation, key = issue => {
+      // A new measurement of the same spacing or open pin is still the same issue.
+      const id = /^(too-short|short-lead-margin|winding-gap|winding-wide)$/.test(issue.code) ? issue.message.split(':')[0]
+        : issue.code==='open-pin' ? issue.message.split(' at (')[0] : issue.message;
+      return issue.code+'\n'+id;
+    };
+    const before = new Set(old.issues.map(key)), after = new Set(next.issues.map(key));
+    const resolved = [], still = [], first = [], changed = [], unchecked = [];
+    for (const i of old.issues) {
+      if (after.has(key(i))) still.push(i);
+      else if (next.checked_stages && !next.checked_stages.includes(old.issue_stages?.[i.code])) unchecked.push(i);
+      else resolved.push(i);
+    }
+    for (const i of next.issues) if (!before.has(key(i))) {
+      (old.checked_stages && !old.checked_stages.includes(next.issue_stages?.[i.code]) ? first : changed).push(i);
+    }
+    const groups = [['resolved',resolved],['still',still],['first_check',first],['after_change',changed],['unchecked_again',unchecked]];
+    return `<details data-keep="comparison"><summary>${escape((prior.number ? t('compared_with',prior.number) : t('last_check')))}</summary>
+      ${groups.filter(([,items])=>items.length).map(([label,items])=>`<p><strong>${escape(t(label))}</strong></p><ul>${items.map(i=>`<li>${escape(issueText(i))}</li>`).join('')}</ul>`).join('')}
+      ${old.scale_cm_per_unit && next.scale_cm_per_unit && old.scale_cm_per_unit[0] !== next.scale_cm_per_unit[0] ? `<p>${escape(t('scale_delta',old.scale_cm_per_unit[0],next.scale_cm_per_unit[0]))}</p>` : ''}</details>`;
+  }
+  let lastCheckTable=null;
+  function changeCause(before,after,old,next) {
+    if (!before || !after || !old || !next) return '';
+    const pins = table=>new Map((table.elements||[]).flatMap(e=>Object.entries(e.pins||{}).map(([k,p])=>[e.id+'.'+k,canonical(p)])));
+    const a=pins(before), b=pins(after);
+    for (const [id,at] of a) if (b.has(id) && b.get(id)!==at) {
+      for (const [other,point] of a) if (other!==id && point===at && b.get(other)===at) return t('shared_pin',id,other);
+    }
+    if (old.scale_cm_per_unit?.[0]!==next.scale_cm_per_unit?.[0]) {
+      const stripped=v=>({ ...v,elements:(v.elements||[]).map(({label_pos,label,opts,...other})=>{
+        const {label_offset,...rest}=opts||{};return Object.keys(rest).length?{...other,opts:rest}:other;
+      })});
+      if (canonical(stripped(before))===canonical(stripped(after)) && canonical(before)!==canonical(after)) return t('label_scale');
+    }
+    return '';
+  }
+  window.CircuitCompareChecks=(old,next,table)=>{
+    const target=el('checkComparison');
+    if (!target) return;
+    if (old?.checked_stages && next.checked_stages && lastCheckTable &&
+       (canonical(old.issues)!==canonical(next.issues) || canonical(old.scale_cm_per_unit)!==canonical(next.scale_cm_per_unit))) {
+      const explanation=changeCause(lastCheckTable,table,old,next);
+      target.innerHTML=comparisonHTML({validation:old},next)+(explanation?'<p>'+escape(explanation)+'</p>':'');
+    }
+    lastCheckTable=JSON.parse(JSON.stringify(table));
+  };
+  function reviewHint(c) {
+    if (c.state === 'stale') return t('stale');
+    if (task?.status === 'waiting_candidate' && c.state === 'pending') {
+      if (!c.validation.passed) return t('blocked_reason',c.number);
+      if (c.validation.issues.some(i=>i.level==='warning')) return t('warning_ok',c.number);
+    }
+    return '';
+  }
+  function profileHTML(c) {
+    if (!Object.keys(c.profiles || {}).length) return '';
+    const single = c.profiles['ieee-single'];
+    const fitLabels = !single.passed || single.issues.some(i => ['text-on-line','text-on-symbol','text-overlap'].includes(i.code));
+    const profiles = Object.entries(c.profiles).map(([name,r])=>{
+      const count = r.issues.filter(i=>i.level==='error').length;
+      return `<button data-review-profile="${escape(name)}" aria-pressed="${c.profile===name}" ${!allowed('review_profile') || c.profile===name ? 'disabled' : ''}>${escape(t(name))} · ${escape(count?t('error_count',count):t('valid'))}</button>`;
+    });
+    return `<p>${escape(t('readonly'))}</p><div class="review-paper"><strong>${escape(t('paper_check'))}</strong><div class="row">${profiles.join('')}</div>
+      ${fitLabels && !c.preview.modules && allowed('fit_labels') ? button('fit_labels') : ''}</div>`;
+  }
+
   function candidateHTML(candidate) {
     const pending = ['pending','stale'].includes(candidate.state);
     const facts = [t(candidate.validation.passed ? 'valid' : 'invalid'), summaryText(candidate.changes)];
@@ -159,7 +281,7 @@
     if (candidate.base_version !== task.drawing_version) facts.push(t('versions', candidate.base_version, task.drawing_version));
     const body = `<p class="facts">${facts.map(escape).join(' · ')}</p>
       ${candidate.state === 'stale' ? `<p role="alert">${escape(t('stale'))}</p>` : ''}
-      ${candidate.validation.issues.length ? `<details><summary>${escape(t('issues'))}</summary><pre class="log">${escape(JSON.stringify(candidate.validation.issues, null, 2))}</pre></details>` : ''}
+      ${reportHTML(candidate)}${pending ? profileHTML(candidate) : ''}
       ${changesHTML(candidate.changes)}
       ${(candidate.review_questions || []).map(q => `<p class="agent-confirm">${escape(q.block)} · ${escape(q.question)}</p>`).join('')}
       ${candidate.assumptions?.length ? `<details ${task.task_mode === 'example' ? 'open' : ''}><summary>${escape(t('assumptions'))}</summary>${candidate.assumptions.map(item => `<p>${escape(item)}</p>`).join('')}</details>` : ''}`;
@@ -203,6 +325,7 @@
     el('agentClose').setAttribute('aria-label', t('close'));
     el('agentTaskTitle').textContent = taskId ? task.title : t('new_task');
     el('agentTaskTitle').title = el('agentTaskTitle').textContent;
+    if (!taskId || !task?.candidates?.at(-1)?.draft_file) el('agentDraftReturn').hidden=true;
     const key = canonical({status:task?.status, candidates:task?.candidates, questions:task?.questions, detail:task?.detail,
       steps:task?.steps, error:task?.error, retry:task?.retry_after_s, queued:task?.queued, requests:task?.requests, actions:task?.allowed_actions, history:task?.history, language:language(), busy});
     if (key !== renderKey) {
@@ -242,6 +365,12 @@
       body.querySelectorAll('[data-example]').forEach(b => b.onclick = () => { el('agentInput').value = t(b.dataset.example); draftChanged(); el('agentInput').focus(); });
       body.querySelectorAll('[data-withdraw]').forEach(b => b.onclick = () => act('withdraw', {message_id:b.dataset.withdraw}));
       body.querySelectorAll('[data-locate]').forEach(b => b.onclick = () => locate(b.dataset.locate));
+      body.querySelectorAll('[data-review-profile]').forEach(b => b.onclick=()=>act('review_profile',{profile:b.dataset.reviewProfile}));
+      body.querySelectorAll('[data-fix-issue]').forEach(b => b.onclick=()=>{
+        const c=task.candidates.at(-1), issue=c.validation.issues[Number(b.dataset.fixIssue)];
+        el('agentInput').value=t('repair_instruction',issueText(issue)); draft=el('agentInput').value;
+        act('revise',{issue,candidate_id:c.candidate_id,number:c.number});
+      });
       body.querySelectorAll('[data-settings]').forEach(b => b.onclick = () => el('aiSettings').click());
       body.querySelectorAll('[data-param]').forEach(input => input.oninput = () => {
         params[input.dataset.param] = input.value;
@@ -263,7 +392,7 @@
     scopeId = last?.candidate_id || '';
     updateScope();
     const actions = el('agentActions');
-    const actionsHTML = taskId ? ['adopt','discard','revise','regenerate','undo_candidate','undo_task_changes','readopt','stop']
+    const actionsHTML = taskId ? ['open_draft','adopt','discard','revise','regenerate','undo_candidate','undo_task_changes','readopt','stop']
       .filter(a => task.allowed_actions.includes(a) || a === 'adopt' && task.status === 'waiting_candidate')
       .map(a => button(a, a === 'adopt')).join('') : '';
     if (actionsHTML !== actionsKey) {
@@ -274,10 +403,10 @@
     actions.hidden = !actionsHTML;
     const candidate = task?.candidates?.at(-1), waiting = task?.status === 'waiting_candidate';
     el('agentBanner').hidden = !waiting && !['running','planning'].includes(task?.status);
-    el('agentBanner').innerHTML = waiting ? `<strong>${escape(t('candidate', candidate.number))} · ${escape(t('candidate.' + candidate.state))}</strong>
-      <span class="row" ${candidate.changes.some(c => c.object_type !== 'sim_setting') ? '' : 'hidden'}>${['before','after','overlay'].map(mode => `<button data-preview-mode="${mode}" aria-pressed="${beforeAfter === mode}">${escape(t(mode))}</button>`).join('')}</span><span class="grow">${escape(summaryText(candidate.changes))}</span>${button('adopt', true)}${button('discard')}`
+    const bannerHTML = waiting ? `<strong>${escape(t('candidate', candidate.number))} · ${escape(t('candidate.' + candidate.state))}</strong>
+      <span class="row" ${candidate.changes.some(c => c.object_type !== 'sim_setting') ? '' : 'hidden'}>${['before','after','overlay'].map(mode => `<button data-preview-mode="${mode}" aria-pressed="${beforeAfter === mode}">${escape(t(mode))}</button>`).join('')}</span><span class="grow">${escape(reviewHint(candidate) || summaryText(candidate.changes))}</span>${allowed('open_draft') ? button('open_draft') : ''}${button('adopt', true)}${button('discard')}`
       : `<span class="grow">${escape(t('snapshot_run', task?.run_version || version))}</span>${button('stop')}`;
-    wireActions(el('agentBanner'));
+    if (bannerKey!==bannerHTML) { bannerKey=bannerHTML;el('agentBanner').innerHTML=bannerHTML;wireActions(el('agentBanner')); }
     // Wide windows: buttons already on the canvas banner are not repeated in the panel (narrow drawers keep them).
     const onBanner = new Set(el('agentBanner').hidden ? [] : [...el('agentBanner').querySelectorAll('[data-action]')].map(b => b.dataset.action));
     actions.querySelectorAll('[data-action]').forEach(b => b.classList.toggle('dup', onBanner.has(b.dataset.action)));
@@ -298,6 +427,7 @@
     if (action === 'submit_params' && !validParams()) return;
     if (action === 'revise' && !el('agentInput').value.trim()) { el('agentInput').focus(); return; }
     if (action === 'adopt' || action === 'readopt') clearPreview();
+    const popup=action==='open_draft' ? window.open('about:blank','_blank') : null;
     busy = true; render(); notify('');
     try {
       const input = el('agentInput').value;
@@ -312,7 +442,13 @@
       } else if (action === 'revise' && scope.size) {
         Object.assign(extra, {selection:[...scope], candidate_id:scopeId});
       }
+      if (['open_draft','review_draft','review_profile','fit_labels','adopt','revise'].includes(action)) {
+        const c=task.candidates.at(-1);
+        extra={candidate_id:c.candidate_id,number:c.number,...extra};
+      }
+      const wire=extra.wire; delete extra.wire;
       let response = await request(action, {prompt:input, text:input, params, start_from:startFrom, ...extra});
+      if (response.draft_editor) openDraftWindow(response.draft_editor,task.candidates.at(-1),wire,popup);
       if (response.waveform_source) {
         if (context().version !== response.source_version) throw new Error(t('stale'));
         await window.openWaveforms({source:response.waveform_source, isCurrent:() => context().version === response.source_version});
@@ -329,7 +465,7 @@
       if (['start','supplement','revise'].includes(action)) { el('agentInput').value = ''; draft = ''; }
       focusNext = ['start','submit_params','use_defaults','revise'].includes(action);
       renderKey = ''; previewKey = '';
-    } catch (error) { notify(error.message); }
+    } catch (error) { if (popup) popup.close(); notify(tr(error.message)); }
     finally { busy = false; render(); }
   }
   async function poll() {
@@ -338,7 +474,7 @@
     try {
       if (pendingAck) { task = await request('ack', pendingAck); saveAck(null); }
       const expectedTask = taskId, response = await request('status', taskId ? {} : {prompt:draft});
-      if (expectedTask !== taskId) return;
+      if (expectedTask !== taskId || busy || pendingAck) return;
       task = response;
       render();
     } catch (error) { notify(error.message); }
@@ -376,18 +512,31 @@
     }
     return previewFrame.contentWindow.CircuitAgentEditor;
   }
-  async function preview(candidate) {
+  let previewQueue=Promise.resolve();
+  function preview(candidate) {
     const key = candidate.candidate_id + ':' + beforeAfter + ':' + nodes.canvas.clientWidth + ':' + nodes.canvas.clientHeight;
-    if (key === previewKey) return;
+    if (key === previewKey) return previewQueue;
     previewKey = key;
-    const stamp = ++previewGeneration, bridge = await frameReady();
-    const picture = await bridge.renderPreview(beforeAfter === 'before' ? candidate.before_table : candidate.preview, editor.snapshot().profile);
+    const stamp=++previewGeneration, mode=beforeAfter;
+    previewQueue=previewQueue.catch(()=>{}).then(()=>drawPreview(candidate,stamp,mode)).catch(error=>{
+      if (stamp===previewGeneration) previewKey='';
+      throw error;
+    });
+    return previewQueue;
+  }
+  async function drawPreview(candidate, stamp, beforeAfter) {
+    if (stamp!==previewGeneration) return;
+    const bridge=await frameReady();
+    if (stamp!==previewGeneration) return;
+    const viewport=[nodes.canvas.clientWidth,nodes.canvas.clientHeight];
+    const picture = await bridge.renderPreview(beforeAfter === 'before' ? candidate.before_table : candidate.preview, (beforeAfter === 'before' ? candidate.before_profile : candidate.profile) || editor.snapshot().profile,null,viewport);
     const removed = beforeAfter === 'overlay' && candidate.changes.some(c => c.kind === 'remove')
-      ? await bridge.renderPreview(candidate.before_table, editor.snapshot().profile, picture.view) : null;
+      ? await bridge.renderPreview(candidate.before_table, candidate.before_profile || editor.snapshot().profile, picture.view,viewport) : null;
     if (stamp !== previewGeneration) return;
     let layer = el('agentPreview');
     if (!layer) { layer = document.createElement('div'); layer.id = 'agentPreview'; layer.className = 'agent'; nodes.canvas.append(layer); }
     layer.innerHTML = `<div class="agent-preview-scene">${picture.markup}</div>`;
+    layer.dataset.mode=beforeAfter;layer.dataset.candidate=String(candidate.number);
     const scene = layer.firstElementChild;
     if (editor.kind === 'control' && beforeAfter !== 'before') scene.onclick = event => {
       const obj = event.target.closest('[data-block],[data-link],[data-text],[data-region]');
@@ -395,7 +544,13 @@
       const kind = ['block','link','text','region'].find(name => obj.hasAttribute('data-' + name));
       chooseTarget(kind + ':' + obj.getAttribute('data-' + kind), event.shiftKey);
     };
-    if (beforeAfter === 'overlay') for (const change of candidate.changes) {
+    const markers = [...candidate.changes];
+    if (beforeAfter === 'overlay' && editor.kind === 'circuit') {
+      const words = new Set(candidate.validation.issues.flatMap(i=>(i.message || '').match(/[\w/-]+/g)||[]));
+      for (const part of candidate.preview.elements || []) if (words.has(part.id) && !markers.some(c=>c.object_type==='element' && c.object_id===part.id))
+        markers.push({section:'elements',kind:'issue',object_type:'element',object_id:part.id,label:part.id,after:part});
+    }
+    if (beforeAfter === 'overlay') for (const change of markers) {
       const base = change.kind === 'remove' ? candidate.before_table : candidate.preview;
       const index = base[change.section]?.findIndex?.((obj, i) => String(obj?.id ?? i) === change.object_id);
       const id = editor.kind === 'control' && ['region','link','text'].includes(change.object_type) ? index : change.object_id;
@@ -408,7 +563,7 @@
       mark.onclick = event => {
         if (editor.kind === 'control' && change.kind !== 'remove' && /^(block|link|region|text):/.test(key))
           chooseTarget(key, event.shiftKey);
-        notify(`${change.label} · ${compact(change.kind === 'remove' ? change.before : change.after)}`); mark.focus(); };
+        notify(`${sectionName(change.section)} · ${change.object_id}`); mark.focus(); };
       scene.append(mark);
     }
     updateScope();
@@ -521,13 +676,71 @@
   }
   function showReadiness(report) {
     const box = el('agentReadiness'); box.hidden = false;
-    box.textContent = tr(report.ready ? '仿真就绪' : '仿真待补项');
+    box.textContent = t('simulation_scope') + ' · ' + tr(report.ready ? '仿真就绪' : '仿真待补项');
+    const help=document.createElement('p');help.textContent=t('draw_help');box.append(help);
     for (const item of report.issues.length ? report.issues : [{message:tr('打开仿真参数')}]) {
-      const b = document.createElement('button'); b.type='button'; b.textContent=tr(item.message);
-      b.onclick=() => openSpiceForElement(null,item.target ? item : null); box.append(b);
+      const b = document.createElement('button'); b.type='button';
+      b.textContent=item.target==='drawing' && String(item.message).includes('layout rejected') ? t('drawing_first') :
+        item.target==='transient' && String(item.message).includes('缺少字段') ? t('transient_needed') : tr(item.message);
+      b.onclick=() => item.target==='drawing' ? showSidebar('issues',true) : openSpiceForElement(null,item.target ? item : null); box.append(b);
     }
   }
+  let draftListener=null;
+  function openDraftWindow(session,candidate,wire,popup) {
+    if (draftListener) window.removeEventListener('message',draftListener);
+    const target=new URL(session.url), owner=taskId;
+    target.hash=(wire?'agent-draft-wire':'agent-draft')+'?'+new URLSearchParams({owner:location.origin});
+    const box=el('agentDraftReturn');
+    box.hidden=false;
+    box.innerHTML=`<strong>${escape(t('draft_title',candidate.number))}</strong> <a target="_blank" rel="noopener">${escape(t('reopen_draft'))}</a>
+      <button type="button">${escape(t('read_draft'))}</button>`;
+    box.querySelector('a').href=target.href;
+    const review=async()=>{
+      if (owner!==taskId || task?.candidates?.at(-1)?.number!==candidate.number || !allowed('review_draft')) {
+        notify(t('draft_kept',session.file)+' '+t('stale'));return;
+      }
+      await act('review_draft',{candidate_id:candidate.candidate_id,number:candidate.number});
+    };
+    box.querySelector('button').onclick=review;
+    if (!popup) return;
+    const receive=async event=>{
+      if (event.origin!==target.origin || event.source!==popup || !['agent-draft-saved','agent-draft-kept'].includes(event.data)) return;
+      window.removeEventListener('message',receive);
+      if (event.data==='agent-draft-saved') await review();
+      else notify(t('draft_kept',session.file));
+    };
+    draftListener=receive;window.addEventListener('message',receive);
+    popup.location.replace(target.href);
+  }
+  async function initDraft() {
+    while (!editor.ready() || !report || !view || document.getElementById('startupDialog').open) await new Promise(resolve=>setTimeout(resolve,30));
+    const currentFile=editor.snapshot().file;
+    const top=document.createElement('div'); top.className='agent agent-draft-bar';
+    const match=/agent-draft-[a-f0-9]+-(\d+)\.json$/i.exec(currentFile);
+    top.innerHTML=`<strong>${escape(t('draft_title',match?.[1]||''))}</strong> <span>${escape(t('draft_help'))}</span>
+      <button data-review>${escape(t('save_check'))}</button><button data-keep-draft>${escape(t('keep_draft'))}</button><span role="status"></span>`;
+    document.body.prepend(top);
+    const owner=new URLSearchParams(location.hash.split('?')[1]||'').get('owner');
+    if (location.hash.startsWith('#agent-draft-wire')) document.getElementById('drawWire').click();
+    const status=top.querySelector('[role=status]');
+    async function save(review) {
+      try {
+        if (editor.snapshot().file!==currentFile) throw new Error(t('draft_file_changed'));
+        if (editor.busy()) throw new Error(t('finish_edit'));
+        await api('/api/save',{layout:tableForSave(),profile:editor.snapshot().profile});
+        status.textContent=t('draft_kept',currentFile);
+        if (window.opener && !window.opener.closed && owner && /^http:\/\/(?:localhost|127\.0\.0\.1):\d+$/.test(owner)) {
+          window.opener.postMessage(review?'agent-draft-saved':'agent-draft-kept',owner);
+          window.opener.focus();window.close();
+        } else status.textContent+=' '+t('return_check');
+      } catch(e) {status.textContent=tr(e.message);}
+    }
+    top.querySelector('[data-review]').onclick=()=>save(true);
+    top.querySelector('[data-keep-draft]').onclick=()=>save(false);
+  }
   async function init() {
+    if (editor?.kind==='circuit' && /^#agent-draft(?:-wire)?(?:\?|$)/.test(location.hash)) {await initDraft();return;}
+
     if (resultPage) { await poll(); setInterval(poll, 1500); return; }
     // Install the toolbar and canvas wrapper before the first fit/drag uses their size.
     nodes = editor.mount();
@@ -540,10 +753,10 @@
     const savedAck = JSON.parse(sessionStorage.getItem('agent-pending-ack') || 'null');
     if (savedAck?.taskId === taskId) pendingAck = {token:savedAck.token, applied:savedAck.applied};
     nodes.panel.innerHTML = `<div class="header row"><strong id="agentTaskTitle" class="grow"></strong><button id="agentNew">${escape(t('new_task'))}</button><button id="agentHistory">${escape(t('history'))}</button><button id="agentResetLayout" type="button">${escape(tr('恢复布局'))}</button><button id="agentClose" aria-label="${escape(t('close'))}">×</button></div>
-      <div id="agentBody"></div><div id="agentReadiness" hidden></div><div id="agentNotice" role="status"></div><div id="agentActions" class="row actions"></div>
+      <div id="agentBody"></div><div id="agentDraftReturn" hidden></div><div id="agentReadiness" hidden></div><div id="agentNotice" role="status"></div><div id="agentActions" class="row actions"></div>
       <div class="composer"><div class="agent-compose-fields"><div id="agentStartOptions" class="row"><label><span id="agentStartLabel">${escape(t('start_from'))}</span><select id="agentStartFrom"><option value="current">${escape(t('current'))}</option><option value="blank">${escape(t('blank'))}</option>${editor.kind === 'control' ? '<option value="selection">'+escape(t('selection'))+'</option>' : ''}</select></label><button id="agentPresets">${escape(t('presets'))}</button>
-      ${editor.snapshot().table.algorithm ? '' : `<label><span id="agentTaskModeLabel">${escape(tr('任务方式'))}</span><select id="agentTaskMode"><option value="">${escape(tr('按任务描述'))}</option><option value="draw">${escape(tr('只画图'))}</option><option value="example">${escape(tr('示例仿真'))}</option></select></label>`}
-      </div><details id="agentRefs"><summary>${escape(t('optional_reference'))}</summary><select id="agentRefUse" aria-label="${escape(t('optional_reference'))}"><option value="structure">${escape(t('sketch'))}</option><option value="style">${escape(t('style_reference'))}</option></select><div data-reference-images></div></details>
+      ${editor.snapshot().table.algorithm ? '' : `<label><span id="agentTaskModeLabel">${escape(tr('任务方式'))}</span><select id="agentTaskMode" aria-describedby="hint-agentMode"><option value="">${escape(tr('按任务描述'))}</option><option value="draw">${escape(tr('只画图'))}</option><option value="example">${escape(tr('示例仿真'))}</option></select></label>${editorHint("agentMode")}`}
+      </div><div class="agent-reference-options"><details id="agentRefs"><summary aria-describedby="hint-agentRefs">${escape(t('optional_reference'))}</summary><select id="agentRefUse" aria-describedby="hint-agentRefs" aria-label="${escape(t('optional_reference'))}"><option value="structure">${escape(t('sketch'))}</option><option value="style">${escape(t('style_reference'))}</option></select><div data-reference-images></div></details>${editorHint("agentRefs")}</div>
       <div id="agentScope" class="row" hidden><span></span><button type="button">${escape(t('clear_scope'))}</button></div>
       <textarea id="agentInput" aria-label="${escape(t('task_input'))}" placeholder="${escape(t('task_input'))}" rows="3"></textarea></div><div class="row">${editor.kind === 'circuit' ? `<button type="button" id="agentCheckSimulation">${escape(tr('检查仿真参数'))}</button>` : ''}<span class="grow"></span><button id="agentSubmit" class="primary" disabled>${escape(t('start'))}</button></div></div><div id="agentLive" class="sr-only" aria-live="polite"></div>`;
     const banner = document.createElement('div'); banner.id = 'agentBanner'; banner.className = 'agent row'; banner.hidden = true; nodes.column.prepend(banner);
@@ -594,6 +807,14 @@
         onScenario:(mode, scenario) => { el('agentTaskMode').value = mode; exampleCase = scenario; }});
       window.CircuitPanelLayout?.attachLibrary(el('agentInput').closest('.composer').querySelector('[data-prompt-library]'));
     };
+    document.addEventListener('click', e=>{
+      if (editor.kind==='circuit' && document.body.classList.contains('agent-open') && task?.status==='waiting_candidate'
+          && e.target.closest('#drawWire,[data-command="drawWire"]')) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (allowed('open_draft')) act('open_draft',{wire:true});
+        else notify(t(task.candidates.at(-1)?.state==='stale'?'stale':'readonly'));
+      }
+    },true);
     document.addEventListener('keydown', e => {
       const key = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
       if (mod && e.shiftKey && key === 'a') { e.preventDefault(); editor.open(); el('agentInput').focus(); }

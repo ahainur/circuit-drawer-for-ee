@@ -85,6 +85,8 @@
   .el-body { fill: #fff; stroke: var(--ink); }
   .sel .el-body, .sel .glyph { stroke: var(--accent); }
   .bad .el-body, .bad .glyph { stroke: var(--bad); }
+  .label-check { fill:none; stroke:var(--bad); stroke-width:.018; stroke-dasharray:.055 .035; }
+  .label-check.warning { stroke:#966000; }
   .bad-box { fill: rgba(209,47,47,.10); stroke: var(--bad); stroke-width: .015; stroke-dasharray: .04 .03; }
   @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; }
     aside { border-left: 0; border-top: 1px solid var(--line); } }
@@ -354,7 +356,9 @@
       <details class="drawing-scale"><summary>图纸比例</summary><div class="hint" id="scaleInfo"></div></details>
     </section>
     <section id="panel-issues" role="tabpanel" aria-labelledby="tab-issues" tabindex="0" hidden>
+    <strong>当前图纸的校验</strong>
     <div id="status">加载中…</div>
+    <p id="checkPending" hidden>器件与网络连接、标签和排版将在修正基础几何后检查。</p><div id="checkComparison"></div>
     <p id="profileHint" hidden>这张图按双栏校验可通过；当前单栏较挤。<button id="profileToDouble">切到双栏</button></p>
     <ul id="issues"></ul>
     </section>
@@ -451,6 +455,10 @@
     try {
       await initializeEditor();
       if (problem) failed(problem); else dialog.close();
+      if (!problem && location.hash === '#waveforms') {
+        window.CircuitFigure.enter();
+        await window.openWaveforms({publication:true});
+      }
     } catch (error) {
       console.error('Editor startup failed', error);
       failed(error.message);
@@ -460,6 +468,7 @@
 </script>
 <script src="/i18n-messages.js"></script>
 <script src="/i18n.js"></script>
+<script src="/hints.js"></script>
 <script src="/paper-style.js"></script>
 <script src="/prompt-library.js"></script>
 <script src="/electrical.js"></script>
@@ -498,14 +507,16 @@ function joinPath(dir, name) {
   return String(dir).replace(/[\\/]+$/, "") + sep + name;
 }
 let saveQueue = Promise.resolve();
+let manualDraftRevision;
 async function api(path, body) {
   const payload = body === undefined ? undefined : JSON.stringify(body);
   const savedTable = ['/api/save', '/api/save-as', '/api/waveform-save'].includes(path) && body?.layout ? JSON.stringify(body.layout) : null;
   const request = async () => {
     const r = await fetch(path, payload === undefined ? {} : {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: payload});
+      headers: {"Content-Type": "application/json"}, body: path === "/api/save" && manualDraftRevision ? JSON.stringify({...JSON.parse(payload), draft_revision:manualDraftRevision}) : payload});
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
+    if (j.draft_revision) manualDraftRevision = j.draft_revision;
     if (savedTable && j.saved) setEditorFile(j.saved, savedTable);
     return j;
   };
@@ -673,7 +684,17 @@ function fitDrawingView() {
   view = {x0: Math.min(...xs) - pad, y0: Math.min(...ys) - pad,
           w: Math.max(...xs) - Math.min(...xs) + 2 * pad, h: Math.max(...ys) - Math.min(...ys) + 2 * pad};
 }
-function applyView() { svg.setAttribute("viewBox", `${view.x0} ${-(view.y0 + view.h)} ${view.w} ${view.h}`); }
+function applyView() {
+  const [sx, sy] = report?.scale_cm_per_unit || [1, 1];
+  const w = svg.clientWidth, h = svg.clientHeight;
+  if (!view || !w || !h) return;
+  const pixelsPerCm = Math.min(w / (view.w * sx), h / (view.h * sy));
+  const width = w / (pixelsPerCm * sx), height = h / (pixelsPerCm * sy);
+  const left = view.x0 + (view.w - width) / 2, bottom = view.y0 + (view.h - height) / 2;
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("viewBox", [left, -bottom-height, width, height].join(" "));
+}
+new ResizeObserver(applyView).observe(svg);
 function toUnits(evt) {
   const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
   const p = pt.matrixTransform(svg.getScreenCTM().inverse());
@@ -739,6 +760,10 @@ function texFractions(s) {
 }
 // Text outside $...$, \mathrm-like groups and operator names are upright, as TeX sets them.
 const TEX_UPRIGHT = ["\uE004", "\uE005"];
+function paperLabelSize(pt) {
+  const sy = report?.scale_cm_per_unit?.[1] || 1;
+  return (pt || report?.font_pt || 8) * 2.54 / 72.27 / sy;
+}
 function texToSvg(parent, tex, x, y, size) {
   const [up, down] = TEX_UPRIGHT;
   // $...$ is math (minus signs become −); the rest is text, set upright
@@ -755,6 +780,8 @@ function texToSvg(parent, tex, x, y, size) {
   s = texSymbols(s.replace(/\\(max|min|sin|cos|tan|ln|log|exp)(?![A-Za-z])/g, (m, name) => up + name + down));
   const t = el("text", {x, y: -y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central",
     "font-family": "Times New Roman, Times, serif", "font-style": "italic"}, parent);
+  const [sx, sy] = report?.scale_cm_per_unit || [1, 1];
+  if (sx !== sy) t.setAttribute("transform", "translate("+x+" "+(-y)+") scale("+(sy/sx)+" 1) translate("+(-x)+" "+y+")");
   // TeX sets capital Greek and operator symbols upright; letters stay italic
   const UPRIGHT = /([ΓΔΘΛΞΠΣΥΦΨΩ⊥⊤±∓·×÷∞≈∼∝≤≥≠→←↔∠∘∥…⋯⋮]+)/;
   // A line begun on the base line skips the scripts it spans (one bar over the
@@ -819,7 +846,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
   if ((selected && ["el", "modulePart"].includes(selected.type) && selected.id === e.id) || (typeof moduleSelection !== "undefined" && moduleSelection.has(e.id))) g.classList.add("sel");
   if (badIds.has(e.id)) g.classList.add("bad");
   inkOn(g, !glyphOnly && report && report.inks && report.inks.elements[e.id]);
-  const box = geo && geo.bodies && geo.bodies[0];
+  const box = geo?.ink_body || geo?.bodies?.[0];
   const P = e.pins;
   if (geo?.resistor_path && box) {
     el("polyline", {points: geo.resistor_path.map(([x,y])=>`${x},${-y}`).join(" "), class:"glyph resistor-zigzag", fill:"none"}, g);
@@ -839,7 +866,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
     if (e.kind === "R") el("rect", {x: box[0], y: -box[3], width: box[2] - box[0], height: box[3] - box[1], class: "el-body"}, g);
     if (e.kind === "L") drawCoil(g, s, t, true, (hor ? box[3] - box[1] : box[2] - box[0]) / 2);
     if (e.kind === "C") {
-      const gap = (hor ? box[2] - box[0] : box[3] - box[1]) * 0.2;
+      const gap = (hor ? box[2] - box[0] : box[3] - box[1]) * (geo.ink_body ? 0.5 : 0.2);
       const h = hor ? (box[3] - box[1]) / 2 : (box[2] - box[0]) / 2;
       const u = hor ? [1, 0] : [0, 1], sgn = (t[0] - s[0] + t[1] - s[1]) > 0 ? 1 : -1;
       const p1 = [c[0] - u[0] * gap, c[1] - u[1] * gap], p2 = [c[0] + u[0] * gap, c[1] + u[1] * gap];
@@ -871,7 +898,7 @@ function drawElement(e, geo, root, glyphOnly = false) {
       for (const [p, k] of [[t, 1], [s, 0.5]])
         line(g, [p[0] + n[0] * h * k, p[1] + n[1] * h * k], [p[0] - n[0] * h * k, p[1] - n[1] * h * k]);
     } else if (e.kind === "V" || e.kind === "I" || e.kind === "vac") {
-      const rx = (box[2] - box[0]) / 2, ry = (box[3] - box[1]) / 2, rr = hor ? rx : ry;
+      const [rx, ry] = geo.source_radii || [(box[2]-box[0])/2, (box[3]-box[1])/2], rr = hor ? rx : ry;
       line(g, s, t);
       el("ellipse", {cx: c[0], cy: -c[1], rx, ry, class: "el-body"}, g);
       if (e.kind === "vac") {
@@ -982,8 +1009,8 @@ function drawElement(e, geo, root, glyphOnly = false) {
     const texts = e.kind === "transformer" ? [e.label, e.opts?.ratio].filter(Boolean) : (e.label ? [e.label] : []);
     // Transformer name and ratio follow the polarity dot boxes.
     const boxes = e.kind === "transformer" ? geo.labels.slice(-texts.length || geo.labels.length) : geo.labels;
-    const fs = 0.3 * (((e.opts || {}).label_size) || 8) / 8;
-    texts.forEach((tx, i) => { let b = boxes[i]; if (!b) return;
+    const fs = paperLabelSize(e.opts?.label_size);
+    texts.forEach((tx, i) => { let b = geo.ink_label || boxes[i]; if (!b) return;
       const draggable = e.kind !== "transformer" || i === texts.length - 1 && !!e.opts?.ratio;
       if (draggable && drag?.label === e.id) {
         const delta = drag.offset.map((v, k) => v - (geo.label_offset?.[k] || 0));
@@ -1002,6 +1029,8 @@ function drawElement(e, geo, root, glyphOnly = false) {
     for (const k in P) {
       const hd = el("rect", {x: P[k][0] - 0.06, y: -P[k][1] - 0.06, width: 0.12, height: 0.12, fill: "#fff",
         stroke: "#2457d6", "stroke-width": 0.02, style: "cursor:crosshair"}, root);
+      hd.dataset.pinHandle = e.id + "." + k;
+      el("title", {}, hd).textContent = hd.dataset.pinHandle;
       hd.addEventListener("pointerdown", ev => startDragPin(ev, e.id, k));
     }
   if (badIds.has(e.id) && geo) (geo.bodies || []).forEach(b =>
@@ -1133,7 +1162,7 @@ function renderDrawing(keepWireTargets = false) {
       el("polygon", {points: "-.07,-.05 .07,0 -.07,.05", fill: "currentColor", transform: `translate(${a.at[0]} ${-a.at[1]}) rotate(${rot})`}, g);
     }
     const b = !moduleTitle && annotationBox(i, a);
-    const t = texToSvg(g, a.text, b ? (b[0] + b[2]) / 2 : a.at[0], b ? (b[1] + b[3]) / 2 : a.at[1], 0.3 * (a.size || 8) / 8);
+    const t = texToSvg(g, a.text, b ? (b[0] + b[2]) / 2 : a.at[0], b ? (b[1] + b[3]) / 2 : a.at[1], paperLabelSize(a.size));
     t.style.cursor = "move";
     t.style.fontWeight = a.font_weight || "normal";
     t.addEventListener("pointerdown", ev => startDragAnn(ev, i));
@@ -1147,6 +1176,12 @@ function renderDrawing(keepWireTargets = false) {
     const hit = el("circle", {cx: j[0], cy: -j[1], r: 0.09, fill: "transparent", style: "cursor:pointer"}, svg);
     hit.addEventListener("pointerdown", ev => { if (wireDraft) return; ev.stopPropagation(); select({type: "node", at: j.slice()}); });
   });
+  if (!drag && !instanceDrag) for (const issue of report?.issues || []) {
+    for (const [x0,y0,x1,y1] of issue.label_boxes || []) {
+      el("rect", {x:x0, y:-y1, width:x1-x0, height:y1-y0, class:"label-check " + issue.level,
+        "data-label-issue":issue.code, "pointer-events":"none"}, svg);
+    }
+  }
   // bad points
   const livePins = new Map(layout.elements.flatMap(e =>
     Object.entries(e.pins).map(([name, at]) => [`${e.id}.${name}`, at])));
@@ -1166,6 +1201,7 @@ function renderDrawing(keepWireTargets = false) {
   // Selected wire handles stay clickable above labels and junction hit targets.
   svg.querySelectorAll(".vtx").forEach(handle => svg.appendChild(handle));
   drawWirePinTargets();
+  if (!wireDraft) svg.querySelectorAll("[data-pin-handle]").forEach(handle => svg.append(handle));
 }
 
 // Module drawings are projections of the source table. The table's own parts,
@@ -1495,7 +1531,7 @@ function regionRects(r) {
   return out;
 }
 function labelText(g, text, b, size, weight) {
-  const t = texToSvg(g, text, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, 0.3 * (size || 8) / 8);
+  const t = texToSvg(g, text, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, paperLabelSize(size));
   if (weight === "bold") t.setAttribute("font-weight", "bold");
   if (!text.includes("$")) t.setAttribute("font-style", "normal");
   return t;
@@ -2452,6 +2488,7 @@ document.getElementById("modeDel").onclick = () => {
 
 // ---------- validation ----------
 const CODE_ZH = {
+  "winding-wide":"纸面绕组间距建议", "short-lead-margin":"引脚留白略短",
   "not-orthogonal": "不是横平竖直", "bad-gate-pin": "栅极引脚位置不合适", "too-short": "元件两端太近，画不下", "winding-gap": "变压器原副边间距不合适",
   "bad-order": "沿绕组方向的引脚顺序反了", "zero-length": "导线有重复点", "short-wire": "导线点数不够",
   "body-overlap": "两个元件符号重叠", "module-box-overlap": "折叠框重叠或压到元件", "line-through-body": "导线穿过了元件符号", "collinear-overlap": "两条线叠在一起",
@@ -2460,7 +2497,7 @@ const CODE_ZH = {
   "open-pin": "引脚没接上", "dangling-wire": "导线一端悬空", "shorted-pins": "元件两脚重合（短路）",
   "netlist-open": "该连的没连上（与网表不符）", "netlist-short": "不该连的连上了（与网表不符）",
   "netlist-unknown-pin": "网表里有不存在的引脚", "netlist-missing": "新增引脚待登记",
-  "text-on-symbol": "文字压在元件上", "text-on-line": "文字压在线上", "text-overlap": "文字互相重叠",
+  "text-clearance": "标签留白较小，可以保留", "text-on-symbol": "文字压在元件上（可保留）", "text-on-line": "文字压在线上（可保留）", "text-overlap": "文字互相重叠（可保留）",
   "electrical-label-space": "标号附近没有空位：请移动附近元件/文字，或缩短网络名",
   "arrow-off-wire": "电流箭头不在导线上", "too-cramped": "按当前栏宽放不下", "unknown-kind": "未知元件类型",
   "missing-pin": "元件缺引脚", "duplicate-id": "元件编号重复", "error": "错误",
@@ -2476,6 +2513,9 @@ const CODE_ZH = {
   "subscript-braces": "下标缺少花括号"};
 // the validator's English details, in Chinese for the panel
 const ZH = [
+  [/^(.+?): winding spacing on paper is ([\d.]+) cm \(recommended up to ([\d.]+) cm\)$/, m => `${m[1]} 的绕组在纸上相隔 ${m[2]} cm，建议不超过 ${m[3]} cm。喜欢当前排版可以保留。`],
+  [/^(.+?): lead margin is short by ([\d.]+) mm on paper$/, m => `${m[1]} 的引线比推荐留白短 ${m[2]} mm，可以保留。`],
+  [/^(.+?): secondary must sit ([\d.]+)-([\d.]+) units from the primary along its local right axis \(now ([\d.]+)\)$/, m=>`${m[1]} 的两组绕组太近。沿原边到副边的方向，建议相距 ${m[2]}–${m[3]} 格，目前 ${m[4]} 格。`],
   [/^(callouts\[\d+\].*?) points at the zoomed detail in (.+?), but (.+?) wire it to the circuit outside;.*$/,
    m => `${m[1]} 指向 ${m[2]}，所以它被当成放大图；但 ${m[3]} 把它接到了外面的主电路上。放大图是同一电路的另一画法，只能用端口，不能接线`],
   [/^(wave_symbols\[\d+\]) sits on a wire on purpose.*$/, m => `${m[1]} 故意压在导线上：出图时盖住下面那段线，连接不变`],
@@ -2504,6 +2544,9 @@ const ZH = [
   [/^drawing joins (.+?) \((.+?)\) and (.+?) \((.+?)\)$/, m => `图里把 ${m[1]}（${m[2]}）和 ${m[3]}（${m[4]}）连在了一起，网表里它们不相连`],
   [/^(.+?) is drawn but not declared in the netlist$/, m => `${m[1]} 尚未登记到已确认的网表。确认当前接法后可记录此引脚，供后续检查短路和断路。`],
   [/^current arrow (.+?) at (\(.+?\)) is not on a wire$/, m => `电流箭头 ${m[1]}（${m[2]}）不在导线上`],
+  [/^label of (.+?) is close to the symbol of (.+)$/, m => `${m[1]} 的标签靠近 ${m[2]}。可以保留，也可以拖动标签增加留白。`],
+  [/^label of (.+?) is close to label of (.+)$/, m => `${m[1]} 和 ${m[2]} 的标签靠得较近。可以保留，也可以拖动标签增加留白。`],
+  [/^(.+?) is close to (.+)$/, m => `${m[1]} 和 ${m[2]} 之间的留白较小，可以保留。`],
   [/^(?:label of (.+?)|text (.+?)) overlaps the symbol of (.+)$/, m => `${m[1] ? m[1] + " 的标签" : "文字 " + m[2]}压在 ${m[3]} 的符号上`],
   [/^(?:label of (.+?)|text (.+?)) is crossed by (.+?) (\(.+?\)) -> (\(.+?\))$/, m => `${m[1] ? m[1] + " 的标签" : "文字 " + m[2]}被 ${m[3]} 的线段 ${m[4]}→${m[5]} 穿过`],
   [/^(?:label of (.+?)|text (.+?)) overlaps (?:label of (.+?)|text (.+?))$/, m => `${m[1] ? m[1] + " 的标签" : "文字 " + m[2]}和${m[3] ? " " + m[3] + " 的标签" : "文字 " + m[4]}重叠`],
@@ -2558,6 +2601,8 @@ function shiftedGeometry(e, geo) {
   const pt = q => [q[0] + d[0], q[1] + d[1]];
   const box = b => [b[0] + d[0], b[1] + d[1], b[2] + d[0], b[3] + d[1]];
   const g = {...geo, bodies: (geo.bodies || []).map(box), labels: (geo.labels || []).map(box)};
+  if (geo.ink_body) g.ink_body = box(geo.ink_body);
+  if (geo.ink_label) g.ink_label = box(geo.ink_label);
   if (geo.centre) g.centre = pt(geo.centre);
   if (geo.gate) g.gate = geo.gate.map(pt);
   if (geo.dots) g.dots = geo.dots.map(pt);
@@ -2640,7 +2685,8 @@ async function revalidate() {
   try {
     const result = await api("/api/check", {layout, profile, sync_electrical: !!layout.electrical && !drag, live_spice: !document.getElementById("liveNetlist").hidden});
     if (submitted !== JSON.stringify(layout) || submittedProfile !== profile) { checkAgain = true; }
-    else { report = stampReport(result);
+    else { window.CircuitCompareChecks?.(report, result, layout);
+    report = stampReport(result);
     if (result.electrical) layout.electrical = result.electrical; }
   }
   catch (err) { report = {ok: false, issues: [{code: "error", message: err.message, level: "error"}]}; }
@@ -2672,6 +2718,7 @@ function showIssues() {
   st.className = empty ? "hint" : report.ok ? "ok" : "bad";
   const sc = report.scale_cm_per_unit;
   document.getElementById("scaleInfo").textContent = sc ? `1 格 (1.0) = 横 ${sc[0].toFixed(2)} cm，竖 ${sc[1].toFixed(2)} cm；目标宽度 ${report.width_cm} cm` : "";
+  document.getElementById("checkPending").hidden = !report.checked_stages || report.checked_stages.includes("labels") || empty;
   ul.innerHTML = ""; badIds = new Set(); badPts = [];
   const ids = layout.elements.map(e => e.id);
   report.issues.forEach(is => {
@@ -2690,7 +2737,7 @@ function showIssues() {
     ids.forEach(id => { if (new RegExp(`(^|[^\\w])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w]|$)`).test(is.message)) mine.add(id); });
     (is.message.match(/wire\[\d+\]/g) || []).forEach(w => mine.add(w));
     for (const m of is.message.matchAll(/\((-?[\d.]+), (-?[\d.]+)\)/g)) pts.push([+m[1], +m[2]]);
-    if (is.level === "error") {
+    if (is.level === "error" && !is.label_boxes?.length) {
       const pin = is.code === "open-pin" ? is.message.match(/^(.+) at \(/)?.[1] : null;
       mine.forEach(x => badIds.add(x));
       pts.forEach(at => badPts.push({at, ...(pin ? {pin} : anchorBadPoint(at, mine))}));
@@ -3956,12 +4003,12 @@ function wirePinTargets() {
 }
 function nearbyWirePin(point, disabled = false) {
   if (disabled) return null;
-  const matrix = svg.getScreenCTM(), pixels = Math.hypot(matrix.a, matrix.b);
+  const matrix = svg.getScreenCTM();
   const last = wireDraft?.pts.at(-1);
   let best = null, distance = WIRE_SNAP_PX;
   for (const pin of wirePinTargets()) {
     if (last && same(pin.at, last)) continue;
-    const d = Math.hypot(point[0] - pin.at[0], point[1] - pin.at[1]) * pixels;
+    const d = Math.hypot((point[0] - pin.at[0]) * matrix.a, (point[1] - pin.at[1]) * matrix.d);
     if (d < distance) { best = pin; distance = d; }
   }
   return best;
@@ -4315,7 +4362,7 @@ function tableForSave() {
   return table;
 }
 document.getElementById("save").onclick = async () => {
-  try { const r = await api("/api/save", {layout: tableForSave()}); flash(`已保存到 ${r.saved}`); } catch (e) { flash(e.message, true); }
+  try { const r = await api("/api/save", {layout: tableForSave(), profile}); flash(`已保存到 ${r.saved}`); } catch (e) { flash(e.message, true); }
 };
 document.getElementById("saveAs").onclick = () => {
   const split = Math.max(editorFilePath.lastIndexOf("/"), editorFilePath.lastIndexOf("\\"));
@@ -4453,22 +4500,22 @@ function openSpice(info) {
   const motors = (mod ? mod.devices.map(d=>({id:d.name,kind:d.kind})) : devices).filter(e=>e.kind==="pmsm");
   showDialog("SPICE 参数与导出", `
     <form id="spiceForm"><fieldset id="spiceOptions" style="border:0;padding:0;min-width:0">
-    <section id="spiceOverview" aria-live="polite"><h3 id="spiceReadyTitle">仿真状态</h3>
+    <section id="spiceOverview" aria-live="polite"><div class="help-row"><h3 id="spiceReadyTitle">仿真状态</h3>${editorHint('spiceReadiness')}</div>
       <p id="spiceOperating"></p><p id="spiceChannels"></p><div id="spiceIssues"></div>
     </section>
-      <div class="export-row spice-primary-actions"><button type="submit" data-action="save">保存参数</button>
-        <button type="submit" data-action="export" class="primary">导出 SPICE</button>
-        <button type="submit" data-action="run" ${info.available ? "" : "disabled"}>${lastSpiceRunFile === editorFilePath ? "复跑仿真" : "导出并仿真"}</button>
+      <div class="export-row spice-primary-actions"><div role="group" aria-label="仿真"><button type="submit" data-action="save">保存参数</button>
+        <button type="submit" data-action="run" class="primary" ${info.available ? "" : "disabled"}>${lastSpiceRunFile === editorFilePath ? "复跑仿真" : "导出并仿真"}</button></div>
+        <div role="group" aria-label="导出"><button type="submit" data-action="export">导出 SPICE</button>
         <button type="submit" data-action="simulink">导出 Simulink</button>
         <button type="submit" data-action="plecs">导出 PLECS 独立版</button>
-        <button type="submit" data-action="psim">导出 PSIM</button></div>
+        <button type="submit" data-action="psim">导出 PSIM</button></div></div>
     <div class="help-row"><span class="hint">本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件</span><details class="help-tip"><summary aria-label="模型说明" title="模型说明">?</summary><div class="help-body"><ol><li>${esc(info.note)}</li><li>本次导出 ${mod ? mod.devices.length : devices.length} 个实际元件；叠层不增加电气器件。完整性检查不验证工况。</li><li>数值支持 500u、50k 等，兆用 Meg，m / M 均为毫。</li>${mod ? "" : "<li>示例按钮会核对拓扑，并替换本窗口参数；保存后才写入电路文件。</li>"}</ol></div></details></div>
     <div class="export-row" ${mod ? "hidden" : ""}><button type="button" id="spiceBuck" title="单相 Buck，或 N 相交错 Buck（各相 PWM 依次错开 1/N 周期）">载入 Buck 示例参数（含多相交错）</button>
       <button type="button" id="spiceBoost" title="核对拓扑后替换本窗口参数，保存后才写入电路文件">载入 Boost 示例参数</button></div>
       <div class="spice-fields"><label>参考地（引脚）<select id="spiceGround" required><option value="">请选择</option>
         ${pins.map(p => `<option value="${esc(p)}">${esc(p)} · ${esc(pinNet(p))}</option>`).join("")}</select></label></div>
-      <b>一、元件与驱动参数</b>${threePhaseSection(devices)}
-      <div id="spiceWorkspace"><div class="spice-device-nav"><label>搜索器件<input type="search" id="spiceDeviceSearch"></label>
+      <div class="help-row"><b>一、元件与驱动参数</b>${editorHint('spiceDevices')}</div>${threePhaseSection(devices)}
+      <div id="spiceWorkspace"><div class="spice-device-nav"><label>搜索器件<input type="search" id="spiceDeviceSearch" aria-describedby="hint-spiceDevices"></label>
         <select size="7" id="spiceDeviceList" aria-label="选择器件"></select><button type="button" id="spiceResetLayout">恢复布局</button></div>
         <span id="spiceListDivider"></span><div class="spice-device-edit"><div id="spiceComponents"></div><div id="spiceModules"></div></div></div>
       <div class="help-row"><b>二、瞬态设置</b><details class="help-tip"><summary aria-label="瞬态设置说明" title="瞬态设置说明">?</summary><div class="help-body"><ol><li>从 0 秒启动，使用电感/电容初始条件。PWM 为 0/1 控制信号；占空比按 50% 阈值计算。</li><li>数值稳定电容默认关闭。设为非零后，会在每个电气网络与仿真地之间加入该电容，可能改变快速瞬态；
@@ -5527,6 +5574,7 @@ async function initializeEditor() {
 <script src="/digital-control.js"></script>
 <script src="/auto-modes.js"></script>
 <script src="/reference-images.js"></script>
+<script src="/waveform-insets.js"></script>
 <script src="/waveforms.js"></script>
 <script src="/layers.js"></script>
 <script src="/context-menu.js"></script>

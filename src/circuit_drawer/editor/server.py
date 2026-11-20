@@ -8,6 +8,7 @@ the same validator, and exports never carry the grid.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
 import os
@@ -229,6 +230,11 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
              "labels": [_box(b, s) for b in fp.labels],
              "label_offset": fp.extra.get("label_offset", [0, 0]),
              "side": fp.label_side}
+        for key in ("ink_body", "ink_label"):
+            if key in fp.extra:
+                g[key] = _box(fp.extra[key], s)
+        if "source_radii" in fp.extra:
+            g["source_radii"] = _pt(fp.extra["source_radii"], s)
         if "source_wave" in fp.extra:
             g["source_wave"] = [_pt(p, s) for p in fp.extra["source_wave"]["points"]]
         if "current_arrow" in fp.extra:
@@ -309,6 +315,7 @@ def analyse(layout: Layout, profile: str, base_dir=None) -> dict:
             else:
                 passes_double = wide_report.ok
     out = rep.to_dict()
+    out["font_pt"] = prof.font_pt
     from ..figure_images import safe_items
     from ..geometry import image_box
     out["images"] = []
@@ -676,6 +683,7 @@ LAYOUT_ROUTES = {
     "/api/module-upgrade": "_module_upgrade",
     "/api/waveform-import": "_waveform_import",
     "/api/waveform-view": "_waveform_view",
+    "/api/waveform-inset": "_waveform_inset",
     "/api/waveform-ai": "_waveform_ai",
     "/api/waveform-ai-preview": "_waveform_ai_preview",
     "/api/waveform-preview": "_waveform_preview",
@@ -1032,7 +1040,7 @@ class Editor:
                 if self.path in ("/", "/index.html"):
                     self._send(200, (STATIC / "index.html").read_bytes(),
                                "text/html; charset=utf-8")
-                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/theme-eda.css", "/simulation-workspace.js", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
+                elif self.path in ("/prompt-library.js", "/i18n.js", "/i18n-messages.js", "/emi.js", "/impedance.js", "/impedance-ratio.js", "/waveforms.js", "/waveform-insets.js", "/waveforms.css", "/module-editor.js", "/selection.js", "/context-menu.js", "/menu.js", "/menu.css", "/electrical.js", "/electrical.css", "/editor-ui.js", "/editor-ui.css", "/hints.css", "/hints.js", "/theme-eda.css", "/simulation-workspace.js", "/simulation-recommendations.js", "/parameter-search.js", "/ai-settings.js", "/reference-images.js", "/layers.js", "/guides.js", "/digital-control.js", "/auto-modes.js"):
                     self._send(200, (STATIC / self.path[1:]).read_bytes(),
                                "text/javascript; charset=utf-8" if self.path.endswith(".js")
                                else "text/css; charset=utf-8")
@@ -1054,7 +1062,9 @@ class Editor:
                         self._json(job.status())
                 elif self.path == "/api/state":
                     from ..modules import SYMBOLS
-                    self._json({"layout": Layout.load(editor.path).to_dict(),
+                    raw = editor.path.read_bytes()
+                    self._json({"layout": Layout.from_dict(json.loads(raw.decode("utf-8"))).to_dict(),
+                                **({"draft_revision": hashlib.sha256(raw).hexdigest()} if hasattr(editor, "draft_lock") else {}),
                                 "file": str(editor.path),
                                 "out_dir": str(editor.out_dir.resolve()),
                                 "profile": editor.profile,
@@ -1336,7 +1346,23 @@ class Editor:
                 if "electrical" in lay.extra:
                     from ..electrical import synchronize
                     lay.extra["electrical"] = synchronize(lay, prof)
+                paper = get_profile(prof).name
+                if hasattr(editor, "draft_lock"):
+                    with editor.draft_lock:
+                        if req.get("draft_revision") != hashlib.sha256(editor.path.read_bytes()).hexdigest():
+                            raise ValueError("另一窗口已保存这份草稿。请另存当前修改或重新打开草稿再比较。")
+                        data = (json.dumps(lay.to_dict(), ensure_ascii=False, indent=1) + "\n").encode("utf-8")
+                        with tempfile.NamedTemporaryFile(dir=editor.path.parent, delete=False) as out:
+                            staged = Path(out.name)
+                        try:
+                            staged.write_bytes(data)
+                            staged.replace(editor.path)
+                        finally:
+                            staged.unlink(missing_ok=True)
+                        editor.profile = paper
+                        return {"saved": str(editor.path), "draft_revision": hashlib.sha256(data).hexdigest()}
                 lay.save(editor.path)
+                editor.profile = paper
                 return {"saved": str(editor.path)}
 
             def _preview(self, lay: Layout, prof: str, req: dict) -> dict:
@@ -1484,6 +1510,15 @@ class Editor:
                 editor.jobs[job.id] = job
                 return job.status()
 
+            def _waveform_inset(self, lay: Layout, prof: str, req: dict) -> dict:
+                from ..waveform_insets import new_style, preview_asset, style_of, topology
+                if req.get("action") == "preview":
+                    return preview_asset(req.get("source"), editor.path.parent)
+                if req.get("action") == "capture":
+                    font = (style_of(lay.extra.get("waveform", {})) or new_style())["font"]
+                    return topology(lay, prof, editor.path.parent, req.get("mode"), font)
+                raise ValueError("未知波形插图操作")
+
             def _waveform_ai_preview(self, lay: Layout, prof: str, req: dict) -> dict:
                 identity = req.get("id")
                 job = editor.jobs.get(identity) if isinstance(identity, str) else None
@@ -1507,8 +1542,9 @@ class Editor:
                     target = prof  # XY is a standalone figure, including in a side-by-side time overview.
                 elif req.get('plot', 'time') != 'time':
                     raise ValueError('波形图类型只能是 time 或 xy。')
+                options = {"base_dir": editor.path.parent} if renderer is wave_tex else {}
                 tex = preamble(get_profile(target)) + renderer(data, cfg, target,
-                        [m.get("name") for m in lay.modes]) + "\n\\end{document}\n"
+                        [m.get("name") for m in lay.modes], **options) + "\n\\end{document}\n"
                 with tempfile.TemporaryDirectory() as tmp:
                     svg = build(tex, Path(tmp), "wave-preview", ("svg",))["svg"].read_bytes()
                 return {"svg": base64.b64encode(svg).decode(), "profile": get_profile(target).name}

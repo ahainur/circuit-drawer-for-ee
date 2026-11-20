@@ -24,7 +24,7 @@
   entry.id = 'figureToggle';
   entry.textContent = tr('美化出图');
   entry.onclick = enter;
-  document.querySelector('.quick-tools').append(entry);
+  document.getElementById('quickAi').parentElement.append(entry);
   const workspace = document.createElement('main');
   workspace.id = 'figureWorkspace';
   workspace.hidden = true;

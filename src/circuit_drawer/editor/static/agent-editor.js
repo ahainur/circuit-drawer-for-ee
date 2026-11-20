@@ -122,17 +122,21 @@
     const canvas = document.getElementById('canvasWrap'); canvas.before(column); column.append(canvas);
     return {panel, canvas, column, inspector};
   }
-  async function renderPreview(value, selectedProfile, requestedView) {
+  async function renderPreview(value, selectedProfile, requestedView, viewport) {
     if (!location.search.includes('agent-preview')) throw new Error('Preview requires its isolated editor');
     while (!current()) await new Promise(resolve => setTimeout(resolve, 30));
     profile = selectedProfile;
+    const surface = document.getElementById('canvas');
+    if (viewport) {
+      surface.style.width = viewport[0]+'px'; surface.style.height = viewport[1]+'px';
+    }
     if (control) {
       table = copy(value); analysis = await api('/api/check', {table, profile});
       Object.assign(constants, analysis.constants); clearSel(); draw();
       if (requestedView) { view = requestedView; draw(); } else fit();
     } else {
       layout = copy(value); selected = null;
-      report = await api('/api/check', {layout, profile});
+      report = stampReport(await api('/api/check', {layout, profile}), layout); showIssues();
       if (requestedView) view = requestedView; else fitView(); render();
     }
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -151,6 +155,7 @@
       }
     }
     const clone = canvas.cloneNode(true);
+    if (viewport) {clone.style.removeProperty('width');clone.style.removeProperty('height');}
     clone.removeAttribute('id'); clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
     return {markup: clone.outerHTML, bounds, view: copy(view)};
   }

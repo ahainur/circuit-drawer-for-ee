@@ -198,15 +198,15 @@ function startCanvasPan(ev) {
   ev.preventDefault(); ev.stopImmediatePropagation();
   if (!layout || drag || moduleBox || resizing || instanceDrag || linkDrag) return;
   svg.focus({preventScroll:true});
-  panGesture = {pointer:ev.pointerId, start:[ev.clientX, ev.clientY], view:{...view}, scale:1 / Math.hypot(svg.getScreenCTM().a,svg.getScreenCTM().b)};
+  panGesture = {pointer:ev.pointerId, start:[ev.clientX, ev.clientY], view:{...view}, scale:[1 / svg.getScreenCTM().a, 1 / svg.getScreenCTM().d]};
   svg.setPointerCapture(ev.pointerId); svg.style.cursor = 'grabbing';
 }
 window.addEventListener('pointermove', ev => {
   if (!panGesture || ev.pointerId !== panGesture.pointer) return;
   ev.preventDefault(); ev.stopImmediatePropagation();
   const {start, view:v, scale:k} = panGesture;
-  view.x0 = v.x0 - (ev.clientX - start[0]) * k;
-  view.y0 = v.y0 + (ev.clientY - start[1]) * k;
+  view.x0 = v.x0 - (ev.clientX - start[0]) * k[0];
+  view.y0 = v.y0 + (ev.clientY - start[1]) * k[1];
   applyView();
 }, true);
 function endCanvasPan(ev) {

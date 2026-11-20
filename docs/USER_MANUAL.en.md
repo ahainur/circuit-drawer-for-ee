@@ -2,11 +2,11 @@
 
 [简体中文](USER_MANUAL.zh-CN.md) | [繁體中文](USER_MANUAL.zh-TW.md) | English
 
-This manual covers Circuit Drawer for EE 2.1.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
+This manual covers Circuit Drawer for EE 2.2.0. Read chapters 1 and 2 to install the program, then use the rest as a reference. Commands and field names are written exactly as the program expects them.
 
 Both editors support Simplified Chinese, Traditional Chinese and English. Choose **简体中文 / 繁體中文 / English** at the top right. This manual gives Chinese menu names with English equivalents so you can follow it in either interface.
 
-## Using the Agent in 2.1
+## Using the Agent in 2.2
 
 1、Open **Agent** in the circuit or control editor and choose a blank canvas or the current drawing. In **Prompt library**, search by name or browse DC/DC, inverters and grid connection, rectification and PFC, or motor control. **My prompts** folds separately. Select a template and task mode, click **Fill requirement (editable)**, edit the text and click **Start**. Generation uses your configured online service.
 
@@ -17,6 +17,16 @@ Both editors support Simplified Chinese, Traditional Chinese and English. Choose
 4、Results show measured waveforms, sampling windows, metrics and files. Task history belongs to the current editor service session. The agent-output directory beside the drawing retains run records. Automatic modes use fixed-frequency internal PWM. Variable-frequency cycle repeatability is shown as unverified.
 
 5、The internal mode check and the results page's uniformly sampled cycle check can disagree. Inspect the original waveforms, channels and sampling windows together. Dynamic PWM dead time uses a carrier-threshold approximation and requires verification against the actual gate timing. SPS currently uses one two-bridge group. Unified scheduling for two outputs sharing a primary bridge remains under development.
+
+
+### Repair an Agent candidate
+
+1. Open the candidate card and read the named pins or components. **Before**, **After** and **Overlay** compare versions. **Issues** in the sidebar describes the current drawing. An early geometry failure lists the connection and label checks still pending.
+2. Choose **Edit candidate manually**, or click **Wire** while viewing a candidate. A separate editor opens a draft next to the original file. Draw the missing wire or select a part and drag its named pin handle. Choose **Save and check again**, review the result and click **Adopt**. **Keep draft and return** lets you come back later. If the browser opens a separate tab, use **Check saved draft** in the original window. After changing the original, generate a fresh candidate against that version.
+3. Compare the single- and double-column checks on the same candidate. Choose a paper width or **Try a single-column label layout**, inspect the new preview and adopt it. Undo restores the previous drawing and paper width. The two-stage Boost PFC and half-bridge LLC example is available in the source examples folder as `agent_review/pfc_llc.json`.
+4. Open **Issues** to locate text. An amber dashed outline marks a label near or across a wire, symbol or other text. You can adopt, preview and export that layout. Drag just the label for more space. Moving text leaves the netlist and waveforms unchanged.
+
+5. A winding spacing advisory describes its printed appearance. You can adopt and export a drawing with advice. Simulation uses the pin connections, transformer ratio, polarity, drive and load. Confirm these under **SPICE parameters** when you want waveforms. For a custom converter, give the target output current or power along with the voltages so the load can be determined.
 
 
 ### Choose an example and inspect its waveforms
@@ -136,7 +146,7 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 
 #### 64-bit Windows 10 and 11 installer
 
-1、Download `CircuitDrawer-Setup-2.1.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download `CircuitDrawer-Setup-2.2.0.exe`, choose the installer language and follow the wizard. Installation is per user. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、Use an ASCII installation path. Spaces are supported. Drawing paths, export paths and Windows user names may contain Chinese characters.
 
@@ -145,17 +155,17 @@ Editing, checking and exporting TeX sources or simulation model files need neith
 4、The installer is unsigned. Windows may show **Unknown publisher** or **Windows protected your PC**. After checking the source and SHA256, select **More info → Run anyway** if offered. Compare the command's output with the installer's entry in the release's `SHA256SUMS.txt`.
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.2.0.exe -Algorithm SHA256
 ```
 
 5、Save your drawings and close the launcher and running Circuit Drawer command-line tasks before upgrading or uninstalling. Run the newer installer to upgrade. Uninstall through Windows **Settings → Apps → Circuit Drawer**. User drawings and settings are retained. Save documents in your own drawing folders.
 
 #### Python installation for developers, macOS and Linux
 
-1、Download the wheel `circuit_drawer_for_ee-2.1.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、Download the wheel `circuit_drawer_for_ee-2.2.0-py3-none-any.whl` and run the following command from its download folder. [Release downloads](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 ```bash
-python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.2.0-py3-none-any.whl
 ```
 
 2、You can also install directly from the repository with the following command.
@@ -807,7 +817,7 @@ Every change is checked immediately in the background. Problem parts and positio
 | Overlap | Clearance between symbols, between wires and symbols, between parallel wires | 两个元件符号重叠 (symbols overlap); 导线穿过了元件符号 (wire crosses a symbol); 两条线叠在一起 (wires on top of each other); 两条平行线太近 (parallel wires too close) |
 | Crossings and joints | Every crossing declared as a hop; no wire ending in the middle of a lead | 两线交叉但没标跨线 (unmarked crossing); 导线接在了元件引线中间 (wire touches a lead) |
 | Connections | Every pin connected, no dangling wires; geometry agrees with the netlist pair by pair | 引脚没接上 (open pin); 导线一端悬空 (dangling wire); 该连的没连上 (missing connection); 不该连的连上了 (unwanted connection) |
-| Text | Labels not on symbols, not on wires, not on each other; current arrows on wires | 文字压在元件上 (text on symbol); 文字压在线上 (text on wire); 文字互相重叠 (text overlap); 电流箭头不在导线上 (arrow off wire) |
+| Text | Optional label placement advice. Put current reference arrows on wires. | 文字压在元件上 (text on symbol); 文字压在线上 (text on wire); 文字互相重叠 (text overlap); 电流箭头不在导线上 (arrow off wire) |
 | Column width | Horizontal scale at least 0.55 | 按当前栏宽放不下 (does not fit the column) |
 | Regions, blocks, arrows | Region borders do not cut parts; arrows do not cover parts; zoomed details not wired to the main circuit; module members inside their region | 区域边框切过了元件 (region cuts a symbol); 箭头压在元件上 (arrow on symbol); 放大图被连到了主电路上 (detail wired to circuit); 模块成员不在区域框内 (member outside region) |
 | Modules | Folded boxes do not overlap or cover parts; port links can be routed | 折叠框重叠或压到元件 (folded box overlap); 自动布线失败 (routing failed) |
@@ -833,7 +843,7 @@ Whether the bias is sensible, whether currents really flow in the drawn directio
 | Open pin | `open-pin` | Connect a wire; for a terminal that really needs no connection, tick **故意悬空（NoConn）** |
 | Dangling wire | `dangling-wire` | Connect the end to a pin or another wire, or delete the segment |
 | Missing / unwanted connection | `netlist-open` / `netlist-short` | First decide whether it is a mistake; if you changed the wiring on purpose, use **编辑 → 按图更新网表** |
-| Text on symbol / on wire / overlapping | `text-on-symbol` / `text-on-line` / `text-overlap` | Change the label position, move the part by 0.1–0.2, or reduce the text size |
+| Text on symbol / on wire / overlapping | `text-on-symbol` / `text-on-line` / `text-overlap` | Keep the placement and export, or drag just the label |
 | Subscript without braces (warning) | `subscript-braces` | Click **改成带花括号的写法**; `$V_in$` becomes `$V_{in}$` |
 | Does not fit the column | `too-cramped` | Switch to double column, or tighten the spacing and shrink symbols |
 | Region border cuts a part | `region-cuts-symbol` | Drag the region's corners so the part is entirely inside or outside |
@@ -1220,6 +1230,20 @@ This feature lines up simulated or measured waveforms with mode figures: t0, t1,
 
 ![Waveforms and modes panel](images/manual/en/waveforms-panel.png)
 
+### Add a schematic, legend and equipment symbols to a waveform
+
+1. Open a numeric CSV in **Figure studio → Waveform publication**, or use the waveform panel opened after a SPICE run. Choose **Insert → Current curve legend** and click the target axis. Curves on the same axis share a legend. Applying changes to their names, colours or line styles updates the legend.
+
+2. Choose **Insert → Topology inset…** and select the current schematic or a mode. Drag a rectangle to crop a detail, then click **Use topology** and place it on the plot. The project stores a vector snapshot. After editing the source, select the inset and click **Refresh from source**. Drag a **System symbol** from the library or select it and click the plot. **Images and personal icons…** accepts imported files, pasted images and saved artwork. Transparent PNGs retain their alpha channel.
+
+3. Drag a frame to move it. Drag the lower-right handle to scale an inset proportionally. Arrow keys move it by 0.01 cm, or 0.1 cm with Shift. A meter can be attached to a channel and sample time. Its leader stays on the reading when you move the meter. **Undo** restores the previous placement.
+
+4. In **Plot properties**, choose a background colour and tint strength, such as light purple at 17%. Select **Off**, **Solid** or **Dashed** independently for **Horizontal grid lines** and **Vertical grid lines**, then click **Apply plot style**. The XY / state-plane view shares these settings. Grid lines follow the major ticks when the plot is zoomed. Select an object to adjust its transparency, corner radius and shadow. **SimSun / Times New Roman** requires both fonts, XeLaTeX, xeCJK and mathspec. **Journal default** works with the bundled toolchain. Check **Rendered figure preview** before saving or exporting PDF, SVG, PNG or TeX. Share the project JSON with `waveforms-data/` and `figure-assets/`. Send the accompanying asset files with an exported TeX document.
+
+5. Under **Appearance**, clear **Show border** and apply the properties to remove the outline and its shadow. The background can still be white or transparent. The dashed blue selection outline is an editing aid. Hover over a field or its **?** for help with tint, probe times or mode binding. Tab shows the help, Esc dismisses it, and tapping **?** pins it.
+
+![Boost output voltage at three loads with a vector schematic and a measurement at 8 ms](images/manual/waveform-paper-insets.png)
+
 ### 16.1 Opening the example
 
 ```bash
@@ -1254,7 +1278,7 @@ Click **波形与模态** (Waveforms and modes) on the toolbar, or **模态与�
 
 1、The **标注** (Annotate) buttons above the panel are: **文字** (Text) places text with one click; **箭头** (Arrow) is dragged from its tail to the point it marks; **关键点** (Key point) places a small hollow circle, optionally with text, at peaks, zero crossings and so on.
 
-2、Text may contain English and `$maths$` only (for example `$i_L$ peak`, `$I_{L,\max}$`), no Chinese.
+2、Text may contain Chinese, English and `$maths$` (for example `$i_L$ peak`, `$I_{L,\max}$`).
 
 3、Click an annotation to drag it, drag either end of an arrow, or drag its text alone; double-click to edit the text; **删除所选** (Delete selected) or `Delete` removes it; **撤销** (Undo) restores. The t0, t1, ... and `Mode k` labels can also be dragged aside without moving the boundaries.
 
@@ -1264,7 +1288,7 @@ Click **波形与模态** (Waveforms and modes) on the toolbar, or **模态与�
 
 6、Click **AI annotations…** and enter “Mark the i_L peak with $I_{L,\max}$ and add an arrow on the rising ramp of the first interval labeled $V_{in}/L$.” The program calculates candidate points from the current CSV, selected channels and time intervals, then uses your current AI settings to generate annotations. Review the preview and click **Apply annotations** to append them. One undo removes the whole batch. **Save mode mapping** writes the result to the file.
 
-7、The AI receives a candidate-point summary containing interval boundaries, extrema, zero crossings and the midpoint and slope of the longest continuous rising/falling ramp. Each interval supplies up to eight zero-crossing candidates. The total annotation limit is 40. Regenerate after changing channels, intervals or annotations. Labels use English or mathematical notation and can be adjusted in **Annotation properties**.
+7、The AI receives a candidate-point summary containing interval boundaries, extrema, zero crossings and the midpoint and slope of the longest continuous rising/falling ramp. Each interval supplies up to eight zero-crossing candidates. The total annotation limit is 40. Regenerate after changing channels, intervals or annotations. Labels can use Chinese, English or mathematical notation and can be adjusted in **Annotation properties**.
 
 ![Waveform AI annotation preview](images/manual/en/waveform-ai.png)
 
@@ -2058,7 +2082,7 @@ Word versions that support SVG can insert the SVG directly at its original size;
 
 ### 21.6 Chinese text
 
-When any text in a figure contains Chinese, `CJKutf8` (with the Song typeface) is loaded automatically. Full MiKTeX and TeX Live installations include it; minimal installations need the CJK packages (`latex-cjk-chinese` on Ubuntu). Waveform annotations accept only English and maths.
+When any text in a figure contains Chinese, `CJKutf8` (with the Song typeface) is loaded automatically. Full MiKTeX and TeX Live installations include it; minimal installations need the CJK packages (`latex-cjk-chinese` on Ubuntu). Waveform plot properties also offer the installed SimSun and Times New Roman fonts.
 
 ### 21.7 Black-and-white printing
 
@@ -2531,7 +2555,7 @@ Any error-level problem rejects the table, and no figure is produced. Codes are 
 
 ### B.6 Text (`text-on-symbol`, `text-on-line`, `text-overlap`, `arrow-off-wire`, `subscript-braces`)
 
-1、Labels, ratio text and free text may not lie on symbols or wires and keep at least 0.06 cm from each other. Text size is estimated for 8 pt Times.
+1、The author chooses the placement of labels, ratio text and annotations. Text over a wire, symbol or other text generates print advice. Export the drawing as it stands or move the text for more space.
 
 2、Current reference arrows must lie on wires.
 
@@ -2551,7 +2575,7 @@ A horizontal scale below 0.55 means the drawing does not fit the column; the com
 
 4、Folded boxes may not overlap each other or hide the symbols, leads, labels or pins of visible outside parts (`module-box-overlap`); port links must be routable (`module-route`).
 
-5、Simulation exports (SPICE, Simulink, PLECS) do not refuse known annotation-only problems (arrows and text covering things, region borders, decorative colours and text formatting); drawing previews and PDF still require them to be fixed or explicitly allowed. Electrical connections, the netlist, parameters, model mappings and instance completeness are always checked.
+5、Simulation exports (SPICE, Simulink, PLECS) do not refuse known annotation-only problems (arrows and text covering things, region borders, decorative colours and text formatting); drawing previews and PDF also allow a label over a wire, symbol or other text. Block arrows covering components have their own permission setting. Electrical connections, the netlist, parameters, model mappings and instance completeness are always checked.
 
 
 ## Explicit control arrangement

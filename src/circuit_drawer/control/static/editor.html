@@ -82,6 +82,7 @@
 </style>
 <link rel="stylesheet" href="/menu.css">
 <link rel="stylesheet" href="/hints.css">
+<script src="/hints.js"></script>
 <link rel="stylesheet" href="/theme-eda.css">
 <link rel="stylesheet" href="/agent.css">
 <link rel="stylesheet" href="/figure.css">
@@ -101,10 +102,12 @@
     <span class="file" id="file" translate="no">Circuit Drawer</span><span id="dirty" class="hint"></span>
   </div>
   <div class="quick-tools" role="toolbar" aria-label="常用工具栏">
-<button id="saveBtn" title="Ctrl+S">保存</button>
-<button id="undoBtn" title="撤销 (Ctrl+Z)">撤销</button>
+<div class="tool-group" role="group" aria-label="文件"><button id="saveBtn" title="Ctrl+S">保存</button>
+<button id="exportBtn" class="primary">导出…</button></div>
+<div class="tool-group" role="group" aria-label="编辑"><button id="undoBtn" title="撤销 (Ctrl+Z)">撤销</button>
 <button id="redoBtn" title="重做 (Ctrl+Shift+Z)">重做</button>
-<button id="routeBtn">整理布线</button>
+<button id="delBtn" title="删除选中 (Delete)">删除</button></div>
+<div class="tool-group" role="group" aria-label="绘图"><button id="routeBtn">整理布线</button>
 <button id="arrangeBtn">重新排版</button>
 <select id="addSel" title="添加">
     <option value="">＋ 添加…</option>
@@ -123,11 +126,12 @@
     <option value="region:dashed">蓝色虚线框（框住选中的方块）</option>
   </select>
 <button id="linkBtn" title="连线模式 (L)：点一个端口，再点另一个端口；点空白处得到开口端，点在线上得到分支">连线</button>
-<button id="delBtn" title="删除选中 (Delete)">删除</button>
-<button id="fitBtn">适应窗口</button>
+</div>
+<div class="tool-group" role="group" aria-label="查看"><button id="fitBtn">适应窗口</button>
 <button id="previewBtn">LaTeX 预览</button>
-<button id="quickAi" data-command="tweakControl" title="AI 修改当前图">AI 修改…</button>
-<button id="exportBtn" class="primary">导出…</button>
+</div>
+<div class="tool-group" role="group" aria-label="AI"><button id="quickAi" data-command="tweakControl" title="AI 修改当前图">AI 修改…</button>
+</div>
   </div>
   <div id="menu-file-panel" class="menu-panel" role="menu" aria-labelledby="menu-file" hidden>
     <button data-command="saveBtn" role="menuitem" tabindex="-1" >保存<kbd>Ctrl+S</kbd></button>

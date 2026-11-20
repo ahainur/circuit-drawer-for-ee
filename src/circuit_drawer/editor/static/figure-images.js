@@ -17,6 +17,7 @@
   fileInput.hidden = true;
   document.body.append(fileInput);
   let busy = false, editing = null, encoded = null, baseKey = '';
+  let wavePick = null;
   let generator = null, generation = 0, savingPreferences = Promise.resolve();
   let preferences = {engine:'drawing', image_model:''};
   const field = name => dialog.querySelector(`[name="${name}"]`);
@@ -47,7 +48,7 @@
     if (!dialog.open) dialog.showModal();
   }
   dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
-  dialog.addEventListener('close', () => { ++generation; generator = null; });
+  dialog.addEventListener('close', () => { ++generation; generator = null; wavePick = null; });
   dialog.addEventListener('click', event => {
     const action = event.target.closest('[data-action]')?.dataset.action;
     if (busy || !action) return;
@@ -101,6 +102,11 @@
       <label><input name="foreground" type="checkbox" ${asset.foreground !== false ? 'checked' : ''}>${tr('置于图形前方')}</label>
       <label><input name="remember" type="checkbox">${tr('同时存入个人素材库')}</label></div></div>
       <footer>${button('apply','应用（一步撤销）')}${generated ? button('remember-only','只收藏到个人图标库') + button('generator','重新生成') : ''}${asset.id ? button('remove','删除图片') : ''}${button('close','取消')}</footer>`);
+    if (wavePick) {
+      dialog.querySelector('fieldset').hidden=true;
+      field('foreground').parentElement.hidden=true;
+      dialog.querySelector('.figure-image-edit p').textContent=tr('点击绘图区放置，Enter 使用默认位置，Esc 取消。');
+    }
   }
   async function apply() {
     if (baseKey !== key()) throw new Error(tr('等待操作时图纸已改变，请重试。'));
@@ -114,6 +120,12 @@
         mono_png:(await preview(asset.mono_source)).split(',')[1]};
       asset = {...asset, ...(await request('import-image', {...data, name,
         remember:field('remember').checked})).asset};
+    }
+    if (wavePick) {
+      const accept=wavePick;
+      dialog.close();
+      accept({...asset,name});
+      return;
     }
     if (!asset.id) {
       const used = new Set((snapshot().table.images || []).map(item => item.id));
@@ -329,8 +341,9 @@
   entry.onclick = () => { document.getElementById('systemSymbolLibrary').close(); library(); };
   document.querySelector('#systemSymbolLibrary header').after(entry);
   document.addEventListener('paste', event => {
-    if (!window.CircuitFigure.isOpen() || busy || dialog.open ||
-      event.target.closest('input,textarea,[contenteditable=true]')) return;
+    const picking = wavePick && dialog.open;
+    if (busy || (!picking && (document.getElementById('wavePanel')?.hidden === false ||
+      !window.CircuitFigure.isOpen() || dialog.open || event.target.closest('input,textarea,[contenteditable=true]')))) return;
     const file = [...event.clipboardData.items].find(item => item.type.startsWith('image/'))?.getAsFile();
     if (file) { event.preventDefault(); event.stopImmediatePropagation(); loadFile(file); }
   }, true);
@@ -343,5 +356,6 @@
     event.preventDefault();
     if (!busy && !dialog.open) loadFile(event.dataTransfer.files[0]);
   });
-  window.CircuitFigureImages = {draw, paper, open:library};
+  window.CircuitFigureImages = {draw, paper, open:library, preview,
+    pick(callback, file) {if (busy || dialog.open) return; wavePick=callback; if (file) loadFile(file); else library();}};
 })();

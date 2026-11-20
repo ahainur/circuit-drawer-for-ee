@@ -7,12 +7,22 @@
 .help-tip > summary { list-style: none; display: inline-grid; place-items: center; width: 16px; height: 16px;
   border: 1px solid currentColor; border-radius: 50%; color: var(--muted); font: 600 11px/1 system-ui, sans-serif; cursor: pointer; }
 .help-tip > summary::-webkit-details-marker { display: none; }
+.help-tip > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .help-tip[open] > summary, .help-tip > summary:hover { color: var(--accent); }
 .help-tip > .help-body { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-width: 560px;
   padding: 8px 10px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 4px 14px #0002;
   color: var(--ink); font-size: 12px; font-weight: normal; line-height: 1.55; white-space: normal; }
 .help-body ol { margin: 0; padding-left: 18px; }
 .help-body li + li { margin-top: 4px; }
+.help-tip > .floating-help {
+  position: fixed; inset: auto; margin: 0; z-index: 1000; box-sizing: border-box;
+  width: max-content; max-width: min(26rem, calc(100vw - 16px)); overflow: auto;
+  overflow-wrap: anywhere; overscroll-behavior: contain; border-radius: 5px;
+}
+.help-body p { margin: 0; }
+@media (pointer: coarse) {
+  .help-tip > summary { min-width: 24px; min-height: 24px; }
+}
 .field-error { display: block; margin-top: 2px; color: var(--bad); font-size: 12px; }
 
 fieldset[data-prompt-library] { min-width:0; margin:6px 0; }

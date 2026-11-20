@@ -5,18 +5,18 @@
 Circuit Drawer 是面向电力电子的电路与控制框图编辑器。支持手工绘图、模板编辑，以及让 AI Agent 从空白画布生成图纸、配置参数、运行 ngspice、查看波形与模态。图纸以可编辑 JSON 保存，可输出论文用的 CircuiTikZ 图形，并关联功率电路与控制框图，导出完整闭环仿真模型。
 
 <p align="center">
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/CircuitDrawer-Setup-2.1.0.exe"><img alt="下载 Windows 一键安装包 — 离线安装程序 v2.1.0" src="https://img.shields.io/badge/Windows%20%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85-v2.1.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/CircuitDrawer-Setup-2.2.0.exe"><img alt="下载 Windows 一键安装包 — 离线安装程序 v2.2.0" src="https://img.shields.io/badge/Windows%20%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85-v2.2.0-7CB342?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v2.1.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v2.1.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v2.1.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v2.1.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit_drawer_for_ee-2.2.0-py3-none-any.whl"><img alt="下载 macOS Apple 芯片版 — Python 安装包 v2.2.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Apple%20Silicon%29-v2.2.0-168BFF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit_drawer_for_ee-2.2.0-py3-none-any.whl"><img alt="下载 macOS Intel 版 — Python 安装包 v2.2.0" src="https://img.shields.io/badge/Download%20for%20Mac%20%28Intel%29-v2.2.0-269C91?style=for-the-badge&amp;labelColor=151515"></a>
   <br>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/CircuitDrawer-Setup-2.1.0.exe"><img alt="下载 Windows 版 — 离线安装程序 v2.1.0" src="https://img.shields.io/badge/Download%20for%20Windows-v2.1.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
-  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit_drawer_for_ee-2.1.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v2.1.0" src="https://img.shields.io/badge/Download%20for%20Linux-v2.1.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/CircuitDrawer-Setup-2.2.0.exe"><img alt="下载 Windows 版 — 离线安装程序 v2.2.0" src="https://img.shields.io/badge/Download%20for%20Windows-v2.2.0-36ADEF?style=for-the-badge&amp;labelColor=151515"></a>
+  <a href="https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit_drawer_for_ee-2.2.0-py3-none-any.whl"><img alt="下载 Linux 版 — Python 安装包 v2.2.0" src="https://img.shields.io/badge/Download%20for%20Linux-v2.2.0-E95420?style=for-the-badge&amp;labelColor=151515"></a>
 </p>
 
 Windows 按钮下载离线安装程序。macOS 和 Linux 按钮下载通用 Python 安装包（`.whl`，需要 Python 3.10+），当前为预览支持。安装步骤见下方。
 
-[新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.1.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-trial-2.1.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-manuals-2.1.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.1.0/circuit-drawer-public-source-2.1.0.zip)
+[新版说明](https://github.com/ahainur/circuit-drawer-for-ee/releases/tag/v2.2.0) / [含示例的试用包](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit-drawer-trial-2.2.0.zip) / [离线三语说明书](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit-drawer-manuals-2.2.0.zip) / [完整源码](https://github.com/ahainur/circuit-drawer-for-ee/releases/download/v2.2.0/circuit-drawer-public-source-2.2.0.zip)
 
 [从空白画布开始](#四快速上手) · [控制图关联与闭环导出](#关联控制图并导出完整闭环) · [Agent 与 MCP 使用说明](docs/AGENT_MCP.md)
 
@@ -54,7 +54,7 @@ Windows 按钮下载离线安装程序。macOS 和 Linux 按钮下载通用 Pyth
 | --- | --- |
 | ![两个折叠成方框的 DAB 模块](docs/images/manual/example-modules-folded.png) | ![永磁同步电机磁场定向控制框图](docs/images/manual/example-control-foc.png) |
 
-在 2.1 电路编辑器中，画布显示 Boost 电路，右侧提示词库可选择任务方式。
+在 2.2 电路编辑器中，画布显示 Boost 电路，右侧提示词库可选择任务方式。
 
 ![Boost 电路与 Agent 的示例仿真选项](docs/images/manual/editor-agent-2.png)
 
@@ -62,7 +62,7 @@ Windows 按钮下载离线安装程序。macOS 和 Linux 按钮下载通用 Pyth
 
 ### 64 位 Windows 10 和 11
 
-1、下载并双击 `CircuitDrawer-Setup-2.1.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
+1、下载并双击 `CircuitDrawer-Setup-2.2.0.exe`，选择安装语言，按向导完成当前用户安装。[发布下载页](https://github.com/ahainur/circuit-drawer-for-ee/releases)
 
 2、安装目录使用 ASCII 字符，允许空格。图纸、导出目录和 Windows 用户名可使用中文。
 
@@ -71,7 +71,7 @@ Windows 按钮下载离线安装程序。macOS 和 Linux 按钮下载通用 Pyth
 4、安装包尚未签名，Windows 可能显示“未知发布者”或“Windows 已保护你的电脑”。核对下载来源及 SHA256 后，可在提供该选项的界面选择“更多信息 → 仍要运行”。在 PowerShell 运行下面的命令，将结果与同一发布页 `SHA256SUMS.txt` 中的对应条目比较。
 
 ```powershell
-Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
+Get-FileHash .\CircuitDrawer-Setup-2.2.0.exe -Algorithm SHA256
 ```
 
 5、升级或卸载前先保存图纸，关闭启动器和正在运行的 Circuit Drawer 命令行任务。升级时运行新版安装程序。卸载入口在 Windows“设置 → 应用 → Circuit Drawer → 卸载”，用户图纸和设置会保留。图纸请保存到自己的文档目录。
@@ -85,7 +85,7 @@ Get-FileHash .\CircuitDrawer-Setup-2.1.0.exe -Algorithm SHA256
 Windows：
 
 ```powershell
-python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.2.0-py3-none-any.whl
 ```
 
 macOS 或 Linux：在虚拟环境中安装。
@@ -93,7 +93,7 @@ macOS 或 Linux：在虚拟环境中安装。
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install circuit_drawer_for_ee-2.1.0-py3-none-any.whl
+python -m pip install circuit_drawer_for_ee-2.2.0-py3-none-any.whl
 ```
 
 运行后文命令时保持此环境已激活。Debian／Ubuntu 若提示缺少 `venv` 模块，先安装 `python3-venv`。
@@ -134,6 +134,11 @@ Python 安装方式可按需要配置下列组件。Windows 安装包已包含 L
 3、示例仿真先请你采用电路图，再列出当前值、建议值和假设。确认工况后才运行 ngspice。点 **查看结果** 可看输出电压、电感电流和 PWM。点 **保存** 保留图纸与参数，运行文件位于图纸旁的 `agent-output`。[Agent 操作手册](docs/AGENT_MCP.md#四内置-agent-的使用)
 
 4、要试另一种负载，打开 **仿真 → SPICE 仿真…**。在左侧搜索 `RL`，将示例电阻从 30 Ω 改为 `12`，再搜索 `S1`，将开关频率从 50 kHz 改为 `40k`。核对顶部工况和通道，换一个输出文件夹后运行或复跑，可保留两组波形作比较。手工操作可以直接从已有的 [Boost 图纸](examples/spice/boost.json) 开始。
+
+### 修复候选的接线与排版
+
+1、候选卡会点名待修的元件或引脚。选 **手动修改候选** 打开独立草稿，补线后点 **保存并重新校验**，回到原图比较和采用。
+2、纸面过挤时，可在候选卡比较单栏、双栏，或 **试排单栏标签**。绕组稍宽只显示排版提醒。标签的虚线框标出文字检查位置。标签压线、压元件或彼此重叠时会显示黄色提醒，可照原样采用、预览和出图，也可以只拖动标签。两种栏宽的差异可用随附的 PFC＋LLC 图练习。[打开示例](examples/agent_review/pfc_llc.json)
 
 ### 关联控制图并导出完整闭环
 
@@ -200,6 +205,7 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 | 可复用模块、折叠、模块库 | 网页编辑器器件库的 **模块（子系统）** 分组 |
 | 工作模态图及固定 PWM 模态识别 | 工具栏 **识别模态**、**模态** 页或 Agent，也可用 `circuit-drawer modes` |
 | 波形与模态对应 | **模态与波形 → 波形与模态…**，或 `circuit-drawer waveforms` |
+| 在波形上放置图例、矢量拓扑、系统图标或个人图片（开发版） | **美化出图 → 波形出图 → 插入**，拖动摆位，设置淡色底和横纵网格线。在对象的 **外观** 中可关闭边框。悬停在设置旁的 **?** 可查看用法。[三负载 Boost 示例](examples/waveforms/boost_paper_insets.json) |
 | ngspice 仿真 | **仿真 → SPICE 仿真…**，或 `circuit-drawer spice` |
 | 传导 EMI 工程估算及滤波前后对比 | **实验功能 → 传导 EMI 估算…**，从 `buck_emi` 模板开始 |
 | Simulink 和 PLECS 模型、闭环控制器、折叠模块导出为子系统 | **仿真 → 导出到 Simulink… / 导出到 PLECS…**，或 `circuit-drawer simulink` / `circuit-drawer plecs` |
@@ -229,6 +235,10 @@ circuit-drawer simulink my_buck_sim.json -o out/simulink
 
 6、[示例](examples/)
 
-## 七、许可证
+## 七、贡献者
+
+1、感谢 [@YouthWell](https://github.com/YouthWell) 报告「采用」按钮变灰，并提供 Boost PFC＋LLC 使用截图，帮助定位标签检查过严的问题。
+
+## 八、许可证
 
 Circuit Drawer for EE 以 [MIT 许可证](LICENSE) 发布。

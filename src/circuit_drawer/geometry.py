@@ -384,7 +384,62 @@ def footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
                     if key in fp.extra:
                         x, y = fp.extra[key]
                         fp.extra[key] = (x + dx, y + dy)
+    if "ink_body" in fp.extra and el.label and fp.labels:
+        ink = _printed_bipole_label(el, fp, prof)
+        if ink is not None:
+            fp.extra["ink_label"] = ink
     return fp
+
+
+# CircuitikZ european resistor and capacitor path extents, in bipole lengths.
+# Routing continues to use the existing clearance envelope.
+_BIPOLE_INK = {"R": (.8, .3), "C": (.2, .6)}
+# Times italic and roman advance widths in thousandths of an em, A-Z then a-z.
+_TIMES_ITALIC = (611,611,667,722,611,611,722,722,333,444,667,556,833,667,722,611,722,611,500,556,722,611,833,611,556,556,
+                 500,500,444,500,444,278,500,500,278,278,444,278,722,500,500,500,500,389,389,278,500,444,667,444,444,389)
+_TIMES_ROMAN = (722,667,667,722,611,556,722,722,333,389,722,611,889,722,722,556,722,667,556,611,722,722,944,722,722,611,
+                444,500,444,500,444,333,500,500,278,278,500,278,778,500,500,500,500,333,389,278,500,500,722,500,500,444)
+_MATH_ID = re.compile(r"\$([A-Za-z])(?:_(?:([A-Za-z0-9])|\{([A-Za-z0-9]+)\}|\{\\mathrm\{([A-Za-z0-9]+)\}\}))?\$")
+
+
+def _advance(char, roman=False):
+    if char.isdigit():
+        return .5
+    widths = _TIMES_ROMAN if roman else _TIMES_ITALIC
+    index = ord(char) - ord("A") if char.isupper() else 26 + ord(char) - ord("a")
+    return widths[index] / 1000
+
+
+def _printed_bipole_label(el, fp, prof):
+    """Bound simple Times identifiers; retain the original envelope for other TeX."""
+    match = _MATH_ID.fullmatch(el.label)
+    if not match or el.opts.get("font_weight", "normal") != "normal":
+        return None
+    base, single, group, roman = match.groups()
+    sub = single or group or roman or ""
+    size = font_of(el.opts.get("label_size"), prof)
+    # LaTeX uses 6 pt scripts at 8 pt. Scriptspace is blank; allow half a printed stroke for ink.
+    cm_per_pt = 2.54 / 72.27
+    width = (size * (_advance(base) + .75 * sum(_advance(c, bool(roman)) for c in sub))
+             + prof.line_pt / 2) * cm_per_pt
+    box = fp.labels[0]
+    x, y = (box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2
+    height = box.y1 - box.y0
+    length, across = axis_sizes(el)
+    if "label_offset" not in fp.extra and length == across:
+        # Native CircuitikZ labels sit beside the visible path. Explicitly moved
+        # labels are centred on the original node written by the TeX emitter.
+        a, b = el.pins["a"], el.pins["b"]
+        horizontal = abs(a[1] - b[1]) < EPS
+        side = el.label_pos or default_label_pos("h" if horizontal else "v")
+        body = fp.extra["ink_body"]
+        if not horizontal and side in ("left", "right"):
+            x = body.x0 - LABEL_GAP - width / 2 if side == "left" else body.x1 + LABEL_GAP + width / 2
+        elif horizontal and side in ("above", "below"):
+            y = body.y1 + LABEL_GAP + height / 2 if side == "above" else body.y0 - LABEL_GAP - height / 2
+        else:
+            return None
+    return centred(x, y, width, height)
 
 
 def _base_footprint(el: Element, s: Scale, prof: Profile) -> Footprint:
@@ -491,6 +546,13 @@ def _two_terminal(el: Element, s: Scale, prof: Profile) -> Footprint:
     L = prof.bipole_len * BODY_FRAC[symbol_kind(el)] * length
     body = centred(mx, my, L, 2 * hh) if axis == "h" else centred(mx, my, 2 * hh, L)
     fp.bodies.append(body)
+    if dims := _BIPOLE_INK.get(symbol_kind(el)):
+        span, across = dims[0] * prof.bipole_len * length, dims[1] * prof.bipole_len * width
+        fp.extra["ink_body"] = centred(mx, my, span, across) if axis == "h" else centred(mx, my, across, span)
+    if el.kind in ("V", "vac", "I"):
+        # The conservative collision envelope includes side clearance around the round ink.
+        along, across = L / 2, L / 2 * width / length
+        fp.extra["source_radii"] = (along, across) if axis == "h" else (across, along)
     pos = el.label_pos or default_label_pos(axis)
     outer = body
     if el.kind == "scr":
@@ -708,8 +770,8 @@ def extra_windings(el: Element, P: dict) -> list[tuple[str, str, str, str]]:
 
 def _transformer(el: Element, s: Scale, prof: Profile) -> Footprint:
     """Windings are drawn on their pins, so a vertical wire leaving a pin
-    never jogs; the validator keeps the primary-secondary gap within
-    WINDING_GAP so the core does not drift away from the coils.  Extra
+    never jogs; the validator checks minimum clearance and advises on a wide
+    primary-secondary gap.  Extra
     windings w3..w6 stand on the primary or the secondary axis and share
     the one core, which spans every winding."""
     u, v, P = transformer_frame(el, s)

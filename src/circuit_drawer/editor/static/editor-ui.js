@@ -71,6 +71,7 @@ function updateEditorChrome() {
   const issues = (report?.issues || []).filter(i => i.level !== 'note' && i.code !== 'empty-drawing').length;
   document.getElementById('issueCount').hidden = !issues;
   document.getElementById('issueCount').textContent = issues;
+  document.getElementById('issueCount').classList.toggle('advisory',!!report?.ok);
   const snapshot = editorTableSnapshot(layout);
   document.getElementById('fileDirty').hidden = savedEditorTable === null || savedEditorTable === snapshot;
   updateHistoryControls(snapshot);

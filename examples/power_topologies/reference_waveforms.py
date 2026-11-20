@@ -17,7 +17,7 @@ from pathlib import Path
 from circuit_drawer.layout import Layout
 from circuit_drawer.profiles import get_profile
 from circuit_drawer.templates.saved import BUNDLED
-from circuit_drawer.validate import check
+from circuit_drawer.validate import LabelIssue, check
 from circuit_drawer.waveforms import circuit_signature
 
 NAMES = (
@@ -106,10 +106,13 @@ def example(name):
     table = json.loads((BUNDLED / (name + '.json')).read_text(encoding='utf-8'))['layout']
     lay = Layout.from_dict(table)
     assert len(lay.modes) == len(edges) - 1
+    single = check(lay, get_profile('single'))
+    # Choose a compact example only if its labels still read clearly at column width.
+    compact = single.ok and not any(isinstance(issue, LabelIssue) for issue in single.issues)
     table['waveform'] = dict(version=1, source='waveforms-data/' + name + '.csv',
         sha256=hashlib.sha256(raw).hexdigest(), time_column='time_s', time_unit='s',
         display_unit='us' if period == PERIOD else 'ms', relative_time=True,
-        slice_style='shade', arrange='grid' if check(lay, get_profile('single')).ok else 'stack', window=[0, period],
+        slice_style='shade', arrange='grid' if compact else 'stack', window=[0, period],
         boundaries=[q * period for q in edges], intervals=[m['name'] for m in lay.modes],
         channels=[dict(column=c, label=c.rsplit('_', 1)[0], unit=c.rsplit('_', 1)[1], color=COLORS[i])
                   for i, c in enumerate(columns)], circuit_signature=circuit_signature(lay),

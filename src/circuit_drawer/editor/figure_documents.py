@@ -38,11 +38,16 @@ def request(editor, req):
         raw = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict) or raw.get("kind") != "control" or raw.get("algorithm") is not True:
             raise ValueError("请选择算法流程图")
-        from ..launcher import Session
+        return open_editor(editor, path, raw.get("profile") or "ieee-single")
+
+
+def open_editor(editor, path, profile):
+    """Share child-editor lifetime with the parent, keeping its document independent."""
+    from ..launcher import Session
+    with _LOCK:
         sessions = getattr(editor, "figure_documents", {})
         if path not in sessions:
-            sessions[path] = Session(path, raw.get("profile") or "ieee-single",
-                                     settings=editor.web_settings.settings)
+            sessions[path] = Session(path, profile, settings=editor.web_settings.settings)
             sessions[path].editor.provider = editor.provider
             sessions[path].editor.model = editor.model
             sessions[path].editor.chat_factory = editor.chat_factory

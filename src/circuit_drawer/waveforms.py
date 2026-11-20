@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
@@ -29,6 +30,7 @@ from .pipeline import LayoutRejected, render_modes
 from .profiles import get_profile
 from .regions import INKS, LINE_HEAD, Callout, ink_rgb, ink_tikz, valid_ink
 from .validate import ARROW_TEXT, check
+from . import waveform_insets as insets
 
 MAX_BYTES = 64 * 1024 * 1024
 MAX_ROWS = 1_000_000
@@ -225,7 +227,9 @@ def validate_settings(lay: Layout, cfg: dict, data: Data, *, bound=False) -> dic
                 raise ValueError("通道标签和单位需为最多 60 字的文字")
         if not re.fullmatch(r"#[0-9a-fA-F]{6}", c.get("color", "")):
             raise ValueError("波形颜色需为 #rrggbb")
-        unknown = set(c) - {"column", "label", "unit", "color", "axis_group"}
+        if c.get("line", "solid") not in insets.LINE_STYLES:
+            raise ValueError(f"通道 {column} 线型无效")
+        unknown = set(c) - {"column", "label", "unit", "color", "axis_group", "line"}
         if unknown:
             raise ValueError(f"通道 {column} 不支持字段 {', '.join(sorted(unknown))}")
         group = c.get("axis_group")
@@ -236,6 +240,7 @@ def validate_settings(lay: Layout, cfg: dict, data: Data, *, bound=False) -> dic
             raise ValueError(f"同轴组 {group[0]['axis_group']} 的通道单位必须相同；请统一单位或使用独立纵轴")
     # A note may sit on a hidden channel: it is kept, just not drawn.
     _check_notes(cfg, set(data.columns) - {cfg.get("time_column")})
+    insets.validate(cfg, set(data.columns) - {cfg.get("time_column")})
     from .waveform_xy import validate as validate_xy
     validate_xy(cfg, data)
     return cfg
@@ -279,8 +284,6 @@ def _check_notes(cfg: dict, channels: set) -> None:
             raise ValueError(f"{name}.text 需为最多 120 字的文字")
         if kind == "text" and not text.strip():
             raise ValueError(f"{name} 是文字标注，text 不能为空")
-        if has_wide(text):
-            raise ValueError(f"{name}.text 请用英文或数学记号（如 $i_L$ peak），论文图不放中文")
         if ARROW_TEXT.fullmatch(text.strip()):
             raise ValueError(f"{name}.text 把箭头写成了文字；请改用 kind: arrow，填 from 和 to")
         if text.count("$") % 2:
@@ -356,6 +359,28 @@ def last_period(data: Data, column: str) -> list[float]:
     return [begin, middle[0], end]
 
 
+def store_csv_snapshot(destination, raw, sha):
+    """Concurrent imports may share a snapshot, but must never see a partial CSV."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.exists():
+        with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+        try:
+            temporary.write_bytes(raw)
+            try:
+                if os.name == "nt":
+                    temporary.rename(destination)
+                else:
+                    os.link(temporary, destination)
+                return
+            except FileExistsError:
+                pass
+        finally:
+            temporary.unlink(missing_ok=True)
+    if hashlib.sha256(WaveStore._bytes(destination)).hexdigest() != sha:
+        raise ValueError("CSV 快照文件内容不一致，请保留现场并重新命名导入文件")
+
+
 class WaveStore:
     def __init__(self, layout_path: Path):
         self.path = layout_path
@@ -403,13 +428,7 @@ class WaveStore:
         sha = hashlib.sha256(raw).hexdigest()
         name = re.sub(r"[^\w-]+", "_", name).strip("_")[:60] or "waveform"
         destination = self.path.parent / "waveforms-data" / f"{name}_{sha[:16]}.csv"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists():
-            if hashlib.sha256(destination.read_bytes()).hexdigest() != sha:
-                raise ValueError("CSV 快照文件内容不一致，请保留现场并重新命名导入文件")
-        else:
-            with destination.open("xb") as f:
-                f.write(raw)
+        store_csv_snapshot(destination, raw, sha)
         time_column = req.get("time_column") or next(iter(data.columns))
         channels = []
         for key in data.columns:
@@ -433,7 +452,7 @@ class WaveStore:
         if previous:
             candidate = {**cfg, **{k: deepcopy(previous[k]) for k in
                          ("window", "boundaries", "intervals", "channels", "display_unit", "relative_time",
-                          "period_column", "slice_style", "arrange", "notes", "label_offsets", "xy")
+                          "period_column", "slice_style", "arrange", "notes", "label_offsets", "xy", "insets", "plot_style", "grid")
                           if k in previous}}
             try:
                 if candidate.get("period_column"):
@@ -442,7 +461,15 @@ class WaveStore:
                 validate_settings(lay, candidate, data)
                 cfg = candidate
             except (ValueError, TypeError, KeyError):
-                pass
+                # A new time span or different channels still fit the same paper style.
+                for field in ("plot_style", "grid"):
+                    if field not in previous:
+                        continue
+                    try:
+                        insets.validate({field: previous[field]})
+                        cfg[field] = deepcopy(previous[field])
+                    except ValueError:
+                        pass
         return self.preview(lay, cfg, profile, target=target)
 
     def preview(self, lay: Layout, cfg: dict, profile: str = "ieee-single", *, target="overview") -> dict:
@@ -453,11 +480,14 @@ class WaveStore:
         current = deepcopy(lay)
         current.extra["waveform"] = cfg
         from .waveform_xy import preview as xy_preview
+        sheet = paper(cfg, profile, target, [m.get("name") for m in lay.modes])
+        if cfg.get("insets"):
+            sheet["insets"] = insets.objects(data, cfg, sheet, channels)
         return {"config": cfg, "columns": list(data.columns), "rows": len(data.time),
                 "xy": xy_preview(data, cfg, profile, [m.get("name") for m in lay.modes]),
                 "column_defaults": {column: column_defaults(column) for column in data.columns
                                     if column != cfg["time_column"]},
-                "paper": paper(cfg, profile, target, [m.get("name") for m in lay.modes]),
+                "paper": sheet, "plot_defaults": insets.new_style(),
                 "extent": [data.time[0], data.time[-1]], "channels": channels,
                 "stale": source_status(current, profile, self.path.parent)["waveform_stale"],
                 "binding_errors": [i for i, name in enumerate(cfg["intervals"])
@@ -547,7 +577,7 @@ def plot_channels(data: Data, cfg: dict) -> list[dict]:
     return channels
 
 
-def legend(group: list, width: float, font_pt: float, *, force=False) -> tuple[list, float]:
+def legend(group: list, width: float, font_pt: float, *, force=False, row_cm=ROW_CM) -> tuple[list, float]:
     """Wrap whole colour keys above their shared axis, in printed cm."""
     if len(group) == 1 and not force:
         return [], 0
@@ -560,11 +590,12 @@ def legend(group: list, width: float, font_pt: float, *, force=False) -> tuple[l
             raise ValueError(f"同轴图例 {channel['label']} 过长，请缩短通道标签")
         if x and x + entry > width:
             x, row = 0., row + 1
-        items.append({"text": text, "color": channel["color"], "x": x, "row": row})
+        items.append({"text": text, "color": channel["color"], "x": x, "row": row,
+                      **({"line":channel["line"]} if "line" in channel else {})})
         x += entry + LEGEND_GAP_CM * 2
     height = (row + 1) * row_height
     for item in items:
-        item["at"] = [item.pop("x"), ROW_CM + height - (item.pop("row") + .5) * row_height]
+        item["at"] = [item.pop("x"), row_cm + height - (item.pop("row") + .5) * row_height]
     return items, height
 
 
@@ -584,13 +615,13 @@ def chart_profile(cfg: dict, profile: str, target="overview") -> str:
     return "ieee-single" if target == "overview" and cfg.get("arrange") == "side" else profile
 
 
-def chart_labels(cfg: dict, width: float, font_pt: float, names: list) -> list[dict]:
+def chart_labels(cfg: dict, width: float, font_pt: float, names: list, row_cm=ROW_CM) -> list[dict]:
     """Label anchors in paper cm, before manual offsets; both renderers use these."""
     left, right = cfg["window"]
     xs = [(t - left) / (right - left) * width for t in cfg["boundaries"]]
     texts = [f"$t_{{{i}}}$" for i in range(len(xs))]
     centres = spread(xs, [text_size(t, font_pt)[0] for t in texts], LABEL_GAP_CM)
-    labels = [{"key": f"t{i}", "at": [cx, ROW_CM + .02], "text": text}
+    labels = [{"key": f"t{i}", "at": [cx, row_cm + .02], "text": text}
               for i, (cx, text) in enumerate(zip(centres, texts))]
     if centres[-1] + text_size(texts[-1], font_pt)[0] / 2 > width + CHART_RIGHT_CM:
         # Dense commutations must not push labels off the paper. Group their
@@ -607,13 +638,13 @@ def chart_labels(cfg: dict, width: float, font_pt: float, names: list) -> list[d
                     break
                 first = groups.pop()[0]
             groups.append((first, centre, half, text))
-        labels = [{"key": f"t{first}", "at": [centre, ROW_CM + .02], "text": text}
+        labels = [{"key": f"t{first}", "at": [centre, row_cm + .02], "text": text}
                   for first, centre, _, text in groups]
     if cfg.get("slice_style", "shade") == "shade":
         for i, k in enumerate(mode_tags(cfg, names)):
             span = xs[i + 1] - xs[i]
             if k is not None and span >= MIN_TAG_CM:
-                labels.append({"key": f"mode{i}", "at": [(xs[i] + xs[i+1])/2, ROW_CM + .3],
+                labels.append({"key": f"mode{i}", "at": [(xs[i] + xs[i+1])/2, row_cm + .3],
                                "text": f"Mode {k}" if span >= FULL_TAG_CM else str(k)})
     return labels
 
@@ -625,19 +656,23 @@ def paper(cfg: dict, profile: str, target="overview", names=None, *, width_cm=No
     if width <= 0:
         raise ValueError("波形子图宽度不足以容纳坐标轴，请减少列数或增大纸面宽度")
     rows, offset = [], 0.
+    style = insets.style_of(cfg)
+    row_cm = style.get("row_cm", ROW_CM)
+    placed_legends = {i["channel"] for i in cfg.get("insets", []) if i["kind"] == "legend"}
     for group in axis_groups(cfg["channels"]):
-        keys, legend_height = legend(group, width, prof.font_pt)
+        keys, legend_height = ([], 0) if any(c["column"] in placed_legends for c in group) else legend(group, width, prof.font_pt, row_cm=row_cm)
         if rows:
-            offset += ROW_CM + ROW_GAP_CM + legend_height
+            offset += row_cm + ROW_GAP_CM + legend_height
         title = group[0] if len(group) == 1 else {**group[0], "label": "Amplitude"}
         rows.append({"columns": [c["column"] for c in group], "offset_cm": offset,
                      "legend": keys, "legend_cm": legend_height, "title": axis_title(title)})
     top = CHART_TOP_CM + rows[0]["legend_cm"]
-    height = offset + ROW_CM
-    labels = chart_labels(cfg, width, prof.font_pt, names or [])
+    height = offset + row_cm
+    labels = chart_labels(cfg, width, prof.font_pt, names or [], row_cm)
     for label in labels:
         label["at"][1] += rows[0]["legend_cm"]
-    return {"profile": prof.name, "width_cm": width, "row_cm": ROW_CM, "gap_cm": ROW_GAP_CM,
+    return {"profile": prof.name, "width_cm": width, "row_cm": row_cm, "gap_cm": ROW_GAP_CM,
+            "plot_style": style, "background": insets.tint(style) if style else "#ffffff", "grid": insets.grid_settings(cfg),
             "left_cm": CHART_LEFT_CM, "right_cm": CHART_RIGHT_CM,
             "top_cm": top, "bottom_cm": CHART_BOTTOM_CM, "rows": rows,
             "total_width_cm": width + CHART_LEFT_CM + CHART_RIGHT_CM,
@@ -710,7 +745,7 @@ def _notes_tex(notes: list, x, y, prof) -> list[str]:
     return out
 
 
-def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, width_cm=None) -> str:
+def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, width_cm=None, base_dir=None, mono=False) -> str:
     """``names`` is the table's mode order; with slice_style "shade" each
     interval gets a band and its "Mode k" tag, k as in the mode files."""
     prof = get_profile(profile)
@@ -721,9 +756,15 @@ def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, 
     origin = left if cfg.get("relative_time", False) else 0
     time_unit = r"$\mu$s" if cfg["display_unit"] == "us" else cfg["display_unit"]
     groups = axis_groups(plot_channels(data, cfg))
+    objects = insets.objects(data, cfg, sizes, [c for group in groups for c in group])
     rows = len(groups)
     bottom = sizes["rows"][-1]["offset_cm"]
     out = [r"\begin{tikzpicture}[x=1cm,y=1cm]" + "\n"]
+    if sizes["plot_style"].get("font") == "system":
+        out.append(insets.SYSTEM_FONTS)
+    elif any(has_wide(str(c.get(k, ""))) for c in cfg["channels"]+cfg.get("notes", [])+cfg.get("insets", [])
+             for k in ("text", "label", "unit")):
+        out.append(insets.CJK_FONTS)
     # Fix the chart width so individual figures and a composed sheet agree.
     out.append(rf"\path[use as bounding box] (-{CHART_LEFT_CM:g},-{bottom+CHART_BOTTOM_CM:g}) rectangle ({width+CHART_RIGHT_CM:g},{height+sizes['top_cm']:g});")
     x = lambda t: (t - left) / (right - left) * width
@@ -739,17 +780,25 @@ def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, 
         lo, hi = ax["range"]
         y = lambda v, lo=lo, hi=hi: (v - lo) / (hi - lo) * height
         out.append(rf"\begin{{scope}}[yshift=-{row_paper['offset_cm']:g}cm]")
+        if sizes["plot_style"]:
+            bg = ink_tikz(insets.tint(sizes["plot_style"], mono))
+            out.append(rf"\fill[fill={bg}] (0,0) rectangle ({width:g},{height:g});")
         for key in row_paper["legend"]:
             px, py = key["at"]
             colour = ink_tikz(key["color"])
-            out.append(rf"\draw[draw={colour},line width={prof.line_pt:g}pt] ({px:g},{py:g}) -- ({px+LEGEND_LINE_CM:g},{py:g});")
+            line = "," + insets.LINE_STYLES[key["line"]] if "line" in key else ""
+            out.append(rf"\draw[draw={colour}{line},line width={prof.line_pt:g}pt] ({px:g},{py:g}) -- ({px+LEGEND_LINE_CM:g},{py:g});")
             out.append(rf"\node[anchor=west,inner sep=1pt] at ({px+LEGEND_LINE_CM+LEGEND_GAP_CM:g},{py:g}) {{{key['text']}}};")
         if shade:
             # Every other interval, so neighbours stay apart in grey print.
             for i in range(0, len(marks) - 1, 2):
-                out.append(rf"\fill[black!7] ({x(marks[i]):.7f},0) rectangle ({x(marks[i+1]):.7f},{height:g});")
+                if sizes["plot_style"] and cfg["intervals"][i] is None:
+                    continue
+                shade_fill = "black,opacity=.07" if sizes["plot_style"] else "black!7"
+                out.append(rf"\fill[{shade_fill}] ({x(marks[i]):.7f},0) rectangle ({x(marks[i+1]):.7f},{height:g});")
+        out += insets.tex_grid(sizes["grid"], width, height, (x(t*factor+origin) for t in times),
+                               (y(v) for v in ax["ticks"]))
         for v, label in zip(ax["ticks"], ax["labels"]):
-            out.append(rf"\draw[gray!25,line width=.25pt] (0,{y(v):.6f}) -- ({width:g},{y(v):.6f});")
             out.append(rf"\node[anchor=east] at (-.1,{y(v):.6f}) {{{label}}};")
         out.append(rf"\node[rotate=90] at (-1.05,{height/2:g}) {{{row_paper['title']}}};")
         out.append(r"\begin{scope}" + rf"\clip (0,0) rectangle ({width:g},{height:g});")
@@ -764,7 +813,8 @@ def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, 
                     other_t, other_value = points[neighbour]
                     points[index] = [edge, value + (other_value - value) * (edge - t) / (other_t - t)]
             coords = " -- ".join(f"({x(t):.7f},{y(v):.7f})" for t, v in points)
-            out.append(rf"\draw[trace,line width={prof.line_pt:g}pt,line join=round] {coords};")
+            line = ","+insets.LINE_STYLES[channel["line"]] if "line" in channel else ""
+            out.append(rf"\draw[trace{line},line width={prof.line_pt:g}pt,line join=round] {coords};")
         out.append(r"\end{scope}")
         for t in marks:
             out.append(rf"\draw[gray,dashed,line width=.3pt] ({x(t):.7f},0) -- ({x(t):.7f},{height:g});")
@@ -781,6 +831,7 @@ def wave_tex(data: Data, cfg: dict, profile: str, names: list | None = None, *, 
             if row == rows - 1:
                 out.append(rf"\node[anchor=north] at ({tx:.7f},-.04) {{{tick_label(t, times)}}};")
         out += _notes_tex([n for n in notes if n["channel"] in row_paper["columns"]], x, y, prof)
+        out += insets.tex_row(objects, cfg, row_paper, sizes, ax, base_dir, mono)
         out.append(r"\end{scope}")
     title = r"Time $t-t_0$" if cfg.get("relative_time", False) else "Time"
     out.append(rf"\node[anchor=north] at ({width/2:g},-{bottom+.42:g}) {{{title} [{time_unit}]}};")
@@ -813,7 +864,7 @@ def export_waveforms(lay: Layout, store: WaveStore, out_dir: Path, stem: str,
     if include_modes and any(lay.modes[i].get("name") in cfg["intervals"] for i in provenance["stale_modes"]):
         raise ValueError("绑定的仿真模态已过期，请重新识别并核对区间绑定。")
     names = [m.get("name") for m in lay.modes]
-    chart = wave_tex(data, cfg, profile, names) if not xy_only else ''
+    chart = wave_tex(data, cfg, profile, names, base_dir=store.path.parent) if not xy_only else ''
     docs = {f"{stem}_waveforms": preamble(prof) + chart + "\n\\end{document}\n"} if not xy_only else {}
     if 'xy' in cfg:
         from .waveform_xy import tex as xy_tex
@@ -910,7 +961,7 @@ def _sliced(lay: Layout, data: Data, cfg: dict, prof, chart: str, names: list,
         # Chart and mode column are each one IEEE column wide; the rest of
         # the double column is the gutter between them.
         gap = prof.width_cm - 2 * cell_prof.width_cm
-        left = wave_tex(data, cfg, cell_prof.name, names)
+        left = wave_tex(data, cfg, cell_prof.name, names, base_dir=base_dir)
         right = f"\\\\[{MODE_GAP_PT}pt]\n".join(cells)
         body = (rf"\begin{{tabular}}{{@{{}}c@{{\hspace{{{gap:.3f}cm}}}}c@{{}}}}" + "\n"
                 + rf"\begin{{minipage}}[c]{{{cell_prof.width_cm:g}cm}}\centering {left}\end{{minipage}} &"

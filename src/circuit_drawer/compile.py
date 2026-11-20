@@ -22,8 +22,13 @@ def have_latex() -> bool:
 
 
 def _compile(tex_file: Path) -> Path:
-    executable = find_tool("pdflatex")
+    with tex_file.open(encoding="utf-8") as stream:
+        system_font = stream.readline().strip() == "% !TEX program = xelatex"
+    engine = "xelatex" if system_font else "pdflatex"
+    executable = find_tool(engine)
     if executable is None:
+        if system_font:
+            raise CompileError("宋体与 Times New Roman 出图需要 XeLaTeX、xeCJK 和这两款本机字体。可在绘图区字体中选择期刊默认。")
         raise CompileError("pdflatex not found; install TeX Live with circuitikz")
     run = subprocess.run([executable, "-interaction=nonstopmode", "-halt-on-error", tex_file.name],
                          cwd=tex_file.parent, env=latex_environment(executable), capture_output=True,
@@ -33,7 +38,7 @@ def _compile(tex_file: Path) -> Path:
         log = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else run.stdout
         lines = log.splitlines()
         errors = ["\n".join(lines[i:i + 6]) for i, line in enumerate(lines) if line.startswith("!")]
-        raise CompileError("pdflatex failed:\n" + "\n".join(errors[:3] or [(log + run.stderr)[-800:]]))
+        raise CompileError(engine + " failed:\n" + "\n".join(errors[:3] or [(log + run.stderr)[-800:]]))
     return tex_file.with_suffix(".pdf")
 
 
@@ -78,11 +83,16 @@ def _export_pdf(pdf: Path, out_dir: Path, stem: str,
 def build(tex: str, out_dir: Path, stem: str,
           formats: tuple[str, ...] = FORMATS, png_dpi: int = 600) -> dict[str, Path]:
     from .figure_images import unpack_tex
+    from .waveform_insets import print_fonts
+    tex = print_fonts(tex)
     tex, assets = unpack_tex(tex)
-    if "→" in tex:
-        # pdfLaTeX's text arrow requires a TS1 font outside the bundled subset.
-        tex = tex.replace(r"\begin{document}",
-                          r"\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}" "\n" r"\begin{document}", 1)
+    if not tex.startswith("% !TEX program = xelatex"):
+        # Use maths glyphs available in the offline pdfTeX bundle.
+        symbols = {"→": r"\rightarrow", "Ω": r"\Omega", "μ": r"\mu"}
+        declarations = [rf"\DeclareUnicodeCharacter{{{ord(symbol):04X}}}{{\ensuremath{{{command}}}}}"
+                        for symbol, command in symbols.items() if symbol in tex]
+        if declarations:
+            tex = tex.replace(r"\begin{document}", "\n".join([*declarations, r"\begin{document}"]), 1)
     out_dir.mkdir(parents=True, exist_ok=True)
     made: dict[str, Path] = {}
     if "tex" in formats:

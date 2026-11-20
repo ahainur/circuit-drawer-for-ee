@@ -201,7 +201,7 @@ class WaveNoteWorkflow:
         return Evaluation(NoteProposal(notes), [])
 
     def unreadable(self, exc):
-        return f'标注校验失败，请按错误修正并返回完整 notes JSON。\n{exc}\n位置仅使用候选编号，文字使用英文或成对 $ 的数学记号。'
+        return f'标注校验失败，请按错误修正并返回完整 notes JSON。\n{exc}\n位置仅使用候选编号，文字可用中英文或成对 $ 的数学记号。'
 
     def feedback(self, result, best, improved, previous):
         return self.unreadable('\n'.join(result.errors))

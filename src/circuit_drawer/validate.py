@@ -8,6 +8,7 @@ exactly those entries.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -43,12 +44,22 @@ class Issue:
 
 
 @dataclass
+class LabelIssue(Issue):
+    # Label rectangles in drawing coordinates, for the same paper/profile as this report.
+    label_boxes: list[list[float]] = field(default_factory=list)
+
+
+@dataclass
 class Report:
     scale: Scale
     issues: list[Issue] = field(default_factory=list)
     nets: dict[str, int] = field(default_factory=dict)   # "El.pin" -> net id
     wire_nets: list[int] = field(default_factory=list)
     junctions: list[Point] = field(default_factory=list)  # in layout units
+
+    # The ordered stages are also used to explain a partial check in the editor.
+    checked_stages: list[str] = field(default_factory=list)
+    issue_stages: dict[str, str] = field(default_factory=dict)
 
     @property
     def errors(self) -> list[Issue]:
@@ -61,7 +72,8 @@ class Report:
     def to_dict(self) -> dict:
         return {"ok": self.ok,
                 "scale_cm_per_unit": [round(self.scale.x, 4), round(self.scale.y, 4)],
-                "issues": [vars(i) for i in self.issues]}
+                "issues": [vars(i) for i in self.issues],
+                "checked_stages": self.checked_stages, "issue_stages": self.issue_stages}
 
 
 @dataclass
@@ -165,9 +177,14 @@ def footprints(layout: Layout, s: Scale, prof: Profile) -> dict[str, Footprint]:
     return {el.id: footprint(el, s, prof) for el in layout.elements}
 
 
-def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Report:
+def validate(layout: Layout, s: Scale, prof: Profile, *, connections=(), reserve_label_space=False) -> Report:
     rep = Report(scale=s)
-    add = rep.issues.append
+    rep.checked_stages.append("geometry")
+
+    def add(issue):
+        rep.issue_stages[issue.code] = rep.checked_stages[-1]
+        rep.issues.append(issue)
+
     from .control_view import problems as control_view_problems
     for message in control_view_problems(layout):
         add(Issue("bad-control-view", message))
@@ -260,10 +277,17 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                           f"(or an exact 45-degree one, |dx| = |dy|)"))
             elif max(dx, dy) < min_two - EPS:
                 k = s.x if dx > dy else s.y
-                add(Issue("too-short", f"{el.id}: pin distance {max(dx, dy):.2f} cm "
-                          f"< {min_two:.2f} cm needed for the symbol and its leads; "
-                          f"move the pins apart by at least "
-                          f"{(min_two - max(dx, dy)) / k:.2f} units"))
+                distance = max(dx, dy)
+                # A shortfall below half a printed stroke still leaves both leads visible.
+                ink_tolerance = min(MIN_LEAD, prof.line_pt * 2.54 / 72.27 / 2)
+                if min_two - distance <= ink_tolerance:
+                    add(Issue("short-lead-margin", f"{el.id}: lead margin is short by "
+                              f"{(min_two - distance) * 10:.3f} mm on paper", "warning"))
+                else:
+                    move = math.ceil((min_two - distance) / k * 100) / 100
+                    add(Issue("too-short", f"{el.id}: pin distance {distance:.4f} cm "
+                              f"< {min_two:.4f} cm needed for the symbol and its leads; "
+                              f"move the pins apart by at least {move:.2f} units"))
         elif el.kind in SWITCHES:
             t, b = (P[p] for p in PIN_NAMES[el.kind])
             if "g" in P:
@@ -297,10 +321,13 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
             hi = max(WINDING_GAP[1], lo)
             if abs(P["p2"][0] - xp) > EPS or any(abs(P[k][0] - xs) > EPS for k in sec):
                 add(Issue("not-orthogonal", f"{el.id}: windings must be parallel and horizontal or vertical"))
-            elif not lo - EPS <= xs - xp <= hi + EPS:
+            elif xs - xp < lo - EPS:
                 add(Issue("winding-gap", f"{el.id}: secondary must sit "
                           f"{lo / across:.2f}-{hi / across:.2f} units from the primary "
                           f"along its local right axis (now {(xs - xp) / across:.2f})"))
+            elif xs - xp > hi + EPS:
+                add(Issue("winding-wide", f"{el.id}: winding spacing on paper is {xs - xp:.3f} cm "
+                          f"(recommended up to {hi:.3f} cm)", "warning"))
             coils = [("p1", "p2")] + list(zip(sec, sec[1:]))
             min_two = min_len("L", length)
             for u, v in coils:
@@ -370,6 +397,7 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
     if rep.errors:
         return rep
 
+    rep.checked_stages.append("connections")
     # ---- 3. symbol bodies -------------------------------------------------
     bodies = [(el.id, b) for el in layout.elements for b in fps[el.id].bodies]
     bodies += [(f"wave of {eid}", fp.extra["source_wave"]["box"])
@@ -564,6 +592,7 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                 add(Issue("netlist-missing", f"{ref} is drawn but not declared in "
                           f"the netlist", "warning"))
 
+    rep.checked_stages.append("labels")
     # ---- 7. regions and callouts ------------------------------------------
     regions, callouts = safe_regions(layout, s, prof)
     _check_regions(regions, callouts, bodies, s, add)
@@ -574,8 +603,16 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
 
     # ---- 8. text --------------------------------------------------------
     texts: list[tuple[str, Box, float]] = []
+    ink_bodies = {eid: fp.extra["ink_body"] for eid, fp in fps.items() if "ink_body" in fp.extra}
+
+    def label_issue(code, message, *boxes):
+        marks = [[*unscaled((b.x0, b.y0), s), *unscaled((b.x1, b.y1), s)] for b in boxes]
+        add(LabelIssue(code, message, "warning", marks))
+
     for el in layout.elements:
-        texts += [(f"label of {el.id}", b, text_clearance(el.opts.get("label_size"), prof)) for b in fps[el.id].labels]
+        fp = fps[el.id]
+        labels = [fp.extra["ink_label"]] if "ink_label" in fp.extra and not reserve_label_space else fp.labels
+        texts += [(f"label of {el.id}", b, text_clearance(el.opts.get("label_size"), prof)) for b in labels]
     for r in regions:
         if (box := region_label_box(r, s, prof)) is not None:
             texts.append((f"label of {r.name}", box, text_clearance(r.size, prof)))
@@ -614,12 +651,17 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                           "move nearby elements/text or shorten the network name in the editor"))
     for name, box, clearance in texts:
         for eid, b in bodies:
-            if box.overlaps(b, clearance) and not name.endswith(f"of {eid}"):
-                add(Issue("text-on-symbol", f"{name} overlaps the symbol of {eid}"))
+            target = b if reserve_label_space else ink_bodies.get(eid, b)
+            if name.endswith(f"of {eid}") or not box.overlaps(target, clearance):
+                continue
+            if box.overlaps(target):
+                label_issue("text-on-symbol", f"{name} overlaps the symbol of {eid}", box)
+            else:
+                label_issue("text-clearance", f"{name} is close to the symbol of {eid}", box)
         for g in segs:
             if box.hits_segment(g.p, g.q):
-                add(Issue("text-on-line", f"{name} is crossed by {g.owner} "
-                          f"{_fmt(g.p, s)} -> {_fmt(g.q, s)}"))
+                label_issue("text-on-line", f"{name} is crossed by {g.owner} "
+                            f"{_fmt(g.p, s)} -> {_fmt(g.q, s)}", box)
         for b in blocks:
             if name != f"text of {b.name}" and box.overlaps(block_rect(b, s)):
                 add(Issue("text-on-block", f"{name} overlaps {b.name}; move the text out of the box"))
@@ -629,8 +671,10 @@ def validate(layout: Layout, s: Scale, prof: Profile, *, connections=()) -> Repo
                                    if o not in allowed and box.hits_segment(p, q) and name != f"label of {o}"):
             add(Issue("text-on-callout", f"{name} is covered by {owner}"))
     for (na, ba, ca), (nb, bb, cb) in combinations(texts, 2):
-        if ba.overlaps(bb, max(ca, cb)):
-            add(Issue("text-overlap", f"{na} overlaps {nb}"))
+        if ba.overlaps(bb):
+            label_issue("text-overlap", f"{na} overlaps {nb}", ba, bb)
+        elif ba.overlaps(bb, max(ca, cb)):
+            label_issue("text-clearance", f"{na} is close to {nb}", ba, bb)
 
     return rep
 
@@ -903,7 +947,11 @@ def fit_scale(layout: Layout, prof: Profile, *, connections=()) -> Scale:
         if x >= lo - EPS:
             break
         candidate = at(x)
-        if validate(layout, candidate, prof, connections=connections).ok:
+        # Keep the roomier original fit when space is available. A user-selected
+        # paper scale only needs the actual drawing check.
+        trial = validate(layout, candidate, prof, connections=connections, reserve_label_space=True)
+        if trial.ok and not any(isinstance(i, LabelIssue) or i.code in ("short-lead-margin", "winding-wide")
+                                for i in trial.issues):
             return candidate
     return at(lo)
 
@@ -960,6 +1008,13 @@ def check_with_assembly(layout: Layout, prof: Profile, scale: Scale | None = Non
         prof = paper_profile(prof, layout.extra)
     except ValueError as exc:
         return Report(scale or Scale(1, 1), [Issue("bad-figure", str(exc))]), None
+    waveform = layout.extra.get("waveform")
+    if isinstance(waveform, dict) and {"insets", "plot_style", "grid"}.intersection(waveform):
+        from .waveform_insets import validate as check_insets
+        try:
+            check_insets(waveform)
+        except ValueError as exc:
+            return Report(scale or Scale(1, 1), [Issue("bad-waveform-inset", str(exc))]), None
     try:
         requested = drawing_scale(layout)
     except ValueError as exc:

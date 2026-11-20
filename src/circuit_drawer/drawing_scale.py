@@ -33,6 +33,19 @@ def width_issue(layout, scale, profile):
     return None
 
 
+def scale_point(point, anchor, factor):
+    """Use the editor wire grid's Math.round convention, including negative ties."""
+    result = []
+    for value, origin in zip(point, anchor):
+        ticks = (origin + (value - origin) * factor) * 10000
+        if not math.isfinite(ticks):
+            raise ValueError("缩放后的坐标超出允许范围")
+        lower = math.floor(ticks)
+        nearest = lower + 1 if ticks - lower >= .5 else lower
+        result.append(nearest / 10000)
+    return result
+
+
 def transform(source, factor, anchor, profile, *, text=False):
     """Scale one flat source drawing; callers choose the selection/instance.
 
@@ -51,7 +64,7 @@ def transform(source, factor, anchor, profile, *, text=False):
     raw = deepcopy(source.to_dict())
 
     def point(p):
-        return [round(c + (v-c)*factor, 4) for v,c in zip(p,anchor)]
+        return scale_point(p, anchor, factor)
 
     def bounded(value, bounds, name):
         result = round(value*factor, 8)

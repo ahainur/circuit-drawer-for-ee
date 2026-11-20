@@ -12,6 +12,7 @@ POPPLER_OFFLINE_FLAGS = ("--miktex-disable-installer", "--miktex-disable-mainten
 
 _TOOLS = {
     "pdflatex": ("tex/bin/windows", ("pdflatex",)),
+    "xelatex": ("tex/bin/windows", ("xelatex",)),
     "pdftocairo": ("poppler/bin", ("pdftocairo",)),
     "pdffonts": ("poppler/bin", ("pdffonts",)),
     "pdfinfo": ("poppler/bin", ("pdfinfo",)),

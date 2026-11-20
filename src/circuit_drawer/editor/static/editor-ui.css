@@ -149,8 +149,14 @@ main { grid-template-columns: 240px minmax(200px, 1fr) 304px; }
 #spiceWorkspace [hidden] {display:none!important}
 #spiceWorkspace .spice-component {border:0;padding-top:0}
 .spice-primary-actions {position:sticky;top:0;z-index:2;flex-wrap:wrap;padding:5px 0;background:var(--panel,Canvas)}
+.spice-primary-actions > div {display:flex;flex-wrap:wrap;gap:4px}
+.spice-primary-actions > div + div {border-inline-start:1px solid var(--line);padding-inline-start:8px}
 @media(max-width:680px) {
+  .spice-primary-actions {align-items:flex-start;gap:4px}
+  .spice-primary-actions > div + div {width:100%;border:0;padding:0}
   #spiceWorkspace {grid-template-columns:minmax(0,1fr)}
   #spiceListDivider {display:none}
   #spiceDeviceList {height:78px;min-height:0}
 }
+
+#issueCount.advisory { color:#765509; background:#fff2c4; }

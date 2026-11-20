@@ -105,7 +105,8 @@
       2.5
      ]
     },
-    "label": "$C_{rp}$"
+    "label": "$C_{rp}$",
+    "opts": {"label_offset": [0.1, 0]}
    },
    {
     "id": "Lrp",

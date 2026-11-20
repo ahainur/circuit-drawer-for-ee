@@ -3,10 +3,6 @@ body:has(#wavePanel:not([hidden])) { grid-template-rows: auto minmax(220px,1fr) 
 #wavePanel[hidden] { display:none; }
 #wavePanel.wave-publication { position:fixed; inset:55px 8px 30px; height:auto; min-height:0; z-index:30; border:1px solid #999; box-shadow:0 3px 12px #0003; }
 body.figure-open #wavePanel:not(.wave-publication) { display:none; }
-@media(max-width:650px) {
-  #wavePanel.wave-publication .wave-body { grid-template-columns:minmax(0,1fr); overflow:auto; }
-  #wavePanel.wave-publication .wave-chart-wrap { min-height:250px; }
-}
 .wave-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid #ddd; }
 .wave-toolbar strong { margin-right:auto; }
 .wave-body { display:grid; grid-template-columns:minmax(300px,1fr) 350px; min-height:0; flex:1; }
@@ -45,3 +41,50 @@ body.figure-open #wavePanel:not(.wave-publication) { display:none; }
 #waveAIChart { display:block; margin:auto; background:white; font-family:"Times New Roman",serif; pointer-events:none; }
 #waveAIState { white-space:pre-line; }
 #waveAIState > span { display:block; }
+#waveInsertMenu { padding:0 12px; }
+#waveInsertMenu[hidden] { display:none; }
+#waveChart { font-family:"Times New Roman",SimSun,"宋体",serif; }
+#waveChart .wave-inset { cursor:grab; touch-action:none; }
+#waveChart .wave-inset .glyph { stroke:currentColor; stroke-width:.022; }
+#waveChart .wave-inset [data-inset-resize] { cursor:nwse-resize; }
+#waveChart.wave-place, #waveChart.wave-place .wave-inset { cursor:crosshair; }
+#waveTopologyPicker { width:min(620px,90vw); }
+#waveTopologyPicker header { display:flex; align-items:center; justify-content:space-between; }
+#waveTopologyCrop { display:block; width:100%; height:clamp(150px,32vh,360px); background:white; touch-action:none; cursor:crosshair; }
+#systemSymbolLibrary.wave-symbol-picker { position:fixed; z-index:110; inset:12vh 1rem auto auto; width:min(330px,80vw); max-height:58vh; margin:0; overflow:auto; }
+#waveArtSelection { max-width:100%; }
+.export-row label:has(> #waveArrange) { display:grid; gap:3px; min-width:0; max-width:100%; }
+#waveArrange { min-width:0; max-width:100%; }
+.wave-command-groups { display:flex; flex:1 1 auto; flex-wrap:wrap; align-items:center; gap:4px 10px; }
+.wave-command-groups > span { display:inline-flex; align-items:center; gap:4px; }
+.wave-command-groups > span + span { padding-inline-start:8px; border-inline-start:1px solid var(--line); }
+.wave-sidebar { min-width:0; }
+.wave-group { min-width:0; margin:12px 0 7px; padding:5px 0 0; border:0; border-top:1px solid var(--line); }
+.wave-group > legend { padding:0 5px 0 0; font-weight:600; }
+.wave-group > legend .help-tip { vertical-align:middle; }
+.wave-prop-grid { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; }
+.wave-prop-grid > *, .wave-prop-grid select { min-width:0; max-width:100%; }
+.wave-object-choice { display:grid; grid-template-columns:1fr auto; align-items:center; gap:3px; }
+.wave-object-choice select, .wave-wide-field, .wave-font-field, .wave-checks { grid-column:1/-1; }
+.wave-font-field select { margin-top:3px; width:100%; }
+.wave-checks { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; }
+.wave-prop-grid .wave-check { display:inline-flex; flex-direction:row; align-items:center; align-self:center; gap:5px; }
+.wave-prop-grid .wave-check input { width:auto; margin:0; flex:none; }
+.wave-disclosure { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:3px; margin-top:10px; }
+.wave-disclosure > details:first-child { min-width:0; }
+.wave-channel { grid-template-columns:20px minmax(0,1fr) minmax(40px,65px) 35px; }
+.wave-channel > label:has([data-field="line"]) { grid-column:2/-1; }
+@media(max-width:650px) {
+  .wave-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px; padding:4px 8px; }
+  .wave-toolbar > strong, #waveClose { grid-row:1; }
+  #waveClose { grid-column:2; }
+  .wave-command-groups { grid-column:1/-1; grid-row:2; flex-wrap:nowrap; overflow-x:auto; padding:2px 0 4px; }
+  .wave-command-groups > span { flex:none; white-space:nowrap; }
+  .wave-paper-toolbar { gap:3px 8px; padding:3px 8px; }
+  #wavePanel:not([hidden]) {position:fixed;inset:4px;z-index:35;height:auto;min-height:0;}
+  #wavePanel .wave-body {display:block;overflow:auto;}
+  #wavePanel .wave-sidebar {overflow:visible;border-left:0;}
+  #wavePanel .wave-chart-wrap {min-height:0;padding:6px;}
+  #waveProperties .wave-prop-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+  #wavePanel .wave-tools {flex-wrap:wrap;}
+}

@@ -193,6 +193,10 @@ body.agent-open .agent-inspector {padding-left:11px!important}
 .agent .composer>.row {flex-shrink:0}
 .agent #agentInput {display:block;height:var(--agent-description-height,90px);min-height:60px;resize:none;overflow:auto}
 .agent #agentRefs[open] {height:var(--agent-reference-height,62px);overflow:auto}
+.agent-reference-options {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:0 4px}
+.agent-reference-options > .help-tip {grid-column:2;grid-row:1}
+.agent-reference-options > [data-panel-size] {grid-column:1/-1;grid-row:2}
+.agent-reference-options:has(> #agentRefs[hidden]) {display:none}
 .agent #agentRefs:not([open])+[data-panel-size=reference],
 .agent [data-content][hidden]+[data-panel-size=library],
 [data-panel-size=results]:has(+ #agentResults[hidden]) {display:none}
@@ -215,3 +219,11 @@ body.agent-open .agent-inspector {padding-left:11px!important}
   body.agent-open .agent-inspector>[data-panel-size=dock] {display:none}
   .agent .results-grid {grid-template-columns:minmax(0,1fr)}
 }
+
+.agent-draft-bar { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.4rem; background:var(--panel,#f4f2e8); }
+.agent-draft-bar span:first-of-type {flex:1 1 15rem;}
+#agentDraftReturn:not([hidden]) {display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;}
+.agent .review-issues { list-style:none; margin:.4rem 0; padding:0; }
+.agent .review-issues li { border-inline-start:3px solid #a65423; padding:.3rem .5rem; margin:.35rem 0; overflow-wrap:anywhere;}
+.agent .review-issues li.review-warning {border-color:#9a791d;}
+.agent .review-paper { margin:.5rem 0; }

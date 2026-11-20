@@ -5,6 +5,9 @@ from http.server import ThreadingHTTPServer
 
 
 class LocalServer(ThreadingHTTPServer):
+    # Edge can connect for several scripts and styles at once when a new editor opens.
+    # Let Windows queue that burst while the serving thread starts its next handler.
+    request_queue_size = socket.SOMAXCONN
     # On Windows SO_REUSEADDR can bind a second live server to the same port.
     # Exclusive binding makes a port clash an error instead of a silent second editor.
     allow_reuse_address = os.name != "nt"

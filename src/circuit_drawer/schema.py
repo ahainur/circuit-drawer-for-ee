@@ -187,7 +187,13 @@ def figure_field_reference() -> str:
     from .figure_style import STYLE_LIMITS
     from .figure_composition import COMPOSITION_KEYS, PANEL_KEYS, PRESETS, KINDS
     from .figure_images import FIELDS
+    from . import waveform_insets
     lines = ["Saved figure paper settings (preserve on ordinary drawing edits):"]
+    lines += [f"waveform.insets: optional placed {', '.join(waveform_insets.KINDS)}; each id has a CSV channel and at [0..1,0..1] within that axis. "
+              "The optional border boolean defaults to true. With border off, the fill can still be white or transparent. "
+              "width_cm is the printed media width, probe_s binds to source time, crop is a normalized top-left snapshot rectangle. "
+              f"waveform.plot_style: {', '.join(waveform_insets.DEFAULT_STYLE)}. Preserve these settings and project asset hashes.",
+              "waveform.grid: optional horizontal and vertical major grid line styles (none, solid or dashed) for time and XY plots."]
     lines += [f"figure.{key}: finite number {lo}..{hi}" for key, (lo, hi) in STYLE_LIMITS.items()]
     lines += [f"regions and rectangular blocks {f.name}: {f.doc}" for f in box_appearance_fields()]
     lines += [f"figure.compositions: saved project source references; fields {sorted(COMPOSITION_KEYS)}",

@@ -131,7 +131,7 @@ Drawing, editing, checking, exporting TeX and exporting simulation models need n
 
 2、Open **Agent → Prompt library**, choose **Blank canvas** and search for **Boost**. Choose **Drawing only** to keep unspecified component values symbolic, or **Example simulation** to match the circuit connections to an example operating point. Click **Fill requirement (editable)**, edit the task, then click **Start**.
 
-3、For a simulation, adopt the circuit drawing first. The next review shows current values, proposed values and assumptions. Confirm the operating point to run ngspice. **View results** shows output voltage, inductor current and PWM. Save the drawing to keep its parameters. Run files are in `agent-output` beside the drawing. [Agent instructions](docs/AGENT_MCP.md#四内置-agent-的使用)
+3、For a simulation, adopt the circuit drawing first (If topology cannot be adopted, first troubleshoot the errors in the initial topology and the current candidate graph). The next review shows current values, proposed values and assumptions. Confirm the operating point to run ngspice. **View results** shows output voltage, inductor current and PWM. Save the drawing to keep its parameters. Run files are in `agent-output` beside the drawing. [Agent instructions](docs/AGENT_MCP.md#四内置-agent-的使用)
 
 4、To try a second load, open **Simulation → SPICE simulation…**. Search for `RL` on the left and change its resistance from 30 Ω to `12`. Search for `S1` and change the switching frequency from 50 kHz to `40k`. Check the operating point and channels at the top, select a new output folder, then run or rerun to compare the waveforms. You can also start directly with the [editable Boost circuit](examples/spice/boost.json).
 
